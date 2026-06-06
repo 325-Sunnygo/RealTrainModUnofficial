@@ -486,6 +486,10 @@ public class VehiclePackLoader {
                 singleTrain
             );
             definition.setServerScriptPath(serverScriptPath);
+            definition.setPantographs(
+                parsePantographs(obj, trainModel, "pantograph_front"),
+                parsePantographs(obj, trainModel, "pantograph_back")
+            );
             definition.setJsonRunningSounds(
                 soundStop,
                 soundStartAcceleration,
@@ -824,6 +828,55 @@ public class VehiclePackLoader {
             ));
         }
         return values;
+    }
+
+    private static List<VehicleDefinition.PantographPart> parsePantographs(JsonObject root, JsonObject trainModel, String key) {
+        JsonArray array = null;
+        if (trainModel != null && trainModel.has(key) && trainModel.get(key).isJsonArray()) {
+            array = trainModel.getAsJsonArray(key);
+        } else if (root != null && root.has(key) && root.get(key).isJsonArray()) {
+            array = root.getAsJsonArray(key);
+        }
+        if (array == null) {
+            return List.of();
+        }
+        List<VehicleDefinition.PantographPart> parts = new ArrayList<>();
+        for (JsonElement element : array) {
+            if (!element.isJsonObject()) continue;
+            VehicleDefinition.PantographPart part = parsePantographPart(element.getAsJsonObject());
+            if (part != null) parts.add(part);
+        }
+        return parts;
+    }
+
+    private static VehicleDefinition.PantographPart parsePantographPart(JsonObject obj) {
+        List<String> objects = parseStringList(obj, null, "objects");
+        float[] pos = parseFloatArray(obj.has("pos") ? obj.getAsJsonArray("pos") : null, 3);
+        if (pos.length < 3) {
+            pos = new float[]{0.0F, 0.0F, 0.0F};
+        }
+        // transform: 各要素は [角度, ax, ay, az](回転) か [dx, dy, dz](平行移動)。
+        List<float[]> transforms = new ArrayList<>();
+        if (obj.has("transform") && obj.get("transform").isJsonArray()) {
+            for (JsonElement t : obj.getAsJsonArray("transform")) {
+                if (!t.isJsonArray()) continue;
+                JsonArray ta = t.getAsJsonArray();
+                float[] vals = new float[ta.size()];
+                for (int i = 0; i < ta.size(); i++) {
+                    try { vals[i] = ta.get(i).getAsFloat(); } catch (Exception ignored) {}
+                }
+                if (vals.length == 3 || vals.length == 4) transforms.add(vals);
+            }
+        }
+        List<VehicleDefinition.PantographPart> childParts = new ArrayList<>();
+        if (obj.has("childParts") && obj.get("childParts").isJsonArray()) {
+            for (JsonElement c : obj.getAsJsonArray("childParts")) {
+                if (!c.isJsonObject()) continue;
+                VehicleDefinition.PantographPart child = parsePantographPart(c.getAsJsonObject());
+                if (child != null) childParts.add(child);
+            }
+        }
+        return new VehicleDefinition.PantographPart(objects, pos, transforms.toArray(float[][]::new), childParts);
     }
 
     private static List<VehicleDefinition.LightDefinition> parseLights(JsonObject root, JsonObject trainModel, String key) {

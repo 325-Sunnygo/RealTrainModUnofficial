@@ -30,6 +30,14 @@ public class VehicleDefinition {
     public record LightDefinition(byte type, int color, Vec3 position, float radius, boolean reverse) {
     }
 
+    /**
+     * 本家RTM pantograph_front/back の階層パーツ定義。各パーツは pos へ平行移動後、
+     * transforms(各要素 = [角度, axisX, axisY, axisZ] か [dx, dy, dz]) を move 倍して適用し、
+     * childParts へ親の行列を継承する。move = pantograph_F/40 (0=上昇/モデル姿勢, 1=下降/折畳)。
+     */
+    public record PantographPart(List<String> objects, float[] pos, float[][] transforms, List<PantographPart> childParts) {
+    }
+
     private final String id;
     private final String displayName;
     private final String packName;
@@ -47,6 +55,10 @@ public class VehicleDefinition {
     private final String soundScriptPath;
     // SuperRailBuilder3 などのサーバ側スクリプト（オプション。後付け設定）
     private String serverScriptPath = "";
+    // 本家RTM pantograph_front/back（巨大コンストラクタを避けるため後付け設定）。
+    private List<PantographPart> pantographFront = List.of();
+    private List<PantographPart> pantographBack = List.of();
+    private java.util.Set<String> pantographGroupNames = java.util.Set.of();
     private final String vehicleType;
     private final String doorType;
     private final float trainDistance;
@@ -428,6 +440,40 @@ public class VehicleDefinition {
 
     public List<RollsignDefinition> getRollsigns() {
         return rollsigns;
+    }
+
+    public List<PantographPart> getPantographFront() {
+        return pantographFront;
+    }
+
+    public List<PantographPart> getPantographBack() {
+        return pantographBack;
+    }
+
+    /** pantograph_front/back に含まれる全グループ名(正規化済み小文字)。静止描画の除外判定に使う。 */
+    public java.util.Set<String> getPantographGroupNames() {
+        return pantographGroupNames;
+    }
+
+    public void setPantographs(List<PantographPart> front, List<PantographPart> back) {
+        this.pantographFront = front == null ? List.of() : List.copyOf(front);
+        this.pantographBack = back == null ? List.of() : List.copyOf(back);
+        java.util.Set<String> names = new java.util.HashSet<>();
+        collectPantographGroupNames(this.pantographFront, names);
+        collectPantographGroupNames(this.pantographBack, names);
+        this.pantographGroupNames = java.util.Set.copyOf(names);
+    }
+
+    private static void collectPantographGroupNames(List<PantographPart> parts, java.util.Set<String> out) {
+        if (parts == null) return;
+        for (PantographPart p : parts) {
+            if (p.objects() != null) {
+                for (String o : p.objects()) {
+                    if (o != null && !o.isBlank()) out.add(o.trim().toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+            collectPantographGroupNames(p.childParts(), out);
+        }
     }
 
     public List<LightDefinition> getHeadLights() {

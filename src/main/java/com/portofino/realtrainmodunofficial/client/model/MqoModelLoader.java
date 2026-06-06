@@ -89,6 +89,18 @@ public final class MqoModelLoader {
     private static final Set<String> MISSING_SCRIPT_WARNINGS = ConcurrentHashMap.newKeySet();
     private static final Set<String> SHADER_MOD_IDS = Set.of("iris", "oculus");
     private static volatile List<Path> sharedPackCandidates;
+
+    /**
+     * レール(ブロックエンティティ)描画用 cutout モード。クライアント描画スレッドで同期的に
+     * set→render→clear するため static で安全。true の間、半透明バッチも「元テクスチャ」で
+     * cutout(不透明・深度書き込み)描画する。レールは本来不透明なので、車体の半透明窓ガラス
+     * (entityTranslucent・先に深度を書く)に奥のレールが遮蔽されて消えるのを防ぐ。
+     */
+    private static boolean railCutoutMode = false;
+    public static void setRailCutoutMode(boolean enabled) { railCutoutMode = enabled; }
+    // [診断] BakedFilter ログを車両ID単位で1回だけ出すための記録。
+    private static final Set<String> BAKED_FILTER_LOGGED = ConcurrentHashMap.newKeySet();
+    private static final Set<String> LIGHT_BATCH_DIAG = ConcurrentHashMap.newKeySet();
     private static ResourceLocation fallbackWhite;
     private static long modelCacheBytes;
     private static int bakedFilterLogCount = 0;
@@ -3532,6 +3544,19 @@ public final class MqoModelLoader {
                     int scriptPass = scriptRenderer != null ? scriptRenderer.getCurrentPass() : 0;
                     boolean scriptTexture = scriptRenderer != null && scriptRenderer.getBoundTexture() != null;
                     ResourceLocation emissiveTexture = !scriptTexture && scriptPass >= 2 ? batch.emissiveTextureForPass(scriptPass) : null;
+                    // [診断] ヘッドライトバッチの発光描画状態。pass2で emissiveTexture が無いと continue で
+                    // スキップされ発光しない=消灯に見える。
+                    if (batch.groupNameLower != null
+                        && (batch.groupNameLower.contains("light_f") || batch.groupNameLower.contains("light_r"))) {
+                        String lk = "rs|" + batch.groupNameLower + "|p" + scriptPass + "|tl" + batch.translucent;
+                        if (LIGHT_BATCH_DIAG.add(lk)) {
+                            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+                                "[LightBatchDiag] group={} pass={} translucent={} emissiveTex={} baseTex={} willSkip={}",
+                                batch.groupNameLower, scriptPass, batch.translucent,
+                                emissiveTexture, batch.texture,
+                                (scriptPass >= 2 && !scriptTexture && emissiveTexture == null));
+                        }
+                    }
                     if (scriptPass >= 2 && !scriptTexture && emissiveTexture == null) {
                         continue;
                     }
@@ -3540,7 +3565,11 @@ public final class MqoModelLoader {
                         ? scriptRenderer.getBoundTexture()
                         : (emissiveTexture != null ? emissiveTexture : batch.texture);
                     if (!scriptTexture && emissiveTexture == null) {
-                        texture = translucent ? batch.windowTexture : batch.opaqueTexture;
+                        // レール cutout モードでは半透明分割(opaque/window)を使わず元テクスチャをそのまま
+                        // 使い、cutout で全部描く。鋼材が opaqueTexture で消されて窓パスにしか出ず、
+                        // それが車体ガラスに遮蔽される問題を回避する。
+                        texture = railCutoutMode ? batch.texture
+                            : (translucent ? batch.windowTexture : batch.opaqueTexture);
                     }
 
                     boolean forceCutout;
@@ -3567,8 +3596,9 @@ public final class MqoModelLoader {
                             || shouldForceShaderSafeCutout(entity, batch, lowerGroupName, false);
                         depthBias = batch.cachedDepthBiasNoScriptTex;
                     }
-                    boolean needsBlend = (translucent && batch.translucent)
-                        || (!forceCutout && (scriptTexture || scriptPassNow >= 2));
+                    boolean needsBlend = !railCutoutMode
+                        && ((translucent && batch.translucent)
+                            || (!forceCutout && (scriptTexture || scriptPassNow >= 2)));
 
                     int scriptRed   = scriptRenderer != null ? scriptRenderer.getColorRed255()   : 255;
                     int scriptGreen = scriptRenderer != null ? scriptRenderer.getColorGreen255() : 255;
@@ -3698,6 +3728,10 @@ public final class MqoModelLoader {
                         Matrix4f mat = pose.pose();
                         Matrix3f norm = pose.normal();
                         float[] normalOut = new float[3];
+                        // 発光テクスチャ(emissive pass=2 の前照灯/標識灯/方向幕など)はフルブライトで描く。
+                        // これをしないと周囲光(packedLight)依存になり、夜/暗所で点灯ライトが光らず
+                        // 消灯と区別がつかない(=「常に消灯」に見える)。本家RTMの Light マテリアル相当。
+                        int effectiveLight = (!scriptTexture && emissiveTexture != null) ? 0x00F000F0 : packedLight;
                         for (int i = 0; i < batch.vertexCount; i++) {
                             int o = i * 8;
                             float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
@@ -3719,7 +3753,7 @@ public final class MqoModelLoader {
                                 .setColor(scriptRed, scriptGreen, scriptBlue, scriptAlpha)
                                 .setUv(u, v)
                                 .setOverlay(overlay)
-                                .setLight(packedLight)
+                                .setLight(effectiveLight)
                                 .setNormal(normalOut[0], normalOut[1], normalOut[2]);
                         }
                     }
@@ -3787,13 +3821,26 @@ public final class MqoModelLoader {
                 // baked render filter 組み立て (scriptedOpaqueGroups を 使う前にクリアしない)
                 GroupPredicate opaqueFilter = groupFilter;
                 GroupPredicate translucentFilter = groupFilter;
-                if (hasScript && scriptRenderer != null && bakedFilterLogCount < 3) {
-                    bakedFilterLogCount++;
-                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-                        "[BakedFilter:preferScript] hasScriptRenderedGroups={}",
-                        scriptRenderer.hasScriptRenderedGroups());
+                if (hasScript && scriptRenderer != null) {
+                    String vid = entity instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity te
+                        ? te.getVehicleId() : "?";
+                    if (BAKED_FILTER_LOGGED.add(vid)) {
+                        boolean filterApplied = scriptRenderer.hasScriptRenderedGroups()
+                            && scriptRenderer.getRenderedBatchCount() > 0;
+                        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+                            "[BakedFilter:preferScript] vehicle={} hasScriptRenderedGroups={} renderedBatches={} filterApplied(skip script groups)={}",
+                            vid,
+                            scriptRenderer.hasScriptRenderedGroups(),
+                            scriptRenderer.getRenderedBatchCount(),
+                            filterApplied);
+                    }
                 }
-                if (hasScript && scriptRenderer != null && scriptRenderer.hasScriptRenderedGroups()) {
+                // スクリプトが実際に1バッチも描画していない(=描画スクリプトが詰んで無言失敗)場合は、
+                // グループ除外をせず baked で全グループを描画する。これをしないと、スクリプトが
+                // registerParts でグループを印付けただけで何も描かず終わった車両が、baked からも
+                // 除外されて「丸ごと描画されない」状態になる。
+                if (hasScript && scriptRenderer != null && scriptRenderer.hasScriptRenderedGroups()
+                    && scriptRenderer.getRenderedBatchCount() > 0) {
                     opaqueFilter = groupName ->
                         (groupFilter == null || groupFilter.shouldRender(groupName))
                             && scriptRenderer.shouldRenderBakedGroup(groupName, false);
@@ -3876,7 +3923,8 @@ public final class MqoModelLoader {
                     "[BakedFilter] hasScriptRenderedGroups={}",
                     scriptRenderer.hasScriptRenderedGroups());
             }
-            if (hasScript && scriptRenderer != null && scriptRenderer.hasScriptRenderedGroups()) {
+            if (hasScript && scriptRenderer != null && scriptRenderer.hasScriptRenderedGroups()
+                && scriptRenderer.getRenderedBatchCount() > 0) {
                 opaqueFilter = groupName ->
                     (groupFilter == null || groupFilter.shouldRender(groupName))
                         && scriptRenderer.shouldRenderBakedGroup(groupName, false);

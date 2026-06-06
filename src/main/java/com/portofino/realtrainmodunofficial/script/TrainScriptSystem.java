@@ -220,7 +220,7 @@ public class TrainScriptSystem {
         // NGTUtilClient / MCWrapperClient も user script と同じ eval で確実に定義する(別 eval の
         // 定義は見えないため)。getMinecraft は __RTMU_MC__(クライアント実体)へ橋渡し。
         "function __rtmuMcShim() { return { field_71462_r: ((typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getCurrentScreen() : null), func_135016_M: function() { return { func_135041_c: function() { return { func_135034_a: function() { return ((typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getLanguageCode() : 'en_us'); } }; } }; } }; }\n" +
-        "var NGTUtilClient = { getMinecraft: function() { return __rtmuMcShim(); }, getPlayer: function() { try { return (typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getPlayer() : null; } catch (e) { return null; } }, bindTexture: function(t) { try { if (typeof renderer !== 'undefined' && renderer) renderer.bindTexture(t); } catch(e){} } };\n" +
+        "var NGTUtilClient = { getMinecraft: function() { return __rtmuMcShim(); }, getPlayer: function() { try { return (typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getPlayer() : null; } catch (e) { return null; } }, bindTexture: function(t) { try { if (typeof renderer !== 'undefined' && renderer) renderer.bindTexture(t); } catch(e){} }, playSound: function(s){}, stopSound: function(s){} };\n" +
         "var MCWrapperClient = { getPlayer: function() { try { return (typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getPlayer() : null; } catch (e) { return null; } }, getMinecraft: function() { return __rtmuMcShim(); } };\n" +
         // RTM 共通ラッパー/レール系グローバルも user script eval で定義(別 eval の定義は見えないため)。
         // entity 位置などは null 安全に。レール系は SRB の preview/敷設で参照される。
@@ -238,6 +238,13 @@ public class TrainScriptSystem {
         "if (typeof RTMResource === 'undefined') RTMResource = { RAIL: { defaultName: 'default', __rtmuToken: 'RAIL' } };\n" +
         "if (typeof ResourceStateRail === 'undefined') ResourceStateRail = function(type, x){ this.type=type; this.modelId=''; this.setResourceName=function(n){ this.modelId=n; }; this.readFromNBT=function(nbt){}; this.writeToNBT=function(){ return (typeof NBTTagCompound!=='undefined')?new NBTTagCompound():{}; }; };\n" +
         "if (typeof ItemRail === 'undefined') ItemRail = { getProperty: function(item){ return null; } };\n" +
+        // RTM サウンドクラスのスタブ。RTMU は車両音を別系統(soundScriptEngine)で鳴らすため、
+        // 描画スクリプト内の MovingSoundTrain/NGTUtilClient.playSound は no-op で十分。これが無いと
+        // ReferenceError → render が例外 → 3回でスクリプト無効化 → baked フォールバックで昼/夜ドア等が
+        // 二重描画される(ゴースト)。func_147650_b は 1.12/1.21 両対応の resource ラッパーを返す。
+        "if (typeof MovingSoundTrain === 'undefined') MovingSoundTrain = function(entity, resource, repeat, flag){ this.__res = resource; this.setVolume = function(v){}; this.setPitch = function(p){}; this.stop = function(){}; this.func_147650_b = function(){ var r=this.__res; return { func_110624_b:function(){ try{ return (r&&r.func_110624_b)?r.func_110624_b():((r&&r.getNamespace)?r.getNamespace():''); }catch(e){ return ''; } }, func_110623_a:function(){ try{ return (r&&r.func_110623_a)?r.func_110623_a():((r&&r.getPath)?r.getPath():''); }catch(e){ return ''; } } }; }; };\n" +
+        "if (typeof MovingSoundTileEntity === 'undefined') MovingSoundTileEntity = MovingSoundTrain;\n" +
+        "if (typeof MovingSound === 'undefined') MovingSound = MovingSoundTrain;\n" +
         "if (typeof RailDir === 'undefined') RailDir = { STRAIGHT: 0, NORTH: 0, EAST: 2, SOUTH: 4, WEST: 6 };\n" +
         "if (typeof NBTTagCompound === 'undefined') NBTTagCompound = function(){ this.__m={}; this.func_74782_a=function(k,v){ this.__m[k]=v; }; this.func_74775_l=function(k){ return this.__m[k]||new NBTTagCompound(); }; this.func_74778_a=function(k,v){ this.__m[k]=v; }; this.func_74779_i=function(k){ return this.__m[k]||''; }; };\n" +
         // TileEntityLargeRailBase は RTMU の LargeRailCoreBlockEntity 型に束ねる(Java.type)。
@@ -1790,6 +1797,13 @@ public class TrainScriptSystem {
             return func_70070_b();
         }
 
+        // RTM EntityTrainBase#getSignal 互換。ATS表示スクリプト(2419等)が entity.getSignal() を
+        // 呼ぶ。未実装だと render が例外→3回でスクリプト無効化→baked フォールバックで
+        // 昼/夜ドアが二重に出る等の不具合になっていた。TrainEntity 側に委譲する(既定0=現示なし)。
+        public int getSignal() {
+            return train == null ? 0 : train.getSignal();
+        }
+
         // ---- Door state (RTM-compatible) ----
         // Returns: 0=all closed, 1=right open, 2=left open, 3=both open
 
@@ -2686,10 +2700,30 @@ public class TrainScriptSystem {
                 if (shouldSuppressOerMseScriptHoodGroup(x)) continue;
                 normalized.add(x);
             }
+            // [診断] ヘッドライトグループが renderRegisteredGroups に到達したか(フィルタ前)。
+            for (String dn : normalized) {
+                if (dn.contains("light_f") || dn.contains("light_r")) {
+                    String lk = "pre|" + dn + "|p" + currentPass;
+                    if (lightRenderDiag.add(lk)) {
+                        RealTrainModUnofficial.LOGGER.info(
+                            "[LightRenderDiag] PRE group={} pass={} (entered renderRegisteredGroups)", dn, currentPass);
+                    }
+                }
+            }
             if (normalized.isEmpty()) return;
             if (currentPass >= 2) {
                 normalized = filterLegacyScriptEmissiveGroups(normalized);
                 if (normalized.isEmpty()) return;
+            }
+            // [診断] 発光/角度フィルタ後にヘッドライトが残ったか。
+            for (String dn : normalized) {
+                if (dn.contains("light_f") || dn.contains("light_r")) {
+                    String lk = "post|" + dn + "|p" + currentPass;
+                    if (lightRenderDiag.add(lk)) {
+                        RealTrainModUnofficial.LOGGER.info(
+                            "[LightRenderDiag] POST group={} pass={} (survived filters -> will render)", dn, currentPass);
+                    }
+                }
             }
             // 角度バリアント (body-30 / body-90 / body-180 / bogie1-90 等) のフィルタ。
             // RTM の連結曲げ用に用意された「曲げ角ごとの代替メッシュ」で、本家は曲げ角に応じ
@@ -3747,6 +3781,16 @@ public class TrainScriptSystem {
                 } else if (currentPass < 2) {
                     scriptedOpaqueGroups.addAll(presentGroupNames);
                 }
+                // [診断] ヘッドライト(ex16_light_f/r_on/off)が各passで実描画へ到達するか。
+                for (String pgn : presentGroupNames) {
+                    if (pgn.contains("light_f") || pgn.contains("light_r")) {
+                        String lk = pgn + "|p" + currentPass;
+                        if (lightRenderDiag.add(lk)) {
+                            RealTrainModUnofficial.LOGGER.info(
+                                "[LightRenderDiag] group={} pass={} (reached render)", pgn, currentPass);
+                        }
+                    }
+                }
                 int renderPackedLight = effectivePackedLightForScriptParts(presentGroupNames);
                 currentMatId = 0;
                 if (legacyDisplaySelection) {
@@ -4005,11 +4049,20 @@ public class TrainScriptSystem {
             }
             String lower = groupName.toLowerCase(Locale.ROOT);
             if (train != null) {
-                // For train vehicles, legacy pass > 1 must not turn exterior body/light
-                // meshes into daylight/fullbright flashes. Interior light is the only
-                // train-wide emissive surface here; headlights and destination signs are
-                // rendered normally in pass 0/1 and should not brighten the shell.
-                return interiorOn && isInteriorEmissionGroup(lower);
+                // 室内灯は従来どおり(室内灯ON時のみ)。
+                if (interiorOn && isInteriorEmissionGroup(lower)) {
+                    return true;
+                }
+                // 明示的な点灯(_on)のヘッドライト/標識灯/急行灯は発光パスで光らせる。
+                // スクリプトは進行方向等で点灯グループ(ex16_light_f_on)だけを render するため、
+                // ここに来る _on グループ = 点灯すべきもの。これを発光させないと点灯/消灯の差
+                // (発光グロー)が出ず「常に消灯」に見えていた(スペーシア等)。
+                // 消灯(_off)や、on/off の区別が無い汎用 "light"(=車体パネルの AlphaBlend,Light 等)は
+                // 除外して、車体全体がフラッシュする副作用を防ぐ。
+                if (!isLightOffGroup(lower) && isExplicitOnLightGroup(lower)) {
+                    return true;
+                }
+                return false;
             }
             if (isLegacyDisplayGroup(lower)) {
                 return true;
@@ -4027,6 +4080,21 @@ public class TrainScriptSystem {
                 return shouldRenderLightGroup(train, lower) && !isLightOffGroup(lower);
             }
             return false;
+        }
+
+        /**
+         * 明示的に「点灯」状態のライト系グループか。light/lamp/marker/led を含み、かつ
+         * 末尾が _on / on<数字> 等。on/off ペアを持つ切替式ライト(ヘッドライト・急行灯・標識灯・
+         * ドアランプ点灯)だけを発光対象にし、on/off の区別が無い汎用 "light"(車体パネル等)は除外する。
+         */
+        private static boolean isExplicitOnLightGroup(String lower) {
+            if (lower == null) return false;
+            boolean lightLike = lower.contains("light") || lower.contains("lamp")
+                || lower.contains("marker") || lower.contains("led");
+            if (!lightLike) return false;
+            return lower.endsWith("_on") || lower.endsWith("-on")
+                || lower.matches(".*_on\\d*$") || lower.matches(".*-on\\d*$")
+                || lower.matches(".*on\\d+$") || lower.contains("_on_") || lower.contains("-on-");
         }
 
         private boolean isInteriorEmissionGroup(String lowerGroupName) {
@@ -4105,7 +4173,23 @@ public class TrainScriptSystem {
             scriptedEmissiveGroups.clear();
         }
 
+        private final java.util.Set<String> doorDiagLogged = new java.util.HashSet<>();
+        private final java.util.Set<String> lightRenderDiag = new java.util.HashSet<>();
         public boolean shouldRenderBakedGroup(String groupName, boolean translucent) {
+            boolean result = shouldRenderBakedGroup0(groupName, translucent);
+            // [診断] ドア二重描画調査: door グループに対するベイク描画判定を (名前+pass) 単位で1回だけ出す。
+            String n = normalizeLegacyGroupName(groupName);
+            if (n.contains("door")) {
+                String key = n + "|" + translucent;
+                if (doorDiagLogged.add(key)) {
+                    RealTrainModUnofficial.LOGGER.info(
+                        "[DoorDiag] group={} translucent={} bakedRender={} registered={}",
+                        n, translucent, result, scriptRegisteredGroups.contains(n));
+                }
+            }
+            return result;
+        }
+        private boolean shouldRenderBakedGroup0(String groupName, boolean translucent) {
             String normalized = normalizeLegacyGroupName(groupName);
             if (normalized.isEmpty()) {
                 return true;

@@ -342,6 +342,9 @@ public final class LegacyScriptSoundManager {
 
     private static final class LoopingTrainSound extends AbstractTickableSoundInstance {
         private final TrainEntity train;
+        // 一定tick更新(update)されなければ自動停止する。サウンドスクリプトが詰む/無効化される等で
+        // 供給が止まった時にループ音が鳴り続ける「無限音」を防ぐ。正常な音は毎tick update されるので無害。
+        private int ticksSinceUpdate = 0;
 
         private LoopingTrainSound(TrainEntity train, ResourceLocation soundId) {
             super(SoundEvent.createVariableRangeEvent(soundId), SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
@@ -362,6 +365,7 @@ public final class LegacyScriptSoundManager {
             this.x = train.getX();
             this.y = train.getY();
             this.z = train.getZ();
+            this.ticksSinceUpdate = 0;
         }
 
         private void requestStop() {
@@ -371,6 +375,15 @@ public final class LegacyScriptSoundManager {
         @Override
         public void tick() {
             if (!train.isAlive()) {
+                ACTIVE.remove(key(train.getUUID(), this.getLocation()), this);
+                AUTO_RUNNING.remove(train.getUUID());
+                stop();
+                return;
+            }
+            // 一定tick(=10tick/0.5秒)更新が来なければ自動停止。供給元(JSON/スクリプト)が
+            // 正常なら毎tick update() でリセットされるため発火しない。詰んだ/無効化された
+            // サウンドスクリプトが鳴らしっぱなしにする「無限音」のフェイルセーフ。
+            if (++ticksSinceUpdate > 10) {
                 ACTIVE.remove(key(train.getUUID(), this.getLocation()), this);
                 AUTO_RUNNING.remove(train.getUUID());
                 stop();

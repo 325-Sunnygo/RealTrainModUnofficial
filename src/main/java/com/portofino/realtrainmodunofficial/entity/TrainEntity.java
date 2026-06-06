@@ -70,6 +70,10 @@ public class TrainEntity extends Entity {
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> REVERSER =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.INT);
+    // 運転士が乗っている cab の向き(+1=モデル前側 / -1=モデル後側)。乗車時に確定し編成全体へ同期。
+    // 「乗っている側を前」にするため、移動方向もライト方向もこの値 × reverser で決める。
+    private static final EntityDataAccessor<Integer> DRIVER_CAB_DIR =
+        SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DESTINATION_INDEX =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> SOUND_INDEX =
@@ -315,6 +319,7 @@ public class TrainEntity extends Entity {
         builder.define(PANTOGRAPH_UP, true);
         builder.define(REVERSE, false);
         builder.define(REVERSER, 1);
+        builder.define(DRIVER_CAB_DIR, 1);
         builder.define(DESTINATION_INDEX, 0);
         builder.define(SOUND_INDEX, 0);
         builder.define(BODY_ROLL, 0.0F);
@@ -425,6 +430,19 @@ public class TrainEntity extends Entity {
     }
     public boolean isReverse() { return getReverser() < 0; }
     public void setReverse(boolean value) { setReverser(value ? -1 : 1); }
+    /** 運転士 cab の向き(+1/-1)。乗っている側を「前」とするための基準。 */
+    public int getDriverCabDir() { int d = entityData.get(DRIVER_CAB_DIR); return d < 0 ? -1 : 1; }
+    public void setDriverCabDir(int value) { entityData.set(DRIVER_CAB_DIR, value < 0 ? -1 : 1); }
+    public void setDriverCabDirForFormation(int value) {
+        forEachFormationTrain(train -> train.setDriverCabDir(value));
+    }
+    /**
+     * 実効進行方向(-1/0/+1)。reverser × 運転士cab向き。乗っている cab 側が前になる。
+     * 移動方向・ライトの前後切替の両方でこれを使い、整合させる。
+     */
+    public int getEffectiveDirection() {
+        return Integer.compare(getReverser(), 0) * getDriverCabDir();
+    }
     public int getDestinationIndex() { return entityData.get(DESTINATION_INDEX); }
     public void setDestinationIndex(int value) { entityData.set(DESTINATION_INDEX, Math.max(0, value)); }
     public void setDestinationIndexForFormation(int value) {
@@ -971,6 +989,7 @@ public class TrainEntity extends Entity {
         follower.setNotch(this.getNotch());
         follower.setSpeed(this.getSpeed());
         follower.setReverser(this.getReverser());
+        follower.setDriverCabDir(this.getDriverCabDir());
 
         double gap = getCoupledGap(this, follower);
         if (!placeCoupledFollowerOnRail(follower, coupledFollowerThisSide, coupledFollowerOtherSide)) {
@@ -1021,6 +1040,7 @@ public class TrainEntity extends Entity {
             next.setNotch(current.getNotch());
             next.setSpeed(current.getSpeed());
             next.setReverser(current.getReverser());
+            next.setDriverCabDir(current.getDriverCabDir());
             next.setDeltaMovement(Vec3.ZERO);
 
             double gap = getCoupledGap(current, next);
@@ -1322,10 +1342,10 @@ public class TrainEntity extends Entity {
     }
 
     private boolean travelAlongRail(float speed, Entity controller, TrainEntity cabTrain) {
-        // Direction of travel is driven purely by the reverser.
-        // Cab direction (seat Z position) is a UI concept only — reading it here caused
-        // the train to violently reverse the moment a player mounted a rear seat.
-        int controllerDirection = Integer.compare(getReverser(), 0);
+        // 進行方向 = reverser × 運転士cab向き(getEffectiveDirection)。「乗っている cab 側を前」にする。
+        // cab向きは乗車時(停車時のみ)に確定して同期するので、走行中に勝手に反転して急逆走する
+        // (以前 controller の seat Z を毎tick読んで起きた不具合)ことはない。
+        int controllerDirection = getEffectiveDirection();
         if (controllerDirection == 0 && Math.abs(speed) > 0.0F) {
             controllerDirection = activeRailDirection != 0 ? activeRailDirection : (speed >= 0.0F ? 1 : -1);
         }
@@ -3572,6 +3592,7 @@ public class TrainEntity extends Entity {
         });
         formationHead.setNotchForFormation(0);
         formationHead.setReverserForFormation(sourceTail.getReverser());
+        formationHead.setDriverCabDirForFormation(sourceTail.getDriverCabDir());
         formationHead.setLightModeForFormation(sourceTail.getLightMode());
         formationHead.setDestinationIndexForFormation(sourceTail.getDestinationIndex());
         FormationDriver formationDriver = formationHead.getFormationDriver();
@@ -4537,7 +4558,7 @@ public class TrainEntity extends Entity {
 
     public float getVehicleState(int stateType) {
         return switch (stateType) {
-            case 0 -> getReverser() >= 0 ? 0.0F : 1.0F;
+            case 0 -> getEffectiveDirection() < 0 ? 1.0F : 0.0F;  // 進行方向(乗っているcab側=前)。ライト前後切替に使用
             case 1 -> getNotch();
             case 2 -> getRailProgress();
             case 3 -> 0.0F;
@@ -4567,7 +4588,7 @@ public class TrainEntity extends Entity {
     }
 
     public float getTrainDirection() {
-        return getReverser() >= 0 ? 0.0F : 1.0F;
+        return getEffectiveDirection() < 0 ? 1.0F : 0.0F;
     }
 
     // 旧 RTM の Render スクリプトは entity.getRotation() で車体 yaw を取得する。
@@ -5751,6 +5772,14 @@ public class TrainEntity extends Entity {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
         if (isDriverSeatIndex(seatIndex)) {
             setReverser(getDefaultReverserForSeat(def, seatIndex));
+            // 乗った運転台 cab 側を「前」にする(移動方向もライト前後もこれに従う)。
+            // 走行中に切り替えると進行方向が反転して危険なので、停車時のみ確定する。
+            TrainEntity head = getFormationHead();
+            TrainEntity orientationOwner = head != null ? head : this;
+            if (Math.abs(orientationOwner.getSpeed()) < 0.05F) {
+                int cabDir = getDriverCabDirectionBySeatIndex(seatIndex, def);
+                orientationOwner.setDriverCabDirForFormation(cabDir);
+            }
         }
         RealTrainModUnofficial.LOGGER.info(
             "Ride request: vehicle={}, player={}, seatIndex={}, isDriverSeat={}, clickPassengers={}",
@@ -6222,6 +6251,7 @@ public class TrainEntity extends Entity {
         } else if (tag.contains("Reverse")) {
             setReverse(tag.getBoolean("Reverse"));
         }
+        if (tag.contains("DriverCabDir")) setDriverCabDir(tag.getInt("DriverCabDir"));
         if (tag.contains("DestinationIndex")) setDestinationIndex(tag.getInt("DestinationIndex"));
         if (tag.contains("SoundIndex")) setSoundIndex(tag.getInt("SoundIndex"));
         if (tag.contains("BodyRoll")) setBodyRoll(tag.getFloat("BodyRoll"));
@@ -6295,6 +6325,7 @@ public class TrainEntity extends Entity {
         tag.putBoolean("PantographUp", isPantographUp());
         tag.putBoolean("Reverse", isReverse());
         tag.putInt("Reverser", getReverser());
+        tag.putInt("DriverCabDir", getDriverCabDir());
         tag.putInt("DestinationIndex", getDestinationIndex());
         tag.putInt("SoundIndex", getSoundIndex());
         tag.putFloat("BodyRoll", getBodyRoll());

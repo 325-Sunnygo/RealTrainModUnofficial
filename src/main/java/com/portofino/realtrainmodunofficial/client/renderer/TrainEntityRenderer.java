@@ -38,6 +38,10 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         java.util.Collections.synchronizedSet(new java.util.HashSet<>());
     private static final java.util.Set<String> LOGGED_BOGIE_VEHICLES =
         java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private static final java.util.Set<String> ROLLSIGN_DIAG_LOGGED =
+        java.util.Collections.synchronizedSet(new java.util.HashSet<>());
+    private static final java.util.Map<java.util.UUID, String> LIGHT_DIAG_SEEN =
+        new java.util.concurrent.ConcurrentHashMap<>();
 
     private static ResourceLocation getGlowTexture() {
         if (glowTexture == null) {
@@ -233,6 +237,19 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                     "[Render] all groups: {}", allGroups
                 );
             }
+            // [診断] ライト点灯状態の調査。スクリプトは st0=getVehicleState(0)(進行方向) で
+            // 前後の点灯/消灯グループを切り替える。常に消灯なら st0 が常に同じか確認する。
+            // 状態(st0/reverser/lightMode)が変化した時だけ1行出す。
+            {
+                float st0 = entity.getVehicleState(0);
+                String diagKey = st0 + "|" + entity.getReverser() + "|" + entity.getLightMode();
+                String prev = LIGHT_DIAG_SEEN.put(entity.getUUID(), diagKey);
+                if (!diagKey.equals(prev)) {
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+                        "[LightDiag] vehicle={} st0(dir)={} reverser={} lightMode={}",
+                        entity.getVehicleId(), st0, entity.getReverser(), entity.getLightMode());
+                }
+            }
             // 列車の実座標から取り直した lightmap を使用し、室内灯OFFの外装が夜に白く浮かないようにする。
             // 発光 pass は MqoModelLoader/TrainScriptSystem 側で室内灯ONの内装だけに制限する。
             MqoModelLoader.renderModel(model, poseStack, buffer, trainPackedLight, groupFilter, doorTransform, entity);
@@ -244,12 +261,21 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                     .debug("Inline bogie render failed for {}: {}", entity.getVehicleId(), t.toString());
             }
             // 台車の当たり判定は TrainBogieEntity、見た目は車体レンダー内で描画する。
-            if (renderRollsigns && !modelHasScript) {
+            // 本家RTM(RenderVehicleBase)は方向幕(rollsignTexture+rollsigns)を「スクリプト有無に
+            // 関係なく常にJava側で描画」する。RTMUは以前 !modelHasScript でスクリプト車両を
+            // 除外しており、JSONに方向幕を持つスクリプト車(大半のRTMパック)で方向幕が一切
+            // 出ていなかった。JSONに rollsigns が無い車両は renderConfiguredRollsigns 冒頭の
+            // 早期returnでスキップされるので、常に呼んでも二重描画にはならない。
+            if (renderRollsigns) {
                 renderConfiguredRollsigns(entity, def, poseStack, buffer, trainPackedLight);
             }
             if (renderLights) {
                 renderConfiguredLights(entity, def, model, poseStack, buffer, renderYaw, ridingThisTrain);
             }
+            // パンタグラフ(pantograph_front/back)を関節アニメ付きで描画。本家RTM
+            // (BasicVehiclePartsRenderer)準拠でスクリプト有無に関係なく常にJava描画する。
+            // パンタ群は shouldRenderTrainGroup で静止描画から除外済みなので二重にならない。
+            renderConfiguredPantographs(entity, def, model, poseStack, buffer, trainPackedLight);
 
         } catch (Throwable e) {
             com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.error("Failed to render model", e);
@@ -386,6 +412,87 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         return x * x * (3.0F - 2.0F * x);
     }
 
+    /**
+     * 本家RTM(BasicVehiclePartsRenderer)準拠のパンタグラフ関節描画。
+     * move = pantograph_F/40 (前) / pantograph_B/40 (後)。0=上昇(モデル姿勢)、1=下降(折畳)。
+     * 各パーツは pos へ移動 → transform×move を適用 → -pos → グループ描画 → 子へ継承。
+     */
+    private static void renderConfiguredPantographs(TrainEntity entity, VehicleDefinition def,
+                                                    MqoModelLoader.MqoModel model, PoseStack poseStack,
+                                                    MultiBufferSource buffer, int packedLight) {
+        if (def == null || model == null) {
+            return;
+        }
+        java.util.List<VehicleDefinition.PantographPart> front = def.getPantographFront();
+        java.util.List<VehicleDefinition.PantographPart> back = def.getPantographBack();
+        if ((front == null || front.isEmpty()) && (back == null || back.isEmpty())) {
+            return;
+        }
+        float moveFront = Mth.clamp(entity.pantograph_F / 40.0F, 0.0F, 1.0F);
+        float moveBack = Mth.clamp(entity.pantograph_B / 40.0F, 0.0F, 1.0F);
+        if (front != null) {
+            for (VehicleDefinition.PantographPart part : front) {
+                renderPantographPart(part, moveFront, model, poseStack, buffer, packedLight);
+            }
+        }
+        if (back != null) {
+            for (VehicleDefinition.PantographPart part : back) {
+                renderPantographPart(part, moveBack, model, poseStack, buffer, packedLight);
+            }
+        }
+    }
+
+    private static void renderPantographPart(VehicleDefinition.PantographPart part, float move,
+                                             MqoModelLoader.MqoModel model, PoseStack poseStack,
+                                             MultiBufferSource buffer, int packedLight) {
+        if (part == null) {
+            return;
+        }
+        float[] pos = part.pos() != null && part.pos().length >= 3 ? part.pos() : new float[]{0, 0, 0};
+        poseStack.pushPose();
+        try {
+            poseStack.translate(pos[0], pos[1], pos[2]);
+            if (part.transforms() != null) {
+                for (float[] fa : part.transforms()) {
+                    if (fa == null) continue;
+                    if (fa.length == 4) {
+                        // [角度, ax, ay, az] を move 倍して回転
+                        float angle = fa[0] * move;
+                        if (Math.abs(fa[1]) > 1.0E-6F || Math.abs(fa[2]) > 1.0E-6F || Math.abs(fa[3]) > 1.0E-6F) {
+                            poseStack.mulPose(new org.joml.Quaternionf().rotationAxis(
+                                (float) Math.toRadians(angle), fa[1], fa[2], fa[3]));
+                        }
+                    } else if (fa.length == 3) {
+                        poseStack.translate(fa[0] * move, fa[1] * move, fa[2] * move);
+                    }
+                }
+            }
+            poseStack.translate(-pos[0], -pos[1], -pos[2]);
+            java.util.List<String> objects = part.objects();
+            if (objects != null && !objects.isEmpty()) {
+                java.util.Set<String> normalized = new java.util.HashSet<>();
+                for (String o : objects) {
+                    if (o != null && !o.isBlank()) normalized.add(o.trim().toLowerCase(java.util.Locale.ROOT));
+                }
+                MqoModelLoader.GroupPredicate filter = g ->
+                    g != null && normalized.contains(g.toLowerCase(java.util.Locale.ROOT));
+                MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight,
+                    net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, false, filter, null);
+                if (model.hasTranslucentBatches()) {
+                    MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight,
+                        net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, true, filter, null);
+                }
+            }
+            if (part.childParts() != null) {
+                for (VehicleDefinition.PantographPart child : part.childParts()) {
+                    renderPantographPart(child, move, model, poseStack, buffer, packedLight);
+                }
+            }
+        } finally {
+            poseStack.popPose();
+        }
+    }
+
     private static void renderConfiguredRollsigns(TrainEntity entity, VehicleDefinition def, PoseStack poseStack,
                                                   MultiBufferSource buffer, int packedLight) {
         if (def == null || def.getRollsigns().isEmpty()) {
@@ -400,6 +507,15 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         int destinationIndex = Math.floorMod(entity.getDestinationIndex(), count);
         float segmentV0 = destinationIndex / (float) count;
         float segmentV1 = (destinationIndex + 1.0F) / (float) count;
+        // [診断] 純正方向幕が暗い/出ない調査用。pack+texture 単位で1回だけ出す。
+        String rsDiagKey = def.getPackName() + "|" + texturePath;
+        if (ROLLSIGN_DIAG_LOGGED.add(rsDiagKey)) {
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+                "[RollsignDiag] pack={} texPath={} resolved={} rollsigns={} names={} destIdx={} V0={} V1={}",
+                def.getPackName(), texturePath, texture,
+                def.getRollsigns().size(), def.getRollsignNames().size(),
+                destinationIndex, segmentV0, segmentV1);
+        }
         VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
         PoseStack.Pose pose = poseStack.last();
         Matrix4f mat = pose.pose();
@@ -416,7 +532,10 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             float baseVMax = uv[3];
             float vMin = Mth.lerp(segmentV0, baseVMin, baseVMax);
             float vMax = Mth.lerp(segmentV1, baseVMin, baseVMax);
-            int signLight = rollsign.disableLighting() ? 0x00F000F0 : packedLight;
+            // 本家RTM(RenderVehicleBase#renderRollsign)準拠: disableLighting==false(既定)の方向幕は
+            // バックライト点灯表示としてフルブライト描画する。RTMU は判定が逆で、既定の方向幕が
+            // 周囲光(packedLight)依存になり暗所/夜/室内で真っ黒になっていた。本家と同じ向きに修正。
+            int signLight = rollsign.disableLighting() ? packedLight : 0x00F000F0;
 
             for (float[][] quad : rollsign.pos()) {
                 if (quad == null || quad.length < 4) {
@@ -490,6 +609,11 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             return true;
         }
         String normalized = groupName.toLowerCase(java.util.Locale.ROOT);
+        // パンタグラフ(pantograph_front/back)のパーツは renderConfiguredPantographs が関節アニメ付きで
+        // 描画する。ここ(通常/baked描画)で描くと静止姿勢のパンタが二重に出る(=動かない/上がりっぱなし)。
+        if (def != null && def.getPantographGroupNames().contains(normalized)) {
+            return false;
+        }
         // 連結曲げ用の角度バリアントメッシュ (body-90 / body-80(mx) / bogie1-90 等、末尾"-NN"でNN>=10)
         // は RTM が曲げ角に応じ1つだけ描く代替メッシュ。移植版には曲げ処理が無いため、原点姿勢で
         // 描くと翼のように散乱する。スクリプトが描画失敗したフレームでは shouldRenderBakedGroup の

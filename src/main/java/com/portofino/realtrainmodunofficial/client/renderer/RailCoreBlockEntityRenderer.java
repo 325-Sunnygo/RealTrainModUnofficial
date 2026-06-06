@@ -68,6 +68,10 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
     @Override
     public void render(LargeRailCoreBlockEntity be, float partialTick, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
         long profilerStart = ClientRenderProfiler.begin();
+        // レールは不透明扱い(cutout)で描く。車体の半透明窓ガラスに奥のレールが遮蔽されて
+        // 消える問題(中からガラス越しにレールが見えない)を防ぐため、半透明バッチも元テクスチャの
+        // cutout として深度を書き込む。描画後に必ず解除する。
+        MqoModelLoader.setRailCutoutMode(true);
         try {
             if (!be.isLoaded()) return;
             RailDefinition def = RailRegistry.getById(be.getRailDefinitionId());
@@ -136,6 +140,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
         } catch (Throwable t) {
             com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn("Skipping rail render at {} after renderer failure", be.getBlockPos(), t);
         } finally {
+            MqoModelLoader.setRailCutoutMode(false);
             ClientRenderProfiler.endRail(profilerStart);
         }
     }
@@ -286,12 +291,10 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
         poseStack.translate(mo.x, mo.y, mo.z);
         poseStack.scale(scale, scale, scale);
         MqoModelLoader.GroupPredicate filter = g -> matchesRailGroup(g, group);
+        // railCutoutMode 中は不透明(cutout)パスが半透明バッチも元テクスチャで描くため、
+        // 別途の半透明パスは不要(描くと同位置二重描画になる)。
         MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight,
             net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, false, filter, null);
-        if (model.hasTranslucentBatches()) {
-            MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight,
-                net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, true, filter, null);
-        }
         poseStack.popPose();
     }
 
@@ -644,19 +647,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<LargeRai
             groupName -> shouldRenderRailGroup(model, groupName, pos, max, compatibilityHeavy, cameraDistanceSq),
             null
         );
-        double translucentThreshold = compatibilityHeavy ? 38.0D : 72.0D;
-        if (model.hasTranslucentBatches() && cameraDistanceSq < translucentThreshold * translucentThreshold) {
-            MqoModelLoader.renderModelWithoutScript(
-                model,
-                poseStack,
-                buffer,
-                packedLight,
-                net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
-                true,
-                groupName -> shouldRenderRailGroup(model, groupName, pos, max, compatibilityHeavy, cameraDistanceSq),
-                null
-            );
-        }
+        // railCutoutMode 中は上の cutout パスが半透明バッチも元テクスチャで描画する。別途の
+        // 半透明パスは不要(同位置二重描画になる)。これにより遠方/ガラス越しでもレールが消えない。
         poseStack.popPose();
     }
 
