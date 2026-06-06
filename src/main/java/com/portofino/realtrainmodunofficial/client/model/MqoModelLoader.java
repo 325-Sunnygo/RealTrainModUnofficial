@@ -393,6 +393,25 @@ public final class MqoModelLoader {
     }
 
     private static MqoModel loadInternal(Path packPath, String modelFile, Map<String, String> textureOverrides, boolean smoothing) {
+        MqoModel m = loadInternalRaw(packPath, modelFile, textureOverrides, smoothing);
+        if (m != null && m.getSourcePackPath() == null) {
+            m.setSourcePackPath(packPath);
+        }
+        return m;
+    }
+
+    /** スクリプトの ModelLoader.loadModel から呼ぶ補助モデルローダ。同パックから .mqoz/.obj 等を読む。 */
+    public static MqoModel loadAuxModel(Path packPath, String modelFile) {
+        if (packPath == null || modelFile == null || modelFile.isBlank()) return null;
+        String key = "aux|" + packPath + "|" + modelFile;
+        MqoModel cached = getCachedModel(key);
+        if (cached != null) return cached;
+        MqoModel model = loadInternal(packPath, modelFile, Map.of(), true);
+        if (model != null) cacheModel(key, model);
+        return model;
+    }
+
+    private static MqoModel loadInternalRaw(Path packPath, String modelFile, Map<String, String> textureOverrides, boolean smoothing) {
         if (packPath == null || !Files.exists(packPath)) return null;
         logModelLoadDetail("begin", "packPath={}, modelFile={}, smoothing={}, textureOverrides={}", packPath, modelFile, smoothing, textureOverrides);
         try {
@@ -893,8 +912,16 @@ public final class MqoModelLoader {
         }
 
         List<Batch> out = new ArrayList<>();
+        // スムージングはモデル全体(グループ/マテリアル跨ぎ)で行う。以前は bb.bake(smoothing) 内の
+        // バッチ単位平滑化だけが走り、グループ境界の法線が平面のまま残っていた。バニラのフラット
+        // ライティングでは目立たないが、影mod(Iris/Oculus)の陰影では境界がカクカク=「スムージングが
+        // 効かない」状態になっていた。applySmoothNormalsAcrossBatches(本来呼ばれるべき全体平滑化)を
+        // 適用してから、バッチ単位の二重平滑化は無効化(false)してベイクする。
+        if (smoothing) {
+            applySmoothNormalsAcrossBatches(byGroup.values());
+        }
         for (BatchBuilder bb : byGroup.values()) {
-            if (!bb.positions.isEmpty()) out.add(bb.bake(smoothing));
+            if (!bb.positions.isEmpty()) out.add(bb.bake(false));
         }
         List<ResourceLocation> materialTextures = new ArrayList<>(materialOrder.size());
         for (int i = 0; i < materialOrder.size(); i++) {
@@ -999,9 +1026,13 @@ public final class MqoModelLoader {
 
         List<Batch> out = new ArrayList<>();
         LinkedHashSet<ResourceLocation> uniqueTextures = new LinkedHashSet<>();
+        // MQO と同様、グループ/マテリアル跨ぎで全体平滑化してからベイク(バッチ単位の二重平滑化は無効化)。
+        if (smoothing) {
+            applySmoothNormalsAcrossBatches(byGroup.values());
+        }
         for (BatchBuilder bb : byGroup.values()) {
             if (!bb.positions.isEmpty()) {
-                Batch batch = bb.bake(smoothing);
+                Batch batch = bb.bake(false);
                 out.add(batch);
                 uniqueTextures.add(batch.texture);
             }
@@ -2743,6 +2774,11 @@ public final class MqoModelLoader {
                     .add(new SmoothVertexRef(builder, i, normal));
             }
         }
+        int totalVerts = 0;
+        for (List<SmoothVertexRef> g : byPosition.values()) totalVerts += g.size();
+        int multiGroups = 0;
+        for (List<SmoothVertexRef> g : byPosition.values()) if (g.size() > 1) multiGroups++;
+        java.util.concurrent.atomic.AtomicInteger changed = new java.util.concurrent.atomic.AtomicInteger();
         java.util.stream.Stream<List<SmoothVertexRef>> smoothGroups = byPosition.size() > 4096
             ? byPosition.values().parallelStream()
             : byPosition.values().stream();
@@ -2761,6 +2797,11 @@ public final class MqoModelLoader {
                 }
                 if (sum.lengthSquared() > 1.0E-8F) {
                     sum.normalize();
+                    if (Math.abs(sum.x - ref.normal.x) > 1.0E-4F
+                        || Math.abs(sum.y - ref.normal.y) > 1.0E-4F
+                        || Math.abs(sum.z - ref.normal.z) > 1.0E-4F) {
+                        changed.incrementAndGet();
+                    }
                     int o = ref.index * 8;
                     synchronized (ref.builder.positions) {
                         ref.builder.positions.set(o + 3, sum.x);
@@ -2770,6 +2811,9 @@ public final class MqoModelLoader {
                 }
             }
         });
+        RealTrainModUnofficial.LOGGER.info(
+            "[SmoothDiag] verts={} posGroups={} multiVertGroups={} normalsChanged={}",
+            totalVerts, byPosition.size(), multiGroups, changed.get());
     }
 
     private static String positionKey(List<Float> positions, int offset) {
@@ -2912,6 +2956,59 @@ public final class MqoModelLoader {
         }
     }
 
+    // ===== NGTLib 互換の幾何API (RTM スクリプトの Parts.getObjects/_getPosList 用) =====
+    /** NGT Vec3 互換。getYaw/getPitch は RTM と同式 (yaw=atan2(x,z), pitch=atan2(y,√(x²+z²)))。 */
+    public static final class ScriptVec3 {
+        public final float x, y, z;
+        public ScriptVec3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+        public float getX() { return x; }
+        public float getY() { return y; }
+        public float getZ() { return z; }
+        public float getYaw() { return (float) Math.toDegrees(Math.atan2(x, z)); }
+        public float getPitch() { return (float) Math.toDegrees(Math.atan2(y, Math.sqrt(x * x + z * z))); }
+    }
+
+    public static final class ScriptVertex {
+        public final float x, y, z;
+        public ScriptVertex(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+        public float getX() { return x; }
+        public float getY() { return y; }
+        public float getZ() { return z; }
+        public ScriptVec3 toVec() { return new ScriptVec3(x, y, z); }
+        @Override public boolean equals(Object o) {
+            if (!(o instanceof ScriptVertex v)) return false;
+            return Math.abs(v.x - x) < 1.0E-5F && Math.abs(v.y - y) < 1.0E-5F && Math.abs(v.z - z) < 1.0E-5F;
+        }
+        @Override public int hashCode() {
+            return java.util.Objects.hash(Math.round(x * 1000), Math.round(y * 1000), Math.round(z * 1000));
+        }
+    }
+
+    public static final class ScriptFace {
+        public final ScriptVertex[] vertices;
+        public ScriptVertex faceNormal;
+        public ScriptFace(ScriptVertex[] vertices, ScriptVertex faceNormal) {
+            this.vertices = vertices;
+            this.faceNormal = faceNormal;
+        }
+        /** faceNormal が無い場合に頂点から面法線を計算する(NGTLib calculateFaceNormal 互換)。 */
+        public void calculateFaceNormal(Object accuracy) {
+            if (faceNormal != null || vertices == null || vertices.length < 3) return;
+            float ax = vertices[1].x - vertices[0].x, ay = vertices[1].y - vertices[0].y, az = vertices[1].z - vertices[0].z;
+            float bx = vertices[2].x - vertices[0].x, by = vertices[2].y - vertices[0].y, bz = vertices[2].z - vertices[0].z;
+            float nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+            float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+            if (len > 1.0E-8F) { nx /= len; ny /= len; nz /= len; }
+            faceNormal = new ScriptVertex(nx, ny, nz);
+        }
+    }
+
+    public static final class ScriptGroupObject {
+        public final String name;
+        public final ScriptFace[] faces;
+        public ScriptGroupObject(String name, ScriptFace[] faces) { this.name = name; this.faces = faces; }
+    }
+
     public static final class MqoModel {
         // RTM scripts use pass 0 (opaque), 1 (transparent), and "pass > 1" (emissive/fullbright).
         // Running more than 3 passes would repeat emissive content needlessly.
@@ -2928,6 +3025,11 @@ public final class MqoModelLoader {
         // グレー板を1枚足して塞ぐ(両面表示は使わない=禁止ルール遵守)。
         private volatile float[] bodyCapRect; // {minX, minZ, maxX, maxZ, bottomY}
         private volatile boolean bodyCapComputed;
+        // このモデルをロードした元パック。スクリプトの ModelLoader.loadModel で同パックから
+        // 補助モデル(モニタ表示用 .mqoz 等)を読むために使う。
+        private volatile Path sourcePackPath;
+        public Path getSourcePackPath() { return sourcePackPath; }
+        public void setSourcePackPath(Path p) { this.sourcePackPath = p; }
 
         public MqoModel(List<Batch> batches, List<ResourceLocation> materialTextures) {
             this.batches = batches;
@@ -3257,6 +3359,89 @@ public final class MqoModelLoader {
             return result;
         }
 
+        /**
+         * NGTLib 互換の幾何API。指定グループのジオメトリを ScriptGroupObject[](faces→vertices)で返す。
+         * RTM スクリプトの Parts.getObjects(model)/_getPosList が面の位置・法線を算出するのに使う。
+         * バッチは QUADS なので 4 頂点ずつ 1 Face にまとめる。
+         */
+        public Object[] getScriptGroupObjects(java.util.Set<String> normalizedGroups) {
+            java.util.List<ScriptGroupObject> out = new java.util.ArrayList<>();
+            if (normalizedGroups == null) return out.toArray();
+            for (String g : normalizedGroups) {
+                java.util.List<Batch> bs = batchesByNormalizedGroup.get(g);
+                if (bs == null || bs.isEmpty()) continue;
+                java.util.List<ScriptFace> faces = new java.util.ArrayList<>();
+                for (Batch b : bs) {
+                    if (b.data == null) continue;
+                    int vc = b.vertexCount;
+                    for (int f = 0; f + 4 <= vc; f += 4) {
+                        ScriptVertex[] verts = new ScriptVertex[4];
+                        for (int k = 0; k < 4; k++) {
+                            int o = (f + k) * 8;
+                            verts[k] = new ScriptVertex(b.data[o], b.data[o + 1], b.data[o + 2]);
+                        }
+                        int o0 = f * 8;
+                        ScriptVertex normal = new ScriptVertex(b.data[o0 + 3], b.data[o0 + 4], b.data[o0 + 5]);
+                        faces.add(new ScriptFace(verts, normal));
+                    }
+                }
+                out.add(new ScriptGroupObject(g, faces.toArray(new ScriptFace[0])));
+            }
+            return out.toArray();
+        }
+
+        /**
+         * NGTLib PolygonModel#renderPart 互換の「生」描画。指定グループの面を、生の頂点座標・生UVで、
+         * 外部指定テクスチャ(NGTUtilClient.bindTexture 相当)を使って描く。forceCutout/UV window/opaque分割
+         * 等の加工を一切しないので、モニタの数字/セグメント/路線図が garbling しない。textureOverride が
+         * null のときはバッチ本来のテクスチャを使う。
+         */
+        /** [診断] 指定グループに含まれるバッチ数(=該当パーツがモデルに存在し描画されるか)。 */
+        public int countScriptPartBatches(java.util.Set<String> groups) {
+            if (groups == null) return 0;
+            int n = 0;
+            for (String g : groups) {
+                java.util.List<Batch> bs = batchesByNormalizedGroup.get(g);
+                if (bs != null) n += bs.size();
+            }
+            return n;
+        }
+
+        public void renderScriptPartRaw(java.util.Set<String> groups, PoseStack poseStack, MultiBufferSource buffer,
+                                        int packedLight, int overlay, ResourceLocation textureOverride) {
+            if (groups == null || groups.isEmpty()) return;
+            PoseStack.Pose pose = poseStack.last();
+            Matrix4f mat = pose.pose();
+            Matrix3f norm = pose.normal();
+            float[] normalOut = new float[3];
+            for (String g : groups) {
+                java.util.List<Batch> bs = batchesByNormalizedGroup.get(g);
+                if (bs == null) continue;
+                for (Batch b : bs) {
+                    if (b.data == null || b.vertexCount <= 0) continue;
+                    ResourceLocation tex = textureOverride != null ? textureOverride
+                        : (b.texture != null ? b.texture : fallbackTexture());
+                    VertexConsumer vc = buffer.getBuffer(RenderType.entityCutoutNoCull(tex));
+                    for (int i = 0; i < b.vertexCount; i++) {
+                        int o = i * 8;
+                        float x = b.data[o], y = b.data[o + 1], z = b.data[o + 2];
+                        float nx = b.data[o + 3], ny = b.data[o + 4], nz = b.data[o + 5];
+                        float u = b.data[o + 6], v = b.data[o + 7];
+                        float tnx = norm.m00() * nx + norm.m10() * ny + norm.m20() * nz;
+                        float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
+                        float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
+                        normalizeNormal(tnx, tny, tnz, normalOut);
+                        vc.addVertex(mat, x, y, z)
+                            .setColor(255, 255, 255, 255)
+                            .setUv(u, v)
+                            .setOverlay(overlay)
+                            .setLight(packedLight)
+                            .setNormal(normalOut[0], normalOut[1], normalOut[2]);
+                    }
+                }
+            }
+        }
+
         public boolean hasTranslucentBatches() {
             for (Batch batch : batches) {
                 if (batch.translucent) {
@@ -3561,9 +3746,12 @@ public final class MqoModelLoader {
                         continue;
                     }
                     String lowerGroupName = batch.groupNameLower;
+                    // RTM 準拠: 'Light' マテリアルの発光は「元テクスチャをそのままフルブライト描画」。
+                    // 以前は派生 _lightN テクスチャ(emissiveTexture)を使っていたが、ヘッドライト等で
+                    // 正しい点灯絵が出ず消灯に見える原因だった。発光パスでも元テクスチャ(batch.texture)を使う。
                     ResourceLocation texture = scriptTexture
                         ? scriptRenderer.getBoundTexture()
-                        : (emissiveTexture != null ? emissiveTexture : batch.texture);
+                        : batch.texture;
                     if (!scriptTexture && emissiveTexture == null) {
                         // レール cutout モードでは半透明分割(opaque/window)を使わず元テクスチャをそのまま
                         // 使い、cutout で全部描く。鋼材が opaqueTexture で消されて窓パスにしか出ず、

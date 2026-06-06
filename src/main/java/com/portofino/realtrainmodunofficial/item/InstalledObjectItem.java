@@ -82,7 +82,10 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
         float placeMountPitch = 0.0F;
         boolean wallMounted = false;
         boolean upsideDown = false;
-        if (category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL) {
+        // SPEAKER は本家RTM同様、設置面で本体を傾けず常に直立(yaw のみ)にする。
+        // (WIRE/SIGNAL は従来どおり専用挙動。)壁/天井クリックでも mountPitch を付けない。
+        if (category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL
+            && category != InstalledObjectCategory.SPEAKER) {
             if (clickedFace == net.minecraft.core.Direction.DOWN) {
                 upsideDown = true;
                 placeMountPitch = 180.0F;

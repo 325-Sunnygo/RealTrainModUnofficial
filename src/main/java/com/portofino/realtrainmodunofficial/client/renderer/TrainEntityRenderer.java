@@ -219,7 +219,12 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 }
             };
             // Direct GL 経路の前に他エンティティのバッチを flush し、深度バッファ整合性を保つ。
-            if (buffer instanceof net.minecraft.client.renderer.MultiBufferSource.BufferSource bs) {
+            // ※この flush は既に廃止された直接GL経路のための名残。影mod(Iris)有効時にエンティティ
+            //   描画フェーズを途中終了させ、車体がエンティティ用プログラム(頂点法線で陰影)ではなく
+            //   別プログラム(面法線=フラット)で描かれてスムージングが効かなくなる原因になっていた。
+            //   シェーダ有効時は flush しない(=エンティティフェーズを維持し頂点法線を使わせる)。
+            if (buffer instanceof net.minecraft.client.renderer.MultiBufferSource.BufferSource bs
+                && !com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
                 bs.endBatch();
             }
             // 初回スポーン時に1回だけ詳細ログを吐く（スパム防止）。

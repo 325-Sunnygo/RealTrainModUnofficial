@@ -808,7 +808,21 @@ public class TrainScriptSystem {
                 // Vec3 は LEGACY_API_PREPEND の Vec3Impl で .sub/.add 等を含めて定義する。inject側では一切宣言しない。
                 ""+
                 "var VecAccuracy = { LOW: 0, MEDIUM: 1, HIGH: 2 };\n" +
-                "var ModelLoader = { loadModel: function(resource, accuracy, options) { return { renderAll: function() {}, renderOnly: function() {}, renderPart: function() {}, objects: [] }; } };\n" +
+                "var ModelLoader = { loadModel: function(resource, accuracy, options) {\n" +
+                "  var __path = null;\n" +
+                "  try { __path = (resource && typeof resource.func_110623_a === 'function') ? resource.func_110623_a() : (resource && resource.path ? resource.path : ('' + resource)); } catch (e) { __path = null; }\n" +
+                "  var __h = null;\n" +
+                "  try { if (typeof renderer !== 'undefined' && renderer && typeof renderer.loadAuxModel === 'function' && __path) __h = renderer.loadAuxModel(__path); } catch (e) { __h = null; }\n" +
+                "  var __objs = [];\n" +
+                "  try { if (__h != null && renderer && typeof renderer.auxObjectNames === 'function') __objs = renderer.auxObjectNames(__h); } catch (e) { __objs = []; }\n" +
+                "  return {\n" +
+                "    __handle: __h,\n" +
+                "    renderAll: function() { try { if (__h != null && renderer && renderer.renderAuxAll) renderer.renderAuxAll(__h); } catch (e) {} },\n" +
+                "    renderOnly: function() {},\n" +
+                "    renderPart: function(cull, name) { try { if (__h != null && renderer && renderer.renderAuxPart) renderer.renderAuxPart(__h, name); } catch (e) {} },\n" +
+                "    objects: __objs\n" +
+                "  };\n" +
+                "} };\n" +
                 "var ModelPackManager = { INSTANCE: { getResource: function(domain, path) { return { domain: domain, path: path, func_110624_b: function() { return domain; }, func_110623_a: function() { return path; } }; } } };\n" +
                 "var TrainState = { getStateType: function(value) { return value; }, suggestState: function(value, fallback) { return value == null ? fallback : value; } };\n" +
                 "TrainState.TrainStateType = { Reverser: 0, Notch: 1, Rail: 2, Door: 4, Light: 5, Pantograph: 6, Speed: 7, Destination: 8, Sound: 9, Interior: 11 };\n" +
@@ -1075,9 +1089,31 @@ public class TrainScriptSystem {
                 "}\n"
             );
             scriptEngine.eval(
+                // CustomMonitor_* は //include で実装が定義される(展開済み)。その実装は NGTLib 直接GL等
+                // 移植版に無い API を使い init/描画で落ちるため、ここで「定義済みなら互換スタブで上書き」する
+                // (条件は !== undefined)。逆(=== undefined)にすると実装側が動いて _getPosList 等で例外→
+                // init 失敗→運転台モニタどころかスクリプト全体が読み込めなくなる。
+                // Stage 5: 実装(//include の素の CustomMonitor_LCD)を「試して、失敗したらスタブへフォールバック」。
+                // Stage 2-3 で ModelLoader.renderPart / Parts.getObjects(getScriptModelObjects) を実装したので
+                // 素の LCD 実装(数字/時計オーバーレイ)が動く可能性がある。動かなければ従来のスタブ(GIF表示)へ。
+                // どちらでも例外で loading を壊さない設計。
                 "if (typeof CustomMonitor_LCD !== 'undefined') {\n" +
-                "  CustomMonitor_LCD = function(modelSet, modelObj, baseParts, texturePath) { this.baseParts = baseParts; this.texturePath = texturePath; this.gif = new CustomTexture(modelObj, texturePath); };\n" +
-                "  CustomMonitor_LCD.prototype = { constructor: CustomMonitor_LCD, render: function(renderer, entity, pass, partialTick) { if (!entity || pass > 2 || !this.baseParts) return; var id = 0; try { id = Math.floor(entity.getTrainStateData(8)); } catch (e) {} if (typeof lcdDisplaySet !== 'undefined' && lcdDisplaySet[id]) { var set = lcdDisplaySet[id]; var tick = 0; try { tick = renderer.getTick(entity); } catch (e) {} id = set[Math.floor((tick % (set.length * 200)) / 200)] || set[0] || id; } else { try { var frames = renderer.getScriptTextureFrameCount('minecraft', this.texturePath); var tick2 = renderer.getTick(entity); if (frames > 0) id = Math.floor(tick2 / 2) % frames; } catch (e2) {} } try { if (typeof renderer.setLightmapMaxBrightness === 'function') renderer.setLightmapMaxBrightness(); if (renderer && typeof renderer.renderGifOnParts === 'function') renderer.renderGifOnParts(this.baseParts, 'minecraft', this.texturePath, id); else { this.gif.bindTexture(entity, id); this.baseParts.render(renderer); } } finally { if (typeof renderer.enableLighting === 'function') renderer.enableLighting(); renderer.clearUvWindow(); renderer.clearScriptTexture(); } } };\n" +
+                "  var __realLCD = CustomMonitor_LCD;\n" +
+                "  var __wrapLCD = function(modelSet, modelObj, baseParts, texturePath) {\n" +
+                "    this.baseParts = baseParts; this.texturePath = texturePath;\n" +
+                "    try { this.gif = new CustomTexture(modelObj, texturePath); } catch (e) { this.gif = null; }\n" +
+                // LCD も実装(路線図GIF+時刻+号車)を試す。getScriptTexture はフレーム別テクスチャを返すので
+                // 路線図は綺麗に出るはず。状態隔離(行列復元+テクスチャクリア)込みなので漏れも防ぐ。
+                // 失敗時は下の renderGifOnParts スタブ(路線図のみ)へフォールバック。
+                "    this.__real = null;\n" +
+                "    try { this.__real = new __realLCD(modelSet, modelObj, baseParts, texturePath); } catch (e) { try { if (typeof renderer !== 'undefined' && renderer && renderer.scriptDiag) renderer.scriptDiag('LCD real ctor failed: ' + e); } catch (x) {} this.__real = null; }\n" +
+                "  };\n" +
+                "  __wrapLCD.prototype = { constructor: __wrapLCD, render: function(renderer, entity, pass, partialTick) {\n" +
+                "    if (this.__real) { var __md = renderer.getMatrixDepth ? renderer.getMatrixDepth() : -1; var __ok = true; try { this.__real.render(renderer, entity, pass, partialTick); } catch (e) { __ok = false; try { if (renderer && renderer.scriptDiag) renderer.scriptDiag('LCD real render failed: ' + e); } catch (x) {} this.__real = null; } try { if (__md >= 0 && renderer.restoreMatrixDepth) renderer.restoreMatrixDepth(__md); } catch (e) {} try { if (renderer.clearScriptTexture) renderer.clearScriptTexture(); if (renderer.clearUvWindow) renderer.clearUvWindow(); if (renderer.enableLighting) renderer.enableLighting(); } catch (e) {} if (__ok) return; }\n" +
+                "    if (!entity || pass > 2 || !this.baseParts) return; var id = 0; try { id = Math.floor(entity.getTrainStateData(8)); } catch (e) {} if (typeof lcdDisplaySet !== 'undefined' && lcdDisplaySet[id]) { var set = lcdDisplaySet[id]; var tick = 0; try { tick = renderer.getTick(entity); } catch (e) {} id = set[Math.floor((tick % (set.length * 200)) / 200)] || set[0] || id; } else { try { var frames = renderer.getScriptTextureFrameCount('minecraft', this.texturePath); var tick2 = renderer.getTick(entity); if (frames > 0) id = Math.floor(tick2 / 2) % frames; } catch (e2) {} } try { if (typeof renderer.setLightmapMaxBrightness === 'function') renderer.setLightmapMaxBrightness(); if (renderer && typeof renderer.renderGifOnParts === 'function') renderer.renderGifOnParts(this.baseParts, 'minecraft', this.texturePath, id); else { this.gif.bindTexture(entity, id); this.baseParts.render(renderer); } } finally { if (typeof renderer.enableLighting === 'function') renderer.enableLighting(); renderer.clearUvWindow(); renderer.clearScriptTexture(); } }\n" +
+                "  };\n" +
+                "  for (var __k in __realLCD) { try { if (__realLCD.hasOwnProperty(__k)) __wrapLCD[__k] = __realLCD[__k]; } catch (e) {} }\n" +
+                "  CustomMonitor_LCD = __wrapLCD;\n" +
                 "}\n"
             );
             scriptEngine.eval(
@@ -1088,16 +1124,36 @@ public class TrainScriptSystem {
                 "}\n"
             );
             scriptEngine.eval(
+                // Stage 5(JRE): メインモニタ(JRE_1)/TIMS(JRE_2) も「素の実装を試す→失敗時ベース部品描画へ
+                // フォールバック」。メソッド(addEntrySet/setOption 等)は実インスタンスへ委譲し、静的 EntrySet は
+                // 実クラスのものを引き継ぐ。実装が動けば運転台モニタの動的表示、ダメでも画面だけは出て loading は不変。
                 "if (typeof CustomMonitor_JRE_1 !== 'undefined') {\n" +
-                "  CustomMonitor_JRE_1 = function(modelSet, modelObj, baseParts) { this.baseParts = baseParts; this.hashMap = new java.util.HashMap(); };\n" +
-                "  CustomMonitor_JRE_1.prototype = { constructor: CustomMonitor_JRE_1, setOption: function() {}, render: function() {}, getHashMap: function(entity) { return this.hashMap.get(entity) || {}; }, setHashMapData: function(entity, key, value) { var data = this.getHashMap(entity); data[key] = value; this.hashMap.put(entity, data); }, getHashMapData: function(entity, key) { return this.getHashMap(entity)[key]; } };\n" +
+                "  var __realJRE1 = CustomMonitor_JRE_1;\n" +
+                "  var __wrapJRE1 = function(modelSet, modelObj, baseParts) { this.baseParts = baseParts; this.__real = null; try { this.__real = new __realJRE1(modelSet, modelObj, baseParts); } catch (e) { try { if (typeof renderer !== 'undefined' && renderer && renderer.scriptDiag) renderer.scriptDiag('JRE1 real ctor failed: ' + e); } catch (x) {} this.__real = null; } };\n" +
+                "  __wrapJRE1.prototype = { constructor: __wrapJRE1,\n" +
+                "    setOption: function(o, e2) { if (this.__real && this.__real.setOption) { try { this.__real.setOption(o, e2); } catch (e) {} } },\n" +
+                "    render: function(renderer, entity, pass, partialTick) { if (this.__real && this.__real.render) { var __md = renderer.getMatrixDepth ? renderer.getMatrixDepth() : -1; var __ok = true; try { this.__real.render(renderer, entity, pass, partialTick); } catch (e) { __ok = false; try { if (renderer && renderer.scriptDiag) renderer.scriptDiag('JRE1 real render failed: ' + e); } catch (x) {} this.__real = null; } try { if (__md >= 0 && renderer.restoreMatrixDepth) renderer.restoreMatrixDepth(__md); } catch (e) {} try { if (renderer.clearScriptTexture) renderer.clearScriptTexture(); if (renderer.clearUvWindow) renderer.clearUvWindow(); if (renderer.enableLighting) renderer.enableLighting(); } catch (e) {} if (__ok) return; } try { if (pass <= 2 && this.baseParts && this.baseParts.render) this.baseParts.render(renderer); } catch (e) {} },\n" +
+                "    getHashMap: function(e) { try { return (this.__real && this.__real.getHashMap) ? this.__real.getHashMap(e) : {}; } catch (x) { return {}; } },\n" +
+                "    setHashMapData: function(e, k, v) { try { if (this.__real && this.__real.setHashMapData) this.__real.setHashMapData(e, k, v); } catch (x) {} },\n" +
+                "    getHashMapData: function(e, k) { try { return (this.__real && this.__real.getHashMapData) ? this.__real.getHashMapData(e, k) : undefined; } catch (x) { return undefined; } } };\n" +
+                "  for (var __k1 in __realJRE1) { try { if (__realJRE1.hasOwnProperty(__k1)) __wrapJRE1[__k1] = __realJRE1[__k1]; } catch (e) {} }\n" +
+                "  CustomMonitor_JRE_1 = __wrapJRE1;\n" +
                 "}\n" +
                 "if (typeof CustomMonitor_JRE_2 !== 'undefined') {\n" +
-                "  var __ptJre2EntrySet = CustomMonitor_JRE_2.EntrySet || {};\n" +
-                "  CustomMonitor_JRE_2 = function(modelSet, modelObj, baseParts) { this.baseParts = baseParts; this.entrySet = {}; this.hashMap = new java.util.HashMap(); };\n" +
-                "  CustomMonitor_JRE_2.EntrySet = __ptJre2EntrySet;\n" +
-                "  ['tc','mc1','mc2','t','tsd','m1','m2','m3','m4','m5','m6','m7','m8'].forEach(function(k) { if (!CustomMonitor_JRE_2.EntrySet[k]) CustomMonitor_JRE_2.EntrySet[k] = { iconF: 'entry_' + k, iconB: 'entry_' + k }; });\n" +
-                "  CustomMonitor_JRE_2.prototype = { constructor: CustomMonitor_JRE_2, addEntrySet: function(trainName, type, options) { this.entrySet[trainName] = { type: type || {}, options: options || {} }; }, addEntriesSet: function(trainNameList, type, options) { if (!trainNameList) return; for (var i = 0; i < trainNameList.length; i++) this.addEntrySet(trainNameList[i], type, options); }, setOption: function(options, entity) { var data = this.getHashMap(entity); data.options = options || {}; this.hashMap.put(entity, data); }, render: function() {}, getHashMap: function(entity) { return this.hashMap.get(entity) || {}; }, setHashMapData: function(entity, key, value) { var data = this.getHashMap(entity); data[key] = value; this.hashMap.put(entity, data); }, getHashMapData: function(entity, key) { return this.getHashMap(entity)[key]; } };\n" +
+                "  var __realJRE2 = CustomMonitor_JRE_2;\n" +
+                "  var __wrapJRE2 = function(modelSet, modelObj, baseParts) { this.baseParts = baseParts; this.__real = null; try { this.__real = new __realJRE2(modelSet, modelObj, baseParts); } catch (e) { try { if (typeof renderer !== 'undefined' && renderer && renderer.scriptDiag) renderer.scriptDiag('JRE2 real ctor failed: ' + e); } catch (x) {} this.__real = null; } };\n" +
+                "  __wrapJRE2.EntrySet = (__realJRE2 && __realJRE2.EntrySet) ? __realJRE2.EntrySet : {};\n" +
+                "  ['tc','mc1','mc2','t','tsd','m1','m2','m3','m4','m5','m6','m7','m8'].forEach(function(k) { if (!__wrapJRE2.EntrySet[k]) __wrapJRE2.EntrySet[k] = { iconF: 'entry_' + k, iconB: 'entry_' + k }; });\n" +
+                "  __wrapJRE2.prototype = { constructor: __wrapJRE2,\n" +
+                "    addEntrySet: function(n, t, o) { if (this.__real && this.__real.addEntrySet) { try { this.__real.addEntrySet(n, t, o); } catch (e) {} } },\n" +
+                "    addEntriesSet: function(l, t, o) { if (this.__real && this.__real.addEntriesSet) { try { this.__real.addEntriesSet(l, t, o); } catch (e) {} } },\n" +
+                "    setOption: function(o, e2) { if (this.__real && this.__real.setOption) { try { this.__real.setOption(o, e2); } catch (e) {} } },\n" +
+                "    render: function(renderer, entity, pass, partialTick) { if (this.__real && this.__real.render) { var __md = renderer.getMatrixDepth ? renderer.getMatrixDepth() : -1; var __ok = true; try { this.__real.render(renderer, entity, pass, partialTick); } catch (e) { __ok = false; try { if (renderer && renderer.scriptDiag) renderer.scriptDiag('JRE2(TIMS) real render failed: ' + e); } catch (x) {} this.__real = null; } try { if (__md >= 0 && renderer.restoreMatrixDepth) renderer.restoreMatrixDepth(__md); } catch (e) {} try { if (renderer.clearScriptTexture) renderer.clearScriptTexture(); if (renderer.clearUvWindow) renderer.clearUvWindow(); if (renderer.enableLighting) renderer.enableLighting(); } catch (e) {} if (__ok) return; } try { if (pass <= 2 && this.baseParts && this.baseParts.render) this.baseParts.render(renderer); } catch (e) {} },\n" +
+                "    getHashMap: function(e) { try { return (this.__real && this.__real.getHashMap) ? this.__real.getHashMap(e) : {}; } catch (x) { return {}; } },\n" +
+                "    setHashMapData: function(e, k, v) { try { if (this.__real && this.__real.setHashMapData) this.__real.setHashMapData(e, k, v); } catch (x) {} },\n" +
+                "    getHashMapData: function(e, k) { try { return (this.__real && this.__real.getHashMapData) ? this.__real.getHashMapData(e, k) : undefined; } catch (x) { return undefined; } } };\n" +
+                "  for (var __k2 in __realJRE2) { try { if (__realJRE2.hasOwnProperty(__k2) && __k2 !== 'EntrySet') __wrapJRE2[__k2] = __realJRE2[__k2]; } catch (e) {} }\n" +
+                "  CustomMonitor_JRE_2 = __wrapJRE2;\n" +
                 "}\n"
             );
             scriptEngine.eval(
@@ -2919,6 +2975,91 @@ public class TrainScriptSystem {
             return defaultModelName.isBlank() ? "train" : defaultModelName;
         }
 
+        // ===== ModelLoader.loadModel 互換: 補助モデル(モニタ表示用 .mqoz 等)を同パックから読み描画する =====
+        /** スクリプトの ModelLoader.loadModel(resource,...) 用。元パックから modelFile を読み、ハンドルを返す。 */
+        public Object loadAuxModel(String modelFile) {
+            if (mqoModel == null || modelFile == null || modelFile.isBlank()) return null;
+            java.nio.file.Path pack = mqoModel.getSourcePackPath();
+            if (pack == null) return null;
+            try {
+                return MqoModelLoader.loadAuxModel(pack, modelFile);
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        /**
+         * NGTLib PolygonModel#renderPart 互換。指定パーツを「生の頂点+生UV」で、外部バインド済みテクスチャ
+         * (NGTUtilClient.bindTexture / gif.bindTexture で設定した boundTexture)を使って描画する。
+         * renderNamedGroups の加工(forceCutout/UV window/opaque分割)を通さないので数字/路線図が garbling しない。
+         */
+        public void renderAuxPart(Object auxHandle, String partName) {
+            if (!(auxHandle instanceof MqoModelLoader.MqoModel aux) || poseStack == null || buffer == null) return;
+            String n = normalizeLegacyGroupName(partName);
+            if (n.isEmpty()) return;
+            java.util.Set<String> names = java.util.Set.of(n);
+            // [診断] partName・boundTexture・実描画バッチ数を partName 単位で1回だけ出す。
+            try {
+                String dk = "auxpart|" + n;
+                if (SCRIPT_DIAG_SEEN.add(dk)) {
+                    int bc = aux.countScriptPartBatches(names);
+                    RealTrainModUnofficial.LOGGER.info("[ScriptDiag] renderAuxPart part={} boundTex={} batches={}",
+                        n, boundTexture, bc);
+                }
+            } catch (Throwable ignored) {}
+            try {
+                aux.renderScriptPartRaw(names, poseStack, buffer, packedLight, overlay, boundTexture);
+            } catch (Throwable ignored) {
+            }
+        }
+
+        /** 補助モデル全パーツを描画(model.renderAll 互換)。 */
+        public void renderAuxAll(Object auxHandle) {
+            if (!(auxHandle instanceof MqoModelLoader.MqoModel aux) || poseStack == null || buffer == null) return;
+            try {
+                MqoModelLoader.renderModelWithoutScript(aux, poseStack, buffer, packedLight, overlay, false, null, this);
+                if (aux.hasTranslucentBatches()) {
+                    MqoModelLoader.renderModelWithoutScript(aux, poseStack, buffer, packedLight, overlay, true, null, this);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        /** 補助モデルのグループ名一覧(model.objects 相当の簡易版)。 */
+        public Object auxObjectNames(Object auxHandle) {
+            if (auxHandle instanceof MqoModelLoader.MqoModel aux) {
+                return aux.getAllNormalizedGroupNames().toArray(new String[0]);
+            }
+            return new String[0];
+        }
+
+        private static final java.util.Set<String> SCRIPT_DIAG_SEEN = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        /** スクリプト側の try/catch から呼ぶ診断ログ。メッセージ単位で1回だけ出す(ノイズ防止)。 */
+        public void scriptDiag(String msg) {
+            if (msg == null) return;
+            String key = msg.length() > 200 ? msg.substring(0, 200) : msg;
+            if (SCRIPT_DIAG_SEEN.add(key)) {
+                RealTrainModUnofficial.LOGGER.info("[ScriptDiag] {}", key);
+            }
+        }
+
+        /** Parts.getObjects(model) 互換: 指定グループ群の GroupObject[](faces→vertices) を現モデルから返す。 */
+        public Object[] getPartObjects(String groupsStr) {
+            if (mqoModel == null || groupsStr == null || groupsStr.isBlank()) {
+                return new Object[0];
+            }
+            java.util.Set<String> names = new java.util.LinkedHashSet<>();
+            for (String raw : expandSerializedGroupNames(groupsStr)) {
+                String n = normalizeLegacyGroupName(raw);
+                if (!n.isEmpty()) names.add(n);
+            }
+            try {
+                return mqoModel.getScriptGroupObjects(names);
+            } catch (Throwable t) {
+                return new Object[0];
+            }
+        }
+
         public String getModelName() {
             if (currentEntity instanceof TrainEntity train) {
                 return train.getVehicleId();
@@ -3131,8 +3272,23 @@ public class TrainScriptSystem {
             }
         }
 
-        public List<Object> getScriptModelObjects(String groupsCsv) {
-            return Collections.emptyList();
+        // Parts.getObjects(model) 用。指定グループの GroupObject[](faces→vertices)を現モデルから返す。
+        // ★ Nashorn の Java.from は java.util.List を変換せず undefined を返す(配列専用)。本家 NGTLib も
+        //   GroupObject[] を返すので、ここは必ず Java 配列(Object[])で返す(List だと _getPosList が落ちる)。
+        public Object[] getScriptModelObjects(String groupsCsv) {
+            if (mqoModel == null || groupsCsv == null || groupsCsv.isBlank()) {
+                return new Object[0];
+            }
+            java.util.Set<String> names = new java.util.LinkedHashSet<>();
+            for (String raw : expandSerializedGroupNames(groupsCsv)) {
+                String n = normalizeLegacyGroupName(raw);
+                if (!n.isEmpty()) names.add(n);
+            }
+            try {
+                return mqoModel.getScriptGroupObjects(names);
+            } catch (Throwable t) {
+                return new Object[0];
+            }
         }
 
         public void markScriptManagedParts(Object parts) {
