@@ -19,6 +19,14 @@ public class LegacyClientRegistry {
         bindTileEntitySpecialRenderer(tileEntityClass, (Object) renderer);
     }
 
+    // TileEntitySpecialRenderer をブリッジ型へ remap した後の厳密なシグネチャ。
+    // これが無いと mod の bindTileEntitySpecialRenderer(Class, LegacyTileEntitySpecialRenderer)
+    // 呼び出しが NoSuchMethodError になり preInit ごと失敗 → ブロック未登録になる。
+    public static void bindTileEntitySpecialRenderer(Class<?> tileEntityClass,
+            com.myname.legacyloader.bridge.client.renderer.tileentity.LegacyTileEntitySpecialRenderer renderer) {
+        bindTileEntitySpecialRenderer(tileEntityClass, (Object) renderer);
+    }
+
     public static Object getTileEntitySpecialRenderer(Class<?> tileEntityClass) {
         if (tileEntityClass == null) return null;
         Class<?> c = tileEntityClass;

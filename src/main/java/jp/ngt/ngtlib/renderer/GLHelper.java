@@ -81,4 +81,17 @@ public final class GLHelper {
             r.rotate(roll, 0.0F, 0.0F, 1.0F);
         }
     }
+
+    // ---- テクスチャ UV スクロール (方向幕/回転計器) ----
+    // 本家は GL_TEXTURE 行列を push/translate/pop するが、1.21 の RTMU 描画では
+    // テクスチャ行列を直接いじれない。UV オフセットは ScriptModelRenderer 側 (JS シムが
+    // renderer.setUvOffset に振る経路) が担うため、Java.type で GLHelper を掴んだスクリプト
+    // 用にここでは<b>安全な no-op</b> を提供する。これが無いと DRC1002.js 等が
+    // 「preMoveTexUV is not a function」で落ち、素モデル全描画にフォールバックして
+    // 隠すはずの部品まで出る (動くと二重に見える) 不具合になっていた。
+    public static void preMoveTexUV(float u, float v) {
+    }
+
+    public static void postMoveTexUV() {
+    }
 }

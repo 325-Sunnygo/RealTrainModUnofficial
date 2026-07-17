@@ -13,8 +13,6 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
-import java.util.Locale;
-
 /**
  * jp.ngt.rtm.entity.train.EntityBogie 用レンダラ — 本家 RenderBogie の忠実移植。
  * 描画位置は車体基準の bogiePos へ補正 (本家: RenderMng の補完値を引いて train 相対位置に置き直す)。
@@ -52,22 +50,24 @@ public class RtmBogieRenderer extends EntityRenderer<EntityBogie> {
                 || BogieRenderer.isDummyBogieModel(bogieDef.modelFile())) {
             return;
         }
-        //本家組込の ModelBogie.class は Java クラスなので RTMU では読めない。BogieRenderer が
-        //標準台車 (ModelBogie_ft1.obj) へ差し替えて描く。
+        //★蒸気機関車 (D51/9600 等) の二重描画対策。
         //
-        //以前はここで .class を無条件に return していた。「車体モデル/スクリプトが自前で台車を
-        //描く前提」という想定だったが、300 系新幹線のように車体 MQO が body/yukashita/horo の
-        //3 グループしか持たず台車をまったく含まない車両では誰も台車を描かず、車体だけが宙に
-        //浮いた状態になっていた。
+        //SL は動輪＋主連棒/連結棒 (ロッド) が<b>車体 MQO 側</b>に動輪グループ (wheel/車輪/動輪) として
+        //含まれ、車体スクリプトが車輪回転に合わせてロッドごと動かす。ところが別台車エンティティ
+        //(この RtmBogieRenderer) も同じ位置に台車モデルの車輪を描くため、走行中に動輪・ロッドが
+        //二重に見えていた (報告: D51・9600、台車 DT650・DT580 の「機関車本体」)。本家は動輪を
+        //車体側だけで描くので、<b>車体が自前の車輪グループを持つ車両はこの台車描画を丸ごと
+        //スキップ</b>して車体側に一本化する。
         //
-        //自前の走り装置 (車輪グループ) を持つ車両 (蒸気機関車など) だけ、二重描画を避けて
-        //スキップする。
-        if (bogieDef.modelFile().toLowerCase(Locale.ROOT).endsWith(".class")) {
-            com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel body =
-                com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadModelForVehicle(def);
-            if (body != null && body.hasOwnWheelGroups()) {
-                return;
-            }
+        //以前はこの判定を「台車モデルが .class のときだけ」に限っていたため、DT650/DT580 のように
+        //実モデルファイル (.mqo/.obj) を持つ SL 台車では二重描画が残っていた。台車モデルの種別に
+        //依らず車体の車輪グループ有無で判定する。逆に、車体が車輪を持たない車両 (大多数の電車。
+        //300系新幹線のように body/yukashita/horo だけの車体を含む) では台車を通常どおり描くので、
+        //車体が宙に浮く問題は起きない。
+        com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel body =
+            com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadModelForVehicle(def);
+        if (body != null && body.hasOwnWheelGroups()) {
+            return;
         }
 
         //★毎フレーム、補間済みの車体位置から弦上の bogiePos を求め、実レール(弧)上の最寄り点へ

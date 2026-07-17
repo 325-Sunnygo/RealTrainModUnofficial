@@ -83,12 +83,18 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             if (!be.isLoaded()) return;
             // レールがたまに真っ暗になる対策: ディスパッチャの packedLight はコア BE の
             // ブロック位置でサンプリングされるが、コアは道床/地面の中にあることが多く
-            // 光量 0 になる。レール上面 (コアの 1〜2 ブロック上) で取り直して明るい方を使う。
+            // 光量 0 になる。<b>ほぼ真っ暗な時だけ</b>レール上面 (1〜2 ブロック上) で取り直す。
+            // 常に max 合成すると日陰・夕暮れでも空の明るさで描かれ、
+            // 「周囲は暗いのにレールだけ明るい」不自然さが出る (ユーザー報告)。
             if (be.getLevel() != null) {
-                net.minecraft.core.BlockPos bp = be.getBlockPos();
-                int above1 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above());
-                int above2 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above(2));
-                packedLight = maxPackedLight(packedLight, maxPackedLight(above1, above2));
+                int blockL = packedLight & 0xFFFF;
+                int skyL = (packedLight >> 16) & 0xFFFF;
+                if (blockL <= 16 && skyL <= 16) { //座標圧縮前で 1 段以下 = 埋没サンプリングとみなす
+                    net.minecraft.core.BlockPos bp = be.getBlockPos();
+                    int above1 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above());
+                    int above2 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above(2));
+                    packedLight = maxPackedLight(packedLight, maxPackedLight(above1, above2));
+                }
             }
             RailDefinition def = RailRegistry.getById(be.getRailDefinitionId());
             if (def == null) def = RailRegistry.getSelected();
@@ -810,6 +816,18 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         double cameraDistanceSq,
         boolean compatibilityHeavy
     ) {
+        //本家 1.7.10 の TESR と同じく「レールのその区間の位置」の明るさで描く。
+        //コア 1 点の明るさ (常に埋没 → 上ブロック=空の明るさで救済) を全長に使うと、
+        //日陰・夜間・トンネル外でレールだけ明るく浮く。区間ごとにレール面すぐ上で
+        //サンプリングし、完全に真っ暗 (ブロック内サンプリング) の時だけ 1 つ上で救済。
+        if (blockEntity.getLevel() != null) {
+            net.minecraft.core.BlockPos sp = net.minecraft.core.BlockPos.containing(wx, wy + 0.25D, wz);
+            int segLight = net.minecraft.client.renderer.LevelRenderer.getLightColor(blockEntity.getLevel(), sp);
+            if (segLight == 0) {
+                segLight = net.minecraft.client.renderer.LevelRenderer.getLightColor(blockEntity.getLevel(), sp.above());
+            }
+            packedLight = segLight;
+        }
         poseStack.pushPose();
         float yBump = depthJitter(pos);
         poseStack.translate(wx - ox, wy - oy - 0.0625 + yBump, wz - oz);

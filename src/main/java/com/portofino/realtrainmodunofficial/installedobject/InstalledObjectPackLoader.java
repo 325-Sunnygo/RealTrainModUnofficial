@@ -400,7 +400,10 @@ public final class InstalledObjectPackLoader {
             );
             Vec3 offset = parseVec3(model, "offset", 1.0 / 16.0);
             float scale = parseFloat(model, "scale", 1.0F);
-            boolean smoothing = getBoolean(obj, "smoothing", true);
+            //本家 ModelConfig.smoothing の既定値は false (JSON で明示された時だけスムージング)。
+            //実パックはほぼ全モデルで明示指定しており、未指定モデルを true にすると本家より
+            //滑らかになってしまうため本家に合わせる。
+            boolean smoothing = getBoolean(obj, "smoothing", false);
             Map<String, String> textures = new HashMap<>(parseTextures(model));
             if (category == InstalledObjectCategory.SIGNAL) {
                 String signalTexture = getString(obj, "signalTexture");

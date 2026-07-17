@@ -4,7 +4,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonPrimitive;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
@@ -52,6 +51,18 @@ public final class ExternalSoundPackBridge {
     private ExternalSoundPackBridge() {
     }
 
+    /**
+     * 生成サウンドパックを作り直す (パック同意状態が変わった後などに呼ぶ)。
+     * <p>生成パックはリソースパックとして扱われるため、ファイルを作り直すだけでは
+     * {@code SoundManager} には反映されない。呼び出し後に必ず
+     * {@link net.minecraft.client.Minecraft#reloadResourcePacks()} でリソースを再読込すること。
+     * これをしないと、タイトル画面で README 同意したパックの走行音等が
+     * 「パックには入っているのに次回起動まで鳴らない」状態になる。
+     */
+    public static void rebuild() {
+        rebuildGeneratedPack();
+    }
+
     public static void register(AddPackFindersEvent event) {
         if (event.getPackType() != PackType.CLIENT_RESOURCES) {
             return;
@@ -96,9 +107,13 @@ public final class ExternalSoundPackBridge {
                 }
             }
             boolean wroteAnyJson = writeMergedSoundsJson(mergedSoundDefs);
+            //中身が空でも pack.mcmeta を書いて<b>有効なパックとして常に返す</b>。こうしておくと、
+            //起動時に同意済みの音パックが 1 つも無くても pack が登録され、後からタイトル画面で
+            //README 同意 → {@link #rebuild()} + reloadResourcePacks したときに新しい音を足せる。
+            //(以前は空だと pack ごと削除して null=未登録にしていたため、その状況では同意しても
+            // 再読込で音が復活しなかった。)
             if (!copiedAnySoundAsset && !wroteAnyJson) {
-                deleteDirectoryIfExists(GENERATED_PACK_ROOT);
-                return null;
+                RealTrainModUnofficial.LOGGER.debug("External sound bridge: no external sounds yet (empty pack registered)");
             }
             writePackMeta();
             return GENERATED_PACK_ROOT;
@@ -314,9 +329,24 @@ public final class ExternalSoundPackBridge {
         }
         JsonObject event = new JsonObject();
         JsonArray sounds = new JsonArray();
-        sounds.add(namespace + ":" + soundPath);
+        sounds.add(soundReferenceWithRange(namespace + ":" + soundPath));
         event.add("sounds", sounds);
         target.add(eventKey, event);
+    }
+
+    /**
+     * レガシー音の可聴距離 (ブロック)。MC 既定の 16 は列車には短すぎて
+     * 「音がすぐ消える」ため、45 ブロックかけて線形に減衰させる。
+     * 実際の減衰終端は max(音量,1)×この値 (音量は {@link LegacyScriptSoundManager} 側で 1.0 に制限)。
+     */
+    private static final int LEGACY_ATTENUATION_DISTANCE = 45;
+
+    /** "ns:path" の音参照を attenuation_distance 付きのオブジェクト形式にする。 */
+    private static JsonObject soundReferenceWithRange(String name) {
+        JsonObject sound = new JsonObject();
+        sound.addProperty("name", name);
+        sound.addProperty("attenuation_distance", LEGACY_ATTENUATION_DISTANCE);
+        return sound;
     }
 
     private static void mergeSoundDefinitions(String namespace, String jsonText, Map<String, JsonObject> mergedSoundDefs) {
@@ -366,7 +396,8 @@ public final class ExternalSoundPackBridge {
             return soundEntry;
         }
         if (soundEntry.isJsonPrimitive() && soundEntry.getAsJsonPrimitive().isString()) {
-            return new JsonPrimitive(namespacedSoundPath(namespace, soundEntry.getAsString()));
+            //文字列参照はオブジェクト形式へ変換し、可聴距離 45 を付与する
+            return soundReferenceWithRange(namespacedSoundPath(namespace, soundEntry.getAsString()));
         }
         if (!soundEntry.isJsonObject()) {
             return soundEntry.deepCopy();
@@ -376,6 +407,7 @@ public final class ExternalSoundPackBridge {
         if (name != null && name.isJsonPrimitive() && name.getAsJsonPrimitive().isString()) {
             copy.addProperty("name", namespacedSoundPath(namespace, name.getAsString()));
         }
+        copy.addProperty("attenuation_distance", LEGACY_ATTENUATION_DISTANCE);
         return copy;
     }
 
@@ -395,9 +427,20 @@ public final class ExternalSoundPackBridge {
         return sanitizeSoundPath(ns) + ":" + sanitizeSoundPath(path);
     }
 
+    /**
+     * 生成パックに含まれるレガシー音の名前空間 (sound_mugenlib, rtm 等)。
+     * {@link LegacyStereoDownmix} が「どの音をモノラル化するか」の判定に使う。
+     */
+    private static final java.util.Set<String> GENERATED_NAMESPACES = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    public static java.util.Set<String> generatedNamespaces() {
+        return GENERATED_NAMESPACES;
+    }
+
     private static boolean writeMergedSoundsJson(Map<String, JsonObject> mergedSoundDefs) throws IOException {
         boolean wroteAny = false;
         for (Map.Entry<String, JsonObject> entry : mergedSoundDefs.entrySet()) {
+            GENERATED_NAMESPACES.add(entry.getKey());
             Path target = GENERATED_PACK_ROOT.resolve("assets").resolve(entry.getKey()).resolve("sounds.json");
             Files.createDirectories(target.getParent());
             Files.writeString(

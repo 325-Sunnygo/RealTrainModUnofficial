@@ -52,6 +52,28 @@ public class LegacyClientHelper {
         return new ClientResourceManagerBridge(mc);
     }
 
+    /** 1.7.10 Minecraft.func_135016_M() (getLanguageManager) の代役。 */
+    public static com.myname.legacyloader.bridge.client.resources.LegacyLanguageManager getLanguageManager(Minecraft mc) {
+        return new com.myname.legacyloader.bridge.client.resources.LegacyLanguageManager();
+    }
+
+    /**
+     * 1.7.10 Minecraft.func_147108_a(GuiScreen) (displayGuiScreen) の代役。
+     * 引数を Object にすることでスタブ GUI 型 (GuiConfirmOpenLink 等) を渡してもバイトコード
+     * 検証を通す (これを invokevirtual のまま残すと、スタブ GUI がモダン Screen と非互換で
+     * VerifyError → そのブロッククラスがロード不能になり、登録が丸ごと失敗していた)。
+     * 実際に現行 Screen なら表示、そうでなければ何もしない。
+     */
+    public static void displayGuiScreen(Minecraft mc, Object screen) {
+        try {
+            if (mc != null && screen instanceof net.minecraft.client.gui.screens.Screen s) {
+                mc.setScreen(s);
+            }
+            // スタブ GUI (Web リンク確認等) は現行 Screen ではないので無視する。
+        } catch (Throwable ignored) {
+        }
+    }
+
     public static LegacyIResourceManager func_110442_L(Minecraft mc) {
         return getResourceManager(mc);
     }

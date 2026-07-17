@@ -227,7 +227,22 @@ public final class VehicleScriptRenderers {
         public boolean render(Object entity, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel bodyModel) {
-            //完全静止した車両だけキャッシュ対象にする (アニメ中の車両は毎フレーム描いて滑らかさ維持)。
+            //ガラス (半透明) を遅延バッファへ回す判定用に、描画中の車両を記録する。
+            //replay 経路では renderNamedGroups に entity が渡らず null になるため、
+            //この記録が無いとガラスが遅延されず、色付きガラス越しのレールに色が付かない。
+            com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(entity);
+            try {
+                return renderDispatch(entity, partialTick, poseStack, buffer, packedLight, packedOverlay, bodyModel);
+            } finally {
+                com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(null);
+            }
+        }
+
+        private boolean renderDispatch(Object entity, float partialTick, PoseStack poseStack,
+                              MultiBufferSource buffer, int packedLight, int packedOverlay,
+                              MqoModelLoader.MqoModel bodyModel) {
+            //完全静止した車両だけキャッシュ対象にする (アニメ中/走行中の車両は毎フレーム描いて
+            //滑らかさ維持。走行中のキャッシュは内装のチラつきを招くため行わない)。
             boolean canCache = isFullyStatic(entity);
             if (!canCache) {
                 this.entityCaches.remove(entity);
@@ -237,9 +252,8 @@ public final class VehicleScriptRenderers {
             EntityCache ec = this.entityCaches.computeIfAbsent(entity, k -> new EntityCache());
             long sig = signature(entity);
             long now = System.currentTimeMillis();
-            //シグネチャ変化 (方向転換・ドア操作・初出現) = スクリプトの時間依存アニメが始まる
-            //合図。ここから ANIMATION_GRACE_MS の間は毎フレーム描いてアニメを進める
-            //(座席回転・ドア開閉は pass==1 で時計が進むため、毎フレームの Nashorn 実行が必須)。
+            //シグネチャ変化 (方向転換・ドア操作・初出現) = スクリプトの時間依存アニメが始まる合図。
+            //ここから ANIMATION_GRACE_MS の間は毎フレーム描いてアニメを進める。
             if (!ec.valid || ec.sig != sig) {
                 ec.animUntilMs = now + ANIMATION_GRACE_MS;
             }
@@ -305,6 +319,13 @@ public final class VehicleScriptRenderers {
             //  「オーバーレイを持つ matId」で render() を呼び直して tess 描画のみを拾う。
             renderMaterialOverlays(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
                     bodyModel, sink);
+            //★発光パス (2-4) は半透明パス (1=窓) より先に描く。
+            //  バッファ描画では同フレーム内の描画順 = RenderType の挿入順で、窓 (entityTranslucent)
+            //  が先に深度を書くと、後から描いた室内灯/尾灯が窓越しの視線で深度テストに落ち、
+            //  「外から見るとライトが消えている・乗ると点いている」珍現象になる。
+            //  灯り→窓の順なら、窓ガラスの色が灯りの上にブレンドされる (本家の見た目と同じ)。
+            renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
+                    bodyModel, graph, sink);
             //★半透明パス (TRANSPARENT=1)。本家 RenderVehicleBase は毎フレーム pass0(不透明)+
             //  pass1(半透明) を回すが、RTMU は従来 pass1 を飛ばしていた。そのため:
             //  (a) 座席回転・ドア開閉・ドアライトのアニメ時計 (スクリプト内で
@@ -323,8 +344,6 @@ public final class VehicleScriptRenderers {
                             excluded == null ? null : Set.copyOf(excluded)));
                 }
             }
-            renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
-                    bodyModel, graph, sink);
             return true;
         }
 

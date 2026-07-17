@@ -20,14 +20,24 @@ public abstract class LegacyRender extends EntityRenderer<Entity> {
     }
 
     private static EntityRendererProvider.Context createContext() {
+        // 1.7.10 mod の ClientProxy は登録フェーズ (RegisterEvent) の <clinit> で
+        // Render インスタンスを作ることがある。その時点では EntityRenderDispatcher や
+        // ItemRenderer 等がまだ生成されておらず null。以前は
+        // getEntityRenderDispatcher().getItemInHandRenderer() が null 参照で NPE を投げ、
+        // ClientProxy の初期化ごと失敗 → legacyloader の登録が中断し、RTMU 本体のブロックまで
+        // 未登録 (ピンク/クラッシュ) になっていた。
+        // これらの Render は「登録される」だけで実描画は RTMU 側が行うため、null フィールドで
+        // Context を作っても問題ない。ディスパッチャが無い時は null 安全に組み立てる。
+        Minecraft mc = Minecraft.getInstance();
+        var dispatcher = mc == null ? null : mc.getEntityRenderDispatcher();
         return new EntityRendererProvider.Context(
-                Minecraft.getInstance().getEntityRenderDispatcher(),
-                Minecraft.getInstance().getItemRenderer(),
-                Minecraft.getInstance().getBlockRenderer(),
-                Minecraft.getInstance().getEntityRenderDispatcher().getItemInHandRenderer(),
-                Minecraft.getInstance().getResourceManager(),
-                Minecraft.getInstance().getEntityModels(),
-                Minecraft.getInstance().font
+                dispatcher,
+                mc == null ? null : mc.getItemRenderer(),
+                mc == null ? null : mc.getBlockRenderer(),
+                dispatcher == null ? null : dispatcher.getItemInHandRenderer(),
+                mc == null ? null : mc.getResourceManager(),
+                mc == null ? null : mc.getEntityModels(),
+                mc == null ? null : mc.font
         );
     }
 

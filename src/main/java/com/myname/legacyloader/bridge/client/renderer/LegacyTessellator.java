@@ -57,6 +57,17 @@ public class LegacyTessellator {
         CURRENT_COLOR.set(packBlockColor(red, green, blue));
     }
 
+    /** 現在の色 (ARGB packed)。OBJ/TESR 描画で glColor3f の値を反映するのに使う。 */
+    public static int currentColor() {
+        Integer c = CURRENT_COLOR.get();
+        return c == null ? 0xFFFFFFFF : c;
+    }
+
+    /** 色を白 (0xFFFFFFFF) にリセット。TESR 描画開始時に呼ぶ。 */
+    public static void resetCurrentColor() {
+        CURRENT_COLOR.set(0xFFFFFFFF);
+    }
+
     public void func_78374_a(double x, double y, double z, double u, double v) {
         double[] normal = CURRENT_NORMAL.get();
         VERTICES.get().add(new Vertex(x, y, z, u, v, CURRENT_ICON.get(),

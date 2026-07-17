@@ -32,6 +32,31 @@ public final class LegacyScriptSoundManager {
     //消えた列車の登録を掃除する頻度 (play 呼び出し回数)
     private static int pruneCounter;
 
+    //---- 一時診断: どの経路・音量・推定範囲で音が鳴るか実測する (音IDごと2秒throttle) ----
+    //実減衰 = max(音量,1.0) × 16 ブロック (createFixedRangeEvent は減衰に無関係)。
+    /**
+     * 音量を安全化。<b>NaN → 0 (無音)</b>。
+     * <p>パックの音スクリプトの音量補間 (fadeCon 等) がゼロ除算で NaN / ±Infinity を返すことがあり、
+     * {@link Mth#clamp} は NaN をそのまま素通しする ({@code Math.max(NaN,0)==NaN})。NaN 音量は
+     * OpenAL の減衰距離 {@code max(vol,1)×16} も NaN にして<b>減衰そのものを無効化</b>し、
+     * 「どんなに離れても最大音量で聞こえる」不具合を起こす。ここで確実に潰す。
+     * ±Infinity は {@code Mth.clamp} が正しく端に丸めるので NaN だけ特別扱いすれば足りる。
+     */
+    static float safeVolume(float v, float max) {
+        if (Float.isNaN(v)) {
+            return 0.0F;
+        }
+        return Mth.clamp(v, 0.0F, max);
+    }
+
+    /** ピッチを安全化。NaN → 1.0。 */
+    static float safePitch(float p) {
+        if (Float.isNaN(p)) {
+            return 1.0F;
+        }
+        return Mth.clamp(p, 0.05F, 4.0F);
+    }
+
     private LegacyScriptSoundManager() {
     }
 
@@ -147,8 +172,8 @@ public final class LegacyScriptSoundManager {
             minecraft.getSoundManager().play(new SimpleSoundInstance(
                 soundId,
                 SoundSource.NEUTRAL,
-                Mth.clamp(volume, 0.0F, 8.0F),
-                Mth.clamp(pitch, 0.05F, 4.0F),
+                safeVolume(volume, 8.0F),
+                safePitch(pitch),
                 SoundInstance.createUnseededRandom(),
                 false,
                 0,
@@ -173,6 +198,14 @@ public final class LegacyScriptSoundManager {
         if (sound != null) {
             //明示 stop 済み / 列車消滅で止まった残骸 → 作り直す
             ACTIVE.remove(key, sound);
+        }
+        //新規作成: サニタイズ後の音量が 0 以下なら登録も再生もしない。
+        //  NaN/±Infinity や fadeIn 開始点の 0 で「音量0のまま SoundEngine にスキップされ、
+        //  チャンネルが無いのに ACTIVE に居座って二度と復活しない」のを防ぐ。次フレームで
+        //  音量が正になれば新規に作り直して鳴る。
+        float sanVol = safeVolume(volume, 1.0F);
+        if (sanVol <= 0.0F) {
+            return;
         }
         sound = new TrainScriptSound(train, soundId, looping);
         sound.update(volume, pitch);
@@ -205,8 +238,8 @@ public final class LegacyScriptSoundManager {
         SimpleSoundInstance instance = new SimpleSoundInstance(
             soundId,
             SoundSource.RECORDS,
-            Mth.clamp(volume, 0.0F, 16.0F),
-            Mth.clamp(pitch, 0.05F, 4.0F),
+            safeVolume(volume, 16.0F),
+            safePitch(pitch),
             SoundInstance.createUnseededRandom(),
             false,
             0,
@@ -443,23 +476,39 @@ public final class LegacyScriptSoundManager {
      */
     private static final class TrainScriptSound extends AbstractTickableSoundInstance {
         private final Entity train;
+        private final boolean repeat;
+        /** 最後にスクリプトから再生要求された時刻 (ms)。ループ音の鳴りっぱなし対策に使う。 */
+        private volatile long lastRequestMs;
+
+        //列車の車体音の可聴距離。実際の減衰は sounds.json の attenuation_distance=45
+        //(ExternalSoundPackBridge が生成時に付与) × max(音量,1) で決まり、45 ブロックかけて
+        //線形にゼロへ落ちる。SoundEvent の range は減衰計算に使われないが、値は合わせておく。
+        private static final float TRAIN_SOUND_RANGE = 45.0F;
 
         private TrainScriptSound(Entity train, ResourceLocation soundId, boolean repeat) {
-            super(SoundEvent.createVariableRangeEvent(soundId), SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
+            super(SoundEvent.createFixedRangeEvent(soundId, TRAIN_SOUND_RANGE),
+                    SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
             this.train = train;
+            this.repeat = repeat;
             this.looping = repeat;
             this.delay = 0;
             this.volume = 0.0F;
             this.pitch = 1.0F;
             this.relative = false;
+            this.lastRequestMs = System.currentTimeMillis();
             this.x = train.getX();
             this.y = train.getY();
             this.z = train.getZ();
         }
 
         private void update(float volume, float pitch) {
-            this.volume = Mth.clamp(volume, 0.0F, 8.0F);
-            this.pitch = Mth.clamp(pitch, 0.05F, 4.0F);
+            //実減衰距離は max(音量,1.0) × attenuation_distance(45)。音量を 1.0 に制限すると
+            //きっかり 45 ブロックで線形にゼロへ落ちる (音量>1 は近くの大きさを変えず範囲だけ
+            //伸ばすため、制限しても近距離の聞こえ方は変わらない)。ループ・一発音とも。
+            float maxVol = 1.0F;
+            this.volume = safeVolume(volume, maxVol);
+            this.pitch = safePitch(pitch);
+            this.lastRequestMs = System.currentTimeMillis();
             this.x = train.getX();
             this.y = train.getY();
             this.z = train.getZ();
@@ -475,6 +524,14 @@ public final class LegacyScriptSoundManager {
             if (!train.isAlive()) {
                 ACTIVE.remove(key(train.getUUID(), this.getLocation()), this);
                 AUTO_RUNNING.remove(train.getUUID());
+                stop();
+                return;
+            }
+            //ループ音がスクリプトから要求されなくなったら (チャンク遠方・非描画で走行スクリプトが
+            //回らなくなった等) 止める。本家 SoundUpdaterVehicle は「今 update で要求されない音は止める」
+            //方式。要求が途絶えて 400ms 経ったら停止 (鳴りっぱなしの走行音を消す)。
+            if (this.repeat && System.currentTimeMillis() - this.lastRequestMs > 400L) {
+                ACTIVE.remove(key(train.getUUID(), this.getLocation()), this);
                 stop();
                 return;
             }

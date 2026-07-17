@@ -175,9 +175,15 @@ public class ItemRail extends Item {
 
     private static void setRPToItem(ItemStack stack, RailPosition[] rps) {
         CompoundTag nbt = getTag(stack);
-        nbt.putByte("Size", (byte) rps.length);
-        for (int i = 0; i < rps.length; ++i) {
-            nbt.put("RP" + i, rps[i].writeToNBT());
+        //rps が null (レール変換中/破壊直後でコアがまだ RailPosition を持たない) の場合、
+        //rps.length で NPE になり WAILA のツールチップ表示だけでゲームが落ちていた。
+        //null/空なら Size=0 で書き込む (アイテムは形状情報無しでも成立する)。
+        int size = rps == null ? 0 : rps.length;
+        nbt.putByte("Size", (byte) size);
+        for (int i = 0; i < size; ++i) {
+            if (rps[i] != null) {
+                nbt.put("RP" + i, rps[i].writeToNBT());
+            }
         }
         setTag(stack, nbt);
     }

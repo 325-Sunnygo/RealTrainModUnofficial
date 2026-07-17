@@ -160,6 +160,13 @@ public class LegacyItemStackHelper {
         return stack == null ? 0 : getMetadata(stack);
     }
 
+    /** 1.7.10 ItemStack.func_77964_b(int) = setItemDamage / setDamageValue。 */
+    public static void func_77964_b(ItemStack stack, int damage) {
+        if (stack != null && !stack.isEmpty()) {
+            stack.setDamageValue(damage);
+        }
+    }
+
     public static boolean func_190926_b(ItemStack stack) {
         return stack == null || stack.isEmpty();
     }

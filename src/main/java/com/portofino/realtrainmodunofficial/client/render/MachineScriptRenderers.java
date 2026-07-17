@@ -121,6 +121,21 @@ public final class MachineScriptRenderers {
         private final TileEntityPartsRenderer renderer;
         private final ModelObject modelObject;
 
+        //設置オブジェクトごとのスクリプト描画キャッシュ。信号機/看板は状態が変わらない間
+        //Nashorn を再実行せず記録を再生する (172 個の毎フレーム実行が主なコストだった)。
+        //シグネチャに含まれない時間依存要素の取りこぼしは REFRESH_FRAMES で救済する。
+        private final java.util.Map<Object, Cache> caches =
+                java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+        private static final int REFRESH_FRAMES = 8;
+
+        private static final class Cache {
+            boolean valid;
+            boolean drew;
+            long sig;
+            int framesSinceRun;
+            GLRecorder rec;
+        }
+
         Scripted(TileEntityPartsRenderer renderer, ModelObject modelObject) {
             this.renderer = renderer;
             this.modelObject = modelObject;
@@ -132,6 +147,34 @@ public final class MachineScriptRenderers {
         public boolean render(InstalledObjectBlockEntity be, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
+            //replay 経路では renderNamedGroups に entity が渡らないため、遅延判定用に記録する
+            //(色付きレンズ越しのレール/地形に色を乗せるにはガラスをレールの後に描く必要がある)。
+            com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(be);
+            try {
+                return renderInner(be, partialTick, poseStack, buffer, packedLight, packedOverlay, model);
+            } finally {
+                com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(null);
+            }
+        }
+
+        private boolean renderInner(InstalledObjectBlockEntity be, float partialTick, PoseStack poseStack,
+                              MultiBufferSource buffer, int packedLight, int packedOverlay,
+                              MqoModelLoader.MqoModel model) {
+            Cache c = this.caches.computeIfAbsent(be, k -> new Cache());
+            long sig = be.renderStateSignature();
+            PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
+
+            //キャッシュヒット: 記録を再生するだけ (Nashorn 実行なし)。
+            if (c.valid && c.sig == sig && c.framesSinceRun < REFRESH_FRAMES) {
+                c.framesSinceRun++;
+                if (!c.drew) {
+                    return false;
+                }
+                VehicleScriptRenderers.replay(c.rec, poseStack, buffer, packedLight, packedOverlay, model, graph);
+                return true;
+            }
+
+            //ミス: 実際にスクリプトを実行して記録し、キャッシュへ保存。
             GLRecorder rec = new GLRecorder();
             GLRecorder.activate(rec);
             try {
@@ -147,11 +190,16 @@ public final class MachineScriptRenderers {
             //★ isEmpty ではなく hasGeometry。スクリプトが何も描かずに落ちると行列操作だけが
             //  残って isEmpty()==false になり、「描画済み」と誤判定して素のモデル描画が
             //  スキップされ、設置物が透明になる。
-            if (!rec.hasGeometry()) {
+            boolean drew = rec.hasGeometry();
+            c.valid = true;
+            c.sig = sig;
+            c.framesSinceRun = 0;
+            c.drew = drew;
+            c.rec = drew ? rec : null;
+            if (!drew) {
                 return false;
             }
-            VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model,
-                    this.modelObject != null ? this.modelObject.model : null);
+            VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model, graph);
             return true;
         }
     }

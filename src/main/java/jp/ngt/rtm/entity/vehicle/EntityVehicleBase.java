@@ -165,6 +165,10 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         if (!this.level().isClientSide || this.getPassengers().isEmpty()) {
             return;
         }
+        //フリーカメラ中は視点追従オフ (カーブで乗員の視点を回さない)
+        if (com.portofino.realtrainmodunofficial.client.FreeCameraController.isActive()) {
+            return;
+        }
         float dYaw = net.minecraft.util.Mth.wrapDegrees(this.getYRot() - this.prevRotationYawVehicle);
         float dPitch = net.minecraft.util.Mth.wrapDegrees(this.getXRot() - this.prevRotationPitchVehicle);
         if (dYaw == 0.0F && dPitch == 0.0F) {

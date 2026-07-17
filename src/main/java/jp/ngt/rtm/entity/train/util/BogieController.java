@@ -14,6 +14,50 @@ import net.minecraft.world.level.Level;
 public class BogieController {
     private final EntityBogie[] bogies = new EntityBogie[2];
 
+    //===== 車体サスペンション (RTMU オリジナル機能) =====
+    //台車はレールへ正確に追従させたまま、車体の Y だけを空気ばね風のばね-ダンパーに通す。
+    //継ぎ目・勾配の折れ目で車体がわずかに沈んで揺り戻す「生きている」上下動を出す。
+    //ピッチ (前後傾) は付けない — 大きく傾けると車体が地形にめり込んで黒くチラつくため、
+    //ピッチは常にレール実測値どおりにする。可動域も地面へ埋まらないようクランプする。
+    private boolean suspInit;
+    private double suspY;
+    private double suspYVel;
+    private double suspPrevTargetY;
+    private double suspTargetVelY;
+    /**
+     * 定速成分 (目標速度) の平滑化係数。目標 Y はレール分割点の量子化で毎 tick 微振動する。
+     * 生の差分をそのまま先読みに使うとその振動が車体へ素通しされて常時揺れて見えるため、
+     * EMA を通した速度で追従する (一定勾配へは数 tick で収束、ノイズは通さない)。
+     */
+    private static final float SUSP_VEL_SMOOTH = 0.3F;
+    /** ばね定数 (残差を 1tick でどれだけ速度へ変換するか)。 */
+    private static final float SUSP_SPRING = 0.12F;
+    /** 速度の減衰率。SPRING と合わせて弱アンダーダンプ (2 割弱のオーバーシュート 1 回で収束)。 */
+    private static final float SUSP_DAMPING = 0.60F;
+    /** これ以上の段差は設置/テレポート/脱線とみなして即スナップ。 */
+    private static final double SUSP_SNAP = 0.5D;
+    /** 目標高さから沈み込める最大量 (ブロック)。地面へめり込ませないよう小さく抑える。 */
+    private static final double SUSP_MAX_DROP = 0.045D;
+    /** 目標高さから浮き上がれる最大量 (ブロック)。 */
+    private static final double SUSP_MAX_RISE = 0.045D;
+
+    /**
+     * レール継ぎ目 (レール core 境界) 通過時の「ガタン」(RTMU オリジナル)。
+     * レール形状は継ぎ目でも連続なので自然な段差入力が無い。台車が継ぎ目を踏んだ瞬間に
+     * サスペンションへ下向きの速度を小さく与え、車体がコトンと沈んで揺り戻す。
+     * 速度に比例 (停車中は無し)。ピッチは付けない (車体を傾けて地形へめり込ませないため)。
+     */
+    public void onRailJoint(EntityBogie bogie, float speed) {
+        if (!this.suspInit) {
+            return;
+        }
+        double kick = Math.min(0.012D, Math.abs(speed) * 0.03D);
+        if (kick < 0.001D) {
+            return;
+        }
+        this.suspYVel -= kick;
+    }
+
     public void createBogie(Level world, EntityTrainBase train) {
         this.bogies[0] = new EntityBogie(RTMEntities.BOGIE.get(), world, (byte) 0);
         this.bogies[1] = new EntityBogie(RTMEntities.BOGIE.get(), world, (byte) 1);
@@ -135,6 +179,36 @@ public class BogieController {
         x += vec.getX();
         y += vec.getY() - EntityTrainBase.TRAIN_HEIGHT;
         z += vec.getZ();
+
+        //車体サスペンション: Y の段差成分だけにばね-ダンパー応答 (フィールド定義部のコメント参照)。
+        //ピッチはレール実測値のまま (傾けて地形へめり込むのを防ぐ)。
+        double targetY = y;
+        if (!this.suspInit || Math.abs(targetY - this.suspY) > SUSP_SNAP) {
+            this.suspInit = true;
+            this.suspY = targetY;
+            this.suspYVel = 0.0D;
+            this.suspTargetVelY = 0.0D;
+        } else {
+            //定速成分は平滑化した目標速度で追従 (生の差分はレール分割点の量子化ノイズを含む)
+            double rawVelY = targetY - this.suspPrevTargetY;
+            this.suspTargetVelY += (rawVelY - this.suspTargetVelY) * SUSP_VEL_SMOOTH;
+            this.suspY += this.suspTargetVelY;
+            //残差 (継ぎ目・勾配の折れによる段差) をばね-ダンパーで吸収 —
+            //ふわっと沈んで一度だけ小さく揺り戻す
+            double errY = targetY - this.suspY;
+            this.suspYVel = this.suspYVel * SUSP_DAMPING + errY * SUSP_SPRING;
+            this.suspY += this.suspYVel;
+            //可動域クランプ: 目標から沈み/浮きを小さく制限し、地面へめり込ませない
+            if (this.suspY < targetY - SUSP_MAX_DROP) {
+                this.suspY = targetY - SUSP_MAX_DROP;
+                if (this.suspYVel < 0.0D) this.suspYVel = 0.0D;
+            } else if (this.suspY > targetY + SUSP_MAX_RISE) {
+                this.suspY = targetY + SUSP_MAX_RISE;
+                if (this.suspYVel > 0.0D) this.suspYVel = 0.0D;
+            }
+        }
+        this.suspPrevTargetY = targetY;
+        y = this.suspY;
 
         train.setPositionAndRotationDirect(x, y, z, yaw, pitch);
         train.updateRoll(roll);

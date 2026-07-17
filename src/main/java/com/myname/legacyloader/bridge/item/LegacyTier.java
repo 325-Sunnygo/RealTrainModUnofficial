@@ -8,6 +8,16 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.item.crafting.Ingredient;
 
 public class LegacyTier implements Tier {
+
+    // 1.7.10 Item.ToolMaterial の標準定数 (harvestLevel, maxUses, efficiency, damage, enchantability)。
+    // Mod が LegacyTier.IRON のように参照する (例: Bamboo の ItemKatana)。
+    public static final LegacyTier WOOD = new LegacyTier(0, 59, 2.0F, 0.0F, 15);
+    public static final LegacyTier STONE = new LegacyTier(1, 131, 4.0F, 1.0F, 5);
+    public static final LegacyTier IRON = new LegacyTier(2, 250, 6.0F, 2.0F, 14);
+    public static final LegacyTier EMERALD = new LegacyTier(3, 1561, 8.0F, 3.0F, 10); // 1.7.10 のダイヤ相当
+    public static final LegacyTier DIAMOND = EMERALD;
+    public static final LegacyTier GOLD = new LegacyTier(0, 32, 12.0F, 0.0F, 22);
+
     private final int level;
     private final int uses;
     private final float speed;

@@ -917,6 +917,35 @@ public class ClassTransformer {
                 return;
             }
 
+            // Minecraft.func_135016_M() = getLanguageManager()。現行 MC には無いので橋渡し。
+            // (AsphaltMod の isJapanese() 等が言語判定に使用。未対応だと NoSuchMethodError で
+            //  ClientProxy.init が中断し、ISBRH ブロック描画の登録まで失われていた。)
+            if (opcode == Opcodes.INVOKEVIRTUAL
+                    && "net/minecraft/client/Minecraft".equals(owner)
+                    && "func_135016_M".equals(name)) {
+                super.visitMethodInsn(Opcodes.INVOKESTATIC,
+                        "com/myname/legacyloader/bridge/client/LegacyClientHelper",
+                        "getLanguageManager",
+                        "(Lnet/minecraft/client/Minecraft;)Lcom/myname/legacyloader/bridge/client/resources/LegacyLanguageManager;",
+                        false);
+                return;
+            }
+
+            // Minecraft.func_147108_a(GuiScreen) = displayGuiScreen。引数を Object 化して橋渡し。
+            // スタブ GUI (GuiConfirmOpenLink 等) をそのまま渡すとモダン Screen と非互換で
+            // VerifyError になり、そのメソッドを含むブロッククラス (AsphaltMod の電光掲示板等) が
+            // ロード不能 → フィールド null → init NPE で以降の登録が失われていた。
+            if (opcode == Opcodes.INVOKEVIRTUAL
+                    && "net/minecraft/client/Minecraft".equals(owner)
+                    && "func_147108_a".equals(name)) {
+                super.visitMethodInsn(Opcodes.INVOKESTATIC,
+                        "com/myname/legacyloader/bridge/client/LegacyClientHelper",
+                        "displayGuiScreen",
+                        "(Lnet/minecraft/client/Minecraft;Ljava/lang/Object;)V",
+                        false);
+                return;
+            }
+
             if (opcode == Opcodes.INVOKEVIRTUAL
                     && "net/minecraft/client/multiplayer/ClientLevel".equals(owner)
                     && "func_72869_a".equals(name)
@@ -989,6 +1018,10 @@ public class ClassTransformer {
                     case "func_77960_j": // getDamageValue() / getItemDamage()
                         super.visitMethodInsn(Opcodes.INVOKESTATIC, ITEM_STACK_HELPER, "func_77960_j",
                                 "(L" + TARGET_ITEM_STACK + ";)I", false);
+                        return;
+                    case "func_77964_b": // setDamageValue(int) / setItemDamage(int)
+                        super.visitMethodInsn(Opcodes.INVOKESTATIC, ITEM_STACK_HELPER, "func_77964_b",
+                                "(L" + TARGET_ITEM_STACK + ";I)V", false);
                         return;
                     case "func_190926_b": // isEmpty()
                         super.visitMethodInsn(Opcodes.INVOKESTATIC, ITEM_STACK_HELPER, "func_190926_b",

@@ -16,6 +16,7 @@ public final class TrainControlKeyMappings {
     public static final KeyMapping PLAY_ANNOUNCEMENT = key("play_announcement", GLFW.GLFW_KEY_I);
     public static final KeyMapping PLAY_HORN = key("play_horn", GLFW.GLFW_KEY_P);
     public static final KeyMapping TOGGLE_RENDER_PROFILER = key("toggle_render_profiler", GLFW.GLFW_KEY_F8);
+    public static final KeyMapping FREE_CAMERA = key("free_camera", GLFW.GLFW_KEY_V);
 
     private TrainControlKeyMappings() {
     }
@@ -29,6 +30,7 @@ public final class TrainControlKeyMappings {
         event.register(PLAY_ANNOUNCEMENT);
         event.register(PLAY_HORN);
         event.register(TOGGLE_RENDER_PROFILER);
+        event.register(FREE_CAMERA);
     }
 
     public static boolean matchesSneak(int key, int scanCode) {

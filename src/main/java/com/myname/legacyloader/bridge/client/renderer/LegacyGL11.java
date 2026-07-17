@@ -74,7 +74,12 @@ public final class LegacyGL11 {
         return new double[]{vec.x, vec.y, vec.z};
     }
 
-    static void resetMatrixStack() {
+    /** 現在の GL 行列 (TESR 内の glTranslatef/glRotatef 累積)。OBJ 描画時の頂点変換に使う。 */
+    public static Matrix4d currentMatrix() {
+        return new Matrix4d(MATRIX_STACK.get().peek());
+    }
+
+    public static void resetMatrixStack() {
         Deque<Matrix4d> stack = MATRIX_STACK.get();
         stack.clear();
         stack.push(new Matrix4d());

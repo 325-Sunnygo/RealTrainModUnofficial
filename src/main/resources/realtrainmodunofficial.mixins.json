@@ -2,7 +2,16 @@
   "required": true,
   "package": "com.portofino.polygondtrainmod.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [],
+  "mixins": [
+    "PlayerMixin"
+  ],
+  "client": [
+    "CameraMixin",
+    "MouseHandlerMixin",
+    "ChannelMixin",
+    "SoundBufferAccessor",
+    "SoundBufferLibraryMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },

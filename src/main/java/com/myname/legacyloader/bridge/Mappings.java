@@ -174,6 +174,16 @@ public class Mappings {
         add("cpw/mods/fml/common/Mod$EventHandler", "com/myname/legacyloader/bridge/fml/LegacyModEventHandlerAnnotation");
         add("cpw/mods/fml/common/SidedProxy", "com/myname/legacyloader/bridge/fml/LegacySidedProxy");
         add("cpw/mods/fml/relauncher/SideOnly", "com/myname/legacyloader/bridge/network/LegacySideOnly");
+        add("net/minecraft/client/resources/LanguageManager", "com/myname/legacyloader/bridge/client/resources/LegacyLanguageManager");
+        add("net/minecraft/client/resources/Language", "com/myname/legacyloader/bridge/client/resources/LegacyLanguage");
+        add("cpw/mods/fml/relauncher/ReflectionHelper", "com/myname/legacyloader/bridge/fml/LegacyReflectionHelper");
+        add("cpw/mods/fml/relauncher/ReflectionHelper$UnableToAccessFieldException", "com/myname/legacyloader/bridge/fml/LegacyReflectionHelper$UnableToAccessFieldException");
+        add("cpw/mods/fml/relauncher/ReflectionHelper$UnableToFindFieldException", "com/myname/legacyloader/bridge/fml/LegacyReflectionHelper$UnableToFindFieldException");
+        add("cpw/mods/fml/relauncher/ReflectionHelper$UnableToFindMethodException", "com/myname/legacyloader/bridge/fml/LegacyReflectionHelper$UnableToFindMethodException");
+        add("net/minecraftforge/fml/relauncher/ReflectionHelper", "com/myname/legacyloader/bridge/fml/LegacyReflectionHelper");
+        add("net/minecraftforge/fml/relauncher/ReflectionHelper$UnableToAccessFieldException", "com/myname/legacyloader/bridge/fml/LegacyReflectionHelper$UnableToAccessFieldException");
+        add("net/minecraftforge/fml/relauncher/ReflectionHelper$UnableToFindFieldException", "com/myname/legacyloader/bridge/fml/LegacyReflectionHelper$UnableToFindFieldException");
+        add("net/minecraftforge/fml/relauncher/ReflectionHelper$UnableToFindMethodException", "com/myname/legacyloader/bridge/fml/LegacyReflectionHelper$UnableToFindMethodException");
 // ==========================================
 //           Command System
 // ==========================================
@@ -393,6 +403,7 @@ public class Mappings {
         //           Inventory / Container
         // ==========================================
         add("net/minecraft/inventory/Container", "com/myname/legacyloader/bridge/inventory/LegacyContainer");
+        add("net/minecraft/inventory/InventoryCrafting", "com/myname/legacyloader/bridge/inventory/LegacyInventoryCrafting");
         add("net/minecraft/inventory/Slot", "com/myname/legacyloader/bridge/inventory/LegacySlot");
         add("net/minecraft/inventory/SlotFurnaceOutput", "com/myname/legacyloader/bridge/inventory/LegacySlotFurnaceOutput");
 
@@ -626,7 +637,10 @@ public class Mappings {
         add("cpw/mods/fml/common/event/FMLEvent", "com/myname/legacyloader/bridge/event/LegacyFMLEvent");
         add("cpw/mods/fml/client/FMLClientHandler", "com/myname/legacyloader/bridge/fml/LegacyFMLClientHandler");
         add("cpw/mods/fml/client/registry/ClientRegistry", "com/myname/legacyloader/bridge/client/registry/LegacyClientRegistry");
-        add("net/minecraft/client/renderer/tileentity/TileEntitySpecialRenderer", "net/minecraft/client/renderer/tileentity/TileEntitySpecialRenderer");
+        add("net/minecraft/client/renderer/tileentity/TileEntitySpecialRenderer", "com/myname/legacyloader/bridge/client/renderer/tileentity/LegacyTileEntitySpecialRenderer");
+        // Forge OBJ ローダ (AsphaltMod 等のカスタム 3D ブロックが TESR で描く .obj モデル)
+        add("net/minecraftforge/client/model/AdvancedModelLoader", "com/myname/legacyloader/bridge/client/model/LegacyAdvancedModelLoader");
+        add("net/minecraftforge/client/model/IModelCustom", "com/myname/legacyloader/bridge/client/model/LegacyModelCustom");
         add("cpw/mods/fml/common/network/ByteBufUtils", "com/myname/legacyloader/bridge/network/LegacyByteBufUtils");
         add("net/minecraft/world/EnumSkyBlock", "com/myname/legacyloader/bridge/world/LegacyEnumSkyBlock");
         add("net/minecraft/client/renderer/IconFlipped", "com/myname/legacyloader/bridge/client/LegacyIconFlipped");

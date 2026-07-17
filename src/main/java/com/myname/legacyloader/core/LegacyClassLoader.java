@@ -45,6 +45,13 @@ public class LegacyClassLoader extends URLClassLoader {
                         // Generate stub for 1.7.10 Minecraft/Forge classes removed in 1.21.1
                         if (isLegacyMinecraftClass(name)) {
                             c = generateStubClass(name);
+                        } else if (isStubbableMissingClass(name)) {
+                            // このクラスローダは 1.7.10 mod 専用。ここに来る未解決クラスは、
+                            // その mod が参照する別 mod の任意連携 API 等 (例: Bamboo →
+                            // shift.sextiarysector.api.IDrink) で、環境に無いだけ。以前は
+                            // NoClassDefFoundError で mod ごとロード失敗 (ブロック未登録) して
+                            // いたが、スタブを生成して「連携機能だけ無効・本体は動く」形にする。
+                            c = generateStubClass(name);
                         } else {
                             throw e;
                         }
@@ -78,6 +85,32 @@ public class LegacyClassLoader extends URLClassLoader {
     }
 
     /**
+     * 1.7.10 mod が参照する「環境に無い別 mod のクラス」をスタブ化してよいか。
+     * このローダは legacy mod jar 専用なので、java./自分自身以外の未解決クラスは
+     * 任意連携の不足とみなしてスタブ化する (本体機能は生かす)。
+     */
+    private static boolean isStubbableMissingClass(String name) {
+        return !name.startsWith("java.")
+                && !name.startsWith("javax.")
+                && !name.startsWith("jdk.")
+                && !name.startsWith("sun.")
+                && !name.startsWith("com.myname.legacyloader.");
+    }
+
+    /** スタブをインターフェースとして生成すべきか (実装/継承の食い違い回避)。 */
+    private static boolean isLikelyInterfaceName(String internalName) {
+        String simple = internalName;
+        int slash = simple.lastIndexOf('/');
+        if (slash >= 0) simple = simple.substring(slash + 1);
+        int dollar = simple.lastIndexOf('$');
+        if (dollar >= 0) simple = simple.substring(dollar + 1);
+        // I + 大文字始まり (IDrink, IFluidHandler 等) は 1.7.10 の慣習でインターフェース。
+        // .api. パッケージ配下も連携インターフェースが多い。
+        return simple.length() >= 2 && simple.charAt(0) == 'I'
+                && Character.isUpperCase(simple.charAt(1));
+    }
+
+    /**
      * Runtime fallback for 1.7.10 classes that are still not mapped to a real bridge.
      *
      * The previous implementation emitted an empty Object subclass. That prevented
@@ -103,13 +136,26 @@ public class LegacyClassLoader extends URLClassLoader {
         String internalName = name.replace('.', '/');
         StubSpec spec = getStubSpecs().get(internalName);
         boolean isInterface = FORCE_INTERFACE.contains(internalName)
-            || (spec != null && ("interface".equals(spec.kind) || "@interface".equals(spec.kind)));
+            || (spec != null && ("interface".equals(spec.kind) || "@interface".equals(spec.kind)))
+            // シグネチャ表に無い未知クラス (別 mod API 等) は名前からインターフェース推定。
+            // implements IDrink 等を満たすため。
+            || (spec == null && isLikelyInterfaceName(internalName));
         boolean isEnum = spec != null && "enum".equals(spec.kind);
 
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         int access = Opcodes.ACC_PUBLIC;
         String superName = "java/lang/Object";
         String[] interfaces = null;
+
+        // 例外型のスタブは Throwable のサブクラスにする。
+        // 1.7.10 mod のコードが `catch (SomeException e)` を持つと、JVM の検証器は
+        // catch 型が Throwable のサブクラスであることを要求する。java/lang/Object 継承の
+        // スタブだと "Catch type is not a subclass of Throwable" で VerifyError になり、
+        // そのメソッドを含むクラス (= ブロック登録処理など) が丸ごと失敗して
+        // ブロックが登録されず、テクスチャも付かない (ピンクブロック) 原因になっていた。
+        // RuntimeException を親にすると unchecked なので、throws 宣言の有無に依らず
+        // どのメソッドからでも throw/catch できて検証を通る。
+        boolean isThrowable = !isInterface && !isEnum && isExceptionLikeName(internalName, spec);
 
         if (isInterface) {
             access |= Opcodes.ACC_INTERFACE | Opcodes.ACC_ABSTRACT;
@@ -119,6 +165,9 @@ public class LegacyClassLoader extends URLClassLoader {
             access |= Opcodes.ACC_SUPER;
         } else {
             access |= Opcodes.ACC_SUPER;
+            if (isThrowable) {
+                superName = "java/lang/RuntimeException";
+            }
         }
 
         cw.visit(Opcodes.V21, access, internalName, null, superName, interfaces);
@@ -135,13 +184,22 @@ public class LegacyClassLoader extends URLClassLoader {
         }
 
         if (!isInterface) {
+            // 引数なしコンストラクタ (super の <init>()V を呼ぶ)
             MethodVisitor init = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
             init.visitCode();
             init.visitVarInsn(Opcodes.ALOAD, 0);
-            init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+            init.visitMethodInsn(Opcodes.INVOKESPECIAL, superName, "<init>", "()V", false);
             init.visitInsn(Opcodes.RETURN);
             init.visitMaxs(1, 1);
             init.visitEnd();
+
+            if (isThrowable) {
+                // 例外はメッセージ付きで new されることが多い (new ModSortingException("...") 等)。
+                // (String) / (String,Throwable) / (Throwable) の 3 コンストラクタを用意する。
+                emitThrowableCtor(cw, superName, "(Ljava/lang/String;)V");
+                emitThrowableCtor(cw, superName, "(Ljava/lang/String;Ljava/lang/Throwable;)V");
+                emitThrowableCtor(cw, superName, "(Ljava/lang/Throwable;)V");
+            }
         }
 
         if (spec != null) {
@@ -175,6 +233,31 @@ public class LegacyClassLoader extends URLClassLoader {
         cw.visitEnd();
         byte[] bytes = cw.toByteArray();
         return defineClass(name, bytes, 0, bytes.length);
+    }
+
+    /** スタブ名から例外型か判定 (Throwable を継承させる対象)。 */
+    private static boolean isExceptionLikeName(String internalName, StubSpec spec) {
+        if (spec != null && ("exception".equals(spec.kind) || "throwable".equals(spec.kind))) {
+            return true;
+        }
+        String simple = internalName;
+        int slash = simple.lastIndexOf('/');
+        if (slash >= 0) simple = simple.substring(slash + 1);
+        int dollar = simple.lastIndexOf('$');
+        if (dollar >= 0) simple = simple.substring(dollar + 1);
+        return simple.endsWith("Exception") || simple.endsWith("Error") || simple.equals("Throwable");
+    }
+
+    /** 例外スタブ用コンストラクタ (引数を捨てて super の空引数コンストラクタを呼ぶ)。 */
+    private void emitThrowableCtor(ClassWriter cw, String superName, String desc) {
+        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", desc, null, null);
+        mv.visitCode();
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        // RuntimeException() を呼ぶ (メッセージ引数は無視。cause 連携は不要な用途)
+        mv.visitMethodInsn(Opcodes.INVOKESPECIAL, superName, "<init>", "()V", false);
+        mv.visitInsn(Opcodes.RETURN);
+        mv.visitMaxs(1, 3);
+        mv.visitEnd();
     }
 
     private static void emitDefaultReturn(MethodVisitor mv, String desc) {

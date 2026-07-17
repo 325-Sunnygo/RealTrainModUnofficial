@@ -41,6 +41,30 @@ public class LegacyOreDictionary {
         return NAME_TO_ID.getOrDefault(name, -1);
     }
 
+    /** 1.7.10 OreDictionary.getOreIDs(ItemStack): その ItemStack が属する鉱石辞書 ID の配列。 */
+    public static int[] getOreIDs(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return new int[0];
+        }
+        List<Integer> ids = new ArrayList<>();
+        for (Map.Entry<String, List<ItemStack>> entry : ORE_REGISTRY.entrySet()) {
+            for (ItemStack registered : entry.getValue()) {
+                if (itemMatches(registered, stack, false)) {
+                    Integer id = NAME_TO_ID.get(entry.getKey());
+                    if (id != null) {
+                        ids.add(id);
+                    }
+                    break;
+                }
+            }
+        }
+        int[] out = new int[ids.size()];
+        for (int i = 0; i < ids.size(); i++) {
+            out[i] = ids.get(i);
+        }
+        return out;
+    }
+
     public static String getOreName(int id) {
         return ID_TO_NAME.getOrDefault(id, "Unknown");
     }

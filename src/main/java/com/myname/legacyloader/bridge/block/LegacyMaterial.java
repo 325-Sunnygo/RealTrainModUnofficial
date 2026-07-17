@@ -101,6 +101,11 @@ public class LegacyMaterial {
         return this;
     }
 
+    // --- 1.7.10 SRG 名エイリアス (Material のビルダー系。Mod がサブクラス構築時に呼ぶ) ---
+    // 例: MaterialBamboo の <init> が func_76219_n() (setNoPushMobility) をチェーン呼び出し。
+    public LegacyMaterial func_76219_n() { return setNoPushMobility(); }
+    public LegacyMaterial func_76222_j() { return setImmovableMobility(); }
+
     protected LegacyMaterial setAdventureModeExempt() {
         this.adventureModeExempt = true;
         return this;

@@ -156,6 +156,11 @@ public class LegacyBlock extends Block implements ILegacyBlock {
         this(material);
     }
 
+    // 引数順が (Material, boolean) の版 (Bamboo 等が使用)
+    public LegacyBlock(LegacyMaterial material, boolean flag) {
+        this(material);
+    }
+
     public LegacyBlock(String textureName, LegacyMaterial material) {
         this(material);
         this.legacyTextureName = textureName;

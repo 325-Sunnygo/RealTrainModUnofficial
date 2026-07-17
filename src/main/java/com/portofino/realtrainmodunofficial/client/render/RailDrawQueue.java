@@ -108,6 +108,12 @@ public final class RailDrawQueue {
         }
         Matrix4f projection = RenderSystem.getProjectionMatrix();
         Vector3f[] savedLights = null;
+        //焼き込み VBO は drawWithShader で直接描く。この段階 (AFTER_BLOCK_ENTITIES) では
+        //ライトマップ層 (Sampler2) が OFF のことがあり、頂点に焼いたライト座標が効かず
+        //レールがフルブライト (夜でも明るい) になる。明示的に ON にしてから描く。
+        net.minecraft.client.renderer.LightTexture lightTex =
+            net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture();
+        lightTex.turnOnLightLayer();
         try {
             for (Map.Entry<RenderType, List<Draw>> entry : QUEUE.entrySet()) {
                 RenderType renderType = entry.getKey();
@@ -152,6 +158,7 @@ public final class RailDrawQueue {
             if (savedLights != null) {
                 RenderSystem.setShaderLights(savedLights[0], savedLights[1]);
             }
+            lightTex.turnOffLightLayer();
             QUEUE.clear();
         }
     }

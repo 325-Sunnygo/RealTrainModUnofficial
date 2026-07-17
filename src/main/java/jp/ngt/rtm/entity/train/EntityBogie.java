@@ -306,6 +306,11 @@ public class EntityBogie extends Entity {
      */
     protected void onChangeRail(TileEntityLargeRailCore newRail) {
         this.playJointSound();
+        //レール継ぎ目のガタン — 車体サスペンションへ入力 (RTMU オリジナル)
+        EntityTrainBase train = this.getTrain();
+        if (train != null && train.bogieController != null) {
+            train.bogieController.onRailJoint(this, train.getSpeed());
+        }
     }
 
     protected void playJointSound() {

@@ -29,6 +29,50 @@ public final class ClientItemHelper {
 
     private ClientItemHelper() {}
 
+    /**
+     * 選択をサーバーへ送ると同時に、<b>クライアント側の手持ちスタックにも</b>反映する。
+     * <p>
+     * クライアント側を更新しないと、クリエイティブでは選択直後の SetCreativeModeSlot 同期で
+     * サーバー側スタックが「選択コンポーネント無し」の版に上書きされ、選択が消える。すると
+     * 設置時 {@link TrainItem#useOn} が既定 (先頭の ELECTRIC 車両 = 223系5000番台Tc) に
+     * フォールバックし、<b>どの車両を選んでも 223系5000番台Tc が湧く</b> (マルチプレイのみで
+     * 再現。シングルはクライアント=サーバーで上書きが起きないため顕在化しない)。
+     * <p>
+     * 両方を更新すればサバイバル (ペイロードでサーバー確定) とクリエイティブ (スタック同期で
+     * サーバー確定) の双方で確実に選択が届く。
+     */
+    private static void commitSelection(ItemStack stack, ModelSelectScreen.SelectionResult selection) {
+        if (stack != null && !stack.isEmpty()) {
+            LegacyItemStackBridge.setSelectedModelData(stack, selection.modelId(), selection.dataMapValue());
+        }
+        PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue()));
+    }
+
+    /** 手持ち (メイン→オフ) から選択式アイテムのスタックを探す。引数なし選択画面用。 */
+    private static ItemStack findHeldSelectableStack() {
+        Player p = Minecraft.getInstance().player;
+        if (p == null) {
+            return ItemStack.EMPTY;
+        }
+        ItemStack main = p.getMainHandItem();
+        if (isSelectable(main)) {
+            return main;
+        }
+        ItemStack off = p.getOffhandItem();
+        if (isSelectable(off)) {
+            return off;
+        }
+        return ItemStack.EMPTY;
+    }
+
+    private static boolean isSelectable(ItemStack s) {
+        return s != null && !s.isEmpty() && (
+            s.getItem() instanceof TrainItem
+            || s.getItem() instanceof com.portofino.realtrainmodunofficial.item.RailItem
+            || s.getItem() instanceof com.portofino.realtrainmodunofficial.item.CarItem
+            || s.getItem() instanceof com.portofino.realtrainmodunofficial.item.ModelSelectableItem);
+    }
+
     public static void openRailSelectScreen(Player player, ItemStack stack) {
         List<ModelSelectScreen.ModelInfo> infos = RailRegistry.getAll().stream()
             .map(d -> new ModelSelectScreen.ModelInfo(d.getId(), d.getDisplayName(), d.getPackName(), d.getButtonTexture()))
@@ -36,7 +80,7 @@ public final class ClientItemHelper {
         Minecraft.getInstance().setScreen(new ModelSelectScreen(
             Component.translatable("screen.realtrainmodunofficial.select_rail"),
             infos,
-            selection -> PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue())),
+            selection -> commitSelection(stack, selection),
             LegacyItemStackBridge.getSelectedModelId(stack),
             LegacyItemStackBridge.getSelectedDataMap(stack)
         ));
@@ -54,7 +98,7 @@ public final class ClientItemHelper {
         Minecraft.getInstance().setScreen(new ModelSelectScreen(
             Component.translatable("screen.realtrainmodunofficial.select_train"),
             infos,
-            selection -> PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue())),
+            selection -> commitSelection(stack, selection),
             LegacyItemStackBridge.getSelectedModelId(stack),
             LegacyItemStackBridge.getSelectedDataMap(stack)
         ));
@@ -78,7 +122,7 @@ public final class ClientItemHelper {
         Minecraft.getInstance().setScreen(new ModelSelectScreen(
             Component.translatable("screen.realtrainmodunofficial.select_train"),
             infos,
-            selection -> PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue())),
+            selection -> commitSelection(findHeldSelectableStack(), selection),
             null,
             ""
         ));

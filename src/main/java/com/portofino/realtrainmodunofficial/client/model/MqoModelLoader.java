@@ -80,6 +80,19 @@ public final class MqoModelLoader {
     public static boolean captureMode;
 
     private static final float RTM_DEFAULT_SMOOTHING_ANGLE = 60.0F;
+
+    /**
+     * 描画フレーム番号。バッチが「このフレームの pass0 (不透明) で描かれたか」を記録し、
+     * pass1 の内装チカチカ対策 (帯抽出テクスチャ/カットアウト化) を<b>pass0 とペアの時だけ</b>
+     * 適用するために使う。スクリプト台車のように pass1 でしか描かれないモデルに適用すると
+     * 台車が消える/不可視になるため、その場合は本家どおり元テクスチャの全ピクセルをブレンド描画する。
+     */
+    private static long renderFrame;
+
+    /** 毎フレーム 1 回進める ({@code DeferredTranslucentRenderer} の AFTER_LEVEL から)。 */
+    public static void advanceRenderFrame() {
+        renderFrame++;
+    }
     private static final String TEXTURE_META_SEPARATOR = "|ptmeta=";
     private static final Pattern V_PATTERN = Pattern.compile("V\\((.+?)\\)");
     private static final Pattern UV_PATTERN = Pattern.compile("UV\\((.+?)\\)");
@@ -858,6 +871,7 @@ public final class MqoModelLoader {
         List<String> materialOrder = new ArrayList<>();
         List<String> materialTexPaths = new ArrayList<>();
         List<Float> materialAlphas = new ArrayList<>();
+        List<float[]> materialColors = new ArrayList<>();
         List<Vec3> currentVerts = new ArrayList<>();
         // key = groupName + "|" + matKey so each object×material pair is a separate batch
         Map<String, BatchBuilder> byGroup = new LinkedHashMap<>();
@@ -881,7 +895,7 @@ public final class MqoModelLoader {
                     Vec3 v = parseVertexLine(line);
                     if (v != null) currentVerts.add(v);
                 } else if (braceType == 2) {
-                    addFaceLine(line, currentVerts, materialOrder, materialTexPaths, materialAlphas, textureOverrides, opener, mirrorType, currentGroup, currentFacetAngle, byGroup);
+                    addFaceLine(line, currentVerts, materialOrder, materialTexPaths, materialAlphas, materialColors, textureOverrides, opener, mirrorType, currentGroup, currentFacetAngle, byGroup);
                 } else if (braceType == 3) {
                     String[] tok = line.split("\\s+");
                     if (tok.length > 0) {
@@ -892,10 +906,17 @@ public final class MqoModelLoader {
                             materialTexPaths.add(texMatcher.find() ? texMatcher.group(1) : null);
                             Matcher colMatcher = COL_PATTERN.matcher(line);
                             float matAlpha = 1.0F;
+                            float[] matColor = {1.0F, 1.0F, 1.0F};
                             if (colMatcher.find()) {
-                                try { matAlpha = Float.parseFloat(colMatcher.group(4)); } catch (NumberFormatException ignored) {}
+                                try {
+                                    matColor[0] = Float.parseFloat(colMatcher.group(1));
+                                    matColor[1] = Float.parseFloat(colMatcher.group(2));
+                                    matColor[2] = Float.parseFloat(colMatcher.group(3));
+                                    matAlpha = Float.parseFloat(colMatcher.group(4));
+                                } catch (NumberFormatException ignored) {}
                             }
                             materialAlphas.add(matAlpha);
+                            materialColors.add(matColor);
                         }
                     }
                 }
@@ -1266,6 +1287,7 @@ public final class MqoModelLoader {
         List<String> materialOrder,
         List<String> materialTexPaths,
         List<Float> materialAlphas,
+        List<float[]> materialColors,
         Map<String, String> textureOverrides,
         TextureOpener opener,
         int mirrorType,
@@ -1309,10 +1331,18 @@ public final class MqoModelLoader {
         String batchKey = groupName + "|" + matKey + "|" + translucent;
         int batchOrder = byGroup.size();
         float baseAlpha = matAlpha;
+        float[] matColor = matKey < materialColors.size() ? materialColors.get(matKey) : null;
+        final float colR = matColor != null ? matColor[0] : 1.0F;
+        final float colG = matColor != null ? matColor[1] : 1.0F;
+        final float colB = matColor != null ? matColor[2] : 1.0F;
         BatchBuilder bb = byGroup.computeIfAbsent(batchKey, k -> {
             BatchBuilder b = new BatchBuilder(batchOrder, groupName, textureInfo.location, textureInfo.emissiveTextures, matKey, translucent, facetAngle);
             b.baseAlpha = baseAlpha;
+            b.baseColorR = colR;
+            b.baseColorG = colG;
+            b.baseColorB = colB;
             b.glassTranslucent = textureInfo.hasGlassBand;
+            b.texHasTranslucentPixels = textureInfo.hasAnyTranslucentPixel;
             b.opaqueTexture = textureInfo.opaqueLocation;
             b.windowTexture = textureInfo.windowLocation;
             return b;
@@ -2020,6 +2050,33 @@ public final class MqoModelLoader {
     }
 
     /**
+     * 半透明ピクセル (0 < a < 0xF0) が<b>1つでも</b>あるか (全画素の正確判定・早期終了)。
+     * {@link #hasPartialAlpha}/{@link #hasGlassBand} は割合しきい値付きの「テクスチャ分類」用で、
+     * 運転席窓のような小さなガラス領域 (全体の3%未満) を見逃す。pass1 で描く半透明ピクセルが
+     * 存在するかどうかはこちらで判定する (見逃すと pass1 がカットアウト化されてガラスが消える)。
+     * しきい値 0xF0 は pass0/pass1 のテクスチャ分割 ({@link #copyOpaqueOnlyAlpha} /
+     * {@link #copyNonOpaqueAlpha}) と同一。
+     */
+    private static boolean hasAnyTranslucentPixel(com.mojang.blaze3d.platform.NativeImage img) {
+        try {
+            if (img.format() != com.mojang.blaze3d.platform.NativeImage.Format.RGBA) {
+                return false;
+            }
+            int w = img.getWidth(), h = img.getHeight();
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    int a = (img.getPixelRGBA(x, y) >>> 24) & 0xFF;
+                    if (a > 0x00 && a < 0xF0) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    /**
      * 明確な「ガラス帯」を持つか。alpha 32..224 の中間アルファ(本当に透けるガラス/煙等)が
      * 一定割合(1.5%)以上あれば true。AA 縁の薄い勾配だけ(SL車体の二値カットアウト)は
      * この範囲のピクセルがごく僅かなので false。これでガラス窓(透ける)とカットアウト車体
@@ -2078,7 +2135,9 @@ public final class MqoModelLoader {
             for (int x = 0; x < w; x++) {
                 int p = img.getPixelRGBA(x, y);            // 0xAABBGGRR (リトルエンディアン)
                 int a = (p >>> 24) & 0xFF;
-                int na = a >= 0xF0 ? 0xFF : 0x00;
+                //本家 renderBodyNormal は glAlphaFunc(GL_EQUAL, 1.0) = alpha が完全に 1.0 (255)
+                //のピクセルだけを pass0 で描く。254 以下は全て pass1 (LESS 1.0 + blend) 側。
+                int na = a >= 0xFF ? 0xFF : 0x00;
                 dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
             }
         }
@@ -2086,8 +2145,12 @@ public final class MqoModelLoader {
     }
 
     /**
-     * RTM系の pass1 用。ガラス帯など本当に半透明なピクセルだけを残し、
-     * ほぼ不透明な縁は pass0 側へ寄せる。
+     * RTM 本家 pass1 (renderBodyTransparent) の忠実移植。
+     * <p>
+     * 本家は {@code glAlphaFunc(GL_LESS, 1.0)} + blend で「alpha < 1.0 のピクセルだけ」を
+     * ブレンド描画する。つまり分割は <b>255 = pass0 / 254 以下 = pass1</b>。
+     * {@link #copyOpaqueOnlyAlpha} (pass0: a==255 のみ) と正確に相補で、全ピクセルが
+     * 必ずどちらか一方のパスで描かれる (両方から漏れる帯域を作らないこと)。
      */
     private static com.mojang.blaze3d.platform.NativeImage copyNonOpaqueAlpha(com.mojang.blaze3d.platform.NativeImage img) {
         int w = img.getWidth(), h = img.getHeight();
@@ -2096,7 +2159,7 @@ public final class MqoModelLoader {
             for (int x = 0; x < w; x++) {
                 int p = img.getPixelRGBA(x, y);
                 int a = (p >>> 24) & 0xFF;
-                int na = (a > 0x00 && a < 0xE0) ? a : 0x00;
+                int na = (a > 0x00 && a < 0xFF) ? a : 0x00;
                 dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
             }
         }
@@ -2167,13 +2230,26 @@ public final class MqoModelLoader {
                     opaqueLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_opq");
                     Minecraft.getInstance().getTextureManager().register(opaqueLoc, opaqueTex);
-                    windowLoc = loc;
+                    //pass1 (半透明パス) 用: 本当に半透明なピクセル (ガラス帯等) だけを残す。
+                    //従来は元テクスチャをそのまま使っていたため、pass1 が屋根・壁など不透明
+                    //ピクセルまで両面ブレンドで再描画し、内装天井と深度勝負になって
+                    //「内装がチカチカ (重なって見える)」原因になっていた。帯だけにすると
+                    //pass1 はガラスにしか触れず、不透明部分は pass0 (カリング付き cutout) の
+                    //1 回だけ描かれる。
+                    com.mojang.blaze3d.platform.NativeImage windowImg = copyNonOpaqueAlpha(img);
+                    DynamicTexture windowTex = new DynamicTexture(windowImg);
+                    windowLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
+                        "dynamic/mqo/" + Integer.toHexString(key) + "_win");
+                    Minecraft.getInstance().getTextureManager().register(windowLoc, windowTex);
                 }
                 // 発光(Light)テクスチャの emissive 解決はサブライトテクスチャ(_light0 等)があるときのみ。
                 // ※以前「サブが無ければ元テクスチャを emissive にする」フォールバックを入れたが、Spacia/E259 等の
                 //   AlphaBlend,Light 車体や Light グループが発光パスで二重描画され、チカチカ/急行灯増殖/車体白化を
                 //   起こしたため撤去。踏切ライトの発光は別の安全な手段で対応する。
-                return new TextureInfo(baseLoc, resolveLegacyLightTextures(binding, opener), alphaBlendOption || partialAlpha || glassBand, partialAlpha, glassBand, opaqueLoc, windowLoc);
+                TextureInfo info = new TextureInfo(baseLoc, resolveLegacyLightTextures(binding, opener), alphaBlendOption || partialAlpha || glassBand, partialAlpha, glassBand, opaqueLoc, windowLoc);
+                //割合判定 (3%/1.5%) は運転席窓のような小さなガラス領域を見逃すため、正確な全画素判定で上書き
+                info.hasAnyTranslucentPixel = hasAnyTranslucentPixel(img);
+                return info;
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.debug("Could not load texture {}: {}", binding.path(), e.getMessage());
@@ -2286,6 +2362,13 @@ public final class MqoModelLoader {
     private static boolean shouldCullModelFaces(Object entity) {
         if (entity instanceof TrainEntity train) {
             VehicleDefinition def = VehicleRegistry.getById(train.getVehicleId());
+            return def != null && def.isDoCulling();
+        }
+        //本家 RenderVehicleBase: doCulling はモデル設定に従う (既定 false = 両面描画)。
+        //以前は本家系列車 (EntityTrainBase) だけ常に true にしていたが、doCulling=false 前提で
+        //作られたパック (片面モデリングの内装等) の面が裏から消える。本家に合わせる。
+        if (entity instanceof jp.ngt.rtm.entity.train.EntityTrainBase train) {
+            VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
             return def != null && def.isDoCulling();
         }
         return true;
@@ -2659,6 +2742,11 @@ public final class MqoModelLoader {
         final ResourceLocation opaqueLocation;
         /** RTM pass1(半透明)用テクスチャ。窓ガラスだけ残し車体は透過。非AlphaBlendは元と同じ。 */
         final ResourceLocation windowLocation;
+        /**
+         * 半透明ピクセル (0<a<0xF0) が 1 つでもあるか (全画素の正確判定)。既定は割合判定の
+         * hasPartialAlpha||hasGlassBand だが、registerTextureFromZip が正確な値で上書きする。
+         */
+        boolean hasAnyTranslucentPixel;
 
         TextureInfo(ResourceLocation location, ResourceLocation[] emissiveTextures, boolean isTranslucent) {
             this(location, emissiveTextures, isTranslucent, false, false, location, location);
@@ -2680,6 +2768,7 @@ public final class MqoModelLoader {
             this.hasGlassBand = hasGlassBand;
             this.opaqueLocation = opaqueLocation == null ? location : opaqueLocation;
             this.windowLocation = windowLocation == null ? location : windowLocation;
+            this.hasAnyTranslucentPixel = hasPartialAlpha || hasGlassBand;
         }
 
         ResourceLocation emissiveTextureForPass(int pass) {
@@ -2770,9 +2859,11 @@ public final class MqoModelLoader {
      * 頂点法線を使うシェーダーパックで面のカクつきとして見える。
      */
     private static void applyObjectWideSmoothing(Collection<BatchBuilder> builders, boolean smoothing) {
-        if (!smoothing || builders == null || builders.isEmpty()) {
+        if (builders == null || builders.isEmpty()) {
             return;
         }
+        //smoothing=false でも必ず回す: depthBias 用の「位置共有バイアス法線」は
+        //フラットモデルにも必要 (無いと light/display の押し出しで面が割れて隙間が開く)。
         Map<String, List<BatchBuilder>> byObject = new LinkedHashMap<>();
         for (BatchBuilder bb : builders) {
             if (bb != null && !bb.positions.isEmpty()) {
@@ -2780,62 +2871,109 @@ public final class MqoModelLoader {
             }
         }
         for (List<BatchBuilder> cluster : byObject.values()) {
-            applySmoothNormalsAcrossBatches(cluster);
+            applySmoothNormalsAcrossBatches(cluster, smoothing);
         }
     }
 
-    private record SmoothVertexRef(BatchBuilder builder, int index, Vector3f normal) {}
+    /** 1 面 (連続4頂点チャンク)。normal は構築時に入れた面法線のスナップショット。 */
+    private record SmoothFace(BatchBuilder builder, int firstVertex, Vector3f normal) {}
 
-    private static void applySmoothNormalsAcrossBatches(Collection<BatchBuilder> builders) {
+    /**
+     * 本家 ngtlib ({@code GroupObject.calcVertexNormals} + {@code Face.calcVertexNormals}) の忠実移植。
+     * <ul>
+     *   <li>隣接は「同一位置を共有する<b>面</b>」単位。1 面は 1 回しか数えない (本家の
+     *       {@code !list.contains(face)})。従来は頂点単位で数えていたため、縮退三角形
+     *       (p2 を複製した 4 頂点) で同じ面が二重加算され、三角形分割された曲面
+     *       (踏切の警報灯フード等) の法線が歪んでいた。</li>
+     *   <li>各コーナーの法線 = 自面の面法線 + 「自面との面法線角が facet 以下」の隣接面の面法線
+     *       の総和を正規化 (重みなし)。比較は常に<b>面法線同士</b>。</li>
+     *   <li>facet はオブジェクトの値を<b>そのまま</b>使う (本家同様)。facet=0 なら
+     *       完全平行な面としか混ざらない = 実質フラット。以前の「0 以下なら 60°」の
+     *       上書きは本家に無い挙動なので廃止 (facet 行が無い場合の既定値はパース側で 60°)。</li>
+     * </ul>
+     * 面 = 連続 4 頂点チャンク (emitQuad / emitTri の縮退クワッド)。ミラー複製は別チャンク
+     * なので本家の「ミラー面も faces に足してから平滑化」と同じく境界がつながる。
+     */
+    private static void applySmoothNormalsAcrossBatches(Collection<BatchBuilder> builders, boolean smoothing) {
         if (builders == null || builders.isEmpty()) {
             return;
         }
-        Map<String, List<SmoothVertexRef>> byPosition = new HashMap<>();
+        List<SmoothFace> faces = new ArrayList<>();
+        Map<String, List<SmoothFace>> byPosition = new HashMap<>();
         for (BatchBuilder builder : builders) {
             if (builder == null || builder.positions.isEmpty()) {
                 continue;
             }
             int vertexCount = builder.positions.size() / 8;
-            for (int i = 0; i < vertexCount; i++) {
-                int o = i * 8;
+            builder.biasNormals = new float[vertexCount * 3];
+            for (int first = 0; first + 3 < vertexCount; first += 4) {
                 Vector3f normal = new Vector3f(
-                    builder.positions.get(o + 3),
-                    builder.positions.get(o + 4),
-                    builder.positions.get(o + 5)
+                    builder.positions.get(first * 8 + 3),
+                    builder.positions.get(first * 8 + 4),
+                    builder.positions.get(first * 8 + 5)
                 );
                 if (normal.lengthSquared() > 1.0E-8F) {
                     normal.normalize();
                 } else {
                     normal.set(0.0F, 1.0F, 0.0F);
                 }
-                byPosition.computeIfAbsent(positionKey(builder.positions, o), k -> new ArrayList<>())
-                    .add(new SmoothVertexRef(builder, i, normal));
-            }
-        }
-        java.util.stream.Stream<List<SmoothVertexRef>> smoothGroups = byPosition.size() > 4096
-            ? byPosition.values().parallelStream()
-            : byPosition.values().stream();
-        smoothGroups.forEach(shared -> {
-            if (shared == null || shared.size() <= 1) {
-                return;
-            }
-            for (SmoothVertexRef ref : shared) {
-                float angle = ref.builder.smoothingAngle > 0.0F ? ref.builder.smoothingAngle : RTM_DEFAULT_SMOOTHING_ANGLE;
-                float cosThreshold = (float) Math.cos(Math.toRadians(angle));
-                Vector3f sum = new Vector3f();
-                for (SmoothVertexRef other : shared) {
-                    if (ref.normal.dot(other.normal) >= cosThreshold) {
-                        sum.add(other.normal);
+                SmoothFace face = new SmoothFace(builder, first, normal);
+                faces.add(face);
+                for (int k = 0; k < 4; k++) {
+                    String key = positionKey(builder.positions, (first + k) * 8);
+                    List<SmoothFace> list = byPosition.computeIfAbsent(key, ignored -> new ArrayList<>());
+                    //本家 !list.contains(face): 同じ面は同じ位置に 1 回だけ (縮退 p2==p3 の二重登録防止)
+                    if (list.isEmpty() || list.get(list.size() - 1) != face) {
+                        list.add(face);
                     }
                 }
-                if (sum.lengthSquared() > 1.0E-8F) {
-                    sum.normalize();
-                    int o = ref.index * 8;
-                    synchronized (ref.builder.positions) {
-                        ref.builder.positions.set(o + 3, sum.x);
-                        ref.builder.positions.set(o + 4, sum.y);
-                        ref.builder.positions.set(o + 5, sum.z);
+            }
+        }
+        java.util.stream.Stream<SmoothFace> stream = faces.size() > 4096
+            ? faces.parallelStream()
+            : faces.stream();
+        stream.forEach(face -> {
+            //本家: angleCos = cos(smoothingAngle)。facet の値をそのまま使う。
+            float cosThreshold = (float) Math.cos(Math.toRadians(face.builder.smoothingAngle));
+            for (int k = 0; k < 4; k++) {
+                int vi = face.firstVertex + k;
+                int o = vi * 8;
+                String key = positionKey(face.builder.positions, o);
+                List<SmoothFace> shared = byPosition.get(key);
+                //本家: vec = 自面の法線から開始し、他の面は面法線角が facet 以下なら加算
+                Vector3f shade = new Vector3f(face.normal);
+                //depthBias の押し出し方向: 同位置の全面の平均 (facet 閾値なし)。
+                //閾値ありの法線で押すと硬いエッジで同位置の頂点が別方向に動き、
+                //light/display グループの押し出しで面が割れて隙間が開く。
+                Vector3f bias = new Vector3f(face.normal);
+                if (shared != null) {
+                    for (SmoothFace other : shared) {
+                        if (other != face) {
+                            bias.add(other.normal);
+                            if (smoothing && face.normal.dot(other.normal) >= cosThreshold) {
+                                shade.add(other.normal);
+                            }
+                        }
                     }
+                }
+                if (bias.lengthSquared() > 1.0E-8F) {
+                    bias.normalize();
+                } else {
+                    bias.set(face.normal);
+                }
+                //読みはスナップショット (SmoothFace.normal) のみなので、書き込みは競合しない
+                face.builder.biasNormals[vi * 3] = bias.x;
+                face.builder.biasNormals[vi * 3 + 1] = bias.y;
+                face.builder.biasNormals[vi * 3 + 2] = bias.z;
+                if (smoothing) {
+                    if (shade.lengthSquared() > 1.0E-8F) {
+                        shade.normalize();
+                    } else {
+                        shade.set(face.normal);
+                    }
+                    face.builder.positions.set(o + 3, shade.x);
+                    face.builder.positions.set(o + 4, shade.y);
+                    face.builder.positions.set(o + 5, shade.z);
                 }
             }
         });
@@ -2857,8 +2995,19 @@ public final class MqoModelLoader {
         final float smoothingAngle;
         /** マテリアル col の不透明度 (1.0=不透明)。半透明ガラス等は <1。描画時に色のαへ乗算。 */
         float baseAlpha = 1.0F;
+        /** マテリアル col の RGB (色タイント)。白以外は描画時に頂点色へ乗算。 */
+        float baseColorR = 1.0F;
+        float baseColorG = 1.0F;
+        float baseColorB = 1.0F;
         /** テクスチャが明確なガラス帯を持つ=本当の半透明。強制カットアウトを免除する。 */
         boolean glassTranslucent = false;
+        /** テクスチャに中間アルファのピクセル (ガラス帯/網等) があるか。無ければ pass1 は描く物が無い。 */
+        boolean texHasTranslucentPixels = false;
+        /**
+         * depthBias 押し出し用の頂点法線 (頂点ごと3要素、正規化済み)。同位置の全面の平均
+         * (facet 閾値なし) なので、同じ位置の頂点は必ず同方向へ動き、押し出しで面が割れない。
+         */
+        float[] biasNormals = null;
         /** RTM pass0(不透明描画)用のアルファテスト相当テクスチャ。 */
         ResourceLocation opaqueTexture = null;
         /** RTM pass1(半透明)用の窓ガラスのみテクスチャ。 */
@@ -2923,7 +3072,12 @@ public final class MqoModelLoader {
             float safeMaxV = Float.isFinite(maxV) ? maxV : 1.0F;
             Batch built = new Batch(order, groupName, texture, emissiveTextures, data, data.length / 8, materialId, translucent, safeMinU, safeMaxU, safeMinV, safeMaxV);
             built.baseAlpha = baseAlpha;
+            built.baseColorR = baseColorR;
+            built.baseColorG = baseColorG;
+            built.baseColorB = baseColorB;
             built.glassTranslucent = glassTranslucent;
+            built.texHasTranslucentPixels = texHasTranslucentPixels;
+            built.biasNormals = biasNormals;
             built.opaqueTexture = opaqueTexture != null ? opaqueTexture : texture;
             built.windowTexture = windowTexture != null ? windowTexture : texture;
             return built;
@@ -3523,6 +3677,12 @@ public final class MqoModelLoader {
             Matrix4f mat = pose.pose();
             Matrix3f norm = pose.normal();
             float[] normalOut = new float[3];
+            //==== RTMU オリジナル: 夜間グロー ====
+            //前照灯/尾灯 (pass>=3) の発光面を、クアッド中心から拡大した「にじみ」シェルで
+            //加算合成 (RenderType.eyes = 加算・フルブライト・深度書き込み無し) して重ねる。
+            //発光テクスチャのアルファがランプ形状を切り抜くので、光る部分だけが膨らむ。
+            //強度は周囲の明るさ由来 (暗いほど強い) — 夜だけでなくトンネル内でも光る。
+            float glow = lit ? glowDarkness(packedLight) : 0.0F;
             for (String name : normalizedGroupNames) {
                 List<Batch> groupBatches = batchesByNormalizedGroup.get(name);
                 if (groupBatches == null || groupBatches.isEmpty()) {
@@ -3534,16 +3694,29 @@ public final class MqoModelLoader {
                         // Light フラグの無いマテリアル (本家の doLighting == false と同じ)
                         continue;
                     }
-                    VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucent(tex));
+                    //発光は深度書き込み無しの entityTranslucentEmissive を使う。
+                    //entityTranslucent (COLOR_DEPTH_WRITE) だと発光面が深度を書き、後から描く
+                    //内装の色付き半透明 (窓・仕切り) がその深度に隠されて表示されなくなる。
+                    //Emissive (COLOR_WRITE のみ) なら深度を書かないので他の半透明を塞がない。
+                    VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucentEmissive(tex));
                     for (int i = 0; i < batch.vertexCount; i++) {
                         int o = i * 8;
                         float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
                         float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
                         float u = batch.data[o + 6], v = batch.data[o + 7];
-                        float inv = (float) (1.0D / Math.sqrt(Math.max(1.0E-8F, nx * nx + ny * ny + nz * nz)));
-                        x += nx * inv * depthBias;
-                        y += ny * inv * depthBias;
-                        z += nz * inv * depthBias;
+                        //押し出しは biasNormals (同位置の全面平均・正規化済み)。陰影法線で押すと
+                        //硬いエッジで同位置の頂点が別方向に動き、面が割れて隙間が開く。
+                        float bnx = nx, bny = ny, bnz = nz;
+                        if (batch.biasNormals != null) {
+                            int bo = i * 3;
+                            bnx = batch.biasNormals[bo];
+                            bny = batch.biasNormals[bo + 1];
+                            bnz = batch.biasNormals[bo + 2];
+                        }
+                        float inv = (float) (1.0D / Math.sqrt(Math.max(1.0E-8F, bnx * bnx + bny * bny + bnz * bnz)));
+                        x += bnx * inv * depthBias;
+                        y += bny * inv * depthBias;
+                        z += bnz * inv * depthBias;
                         float tnx = norm.m00() * nx + norm.m10() * ny + norm.m20() * nz;
                         float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
                         float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
@@ -3555,9 +3728,87 @@ public final class MqoModelLoader {
                             .setLight(light)
                             .setNormal(normalOut[0], normalOut[1], normalOut[2]);
                     }
+                    if (glow > 0.05F) {
+                        //控えめな「ぼんやり発光」: 小さめのシェル 1 枚だけ (ビーム等の派手な演出はなし)
+                        VertexConsumer gvc = buffer.getBuffer(RenderType.eyes(tex));
+                        emitGlowShell(gvc, mat, norm, batch, 1.4F, 0.010F, 0.20F * glow, overlay, normalOut);
+                    }
                 }
             }
         }
+
+        /**
+         * 夜間グローの強度 (0..1)。周囲光 (ブロック光 + 昼夜補正済み空光) が暗いほど 1 に近づく。
+         * 空光は時刻で減衰させるので、夜の地上とトンネル内で光り、昼の地上ではほぼ消える。
+         */
+        private static float glowDarkness(int packedLight) {
+            float skyMul = 1.0F;
+            net.minecraft.client.multiplayer.ClientLevel level = Minecraft.getInstance().level;
+            if (level != null) {
+                skyMul = 1.0F - Math.min(11, level.getSkyDarken()) / 11.0F;
+            }
+            int block = net.minecraft.client.renderer.LightTexture.block(packedLight);
+            int sky = net.minecraft.client.renderer.LightTexture.sky(packedLight);
+            float ambient = Math.max(block, sky * skyMul) / 15.0F;
+            float d = 1.0F - Math.min(1.0F, ambient);
+            return d * d;
+        }
+
+        /**
+         * グローシェルの拡大量の上限 (ブロック)。倍率だけで拡大すると、細長い発光帯
+         * (窓列・ライト帯 = 数十 m のクアッド) が車両の何倍もの巨大な筋になってしまう。
+         * 小さなランプは倍率どおり、大きな面は縁が僅かににじむだけに抑える。
+         */
+        private static final float GLOW_MAX_EXPAND = 0.35F;
+
+        /**
+         * 発光クアッドをクアッド重心から {@code scale} 倍 (絶対量 {@link #GLOW_MAX_EXPAND} まで)
+         * に拡大し、法線方向に {@code lift} 浮かせたシェルを加算合成用バッファへ流す (安価な疑似ブルーム)。
+         * UV は元のままなので、拡大された面はランプ部分のテクセルを引き伸ばして
+         * 「光のにじみ」として見える。
+         */
+        private static void emitGlowShell(VertexConsumer vc, Matrix4f mat, Matrix3f norm, Batch batch,
+                                          float scale, float lift, float alpha, int overlay, float[] normalOut) {
+            for (int q = 0; q + 3 < batch.vertexCount; q += 4) {
+                int base = q * 8;
+                float cx = 0.0F, cy = 0.0F, cz = 0.0F;
+                for (int i = 0; i < 4; i++) {
+                    int o = base + i * 8;
+                    cx += batch.data[o];
+                    cy += batch.data[o + 1];
+                    cz += batch.data[o + 2];
+                }
+                cx *= 0.25F;
+                cy *= 0.25F;
+                cz *= 0.25F;
+                for (int i = 0; i < 4; i++) {
+                    int o = base + i * 8;
+                    float dx = batch.data[o] - cx;
+                    float dy = batch.data[o + 1] - cy;
+                    float dz = batch.data[o + 2] - cz;
+                    float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    //拡大は倍率と絶対上限の小さい方 (巨大な発光帯が筋状に伸びるのを防ぐ)
+                    float grow = Math.min(dist * (scale - 1.0F), GLOW_MAX_EXPAND);
+                    float factor = dist > 1.0E-4F ? (dist + grow) / dist : 1.0F;
+                    float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
+                    float inv = (float) (1.0D / Math.sqrt(Math.max(1.0E-8F, nx * nx + ny * ny + nz * nz)));
+                    float x = cx + dx * factor + nx * inv * lift;
+                    float y = cy + dy * factor + ny * inv * lift;
+                    float z = cz + dz * factor + nz * inv * lift;
+                    float tnx = norm.m00() * nx + norm.m10() * ny + norm.m20() * nz;
+                    float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
+                    float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
+                    normalizeNormal(tnx, tny, tnz, normalOut);
+                    vc.addVertex(mat, x, y, z)
+                        .setColor(1.0F, 1.0F, 1.0F, alpha)
+                        .setUv(batch.data[o + 6], batch.data[o + 7])
+                        .setOverlay(overlay)
+                        .setLight(net.minecraft.client.renderer.LightTexture.FULL_BRIGHT)
+                        .setNormal(normalOut[0], normalOut[1], normalOut[2]);
+                }
+            }
+        }
+
 
         /** このモデルに発光 (Light) マテリアルのバッチが 1 つでもあるか。 */
         public boolean hasEmissiveBatches() {
@@ -3754,6 +4005,13 @@ public final class MqoModelLoader {
                 }
                 int scriptPassNow = scriptRenderer != null ? scriptRenderer.getCurrentPass() : 0;
                 if (translucent && !batch.translucent && scriptPassNow < 2) continue;
+                //本家 renderBodyNormal (pass0) は glAlphaFunc(GL_EQUAL, 1.0)。フラグメント α は
+                //「テクスチャ α × マテリアル col α」なので、col α < 1 のバッチ (色付き半透明ガラス) は
+                //pass0 では 1 ピクセルも α==1.0 にならず何も描かれない = バッチごとスキップと等価。
+                boolean colAlphaGlass = batch.translucent && batch.baseAlpha < 0.999F;
+                if (!translucent && scriptPassNow < 2 && colAlphaGlass) {
+                    continue;
+                }
                 if (scriptRenderer != null) {
                     scriptRenderer.currentMatId = batch.materialId;
                     scriptRenderer.onBatchRendered();
@@ -3778,7 +4036,17 @@ public final class MqoModelLoader {
                         ? scriptRenderer.getBoundTexture()
                         : (emissiveTexture != null ? emissiveTexture : batch.texture);
                     if (!scriptTexture && emissiveTexture == null) {
-                        texture = translucent ? batch.windowTexture : batch.opaqueTexture;
+                        if (translucent) {
+                            //本家 pass1 (renderBodyTransparent) = glAlphaFunc(GL_LESS, 1.0) + blend。
+                            //フラグメント α = テクスチャ α × col α なので:
+                            //  ・col α < 1 のバッチ → 全ピクセルが α<1 → 元テクスチャ全体を描く
+                            //  ・col α = 1 のバッチ → テクスチャ α<255 のピクセルだけ描く
+                            //    (= window テクスチャ。α==255 の車体部分は pass0 が描いた通り残る)
+                            texture = batch.baseAlpha < 0.999F ? batch.texture : batch.windowTexture;
+                        } else {
+                            //本家 pass0 = glAlphaFunc(GL_EQUAL, 1.0) 相当の opaque テクスチャ (α==255 のみ)
+                            texture = batch.opaqueTexture;
+                        }
                     }
 
                     boolean forceCutout;
@@ -3816,6 +4084,13 @@ public final class MqoModelLoader {
                     if (batch.baseAlpha < 0.999F) {
                         scriptAlpha = Math.round(scriptAlpha * batch.baseAlpha);
                     }
+                    // マテリアル col の RGB (色タイント) を乗算。本家 RTM は glColor4f で col 全体を
+                    // 効かせる。白 (1,1,1) 以外のマテリアル (内装の色付き半透明ガラス等) の色を再現する。
+                    if (batch.baseColorR < 0.999F || batch.baseColorG < 0.999F || batch.baseColorB < 0.999F) {
+                        scriptRed   = Math.round(scriptRed   * batch.baseColorR);
+                        scriptGreen = Math.round(scriptGreen * batch.baseColorG);
+                        scriptBlue  = Math.round(scriptBlue  * batch.baseColorB);
+                    }
 
                     if (fullbright) {
                         // Direct OpenGL path: fullbright, no lightmap (trains/entities)
@@ -3831,7 +4106,10 @@ public final class MqoModelLoader {
                         // RTM本家同様、モデル定義の doCulling に従う。
                         // 車内面は doCulling=false の車両で裏面も描かないと、外から窓越しに
                         // 内装が見えなくなる。
-                        int desiredCull = useCull ? 1 : 0;
+                        // ただし半透明 (ガラス等) は doCulling=true でも常に両面表示にする。
+                        // ガラスは外向き 1 枚面なので、片面カリングだと車内側から見た裏面が
+                        // 消えて「外は色付き・中はスッカスカ」になる (本家は glass を両面描画)。
+                        int desiredCull = (useCull && !batch.translucent) ? 1 : 0;
                         if (desiredCull != lastCullMode) {
                             lastCullMode = desiredCull;
                             if (desiredCull == 1) {
@@ -3901,8 +4179,14 @@ public final class MqoModelLoader {
                                 float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
                                 float u = batch.data[o + 6], v = batch.data[o + 7];
                                 if (depthBias != 0.0F) {
-                                    float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, nx*nx + ny*ny + nz*nz)));
-                                    x += nx*il*depthBias; y += ny*il*depthBias; z += nz*il*depthBias;
+                                    //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
+                                    float bnx = nx, bny = ny, bnz = nz;
+                                    if (batch.biasNormals != null) {
+                                        int bo = i * 3;
+                                        bnx = batch.biasNormals[bo]; bny = batch.biasNormals[bo + 1]; bnz = batch.biasNormals[bo + 2];
+                                    }
+                                    float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, bnx*bnx + bny*bny + bnz*bnz)));
+                                    x += bnx*il*depthBias; y += bny*il*depthBias; z += bnz*il*depthBias;
                                 }
                                 if (scriptRenderer != null) {
                                     u = scriptRenderer.mapU(u, batch.minU, batch.maxU);
@@ -3927,10 +4211,27 @@ public final class MqoModelLoader {
                         }
                     } else {
                         // Lightmap-aware path: block entities (rails, installed objects)
-                        // メタセコイア同様の片面 (cull) 表示。
-                        RenderType renderType = needsBlend
-                            ? (useCull ? RenderType.entityTranslucentCull(texture) : RenderType.entityTranslucent(texture))
-                            : (useCull ? RenderType.entityCutout(texture) : RenderType.entityCutoutNoCull(texture));
+                        //本家: カリングはモデル設定 doCulling に従う (useCull)。半透明バッチは
+                        //doCulling=true でも常に両面 (車内側からガラスが見えるように)。
+                        boolean cullThisBatch = useCull && !batch.translucent;
+                        //半透明パス (pass1) は<b>全て深度を書き込まない</b> glassNoDepth を使う。
+                        //  ・理由: replay 経路では entity=null で遅延バッファに載らず、pass1 が
+                        //    レール描画 (AFTER_BLOCK_ENTITIES) より前に走る。ここで深度を書くと
+                        //    「車内からガラス越しに見たレールが深度テストで消える」(ユーザー報告)。
+                        //  ・深度を書かなくても内装チカチカは起きない: 不透明な内装 (座席/壁/床) は
+                        //    pass0 (α==255・片面カリング・深度あり) で描き切っており、pass1 に載るのは
+                        //    本当に半透明なピクセル (窓ガラス) だけ。提出順 (sortOnUpload=false) なので
+                        //    ガラス同士の重なりも毎フレーム安定する。
+                        boolean deferred = needsBlend
+                            && com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.shouldDefer(entity);
+                        RenderType renderType;
+                        if (needsBlend) {
+                            renderType = com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
+                                .glassNoDepth(texture);
+                        } else {
+                            renderType = cullThisBatch ? RenderType.entityCutout(texture)
+                                : RenderType.entityCutoutNoCull(texture);
+                        }
                         //静的 VBO 高速経路: 頂点データ/シェーダー/ライトが BufferSource と同一
                         //条件のときだけ使う (= 見た目完全不変で毎フレームの頂点プッシュを省く)。
                         //列車 (E257 等の大型 MQO + 座席複製) の FPS 低下対策。
@@ -3950,8 +4251,7 @@ public final class MqoModelLoader {
                         //ガラス越しに座席が見えたり消えたりする」(描画順が毎フレーム変わる)。
                         //遅延バッファは地形の半透明の後に一括描画され、常に正しい順序になる。
                         MultiBufferSource targetBuffer = buffer;
-                        if (needsBlend
-                                && com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.shouldDefer(entity)) {
+                        if (deferred) {
                             targetBuffer = com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.buffer();
                         }
                         VertexConsumer consumer = targetBuffer.getBuffer(renderType);
@@ -3967,8 +4267,14 @@ public final class MqoModelLoader {
                             float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
                             float u = batch.data[o + 6], v = batch.data[o + 7];
                             if (depthBias != 0.0F) {
-                                float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, nx*nx + ny*ny + nz*nz)));
-                                x += nx*il*depthBias; y += ny*il*depthBias; z += nz*il*depthBias;
+                                //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
+                                float bnx = nx, bny = ny, bnz = nz;
+                                if (batch.biasNormals != null) {
+                                    int bo = i * 3;
+                                    bnx = batch.biasNormals[bo]; bny = batch.biasNormals[bo + 1]; bnz = batch.biasNormals[bo + 2];
+                                }
+                                float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, bnx*bnx + bny*bny + bnz*bnz)));
+                                x += bnx*il*depthBias; y += bny*il*depthBias; z += bnz*il*depthBias;
                             }
                             if (scriptRenderer != null) {
                                 u = scriptRenderer.mapU(u, batch.minU, batch.maxU);
@@ -4077,7 +4383,12 @@ public final class MqoModelLoader {
                 if (scriptRenderer != null) {
                     scriptRenderer.clearRenderContext();
                 }
-                if (hasOpaqueBatches()) {
+                //本家 renderBodyNormal (pass0) は AlphaBlend 材質も含む全マテリアルを
+                //glAlphaFunc(GL_EQUAL, 1.0) で描く (不透明ピクセルは pass0 で出る)。
+                //hasOpaqueBatches() だけをゲートにすると、全マテリアルが AlphaBlend の
+                //モデル (KQ パックの台車等) で pass0 が丸ごとスキップされ、pass1 の
+                //window テクスチャ (α<255 のみ) に不透明ピクセルが無く台車が消える。
+                if (hasOpaqueBatches() || hasTranslucentBatches()) {
                     renderInternal(poseStack, buffer, packedLight, overlay, false, opaqueFilter, groupTransform, scriptRenderer, entity);
                 }
                 if (hasTranslucentBatches() || (scriptRenderer != null && scriptRenderer.hasAlphaPassContent())) {
@@ -4155,7 +4466,9 @@ public final class MqoModelLoader {
                     (groupFilter == null || groupFilter.shouldRender(groupName))
                         && scriptRenderer.shouldRenderBakedGroup(groupName, true);
             }
-            if (hasOpaqueBatches()) {
+            //本家 pass0 は AlphaBlend 材質の不透明ピクセル (α==255) も描く。全 AlphaBlend の
+            //モデル (KQ 台車等) で pass0 が飛ぶと台車が消えるため、バッチがあれば必ず回す。
+            if (hasOpaqueBatches() || hasTranslucentBatches()) {
                 renderInternal(poseStack, buffer, packedLight, overlay, false, opaqueFilter, groupTransform, scriptRenderer, entity);
             }
             if (hasTranslucentBatches() || (scriptRenderer != null && scriptRenderer.hasAlphaPassContent())) {
@@ -4188,12 +4501,18 @@ public final class MqoModelLoader {
                     float nx = batch.data[o + 3];
                     float ny = batch.data[o + 4];
                     float nz = batch.data[o + 5];
-                    float localLength = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+                    //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
+                    float bnx = nx, bny = ny, bnz = nz;
+                    if (batch.biasNormals != null) {
+                        int bo = i * 3;
+                        bnx = batch.biasNormals[bo]; bny = batch.biasNormals[bo + 1]; bnz = batch.biasNormals[bo + 2];
+                    }
+                    float localLength = (float) Math.sqrt(bnx * bnx + bny * bny + bnz * bnz);
                     if (localLength > 1.0E-6F) {
                         float scale = surfaceBias / localLength;
-                        vx += nx * scale;
-                        vy += ny * scale;
-                        vz += nz * scale;
+                        vx += bnx * scale;
+                        vy += bny * scale;
+                        vz += bnz * scale;
                     }
                     //発光オーバーレイ: 実法線だと diffuse シェーディングで側面/下面が
                     //最大 40% 減光して「昼でも夜でも暗い」ため、上向き法線 (×1.0) で描く
@@ -4695,12 +5014,29 @@ public final class MqoModelLoader {
         final int materialId;
         /** マテリアル col の不透明度 (1.0=不透明)。半透明ガラス等は <1。描画時に色αへ乗算。 */
         float baseAlpha = 1.0F;
+        /** マテリアル col の RGB (色タイント)。白 (1,1,1) 以外は描画時に頂点色へ乗算。 */
+        float baseColorR = 1.0F;
+        float baseColorG = 1.0F;
+        float baseColorB = 1.0F;
         /** テクスチャが明確なガラス帯を持つ=本当の半透明。強制カットアウトを免除する。 */
         boolean glassTranslucent = false;
+        /** テクスチャに中間アルファのピクセル (ガラス帯/網等) があるか。無ければ pass1 は描く物が無い。 */
+        boolean texHasTranslucentPixels = false;
+        /**
+         * depthBias 押し出し用の頂点法線 (頂点ごと3要素、正規化済み)。同位置の全面の平均
+         * (facet 閾値なし)。null なら頂点データの法線で押す (従来動作)。
+         */
+        float[] biasNormals = null;
         /** RTM pass0(不透明描画)用のアルファテスト相当テクスチャ。 */
         ResourceLocation opaqueTexture = null;
         /** RTM pass1(半透明)用の窓ガラスのみテクスチャ。 */
         ResourceLocation windowTexture = null;
+        /**
+         * このバッチを pass0 (不透明) で最後に描いたフレーム番号。pass1 で「pass0 とペアか
+         * (= 内装チカチカ対策を適用してよいか)」の判定に使う。スクリプト台車のような
+         * pass1 単独描画はここが古いままなので、本家どおり元テクスチャ全体をブレンド描画する。
+         */
+        long lastOpaqueDrawFrame = -1L;
         final float[] data;
         final int vertexCount;
         // scriptTexture=false 時の事前計算結果。SL/通常列車は大半の batch で
@@ -4846,8 +5182,14 @@ public final class MqoModelLoader {
                     float nx = data[o + 3], ny = data[o + 4], nz = data[o + 5];
                     float u = data[o + 6], v = data[o + 7];
                     if (bias != 0.0F) {
-                        float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, nx*nx + ny*ny + nz*nz)));
-                        x += nx*il*bias; y += ny*il*bias; z += nz*il*bias;
+                        //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
+                        float bnx = nx, bny = ny, bnz = nz;
+                        if (biasNormals != null) {
+                            int bo = i * 3;
+                            bnx = biasNormals[bo]; bny = biasNormals[bo + 1]; bnz = biasNormals[bo + 2];
+                        }
+                        float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, bnx*bnx + bny*bny + bnz*bnz)));
+                        x += bnx*il*bias; y += bny*il*bias; z += bnz*il*bias;
                     }
                     bb.addVertex(x, y, z)
                         .setUv(u, v)

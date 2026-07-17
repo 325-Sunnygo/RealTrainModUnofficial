@@ -4804,6 +4804,17 @@ public class TrainEntity extends Entity {
         return Mth.clamp(seatRotation / 45.0F, -1.0F, 1.0F);
     }
 
+    /**
+     * {@code seatRotation} の生値 (-45〜45)。PackScriptSource が {@code entity.seatRotation} を
+     * {@code entity.getSeatRotationRaw()} に書き換えるため、このメソッドが無いと SL 等
+     * (旧 TrainEntity で描画される車両) の render() が TypeError で落ち、素モデル全描画に
+     * フォールバックして「隠すはずの部品が出る/動くと二重に見える」不具合になっていた。
+     * EntityVehicleBase.getSeatRotationRaw() と同じ生値を返す。
+     */
+    public float getSeatRotationRaw() {
+        return seatRotation;
+    }
+
     public FormationCompat getFormation() {
         return new FormationCompat(this);
     }

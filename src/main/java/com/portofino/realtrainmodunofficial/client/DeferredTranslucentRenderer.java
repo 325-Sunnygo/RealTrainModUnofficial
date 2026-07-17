@@ -27,7 +27,24 @@ public final class DeferredTranslucentRenderer {
     private static final MultiBufferSource.BufferSource BUFFER =
             MultiBufferSource.immediate(new ByteBufferBuilder(1536));
 
+    /**
+     * 現在描画中の車両。VehicleScriptRenderers が車両描画の間だけセットする。
+     * <p>
+     * 車両描画は GLRecorder に記録して replay する経路があり、その replay 内で
+     * renderNamedGroups が呼ばれるときは scriptRenderer=null → entity=null になる。
+     * そのままだと {@link #shouldDefer} が false を返し、ガラスが遅延バッファに載らず
+     * pass1 (レール描画より前) で描かれてしまう。すると後から描くレールがガラスの
+     * <b>上</b>に乗り「色付きガラス越しなのにレールに色が付かず明るいまま」になる。
+     * この参照を entity のフォールバックにすることで replay 経路でも正しく遅延できる。
+     */
+    private static Object currentVehicle;
+
     private DeferredTranslucentRenderer() {
+    }
+
+    /** 車両描画の開始/終了で呼ぶ (finally で必ず null に戻すこと)。 */
+    public static void setCurrentVehicle(Object entity) {
+        currentVehicle = entity;
     }
 
     /** この entity の半透明バッチを遅延バッファへ回すか。 */
@@ -35,9 +52,14 @@ public final class DeferredTranslucentRenderer {
         if (ShaderCompat.isShaderPackInUse()) {
             return false;
         }
-        return entity instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase
-                || entity instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity
-                || entity instanceof com.portofino.realtrainmodunofficial.entity.CarEntity;
+        Object e = entity != null ? entity : currentVehicle;
+        return e instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase
+                || e instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity
+                || e instanceof com.portofino.realtrainmodunofficial.entity.CarEntity
+                //信号/踏切等の設置物も同じ問題 (色付きレンズ越しのレール/地形に色が付かない)。
+                //1.21 は設置物 (block entity) → レール (AFTER_BLOCK_ENTITIES) の順なので、
+                //設置物の半透明も遅延してレールの後に描く。
+                || e instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
     }
 
     public static MultiBufferSource buffer() {
@@ -52,6 +74,8 @@ public final class DeferredTranslucentRenderer {
         } else if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
             //安全網: 何らかの理由で上のステージが飛んでも残さない
             BUFFER.endBatch();
+            //「このフレームの pass0 で描いたバッチか」判定用のフレーム番号を進める
+            com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.advanceRenderFrame();
         }
     }
 }

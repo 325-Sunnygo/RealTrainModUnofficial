@@ -596,6 +596,25 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
     }
 
     /**
+     * 描画結果を左右する状態のシグネチャ (スクリプト描画キャッシュ用)。
+     * これが変わらない間はスクリプト (Nashorn) を再実行せず記録を再生する。
+     * 静的な信号機/看板 (現示・向き・スクリプトデータが不変) はほぼ毎フレーム再生で済み軽くなる。
+     * 点滅・アニメ物 (signCounter が毎フレーム変わる) は従来どおり再実行される。
+     */
+    public long renderStateSignature() {
+        long h = 1125899906842597L;
+        for (Map.Entry<String, String> e : scriptData.entrySet()) {
+            h = 31L * h + e.getKey().hashCode();
+            h = 31L * h + (e.getValue() == null ? 0 : e.getValue().hashCode());
+        }
+        h = 31L * h + getSignal();
+        h = 31L * h + signCounter;
+        h = 31L * h + signFlicker;
+        h = 31L * h + Float.floatToIntBits(getRotation());
+        return h;
+    }
+
+    /**
      * 本家 BlockSignBoard.getLightValue の移植。
      * <ul>
      *   <li>lightValue &gt;= 0 … 常にその明るさ</li>

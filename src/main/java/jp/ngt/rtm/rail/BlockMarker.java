@@ -244,6 +244,8 @@ public class BlockMarker extends BaseEntityBlock {
                             rpE.anchorYaw = sE.getYaw();
                             rpE.anchorPitch = sE.getPitch();
                         }
+                        //RTMU: 敷設プレイヤーの設定で自動カント (カーブ) / 自動高さを適用
+                        com.portofino.realtrainmodunofficial.RtmuAutoRail.applyTwo(world, player, rpS, rpE);
                         return createRail0(world, rpS, rpE, prop, makeRail, isCreative);
                     }
                 }
@@ -265,6 +267,8 @@ public class BlockMarker extends BaseEntityBlock {
                     return createTurntable(world, list.get(0), list.get(1), prop, makeRail, isCreative);
                 }
                 if (list.size() >= 3) {
+                    //RTMU: 分岐レールへ自動高さを適用 (自動カントは 2 点レールのみ)
+                    com.portofino.realtrainmodunofficial.RtmuAutoRail.applyList(player, list);
                     return createRail1(world, x, y, z, player, list, prop, makeRail, isCreative);
                 }
             }

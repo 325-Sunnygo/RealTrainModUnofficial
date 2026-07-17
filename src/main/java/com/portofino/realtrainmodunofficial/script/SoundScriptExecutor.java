@@ -42,9 +42,18 @@ public final class SoundScriptExecutor {
         return this.train;
     }
 
-    /** スクリプトが見る速度 (km/h)。 */
+    /**
+     * スクリプトが見る速度 (km/h)。<b>常に絶対値 (0 以上)</b>。
+     * <p>
+     * 列車の内部速度 {@code getSpeed()} は進行方向 (リバーサ) で符号が付き、後進時は<b>負</b>になる。
+     * 一方サウンドスクリプトは {@code if (speed < 0.1) 停車} / {@code if (speed < 14) 低速}
+     * のように<b>非負の閾値</b>としか比較しない。符号付きのまま渡すと、後ろ向きに走らせた瞬間
+     * speed が負 → 「speed < 0.1 = 停車」と誤判定され、走行音が止まって停車音に切り替わっていた。
+     * 本家 SoundUpdater も絶対速度を渡すため、ここで abs して合わせる (JSON 走行音経路は
+     * すでに {@code Math.abs(speedOf(...))} 済み)。
+     */
     public float getSpeed() {
-        return this.rawSpeed() * SPEED_TO_KMH;
+        return Math.abs(this.rawSpeed()) * SPEED_TO_KMH;
     }
 
     /** エンティティ内部の速度 (ブロック/tick)。 */

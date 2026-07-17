@@ -46,6 +46,10 @@ public final class TrainControlKeyHandler {
         if (mc.player == null || mc.screen != null) {
             return;
         }
+        //フリーカメラ中は WASD がカメラ移動に使われるため、運転キー (マスコン/ドア/降車) を無効化
+        if (FreeCameraController.isActive()) {
+            return;
+        }
         // Phase 2: 本家忠実列車 (jp.ngt) — マスコン/降車/ドアのみ先行対応
         if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain) {
             handleRtmTrainKeys(mc, rtmTrain, event);
@@ -93,13 +97,13 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "mascon_neutral", 0), new CustomPacketPayload[0]);
         }
 
-        boolean jumpDown = mc.options.keyJump.isDown();
-        if (jumpDown && event.getKey() == GLFW.GLFW_KEY_LEFT) {
+        //矢印キー単独でドア開閉 (← = 左ドア, → = 右ドア)
+        if (event.getKey() == GLFW.GLFW_KEY_LEFT) {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "toggle_door_left", 0));
             doorLeftChordDown = true;
             return;
         }
-        if (jumpDown && event.getKey() == GLFW.GLFW_KEY_RIGHT) {
+        if (event.getKey() == GLFW.GLFW_KEY_RIGHT) {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "toggle_door_right", 0));
             doorRightChordDown = true;
         }
@@ -179,12 +183,12 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "play_horn", 0));
             return;
         }
-        boolean jumpDown = mc.options.keyJump.isDown();
-        if (jumpDown && event.getKey() == GLFW.GLFW_KEY_LEFT) {
+        //矢印キー単独でドア開閉 (← = 左ドア, → = 右ドア)
+        if (event.getKey() == GLFW.GLFW_KEY_LEFT) {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "toggle_door_left", 0));
             return;
         }
-        if (jumpDown && event.getKey() == GLFW.GLFW_KEY_RIGHT) {
+        if (event.getKey() == GLFW.GLFW_KEY_RIGHT) {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "toggle_door_right", 0));
         }
     }
@@ -212,6 +216,16 @@ public final class TrainControlKeyHandler {
             doorLeftChordDown = false;
             doorRightChordDown = false;
             resetHoldState();
+            return;
+        }
+
+        //フリーカメラ中は運転操作 (ノッチ長押し・ドア・降車) を止める
+        if (FreeCameraController.isActive()) {
+            doorLeftChordDown = false;
+            doorRightChordDown = false;
+            resetHoldState();
+            rtmPowerHoldTicks = -1;
+            rtmBrakeHoldTicks = -1;
             return;
         }
 
@@ -287,10 +301,10 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "mascon_neutral", 0), new CustomPacketPayload[0]);
         }
 
-        boolean jumpDown = mc.options.keyJump.isDown();
+        //矢印キー単独でドア開閉 (← = 左ドア, → = 右ドア)。押しっぱなしで連打しないようラッチ。
         boolean leftArrowDown = GLFW.glfwGetKey(mc.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT) == GLFW.GLFW_PRESS;
         boolean rightArrowDown = GLFW.glfwGetKey(mc.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT) == GLFW.GLFW_PRESS;
-        if (jumpDown && leftArrowDown) {
+        if (leftArrowDown) {
             if (!doorLeftChordDown) {
                 PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "toggle_door_left", 0));
                 doorLeftChordDown = true;
@@ -298,7 +312,7 @@ public final class TrainControlKeyHandler {
         } else {
             doorLeftChordDown = false;
         }
-        if (jumpDown && rightArrowDown) {
+        if (rightArrowDown) {
             if (!doorRightChordDown) {
                 PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "toggle_door_right", 0));
                 doorRightChordDown = true;

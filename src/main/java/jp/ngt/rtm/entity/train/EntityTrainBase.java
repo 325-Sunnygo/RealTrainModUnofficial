@@ -86,6 +86,15 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
     private float trainSpeed;
     /**
+     * 実際に車体へ効かせている加減速度 (tick 毎)。目標加速度へ上限ジャークで漸近させ、
+     * 力行/制動の突き上げ (急発進・急ブレーキ) を無くして実車のような立ち上がりにする。
+     */
+    private float appliedAccel;
+    /** 制動の加加速度上限 (tick 毎の加速度変化量)。小さいほどブレーキがじんわり効く。 */
+    private static final float BRAKE_JERK = 0.00018F;
+    /** 力行の加加速度上限。制動よりやや速く立ち上げる。 */
+    private static final float POWER_JERK = 0.00026F;
+    /**
      * notch x -18
      */
     public int brakeCount = 72;
@@ -354,6 +363,10 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     /** スクリプトの読み込みを 1 度だけ試すためのフラグ (無い車両で毎 tick 探しに行かない)。 */
     private boolean attemptedSoundScriptLoad;
 
+    /** 車両パックのサーバースクリプト (serverScriptPath, Server_*.js)。サーバー専用。 */
+    private javax.script.ScriptEngine serverScriptEngine;
+    private boolean attemptedServerScriptLoad;
+
     @Override
     public void tick() {
         super.tick();
@@ -361,8 +374,48 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         if (this.level().isClientSide()) {
             this.tickSound();
         } else {
+            //DataMap を書き換えるサーバースクリプトを先に回してから同期する。
+            this.tickServerScript();
             this.syncFormationData();
             this.syncDataMap();
+        }
+    }
+
+    /**
+     * 本家 serverScriptPath (Server_*.js) を毎 tick 実行する。これらは onUpdate(entity, executer) 内で
+     * {@code entity.getResourceState().getDataMap().setString("trainType", ...)} のように DataMap を書き換え、
+     * 方向幕・種別・trainType 等を決める。
+     * <p>
+     * DataMap の同期 ({@link #syncDataMap}) は実装済みだったが、<b>書き込み側のサーバースクリプト実行が
+     * 実際に設置される本家系エンティティ (EntityTrainBase) に無く</b>、旧 TrainEntity にしか無かったため、
+     * DataMap を使うパック (例: 105系 hikari の server_105_oka.js が trainType を設定) で種別が既定のままに
+     * なっていた。ここで実行すれば server → client (DataMapSyncPayload) まで通り、描画スクリプトが読める。
+     */
+    private void tickServerScript() {
+        this.ensureServerScriptLoaded();
+        if (this.serverScriptEngine != null) {
+            com.portofino.realtrainmodunofficial.script.TrainScriptSystem
+                    .invokeServerScriptOnUpdate(this.serverScriptEngine, this);
+        }
+    }
+
+    private void ensureServerScriptLoaded() {
+        if (this.attemptedServerScriptLoad) {
+            return;
+        }
+        this.attemptedServerScriptLoad = true;
+        com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
+                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
+        if (def == null || !def.hasServerScript()) {
+            return;
+        }
+        try {
+            this.serverScriptEngine =
+                    com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadServerScriptForVehicle(def);
+        } catch (Throwable t) {
+            //専用サーバー等で client パッケージのモデルローダが読めなくても列車 tick を巻き込まない。
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER
+                    .warn("Failed to load train server script for {}: {}", this.getModelName(), t.toString());
         }
     }
 
@@ -618,17 +671,28 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         if (this.isControlCar()) {
             if (!this.level().isClientSide) {
                 TrainConfig cfg = this.getConfig();
-                float acceleration = TrainSpeedManager.getAcceleration(this, notch, Math.abs(speed), cfg)
+                float targetAccel = TrainSpeedManager.getAcceleration(this, notch, Math.abs(speed), cfg)
                         * brakeReleaseFactor;
                 TrainState dir = this.getTrainState(10);
                 if ((dir == TrainState.Direction_Back && speed > 0) || (dir == TrainState.Direction_Front && speed < 0)) {
-                    acceleration = Math.abs(acceleration);
+                    targetAccel = Math.abs(targetAccel);
                 }
                 if (dir == TrainState.Direction_Back) {
-                    acceleration *= -1;
+                    targetAccel *= -1;
                 }
 
-                speed += acceleration;
+                //現実的な加減速: 目標加速度へ上限ジャークで漸近させる。ノッチを入れた瞬間に
+                //フル制動/フル力行がかかる突き上げを無くし、実車のようにじんわり立ち上げる。
+                float maxJerk = notch < 0 ? BRAKE_JERK : POWER_JERK;
+                this.appliedAccel += Mth.clamp(targetAccel - this.appliedAccel, -maxJerk, maxJerk);
+                float prevSpeed = speed;
+                speed += this.appliedAccel;
+                //制動で 0 を跨いだら停止させる (ジャーク制限で行き過ぎても逆走しない)
+                if (notch < 0 && prevSpeed != 0.0F
+                        && Math.signum(speed) != Math.signum(prevSpeed)) {
+                    speed = 0.0F;
+                    this.appliedAccel = 0.0F;
+                }
 
                 if (notch >= 0)//ブレーキ解
                 {

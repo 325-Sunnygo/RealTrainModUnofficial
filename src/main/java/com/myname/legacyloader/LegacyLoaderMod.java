@@ -121,18 +121,79 @@ public class LegacyLoaderMod {
         modBus.addListener(this::addPackFinders);
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modBus.addListener(this::onModifyBakingResult);
+            modBus.addListener(this::onRegisterBlockEntityRenderers);
+            modBus.addListener(this::onRegisterClientExtensions);
         }
         NeoForge.EVENT_BUS.register(this);
         scanLegacyMods();
     }
 
+    /**
+     * 共有 LegacyTileEntity 型に、1.7.10 TESR を毎フレーム呼ぶディスパッチャを登録する。
+     * これで AsphaltMod のカラーコーン/道路灯/電光掲示板等 (OBJ を TESR で描く 3D ブロック) が
+     * 現行 1.21 でも立体表示される。
+     */
+    private void onRegisterBlockEntityRenderers(
+            net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers event) {
+        event.registerBlockEntityRenderer(
+                com.myname.legacyloader.bridge.tileentity.LegacyTileEntity.LEGACY_TYPE,
+                ctx -> new com.myname.legacyloader.bridge.client.renderer.tileentity.LegacyBlockEntityDispatcher());
+    }
+
+    /**
+     * TESR 専用ブロック (getRenderType()==-1) の BlockItem に BEWLR
+     * ({@link com.myname.legacyloader.bridge.client.renderer.tileentity.LegacyTesrItemRenderer}) を登録。
+     * インベントリモデルは {@link #onModifyBakingResult} で isCustomRenderer=true に差し替えるので、
+     * ItemRenderer がこの BEWLR を呼んで OBJ を立体表示する。
+     */
+    private void onRegisterClientExtensions(
+            net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent event) {
+        java.util.List<Item> tesrItems = new java.util.ArrayList<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (item instanceof net.minecraft.world.item.BlockItem blockItem
+                    && LegacyRenderingRegistry.getRenderType(blockItem.getBlock()) == -1) {
+                tesrItems.add(item);
+            }
+        }
+        if (tesrItems.isEmpty()) return;
+        var extensions = new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {
+            private com.myname.legacyloader.bridge.client.renderer.tileentity.LegacyTesrItemRenderer renderer;
+
+            @Override
+            public net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                if (renderer == null) {
+                    renderer = new com.myname.legacyloader.bridge.client.renderer.tileentity.LegacyTesrItemRenderer();
+                }
+                return renderer;
+            }
+        };
+        event.registerItem(extensions, tesrItems.toArray(new Item[0]));
+        LOGGER.info("LegacyLoader: Registered TESR item renderer for {} items", tesrItems.size());
+    }
+
     private void onModifyBakingResult(ModelEvent.ModifyBakingResult event) {
         int wrapped = 0;
+        int tesrItemModels = 0;
+        net.minecraft.client.renderer.block.model.ItemTransforms blockTransforms = standardBlockTransforms(event);
         for (Block block : BuiltInRegistries.BLOCK) {
             ResourceLocation id = BuiltInRegistries.BLOCK.getKey(block);
             if (id == null) continue;
             int renderId = LegacyRenderingRegistry.getRenderType(block);
             if (renderId == 0) continue;
+            if (renderId == -1) {
+                // TESR 専用ブロック: ブロックモデルは空 (OBJ は TESR が描く)。アイテムは
+                // isCustomRenderer=true のモデルに差し替え、BEWLR (LegacyTesrItemRenderer) に描かせる。
+                ModelResourceLocation invId = new ModelResourceLocation(id, "inventory");
+                BakedModel original = event.getModels().get(invId);
+                if (original != null
+                        && !(original instanceof com.myname.legacyloader.bridge.client.renderer.LegacyTesrItemBakedModel)) {
+                    event.getModels().put(invId,
+                            new com.myname.legacyloader.bridge.client.renderer.LegacyTesrItemBakedModel(
+                                    original, blockTransforms));
+                    tesrItemModels++;
+                }
+                continue;
+            }
             LegacySimpleBlockRenderingHandler handler = LegacyRenderingRegistry.getBlockHandler(renderId);
             if (handler == null) continue;
             for (int meta = 0; meta < 16; meta++) {
@@ -141,7 +202,17 @@ public class LegacyLoaderMod {
             if (wrapLegacyModel(event, id, block, renderId, handler, "")) wrapped++;
             if (wrapLegacyModel(event, id, block, renderId, handler, "inventory")) wrapped++;
         }
-        LOGGER.info("LegacyLoader: Wrapped {} legacy ISBRH baked block models", wrapped);
+        LOGGER.info("LegacyLoader: Wrapped {} legacy ISBRH baked block models, {} TESR item models",
+                wrapped, tesrItemModels);
+    }
+
+    /** 標準ブロック (stone) の表示変換を借りる。GUI での 30/225 度回転・0.625 縮小など。 */
+    private net.minecraft.client.renderer.block.model.ItemTransforms standardBlockTransforms(
+            ModelEvent.ModifyBakingResult event) {
+        BakedModel stone = event.getModels().get(new ModelResourceLocation(
+                ResourceLocation.fromNamespaceAndPath("minecraft", "stone"), "inventory"));
+        return stone != null ? stone.getTransforms()
+                : net.minecraft.client.renderer.block.model.ItemTransforms.NO_TRANSFORMS;
     }
 
     private boolean wrapLegacyModel(ModelEvent.ModifyBakingResult event, ResourceLocation id, Block block, int renderId,
@@ -1578,6 +1649,16 @@ public class LegacyLoaderMod {
                 }
             }
 
+            // 1.7.10 mod が assets/minecraft/ にリソース (スクリプト等) を持つと、scanJarContents で
+            // "minecraft" が availableNamespaces に入ってしまう。その名前空間で以下の「生成リソース」
+            // (blockstate / block model / item model を BuiltInRegistries から自動生成) を吐くと、
+            // 全バニラブロックのモデルを石スタブで上書きしてしまい、バニラブロックが全部石になる。
+            // 生成は legacy mod 自身の名前空間だけで行い、minecraft では一切生成しない。
+            // (実際にファイルとして同梱されたテクスチャ/スクリプト等は上のループで既に提供済み。)
+            if ("minecraft".equals(namespace)) {
+                return;
+            }
+
             // 笘・虚逧・函謌舌Μ繧ｽ繝ｼ繧ｹ・亥・繝悶Ο繝・け・・
             Set<ResourceLocation> emittedGeneratedBlocks = new HashSet<>();
             for (Map.Entry<ResourceLocation, String> entry : LegacyBlock.TEXTURE_OVERRIDES.entrySet()) {
@@ -1946,6 +2027,32 @@ public class LegacyLoaderMod {
         // ========================================
 
         private IoSupplier<InputStream> generateBlockModel(String ns, String modelName) {
+            // getRenderType()==-1 の TESR 専用ブロック (AsphaltMod の OBJ 3D ブロック等) は
+            // 標準の立方体モデルを持たせない。cube を生成すると OBJ を箱で覆い隠してしまうため、
+            // 要素なしの空モデルにして「TESR が描く OBJ だけ」が見えるようにする。
+            {
+                String probe = modelName;
+                for (String sfx : new String[]{"_inner", "_outer", "_top", "_double"}) {
+                    if (probe.endsWith(sfx)) {
+                        probe = probe.substring(0, probe.length() - sfx.length());
+                        break;
+                    }
+                }
+                if (probe.length() > 3 && probe.charAt(probe.length() - 3) == '_'
+                        && Character.isDigit(probe.charAt(probe.length() - 2))
+                        && Character.isDigit(probe.charAt(probe.length() - 1))) {
+                    probe = probe.substring(0, probe.length() - 3);
+                }
+                @SuppressWarnings("removal")
+                ResourceLocation probeRL = ResourceLocation.fromNamespaceAndPath(ns, probe);
+                Block probeBlock = BuiltInRegistries.BLOCK.get(probeRL);
+                if (probeBlock != null && probeBlock != net.minecraft.world.level.block.Blocks.AIR
+                        && com.myname.legacyloader.bridge.client.registry.LegacyRenderingRegistry
+                                .getRenderType(probeBlock) == -1) {
+                    String empty = "{\"textures\":{\"particle\":\"" + ns + ":block/" + probe + "\"},\"elements\":[]}";
+                    return () -> new ByteArrayInputStream(empty.getBytes(StandardCharsets.UTF_8));
+                }
+            }
             // 繧ｵ繝輔ぅ繝・け繧ｹ蜃ｦ逅・
             String baseName = modelName;
             String suffix = "";

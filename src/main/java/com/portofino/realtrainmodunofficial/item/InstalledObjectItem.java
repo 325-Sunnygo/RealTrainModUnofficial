@@ -244,6 +244,15 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
                 placeMountPitch = 90.0F;
             }
         }
+        //Shift 設置: プレイヤーの向きで角度が決まる設置物 (改札機/踏切/券売機/標識/看板/照明 等) は、
+        //バニラの立て看板と同じ 22.5 度刻み (16 方向) に丸める。通常設置は従来どおり (自由角度 or 15 度刻み)。
+        //生の getYRot() を 22.5 度で丸める (15 度丸め済みの値を再丸めすると二重丸めでずれるため生値を使う)。
+        //レール載せ・グリッド整列・蛍光灯・壁面固定・信号・ワイヤーは独自の向き決めなので対象外。
+        if (player.isShiftKeyDown() && railSnap == null && !gridAligned && !fluorescent && !wallMounted
+                && category != InstalledObjectCategory.SIGNAL
+                && category != InstalledObjectCategory.WIRE) {
+            placeYaw = Math.round(player.getYRot() / 22.5F) * 22.5F;
+        }
         if (!level.isClientSide) {
             level.setBlock(placePos, RealTrainModUnofficialBlocks.INSTALLED_OBJECT.get().defaultBlockState(), 3);
             if (level.getBlockEntity(placePos) instanceof InstalledObjectBlockEntity blockEntity) {
