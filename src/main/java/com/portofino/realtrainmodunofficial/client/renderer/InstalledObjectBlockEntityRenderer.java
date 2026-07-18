@@ -225,7 +225,11 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         // 改札(TICKET_GATE)はスクリプト経路を使わない。スクリプト経路は扉の開閉 transform を
                         // 渡さないため、扉が静止位置(=開)のまま「ずっと開いてる」状態になる。transform 付きの
                         // renderModelWithoutScript を通して barMoveCount に応じ扉を閉じる(本家RTM挙動)。
-                        MqoModelLoader.renderModelPreferScript(model, poseStack, buffer, packedLight, blockEntity);
+                        //標識/看板 (汎用スクリプト) は状態が変わらない間 Nashorn を再実行せず記録を
+                        //再生する (多数設置時の毎フレーム Nashorn が主コストだった)。信号/踏切は
+                        //MachineScriptRenderers で既にキャッシュ済み。見た目は不変。
+                        com.portofino.realtrainmodunofficial.client.render.InstalledObjectScriptCache.render(
+                            blockEntity, model, poseStack, buffer, packedLight, packedOverlay);
                     } else {
                         MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight, packedOverlay, false, filter, transform, blockEntity);
                         if (model.hasTranslucentBatches() && cameraDistanceSq < translucentThreshold * translucentThreshold) {

@@ -71,10 +71,14 @@ public class TrainItem extends Item {
             return InteractionResult.PASS;
         }
         ItemStack stack = context.getItemInHand();
-        String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        //自動車 (CarItem) と同じく getSelectedModelId で読む。これはモダンコンポーネントが
+        //null のとき minecraft:custom_data NBT (LEGACY_MODEL_NAME) にフォールバックする。
+        //専用サーバー (Youer/Mohist 等 Bukkit 系ハイブリッド) はカスタムデータコンポーネントを
+        //ItemStack 変換で剥がすが custom_data NBT は保持するため、これで選択が生き残る。
+        //(以前は stack.get(SELECTED_MODEL_ID) だけで、剥がれて全列車が先頭=223系5000番台Tcに)。
+        String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         if (selectedId == null || selectedId.isBlank()) {
-            //専用サーバー保険: コンポーネントが同期・保持されない環境では、サーバー側に控えた
-            //プレイヤーの選択を使う (でないと全車両が先頭=223系5000番台Tcになる)。
+            //さらなる保険: サーバー側に控えたプレイヤーの選択 (選択パケット受信時に記録)。
             selectedId = com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.get(player.getUUID());
         }
         VehicleDefinition def = VehicleRegistry.getById(selectedId);

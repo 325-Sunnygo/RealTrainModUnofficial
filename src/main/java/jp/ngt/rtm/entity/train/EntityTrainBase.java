@@ -878,6 +878,13 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return new net.minecraft.world.phys.Vec3(w.x, w.y + 0.15D, w.z);
     }
 
+    /** 乗客 NPC (別 jar rtmupassenger) か。EntityType の名前空間で判定 (mod 間参照を避ける)。 */
+    private static boolean isRtmuPassenger(Entity rider) {
+        net.minecraft.resources.ResourceLocation key =
+                net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(rider.getType());
+        return key != null && "rtmupassenger".equals(key.getNamespace());
+    }
+
     @Override
     protected void positionRider(Entity rider, Entity.MoveFunction move) {
         if (this.hasPassenger(rider)) {
@@ -888,10 +895,15 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 sv = sv.rotateAroundZ(-this.rotationRoll);
                 sv = sv.rotateAroundX(this.getXRot());
                 sv = sv.rotateAroundY(this.getYRot());
-                //旧 EntityFloor 搭乗時の実効高さ (floorY + 0.15) に合わせる
+                //旧 EntityFloor 搭乗時の実効高さ (floorY + 0.15) に合わせる。
+                //乗客 NPC (rtmupassenger) は座り位置が高すぎたので下げる (プレイヤーの着席は不変)。
+                double seatY = this.getY() + sv.getY() + 0.15D;
+                if (isRtmuPassenger(rider)) {
+                    seatY -= 0.35D;
+                }
                 move.accept(rider,
                         this.getX() + sv.getX(),
-                        this.getY() + sv.getY() + 0.15D,
+                        seatY,
                         this.getZ() + sv.getZ());
                 return;
             }
