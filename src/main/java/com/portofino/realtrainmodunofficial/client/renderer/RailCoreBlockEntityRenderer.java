@@ -104,6 +104,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             RailMap[] maps = be.getAllRailMaps();
             if (maps == null || maps.length == 0) return;
 
+            //重ねレール (サブレール): 同じ RailMap 上に各サブレール定義のモデルを描く。メインより
+            //先に描く (どちらも不透明なので順序は問題にならない)。サブレールが無い通常のレールは
+            //この分岐に入らないので影響なし。
+            if (be.subRails != null && !be.subRails.isEmpty()) {
+                renderSubRails(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay);
+            }
+
             // 本家式レール描画 (作り直し後の標準パス)。
             //  スクリプト付き: renderRailStatic をスクリプトが実行し、デフォルト配置は
             //  スクリプトが renderer.renderStaticParts を呼んだ時のみ (位置毎 shouldRenderObject
@@ -157,6 +164,30 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn("Skipping rail render at {} after renderer failure", be.getBlockPos(), t);
         } finally {
             ClientRenderProfiler.endRail(profilerStart);
+        }
+    }
+
+    /**
+     * 重ねレール (サブレール) をすべて描く。各サブレールはメインと同じ RailMap 上に、
+     * サブレール定義<b>自身</b>のモデル+スクリプトで描かれる (RailScriptRenderers.renderSubRail)。
+     * これが無いと、重ねレールは追加・保存されても描画されず「重ねても見た目が変わらない」状態になる。
+     */
+    private void renderSubRails(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
+                                PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
+        for (jp.ngt.rtm.rail.util.RailProperty sub : be.subRails) {
+            if (sub == null || sub.railModel == null || sub.railModel.isBlank()) {
+                continue;
+            }
+            RailDefinition subDef = RailRegistry.getById(sub.railModel);
+            if (subDef == null) {
+                continue;
+            }
+            MqoModelLoader.MqoModel subModel = MqoModelLoader.loadModelForRail(subDef);
+            if (subModel == null) {
+                continue;
+            }
+            com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.renderSubRail(
+                    be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, subDef, subModel);
         }
     }
 
