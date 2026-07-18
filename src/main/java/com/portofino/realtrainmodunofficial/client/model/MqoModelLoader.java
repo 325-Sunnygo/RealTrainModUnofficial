@@ -3625,24 +3625,18 @@ public final class MqoModelLoader {
             }
             Object entity = scriptRenderer != null ? scriptRenderer.getCurrentEntity() : null;
             boolean fullbright = false;
-            //ドアがスライド中 (doorMove が 0 と MAX の間) は door 部品を除外しない。
-            //RTM 標準はドア開閉を「renderDoor のスライド」+「開いた瞬間の addExclusionParts(door_*)」で
-            //表すが、除外はドア状態ビットで即時に効くため、除外を尊重すると<b>開く瞬間にドアが消えて
-            //スライドが見えず、閉じるときだけアニメが出る</b>非対称になっていた (223 系で顕著)。
-            //スライド中は常に描いてアニメを見せ、開き切り/閉じ切り (rest) では除外を尊重する。
-            boolean doorSliding = false;
-            if (entity instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> v) {
-                int max = jp.ngt.rtm.entity.vehicle.EntityVehicleBase.MAX_DOOR_MOVE;
-                doorSliding = (v.doorMoveL > 0 && v.doorMoveL < max) || (v.doorMoveR > 0 && v.doorMoveR < max);
-            }
-            final boolean doorSlidingF = doorSliding;
-            //本家 ResourceState.exclusionParts: スクリプトが「今は描かない」と指定したパーツを落とす。
+            //ドア部品 (door_*) は renderDoor が doorMove でスライド描画する。RTM 標準の描画スクリプトは
+            //render() 先頭の updateClient() でドア状態ビットを見て<b>即座に</b> addExclusionParts(door_*) する
+            //ため、除外を尊重すると<b>開く瞬間にドアが消えてスライドが見えず、閉じるときだけアニメが
+            //出る</b>非対称になっていた (223 系で顕著)。ドアは常に描かせてスライドで開閉を表現する
+            //(開き切りは戸袋に収まる)。除外の適用は replay 時で、そこでは getCurrentEntity()==null で
+            //doorMove を確実には見られないため、door_* は<b>無条件</b>に免除する。
             GroupPredicate exclusionFilter = (excludedGroups == null || excludedGroups.isEmpty())
                 ? null
                 : groupName -> {
                     String g = groupName == null ? "" : groupName.trim().toLowerCase(Locale.ROOT);
-                    if (doorSlidingF && g.contains("door")) {
-                        return true; //スライド中のドアは除外せず描く (開閉アニメを対称に)
+                    if (g.startsWith("door")) {
+                        return true; //ドアは除外せず常に描く (スライドで開閉、開閉アニメを対称に)
                     }
                     return !excludedGroups.contains(g);
                 };
