@@ -3625,12 +3625,27 @@ public final class MqoModelLoader {
             }
             Object entity = scriptRenderer != null ? scriptRenderer.getCurrentEntity() : null;
             boolean fullbright = false;
-            //本家 ResourceState.exclusionParts: スクリプトが「今は描かない」と指定したパーツを落とす
-            //(RTM 標準スクリプトはドアの開閉をこれで表現する)。Batch のグループ名は正規化済み。
+            //ドアがスライド中 (doorMove が 0 と MAX の間) は door 部品を除外しない。
+            //RTM 標準はドア開閉を「renderDoor のスライド」+「開いた瞬間の addExclusionParts(door_*)」で
+            //表すが、除外はドア状態ビットで即時に効くため、除外を尊重すると<b>開く瞬間にドアが消えて
+            //スライドが見えず、閉じるときだけアニメが出る</b>非対称になっていた (223 系で顕著)。
+            //スライド中は常に描いてアニメを見せ、開き切り/閉じ切り (rest) では除外を尊重する。
+            boolean doorSliding = false;
+            if (entity instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> v) {
+                int max = jp.ngt.rtm.entity.vehicle.EntityVehicleBase.MAX_DOOR_MOVE;
+                doorSliding = (v.doorMoveL > 0 && v.doorMoveL < max) || (v.doorMoveR > 0 && v.doorMoveR < max);
+            }
+            final boolean doorSlidingF = doorSliding;
+            //本家 ResourceState.exclusionParts: スクリプトが「今は描かない」と指定したパーツを落とす。
             GroupPredicate exclusionFilter = (excludedGroups == null || excludedGroups.isEmpty())
                 ? null
-                : groupName -> !excludedGroups.contains(
-                    groupName == null ? "" : groupName.trim().toLowerCase(Locale.ROOT));
+                : groupName -> {
+                    String g = groupName == null ? "" : groupName.trim().toLowerCase(Locale.ROOT);
+                    if (doorSlidingF && g.contains("door")) {
+                        return true; //スライド中のドアは除外せず描く (開閉アニメを対称に)
+                    }
+                    return !excludedGroups.contains(g);
+                };
             renderSelectedBatches(ordered, poseStack, buffer, packedLight, overlay, translucent,
                 exclusionFilter, null, scriptRenderer, entity, fullbright);
         }

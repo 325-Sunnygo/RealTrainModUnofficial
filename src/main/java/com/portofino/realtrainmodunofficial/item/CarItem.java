@@ -31,6 +31,11 @@ public class CarItem extends Item {
         Level level = context.getLevel();
         ItemStack stack = context.getItemInHand();
         String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
+        //専用サーバー保険: コンポーネントが同期・保持されない環境では、サーバー側に控えた選択を使う。
+        //(クライアントでは控えが空なので従来通り選択画面が開く)
+        if ((selectedId == null || selectedId.isBlank()) && context.getPlayer() != null) {
+            selectedId = com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.get(context.getPlayer().getUUID());
+        }
         // モデル未選択時は spawn せずに直接選択画面を開く。
         // useOn で PASS しても use() は自動では呼ばれないため、ここで client 側に
         // フックして選択画面を開かないと UI が出ないまま。

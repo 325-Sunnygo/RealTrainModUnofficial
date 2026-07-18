@@ -40,7 +40,11 @@ public record SelectModelPayload(String modelId, String dataMapValue) implements
             Player player = context.player();
             String safeModelId = payload.modelId() == null ? "" : payload.modelId();
             String safeDataMap = payload.dataMapValue() == null ? "" : payload.dataMapValue();
-            
+
+            //専用サーバー保険: アイテムのコンポーネントが同期・保持されなくても選択が効くよう、
+            //サーバー側にプレイヤーごとの選択を控える (設置側が null のとき拾う)。
+            com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.set(player.getUUID(), safeModelId);
+
             for (InteractionHand hand : InteractionHand.values()) {
                 ItemStack stack = player.getItemInHand(hand);
                 if (stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.TrainVehicleItem) {

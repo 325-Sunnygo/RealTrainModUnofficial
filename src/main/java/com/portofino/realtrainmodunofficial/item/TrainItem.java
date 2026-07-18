@@ -72,6 +72,11 @@ public class TrainItem extends Item {
         }
         ItemStack stack = context.getItemInHand();
         String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        if (selectedId == null || selectedId.isBlank()) {
+            //専用サーバー保険: コンポーネントが同期・保持されない環境では、サーバー側に控えた
+            //プレイヤーの選択を使う (でないと全車両が先頭=223系5000番台Tcになる)。
+            selectedId = com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.get(player.getUUID());
+        }
         VehicleDefinition def = VehicleRegistry.getById(selectedId);
         if (def == null || !accepts(def)) {
             def = VehicleRegistry.getAll().stream()
