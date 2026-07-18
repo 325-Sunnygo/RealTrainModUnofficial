@@ -49,6 +49,27 @@ public final class RtmuRenderTypes extends RenderType {
         return GLASS_NO_DEPTH.apply(texture);
     }
 
+    //glassNoDepth の片面カリング版。本家 doCulling=true のモデルは半透明も片面描画するため
+    //(RenderVehicleBase は glDisable(GL_CULL_FACE) を doCulling でしか外さない)、それに合わせる用。
+    //深度書き込み無し・提出順は据え置きで、カリングだけ有効にする。
+    private static final Function<ResourceLocation, RenderType> GLASS_NO_DEPTH_CULL = Util.memoize(tex ->
+        create("rtmu_glass_nodepth_cull",
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, false,
+            CompositeState.builder()
+                .setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+                .setTextureState(new TextureStateShard(tex, false, false))
+                .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                .setLightmapState(LIGHTMAP)
+                .setOverlayState(OVERLAY)
+                .setCullState(CULL)
+                .setWriteMaskState(COLOR_WRITE)
+                .createCompositeState(true)));
+
+    /** {@link #glassNoDepth} の片面カリング版 (本家 doCulling=true 用)。 */
+    public static RenderType glassNoDepthCull(ResourceLocation texture) {
+        return GLASS_NO_DEPTH_CULL.apply(texture);
+    }
+
     //entityTranslucent 相当 (深度書き込みあり・両面) だが提出順で描く。台車・座席など
     //「AlphaBlend だが実質不透明」なパーツの pass1 用。ソートに載らないのでチカチカしない。
     private static final Function<ResourceLocation, RenderType> TRANSLUCENT_NO_SORT = Util.memoize(tex ->

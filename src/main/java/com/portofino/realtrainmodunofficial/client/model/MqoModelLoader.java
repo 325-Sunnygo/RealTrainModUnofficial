@@ -4103,13 +4103,13 @@ public final class MqoModelLoader {
                             RenderSystem.setShaderColor(scriptRed / 255f * lightFactor, scriptGreen / 255f * lightFactor, scriptBlue / 255f * lightFactor, scriptAlpha / 255f);
                             gr = scriptRed; gg = scriptGreen; gb = scriptBlue; ga = scriptAlpha;
                         }
-                        // RTM本家同様、モデル定義の doCulling に従う。
-                        // 車内面は doCulling=false の車両で裏面も描かないと、外から窓越しに
-                        // 内装が見えなくなる。
-                        // ただし半透明 (ガラス等) は doCulling=true でも常に両面表示にする。
-                        // ガラスは外向き 1 枚面なので、片面カリングだと車内側から見た裏面が
-                        // 消えて「外は色付き・中はスッカスカ」になる (本家は glass を両面描画)。
-                        int desiredCull = (useCull && !batch.translucent) ? 1 : 0;
+                        // カリングは本家 RenderVehicleBase / ModelObject を厳密移植 (ユーザー選択):
+                        //   if (!doCulling) glDisable(GL_CULL_FACE);  // 不透明・半透明まとめて両面
+                        //   ... NORMAL + TRANSPARENT の両パスをこの中で描く (renderBodyTransparent も外さない)
+                        //   if (!doCulling) glEnable(GL_CULL_FACE);
+                        // 本家に「半透明だけ両面」の区別は無い。doCulling=false で全両面、true で全片面。
+                        // ★doCulling=true では内装の色付きガラスも片面=車内側から消えるが、本家挙動どおり。
+                        int desiredCull = useCull ? 1 : 0;
                         if (desiredCull != lastCullMode) {
                             lastCullMode = desiredCull;
                             if (desiredCull == 1) {
@@ -4211,9 +4211,9 @@ public final class MqoModelLoader {
                         }
                     } else {
                         // Lightmap-aware path: block entities (rails, installed objects)
-                        //本家: カリングはモデル設定 doCulling に従う (useCull)。半透明バッチは
-                        //doCulling=true でも常に両面 (車内側からガラスが見えるように)。
-                        boolean cullThisBatch = useCull && !batch.translucent;
+                        //本家厳密移植 (ユーザー選択): カリングは doCulling 一括 (不透明も半透明も同じ)。
+                        //doCulling=false で両面、true で片面。「半透明だけ両面」は本家に無い。
+                        boolean cullThisBatch = useCull;
                         //半透明パス (pass1) は<b>全て深度を書き込まない</b> glassNoDepth を使う。
                         //  ・理由: replay 経路では entity=null で遅延バッファに載らず、pass1 が
                         //    レール描画 (AFTER_BLOCK_ENTITIES) より前に走る。ここで深度を書くと
@@ -4226,8 +4226,10 @@ public final class MqoModelLoader {
                             && com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.shouldDefer(entity);
                         RenderType renderType;
                         if (needsBlend) {
-                            renderType = com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
-                                .glassNoDepth(texture);
+                            //半透明も doCulling に従う (本家厳密化)。深度書き込み無し・提出順は据え置き。
+                            renderType = cullThisBatch
+                                ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthCull(texture)
+                                : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepth(texture);
                         } else {
                             renderType = cullThisBatch ? RenderType.entityCutout(texture)
                                 : RenderType.entityCutoutNoCull(texture);
