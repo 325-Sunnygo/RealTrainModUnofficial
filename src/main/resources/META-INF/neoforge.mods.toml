@@ -86,30 +86,9 @@ config="${mod_id}.mixins.json"
     ordering="NONE"
     side="BOTH"
 
-# --- 1.7.10 Legacy Loader (RTMU に同梱: 1つの jar に2 mod エントリ) ---
-# 別プロジェクトだった 1.7.10Legacyloader を RTMU に取り込み、同一 jar 内で
-# "legacyloader" として宣言する。@Mod("legacyloader") の LegacyLoaderMod が
-# 独立したイベントバスで初期化され、minecraft1.7.10mods/ の 1.7.10 mod を読み込む。
-[[mods]]
-modId="legacyloader"
-version="1.0.0"
-displayName="1.7.10 Legacy Loader (RTMU 同梱)"
-description='''Loads legacy Minecraft 1.7.10 mods (building blocks etc.) in NeoForge. Bundled with RTMU.'''
-
-[[dependencies.legacyloader]]
-    modId="neoforge"
-    type="required"
-    versionRange="[${neo_version},)"
-    ordering="NONE"
-    side="BOTH"
-
-[[dependencies.legacyloader]]
-    modId="minecraft"
-    type="required"
-    versionRange="${minecraft_version_range}"
-    ordering="NONE"
-    side="BOTH"
-
+# 1.7.10 Legacy Loader (1.7.10 建材 mod ローダー) は削除した。
+# 誰も使っておらず、専用サーバーでのクライアントクラス解決バグ (BlockEntityRenderer /
+# AbstractTexture の NoClassDefFoundError) の温床だったため、mod ごと撤去。
 # ATSA(ATS Assist)は別mod(atsa サブプロジェクト/別jar, 開発者325)へ分離済み。ここでは宣言しない。
 
 # Features are specific properties of the game environment, that you may want to declare you require. This example declares

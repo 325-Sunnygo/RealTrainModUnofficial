@@ -1,1 +1,0 @@
-package com.myname.legacyloader.bridge.world; public class LegacyColorizerGrass { public static int func_77480_a(double t,double r){return 0x7fb238;} public static int getGrassColor(double t,double r){return func_77480_a(t,r);} }

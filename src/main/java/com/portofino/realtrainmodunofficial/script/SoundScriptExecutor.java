@@ -90,6 +90,30 @@ public final class SoundScriptExecutor {
     }
 
     /**
+     * 本家 SoundUpdaterVehicle.getData(id): dataMap の "SU"+id (double)。
+     * スクリプトが tick をまたいで状態を覚えるのに使う (sound_jnr185_mi.js 等)。
+     */
+    public Object getData(int id) {
+        if (this.train instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
+            return t.getResourceState().getDataMap().getDouble("SU" + id);
+        }
+        if (this.train instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity t) {
+            return t.getResourceState().getDataMap().getDouble("SU" + id);
+        }
+        return 0.0D;
+    }
+
+    /** 本家 SoundUpdaterVehicle.setData(id, value): dataMap の "SU"+id へ double を書く。 */
+    public void setData(int id, Object value) {
+        double v = value instanceof Number n ? n.doubleValue() : 0.0D;
+        if (this.train instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
+            t.getResourceState().getDataMap().setDouble("SU" + id, v, 0);
+        } else if (this.train instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity t) {
+            t.getResourceState().getDataMap().setDouble("SU" + id, v, 0);
+        }
+    }
+
+    /**
      * トンネル内か。本家は車体の四隅 (x±1, z±1) がいずれも空を見上げられないときに true
      * (橋の下や木の下で誤爆しないよう 4 点見る)。223 系はこれで走行音を切り替える。
      */

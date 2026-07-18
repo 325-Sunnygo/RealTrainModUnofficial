@@ -80,6 +80,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     public static final short MIN_AIR_COUNT = 2480;
     public static final float TRAIN_WIDTH = 2.75F;
     public static final float TRAIN_HEIGHT = 1.25F - 0.0625F;//レールに合わせ高さ修正
+    /**
+     * 立ち乗り・乗客が立つ車内床の Y オフセット。TRAIN_HEIGHT は当たり判定ボックスの高さ
+     * (= ボックス天面) なので、実際の車内床へ下げるための負値。立ち乗り
+     * ({@code StandingRideClient}) と乗客 NPC の車内歩行で共通に使う唯一の基準。
+     */
+    public static final double INTERIOR_FLOOR_OFFSET = -0.75D;
 
     public BogieController bogieController = new BogieController();
     private Formation formation;
@@ -373,6 +379,8 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
         if (this.level().isClientSide()) {
             this.tickSound();
+            //立ち乗り: 床に立つローカルプレイヤーを車両の移動・旋回に追従させる (動く床)。
+            com.portofino.realtrainmodunofficial.client.StandingRideClient.tick(this);
         } else {
             //DataMap を書き換えるサーバースクリプトを先に回してから同期する。
             this.tickServerScript();
@@ -778,6 +786,13 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return ok;
     }
 
+    /** 指定の乗員が座っている座席オフセット (車体ローカル)。座席なし乗車/非乗車は null。 */
+    @javax.annotation.Nullable
+    public float[] getSeatOffset(net.minecraft.world.entity.Entity rider) {
+        float[] s = this.seatOffsets.get(rider.getUUID());
+        return s == null ? null : s.clone();
+    }
+
     private void syncSeats() {
         if (this.level().isClientSide) {
             return;
@@ -824,6 +839,43 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         if (!this.level().isClientSide && this.seatOffsets.remove(passenger.getUUID()) != null) {
             this.syncSeats();
         }
+    }
+
+    /** 立ち乗り・乗客が立つ車内床の Y (ワールド)。{@link #INTERIOR_FLOOR_OFFSET} 参照。 */
+    public double getInteriorFloorY() {
+        return this.getY() + TRAIN_HEIGHT + INTERIOR_FLOOR_OFFSET;
+    }
+
+    /**
+     * 車体ローカル座標 (x=幅, y=高, z=長) をワールド座標へ変換する。回転は
+     * {@link #positionRider} の座席変換と同一 (roll→pitch→yaw)。乗客 NPC が車内の
+     * ドア・座席へ歩くときの目標算出に使う。
+     */
+    public net.minecraft.world.phys.Vec3 localToWorldVec(double lx, double ly, double lz) {
+        Vec3 v = new Vec3(lx, ly, lz);
+        v = v.rotateAroundZ(-this.rotationRoll);
+        v = v.rotateAroundX(this.getXRot());
+        v = v.rotateAroundY(this.getYRot());
+        return new net.minecraft.world.phys.Vec3(
+                this.getX() + v.getX(), this.getY() + v.getY(), this.getZ() + v.getZ());
+    }
+
+    /** {@link #localToWorldVec} の逆。ワールド座標を車体ローカル座標へ。 */
+    public net.minecraft.world.phys.Vec3 worldToLocalVec(double wx, double wy, double wz) {
+        Vec3 v = new Vec3(wx - this.getX(), wy - this.getY(), wz - this.getZ());
+        v = v.rotateAroundY(-this.getYRot());
+        v = v.rotateAroundX(-this.getXRot());
+        v = v.rotateAroundZ(this.rotationRoll);
+        return new net.minecraft.world.phys.Vec3(v.getX(), v.getY(), v.getZ());
+    }
+
+    /**
+     * 座席オフセットのワールド位置 ({@link #positionRider} が着席させる位置と同じ、Y は座面+0.15)。
+     * 乗客 NPC が着席前に「席の位置」へ歩くための目標に使う。
+     */
+    public net.minecraft.world.phys.Vec3 getSeatWorldPos(float[] seat) {
+        net.minecraft.world.phys.Vec3 w = localToWorldVec(seat[0], seat[1], seat[2]);
+        return new net.minecraft.world.phys.Vec3(w.x, w.y + 0.15D, w.z);
     }
 
     @Override
@@ -1211,12 +1263,28 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     }
 
     /**
+     * getVehicleState の int オーバーロード。<b>サーバースクリプト対策</b>: スクリプト側の
+     * {@code TrainState.TrainStateType.Door} は JS シムで整数 (id=4 等) に化けるため、
+     * {@code getVehicleState(4)} のように int で呼ばれる。enum 版しか無いと Nashorn が
+     * Integer→TrainStateType のキャストに失敗して server/223.js 等が落ちていた (ドア開閉の
+     * 描画差し替えが効かなくなる)。id をそのまま状態データとして読む。
+     */
+    public byte getVehicleState(int stateTypeId) {
+        return this.getTrainStateData(stateTypeId);
+    }
+
+    /**
      * 本家 EntityVehicleBase.setVehicleState。
      */
     public void setVehicleState(TrainState.TrainStateType type, byte data) {
         if (type != null) {
             this.setTrainStateData(type.id, data);
         }
+    }
+
+    /** setVehicleState の int オーバーロード (スクリプトが id で呼ぶ場合)。 */
+    public void setVehicleState(int stateTypeId, int data) {
+        this.setTrainStateData(stateTypeId, (byte) data);
     }
 
     /**

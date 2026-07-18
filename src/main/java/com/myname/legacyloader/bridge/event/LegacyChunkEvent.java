@@ -1,1 +1,0 @@
-package com.myname.legacyloader.bridge.event; public class LegacyChunkEvent extends com.myname.legacyloader.bridge.fml.LegacyEvent { public final Object chunk; public LegacyChunkEvent(){this.chunk=null;} public static class Load extends LegacyChunkEvent{} public static class Unload extends LegacyChunkEvent{} }

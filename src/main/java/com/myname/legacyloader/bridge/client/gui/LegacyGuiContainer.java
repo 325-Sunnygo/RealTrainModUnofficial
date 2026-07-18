@@ -1,1 +1,0 @@
-package com.myname.legacyloader.bridge.client.gui; public class LegacyGuiContainer extends LegacyGuiScreen { public int field_147003_i; public int field_147009_r; public int field_146999_f; public int field_147000_g; public LegacyGuiContainer(Object c){} }

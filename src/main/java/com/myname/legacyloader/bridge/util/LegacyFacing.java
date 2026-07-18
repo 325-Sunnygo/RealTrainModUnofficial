@@ -1,1 +1,0 @@
-package com.myname.legacyloader.bridge.util; public class LegacyFacing { public static final int[] field_71588_a={0,0,0,0,-1,1}; public static final int[] field_71586_b={-1,1,0,0,0,0}; public static final int[] field_71587_c={0,0,-1,1,0,0}; public static final int[] field_71585_d={1,0,3,2,5,4}; }

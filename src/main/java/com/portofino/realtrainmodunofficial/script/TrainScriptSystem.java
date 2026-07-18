@@ -1425,6 +1425,10 @@ public class TrainScriptSystem {
         try {
             scriptEngine.put("executer", su);
             scriptEngine.put("executor", su);
+            //本家では su がグローバルにも見える。onUpdate() を引数なしで定義したり、
+            //ヘルパー関数が引数で受けずグローバル su を参照するスクリプト
+            //(ReferenceError: "su" is not defined) のために必ず束縛する。
+            scriptEngine.put("su", su);
         } catch (Throwable ignored) {
         }
         if (!(scriptEngine instanceof Invocable invocable)) {

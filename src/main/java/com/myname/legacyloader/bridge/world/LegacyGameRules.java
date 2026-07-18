@@ -1,1 +1,0 @@
-package com.myname.legacyloader.bridge.world; public class LegacyGameRules { public boolean getGameRuleBooleanValue(String n){return false;} public String getGameRuleStringValue(String n){return "";} public void setOrCreateGameRule(String n,String v){} }

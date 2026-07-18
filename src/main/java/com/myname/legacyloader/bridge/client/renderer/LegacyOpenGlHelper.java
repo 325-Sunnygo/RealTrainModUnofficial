@@ -1,1 +1,0 @@
-package com.myname.legacyloader.bridge.client.renderer; public class LegacyOpenGlHelper { public static int field_77478_a=33984; public static int field_77476_b=33985; public static void func_77475_a(int target,float x,float y){} public static void func_77473_a(int unit){} }
