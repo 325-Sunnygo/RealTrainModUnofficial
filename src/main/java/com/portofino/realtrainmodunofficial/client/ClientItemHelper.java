@@ -30,21 +30,20 @@ public final class ClientItemHelper {
     private ClientItemHelper() {}
 
     /**
-     * 選択をサーバーへ送ると同時に、<b>クライアント側の手持ちスタックにも</b>反映する。
+     * 選択を <b>サーバーへペイロード送信するだけ</b>。クライアント側の手持ちスタックには書かない。
      * <p>
-     * クライアント側を更新しないと、クリエイティブでは選択直後の SetCreativeModeSlot 同期で
-     * サーバー側スタックが「選択コンポーネント無し」の版に上書きされ、選択が消える。すると
-     * 設置時 {@link TrainItem#useOn} が既定 (先頭の ELECTRIC 車両 = 223系5000番台Tc) に
-     * フォールバックし、<b>どの車両を選んでも 223系5000番台Tc が湧く</b> (マルチプレイのみで
-     * 再現。シングルはクライアント=サーバーで上書きが起きないため顕在化しない)。
-     * <p>
-     * 両方を更新すればサバイバル (ペイロードでサーバー確定) とクリエイティブ (スタック同期で
-     * サーバー確定) の双方で確実に選択が届く。
+     * <b>重要 (回帰対策):</b> 以前はここでクライアント側スタックにも
+     * {@link LegacyItemStackBridge#setSelectedModelData} で書き込んでいたが、これが
+     * <b>Bukkit系ハイブリッド専用サーバー (Youer/Mohist 等) のクリエイティブで全列車が
+     * 223系5000番台Tc になる回帰</b>を起こした (1.0.8 で混入)。クライアント手持ちを書き換えると
+     * クリエイティブのスロット同期 (SetCreativeModeSlot) が走り、その版が Bukkit の ItemStack 変換で
+     * カスタムコンポーネントを剥がされたままサーバー側スタックを上書きし、選択が消えて既定
+     * (先頭の ELECTRIC 車両 = 223系5000番台Tc) にフォールバックする。クライアントを書かなければ
+     * この同期が誘発されず、ペイロードで確定したサーバー側の選択 (ServerVehicleSelection および
+     * サーバースタックの custom_data) が生き残る。自動車 (payload のみ) が正常なのと同じ経路。
+     * 1.0.7 の挙動に戻す。
      */
     private static void commitSelection(ItemStack stack, ModelSelectScreen.SelectionResult selection) {
-        if (stack != null && !stack.isEmpty()) {
-            LegacyItemStackBridge.setSelectedModelData(stack, selection.modelId(), selection.dataMapValue());
-        }
         PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue()));
     }
 

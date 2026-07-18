@@ -143,6 +143,16 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(this.getConfig());
     }
 
+    /**
+     * スクリプト {@code entity.getResourceState().getResourceSet().getConfig()} を
+     * {@code entity.getModelSet().getConfig()} と等価にする。新しめのパック (E259 等) は前者で
+     * 設定を読むため、これが無いと描画/サーバースクリプトが TypeError で中断する。
+     */
+    @Override
+    protected jp.ngt.rtm.modelpack.modelset.ModelSetCompat getResourceSetForScript() {
+        return this.getModelSet();
+    }
+
     @Override
     public float getVehicleSpeed() {
         return this.getSpeed();

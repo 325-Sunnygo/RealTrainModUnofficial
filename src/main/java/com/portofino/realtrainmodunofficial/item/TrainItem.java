@@ -59,9 +59,22 @@ public class TrainItem extends Item {
             return InteractionResult.PASS;
         }
         if (level.isClientSide()) {
-            return findNearestRailSpawn(level, context.getClickedPos(), context.getClickLocation(), player.getYRot()) != null
-                ? InteractionResult.SUCCESS
-                : InteractionResult.PASS;
+            boolean canSpawn = findNearestRailSpawn(level, context.getClickedPos(), context.getClickLocation(), player.getYRot()) != null;
+            if (canSpawn) {
+                //専用サーバー保険 (アイテム同期に一切依存しない確実版): 設置直前に、クライアントが
+                //持っている選択IDをサーバーへ送る。この選択パケットは使用パケット (UseItemOn) より
+                //先に送られる (startPrediction はクライアント側 useOn を実行してから使用パケットを送る)
+                //ので、サーバーの useOn は ServerVehicleSelection から確実に読める。Bukkit 系で
+                //アイテムのカスタムデータが剥がれても選択が効く。
+                ItemStack held = context.getItemInHand();
+                String sel = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(held);
+                if (sel != null && !sel.isBlank()) {
+                    String dm = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedDataMap(held);
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                        new com.portofino.realtrainmodunofficial.network.SelectModelPayload(sel, dm == null ? "" : dm));
+                }
+            }
+            return canSpawn ? InteractionResult.SUCCESS : InteractionResult.PASS;
         }
         if (player.isShiftKeyDown()) {
             return InteractionResult.PASS;
@@ -76,17 +89,31 @@ public class TrainItem extends Item {
         //専用サーバー (Youer/Mohist 等 Bukkit 系ハイブリッド) はカスタムデータコンポーネントを
         //ItemStack 変換で剥がすが custom_data NBT は保持するため、これで選択が生き残る。
         //(以前は stack.get(SELECTED_MODEL_ID) だけで、剥がれて全列車が先頭=223系5000番台Tcに)。
-        String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
-        if (selectedId == null || selectedId.isBlank()) {
-            //さらなる保険: サーバー側に控えたプレイヤーの選択 (選択パケット受信時に記録)。
-            selectedId = com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.get(player.getUUID());
-        }
+        String itemSel = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
+        String serverSel = com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.get(player.getUUID());
+        String selectedId = (itemSel == null || itemSel.isBlank()) ? serverSel : itemSel;
         VehicleDefinition def = VehicleRegistry.getById(selectedId);
-        if (def == null || !accepts(def)) {
+        boolean fellBack = def == null || !accepts(def);
+        if (fellBack) {
             def = VehicleRegistry.getAll().stream()
                 .filter(this::accepts)
                 .findFirst()
                 .orElse(null);
+        }
+        if (fellBack) {
+            //診断 (専用サーバーの「全列車が223になる」問題の切り分け用): フォールバック時だけ残す。
+            RealTrainModUnofficial.LOGGER.warn("[RTMU] train fell back to default: itemSel={}, serverSel={}, resolved={}",
+                itemSel == null || itemSel.isBlank() ? "-" : itemSel,
+                serverSel == null || serverSel.isBlank() ? "-" : serverSel,
+                def == null ? "-" : def.getId());
+            //223 フォールバックの主因は「サーバーに選択した列車パックが入っていない」こと
+            //(README 同意ゲートが専用サーバーでパックを弾いていた。PackConsent で修正済み)。
+            //serverSel が出ているのに getById=null なら = サーバーにそのパックが無い。
+            //serverSel が空なら = 選択がサーバーに届いていない (旧クライアント/パケット遮断)。
+            String detail = (serverSel != null && !serverSel.isBlank())
+                ? "サーバーに『" + serverSel + "』のパックが入っていません (サーバーの mods/packs を確認)"
+                : "選択がサーバーに届いていません (クライアント/サーバーの RTMU 更新を確認)";
+            player.displayClientMessage(Component.literal("[RTMU] 既定車両を配置: " + detail), false);
         }
         if (def == null) {
             return InteractionResult.PASS;

@@ -71,7 +71,7 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public jp.ngt.mccompat.AxisAlignedBB field_70121_D;
 
     private final jp.ngt.rtm.modelpack.state.ResourceState resourceState =
-            new jp.ngt.rtm.modelpack.state.ResourceState(this::getResourceName);
+            new jp.ngt.rtm.modelpack.state.ResourceState(this::getResourceName, this::getResourceSetForScript);
 
     //本家 vehicleFloors (slotPos 座席)
     protected final java.util.List<jp.ngt.rtm.entity.train.parts.EntityFloor> vehicleFloors = new java.util.ArrayList<>();
@@ -97,6 +97,15 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
      * 本家 getModelSet().getConfig() 相当。暫定: サブクラスが供給。
      */
     public abstract T getConfig();
+
+    /**
+     * スクリプトの {@code entity.getResourceState().getResourceSet()} 用。
+     * 本家 ResourceState.getResourceSet() (= getModelSet() 相当) を返す。
+     * 既定は null (供給元の無い車種)。列車は {@code EntityTrainBase} が getModelSet() を返す。
+     */
+    protected jp.ngt.rtm.modelpack.modelset.ModelSetCompat getResourceSetForScript() {
+        return null;
+    }
 
     @Override
     public void tick() {

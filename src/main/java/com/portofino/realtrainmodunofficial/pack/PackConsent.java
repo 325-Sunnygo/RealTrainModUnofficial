@@ -126,6 +126,16 @@ public final class PackConsent {
         if (zip == null) {
             return true;
         }
+        //専用サーバーにはタイトル画面 (README 同意 UI) が無いため、同意ゲートを適用すると
+        //README 付きパックが永久に「未決=false」となりロードされない。すると<b>サーバーだけ
+        //車両/レール/サウンド等のパックが欠け</b>、クライアントで選んだ列車が設置時に
+        //VehicleRegistry.getById=null → 既定 (先頭の ELECTRIC = 223系5000番台Tc) にフォールバック
+        //する (= 「専用サーバーだと全列車が223になる。自動車 (同梱) は正常」の真因。v1.0.7 の
+        //同意画面導入で表面化。シングルはクライアントが同意済みなので出ない)。
+        //サーバーはパックを配置した管理者の操作を同意とみなし、ゲートを外して全パックをロードする。
+        if (net.neoforged.fml.loading.FMLEnvironment.dist != net.neoforged.api.distmarker.Dist.CLIENT) {
+            return true;
+        }
         ensureLoaded();
         String name = zip.getFileName().toString();
         State decided = DECISIONS.get(name);

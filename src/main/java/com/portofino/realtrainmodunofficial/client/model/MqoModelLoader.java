@@ -3700,7 +3700,19 @@ public final class MqoModelLoader {
                 for (Batch batch : groupBatches) {
                     ResourceLocation tex = batch.emissiveTextureForPass(legacyPass);
                     if (tex == null) {
-                        // Light フラグの無いマテリアル (本家の doLighting == false と同じ)
+                        //本家 RenderVehicleBase.renderBodyLight の i==0 (RenderPass.LIGHT=2) 相当:
+                        //発光テクスチャ (***_light0.png) を持たない旧式ライト (223 系の head_light_on /
+                        //room_light 等の別ジオメトリ) は、素テクスチャの<b>不透明</b>ジオメトリとして描く。
+                        //★対象を「グループ名に light を含む」バッチだけに限定するのが最重要:
+                        //  E259 等は LIGHT パスで body.render() = 全グループ名を渡してくるため、ここで全非発光
+                        //  バッチを不透明化すると<b>ガラス(窓)まで塞いで黒くなる</b> (E257/E259 の窓が黒く
+                        //  なった回帰の真因)。ライト名グループだけに絞ればガラス/車体は一切触れず無傷。
+                        //  また LIGHT(2) のみ。前照灯/尾灯グロー (pass3/4) は発光テクスチャ必須のまま
+                        //  (この種の旧式ライトはそもそも pass3/4 を描かない)。
+                        if (legacyPass == 2 && isLightGroupName(batch.groupNameLower)) {
+                            renderLightGroupOpaque(batch, poseStack, buffer, packedLight, overlay);
+                        }
+                        // Light フラグの無いマテリアル (本家の doLighting == false と同じ) はスキップ
                         continue;
                     }
                     //発光は深度書き込み無しの entityTranslucentEmissive を使う。
@@ -3827,6 +3839,76 @@ public final class MqoModelLoader {
                 }
             }
             return false;
+        }
+
+        private Boolean cachedHasLightGroups;
+
+        /**
+         * グループ名が「旧式ライト」(発光テクスチャを持たず、スクリプトが LIGHT パスで別ジオメトリ
+         * として描くライト。223 系の head_light_on / tail_light_on / room_light 等) を示すか。
+         * 判定は本家パックの慣習どおり名前に "light" を含むこと。
+         */
+        static boolean isLightGroupName(String lowerGroupName) {
+            return lowerGroupName != null && lowerGroupName.contains("light");
+        }
+
+        /**
+         * 発光テクスチャを持たずスクリプトが LIGHT パスで描く旧式ライトグループを持つか。
+         * {@link #hasEmissiveBatches()} が false でも、これが true なら LIGHT パスを回す必要がある
+         * (でないと 223 系などの前照灯/室内灯が一切出ない)。
+         */
+        public boolean hasScriptLightGroups() {
+            Boolean c = cachedHasLightGroups;
+            if (c == null) {
+                boolean found = false;
+                for (Batch b : batches) {
+                    if (isLightGroupName(b.groupNameLower)) {
+                        found = true;
+                        break;
+                    }
+                }
+                c = found;
+                cachedHasLightGroups = c;
+            }
+            return c;
+        }
+
+        /**
+         * 本家 {@code RenderVehicleBase.renderBodyLight} の i==0 (RenderPass.LIGHT) 相当の 1 バッチ描画。
+         * 発光テクスチャを持たない旧式ライト (223 の head_light_on / room_light 等) を、素テクスチャの
+         * <b>不透明</b>ジオメトリ ({@link RenderType#entityCutout} = 深度書き込みあり・アルファテスト) で描く。
+         * <p>
+         * 半透明ガラスの経路 (DeferredTranslucentRenderer / glassNoDepth) には一切触れないので、
+         * <b>窓を塞がない</b>。本家も LIGHT パスの i==0 は通常の不透明描画で、ガラス
+         * (renderBodyTransparent) はその後に別ジオメトリとして描くため成立する。
+         */
+        private void renderLightGroupOpaque(Batch batch, PoseStack poseStack, MultiBufferSource buffer,
+                                            int packedLight, int overlay) {
+            ResourceLocation tex = batch.texture;
+            if (tex == null || batch.vertexCount <= 0) {
+                return;
+            }
+            VertexConsumer vc = buffer.getBuffer(RenderType.entityCutout(tex));
+            PoseStack.Pose pose = poseStack.last();
+            Matrix4f mat = pose.pose();
+            Matrix3f nm = pose.normal();
+            float[] normalOut = new float[3];
+            for (int i = 0; i < batch.vertexCount; i++) {
+                int o = i * 8;
+                float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
+                float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
+                float u = batch.data[o + 6], v = batch.data[o + 7];
+                float tnx = nm.m00() * nx + nm.m10() * ny + nm.m20() * nz;
+                float tny = nm.m01() * nx + nm.m11() * ny + nm.m21() * nz;
+                float tnz = nm.m02() * nx + nm.m12() * ny + nm.m22() * nz;
+                normalizeNormal(tnx, tny, tnz, normalOut);
+                VertexWriter.addVertex(vc, mat, x, y, z)
+                    .setColor(255, 255, 255, 255)
+                    .setUv(u, v)
+                    .setOverlay(overlay)
+                    .setLight(packedLight)
+                    .setNormal(normalOut[0], normalOut[1], normalOut[2]);
+            }
         }
 
 

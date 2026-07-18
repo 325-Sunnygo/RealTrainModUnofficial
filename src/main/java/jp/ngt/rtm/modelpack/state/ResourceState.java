@@ -17,6 +17,16 @@ public class ResourceState {
     private final Supplier<String> nameSupplier;
 
     /**
+     * 本家 ResourceState.getResourceSet() が返す ModelSet の供給元。
+     * <p>
+     * 新しめのパックスクリプト (E259 等、hi03 系) は設定を
+     * {@code entity.getResourceState().getResourceSet().getConfig()} で読む
+     * (古いパックは {@code entity.getModelSet().getConfig()})。エンティティが
+     * 自分の {@link jp.ngt.rtm.entity.train.EntityTrainBase#getModelSet()} 等を渡す。
+     */
+    private final Supplier<jp.ngt.rtm.modelpack.modelset.ModelSetCompat> resourceSetSupplier;
+
+    /**
      * 本家 ResourceState.exclusionParts: 「今は描かないパーツ」の名前。
      * <p>
      * RTM 標準スクリプトはドアの開閉をこれで表現する。ドアが開いた側の扉パーツ
@@ -30,11 +40,29 @@ public class ResourceState {
     private final Set<String> exclusionParts = ConcurrentHashMap.newKeySet();
 
     public ResourceState(Supplier<String> nameSupplier) {
+        this(nameSupplier, () -> null);
+    }
+
+    public ResourceState(Supplier<String> nameSupplier,
+                         Supplier<jp.ngt.rtm.modelpack.modelset.ModelSetCompat> resourceSetSupplier) {
         this.nameSupplier = nameSupplier;
+        this.resourceSetSupplier = resourceSetSupplier == null ? () -> null : resourceSetSupplier;
     }
 
     public DataMap getDataMap() {
         return this.dataMap;
+    }
+
+    /**
+     * 本家 ResourceState.getResourceSet() 互換。スクリプトの
+     * {@code entity.getResourceState().getResourceSet().getConfig()} 用で、
+     * {@code entity.getModelSet()} と同じ {@link jp.ngt.rtm.modelpack.modelset.ModelSetCompat}
+     * (getConfig() を持つ) を返す。これが無いと新しめのパック (E259 等) が
+     * 「getResourceSet is not a function」で落ち、サーバー onUpdate も描画スクリプトも
+     * 中断する (方向幕・座席・ドア・台車・ガラス等が描かれない)。
+     */
+    public jp.ngt.rtm.modelpack.modelset.ModelSetCompat getResourceSet() {
+        return this.resourceSetSupplier.get();
     }
 
     public String getResourceName() {

@@ -377,22 +377,32 @@ public final class VehicleScriptRenderers {
             if (!(entity instanceof EntityTrainBase train)) {
                 return;
             }
-            //発光 (Light) マテリアルを 1 つも持たないパックは発光パス自体が無意味。
-            //点灯/消灯を別ジオメトリで持つ旧式パックはここに来ない。
-            if (bodyModel == null || !bodyModel.hasEmissiveBatches()) {
+            //発光 (Light) マテリアル or 旧式ライトグループ (head_light/room_light 等の別ジオメトリ) の
+            //どちらも無いパックは LIGHT パス自体が無意味。旧式 (223 系など) は発光テクスチャを持たず、
+            //スクリプトが LIGHT パスで別ジオメトリを描くので hasScriptLightGroups でも回す
+            //(でないと前照灯/室内灯が一切出ない)。素テクスチャの不透明描画は
+            //MqoModelLoader.renderLightGroupOpaque が担当 (ライト名グループ限定でガラスは塞がない)。
+            if (bodyModel == null || (!bodyModel.hasEmissiveBatches() && !bodyModel.hasScriptLightGroups())) {
                 return;
             }
             int dir = train.getTrainDirection();
             int mode = train.getTrainStateData(TrainState.TrainStateType.State_Light.id);
             boolean frontEmpty = train.getConnectedTrain(dir) == null;
             boolean backEmpty = train.getConnectedTrain(1 - dir) == null;
+            //旧式ライト (発光テクスチャ無し) は、スクリプトが pass2 (i==0) で head/tail/room を mode 別に
+            //全部描く。sub-pass を mode でゲートすると尾灯(mode2)で i==0 が飛び「点けると消える」に
+            //なるため、i==0 を常に回してスクリプトに委ねる。i==1,2 はこの種のスクリプトは描かない。
+            //発光テクスチャ持ち (新式) は従来どおり本家 sub-pass ロジック。
+            boolean scriptLights = !bodyModel.hasEmissiveBatches() && bodyModel.hasScriptLightGroups();
 
             for (int i = 0; i < 3; i++) {
-                boolean doRender = switch (i) {
-                    case 0 -> mode == 0 || mode == 1;
-                    case 1 -> (mode == 1 && frontEmpty) || mode == 2;
-                    default -> (mode == 1 && !frontEmpty && backEmpty) || mode == 2;
-                };
+                boolean doRender = scriptLights
+                    ? (i == 0)
+                    : switch (i) {
+                        case 0 -> mode == 0 || mode == 1;
+                        case 1 -> (mode == 1 && frontEmpty) || mode == 2;
+                        default -> (mode == 1 && !frontEmpty && backEmpty) || mode == 2;
+                    };
                 if (!doRender) {
                     continue;
                 }

@@ -24,6 +24,13 @@ public class RealTrainModUnofficial {
     public static final String MODID = "realtrainmodunofficial";
     public static final Logger LOGGER = LogUtils.getLogger();
 
+    /**
+     * ビルド刻印。バージョン番号 (1.0.9) を再利用してビルドし直しているため、
+     * サーバー/クライアントに<b>どのビルド</b>が入っているかはこれでしか判別できない。
+     * 起動ログに出る。ビルドを更新するたびに日付+連番を上げること。
+     */
+    public static final String BUILD_TAG = "1.0.9 build 2026-07-18e (sel-fix+getResourceSet+223light)";
+
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
         DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
@@ -97,6 +104,8 @@ public class RealTrainModUnofficial {
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
+        //どのビルドが動いているかの唯一の証拠 (バージョン番号は再利用しているため)。
+        LOGGER.info("[RTMU] {}", BUILD_TAG);
         // 軽量化: 既定のログレベルは INFO に固定する(描画には無関係)。
         // 以前はバグ追跡のため DEBUG を強制していたが、毎tick/毎フレームの DEBUG ログが
         // 文字列整形・I/O コストになり負荷源になるため INFO に下げる(調査時は手動で DEBUG に上げる)。
