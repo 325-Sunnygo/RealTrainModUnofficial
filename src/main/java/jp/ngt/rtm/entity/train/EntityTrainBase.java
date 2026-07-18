@@ -755,14 +755,24 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      * 客席への着席 (Server Only)。座席オフセット (slotPos) で列車本体に直接乗せる。
      */
     public boolean mountToSeat(Player player, float[] partPos) {
-        if (this.level().isClientSide || this.isSeatOccupied(partPos) || this.hasPassenger(player)) {
+        return this.mountEntityToSeat(player, partPos);
+    }
+
+    /**
+     * 任意のエンティティを客席に着席させる (Server Only)。乗客シミュレーション mod
+     * (乗客 NPC) が座席へ座らせるために公開する。座席オフセットを登録するので
+     * {@link #canAddPassenger} の「座席なし乗車は 1 人」制限に引っかからず複数乗れる。
+     * {@link #positionRider} がこのオフセットに座らせ、破壊/降車時は removePassenger で解除される。
+     */
+    public boolean mountEntityToSeat(net.minecraft.world.entity.Entity entity, float[] partPos) {
+        if (this.level().isClientSide || this.isSeatOccupied(partPos) || this.hasPassenger(entity)) {
             return false;
         }
-        this.seatOffsets.put(player.getUUID(), partPos.clone());
+        this.seatOffsets.put(entity.getUUID(), partPos.clone());
         this.syncSeats();
-        boolean ok = player.startRiding(this, true);
+        boolean ok = entity.startRiding(this, true);
         if (!ok) {
-            this.seatOffsets.remove(player.getUUID());
+            this.seatOffsets.remove(entity.getUUID());
             this.syncSeats();
         }
         return ok;
