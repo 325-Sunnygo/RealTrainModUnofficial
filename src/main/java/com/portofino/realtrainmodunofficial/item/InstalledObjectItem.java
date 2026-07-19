@@ -23,7 +23,9 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 
-public class InstalledObjectItem extends Item implements ModelSelectableItem {
+// jp.ngt.rtm.item.ItemInstalledObject を継承し、NGTO Builder の Wire スクリプトの
+// `instanceof ItemInstalledObject`(リレー/碍子判定) が真になるようにする。
+public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject implements ModelSelectableItem {
     // 壁(横倒し)設置で上へ持ち上げる量(ブロック単位)。上げ足りない/上げすぎなら数値を調整する。
     private static final double WALL_MOUNT_RAISE = 0.5D;
     // 逆さ(180°)設置で上へ持ち上げる量(ブロック単位)。天井から吊るす高さ調整用。
@@ -38,6 +40,30 @@ public class InstalledObjectItem extends Item implements ModelSelectableItem {
 
     public InstalledObjectCategory getCategory() {
         return category;
+    }
+
+    // --- NGTO Builder の Wire ツール互換 (本家 ItemWithModel の API 名) ---
+    // スクリプトは ItemStackCompat(ラッパー) を渡すので Object で受けて unwrap する。
+
+    /** 選択中モデルの bare name (本家の定義名)。スクリプトが "baru_insulator_xx_l" 等と比較する。 */
+    public String getModelName(Object stackLike) {
+        InstalledObjectDefinition def = selectedDefinition(stackLike);
+        return def == null ? "" : def.getBareName();
+    }
+
+    /** 選択中モデルの connectorType ("Relay" 等)。Wire ツールのリレー碍子判定に使う。 */
+    public String getSubType(Object stackLike) {
+        InstalledObjectDefinition def = selectedDefinition(stackLike);
+        return def == null ? "" : def.getSubType();
+    }
+
+    private InstalledObjectDefinition selectedDefinition(Object stackLike) {
+        ItemStack stack = jp.ngt.mccompat.ItemStackCompat.unwrap(stackLike);
+        if (stack == null) {
+            return null;
+        }
+        String id = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
+        return InstalledObjectRegistry.getById(id);
     }
 
     @Override

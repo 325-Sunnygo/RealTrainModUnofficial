@@ -8,7 +8,6 @@
   "client": [
     "CameraMixin",
     "MouseHandlerMixin",
-    "ChannelMixin",
     "SoundBufferAccessor",
     "SoundBufferLibraryMixin"
   ],

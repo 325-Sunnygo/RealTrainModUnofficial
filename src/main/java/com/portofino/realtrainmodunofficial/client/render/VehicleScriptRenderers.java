@@ -166,8 +166,11 @@ public final class VehicleScriptRenderers {
         private final Map<Object, EntityCache> entityCaches =
                 java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
         //シグネチャに含めない時間依存アニメ (点滅灯・スクロール幕等) の取りこぼしを救済する
-        //安全網。静止車両でもこの間隔で必ず描き直す。10 フレーム = 約 6Hz でリフレッシュ。
-        private static final int CACHE_REFRESH_FRAMES = 10;
+        //安全網。静止車両でもこの間隔で必ず描き直す。既定 10 フレーム = 約 6Hz。
+        //RTMU 設定「静止車両の再計算頻度」で 10/30/60 を選べる (省エネほど大)。
+        private static int cacheRefreshFrames() {
+            return com.portofino.realtrainmodunofficial.RtmuSettings.staticVehicleRefreshFrames();
+        }
 
         //状態が変わった直後 (方向転換・ドア操作等) は、スクリプトが pass==1 で進める時間依存
         //アニメ (座席回転・ドア開閉。本パックは 5000ms) がこの間かけて進む。その間はキャッシュ
@@ -260,7 +263,7 @@ public final class VehicleScriptRenderers {
             boolean animating = now < ec.animUntilMs;
 
             //キャッシュヒット: 記録済みパスを再生するだけ (Nashorn 実行なし)。アニメ中は不可。
-            if (!animating && ec.valid && ec.sig == sig && ec.framesSinceRun < CACHE_REFRESH_FRAMES) {
+            if (!animating && ec.valid && ec.sig == sig && ec.framesSinceRun < cacheRefreshFrames()) {
                 ec.framesSinceRun++;
                 if (!ec.drew) {
                     return false;
@@ -313,6 +316,12 @@ public final class VehicleScriptRenderers {
             if (sink != null) {
                 //excluded はエンティティ内部のライブ集合なので、キャッシュにはスナップショットを残す。
                 sink.add(new CachedPass(normal, RenderPass.NORMAL.id, excluded == null ? null : Set.copyOf(excluded)));
+            }
+            //軽量化「遠方車両のライト・方向幕を省略」: 車体 (上の NORMAL パス) は描いたので、
+            //追加の Nashorn 実行になる発光パス・オーバーレイ・半透明パスをこの車両については省く。
+            //既定 OFF。ON でも近距離の車両は通常どおり全部描く。
+            if (isDistantForExtras(entity)) {
+                return true;
             }
             //★マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED)。
             //  スクリプトは currentMatId に応じてオーバーレイを描くため、pass0 の本体描画とは別に
@@ -444,6 +453,23 @@ public final class VehicleScriptRenderers {
 
         private static boolean atEndpoint(int value, int max) {
             return value <= 0 || value >= max;
+        }
+
+        /**
+         * 軽量化「遠方車両のライト・方向幕を省略」用。設定がしきい値を持ち、この車両が
+         * カメラからそれより遠ければ true (発光/幕/半透明の追加パスを省く)。
+         */
+        private static boolean isDistantForExtras(Object entity) {
+            double cutoffSq = com.portofino.realtrainmodunofficial.RtmuSettings.distantExtrasCutoffSq();
+            if (cutoffSq <= 0.0D || !(entity instanceof net.minecraft.world.entity.Entity e)) {
+                return false;
+            }
+            net.minecraft.client.Camera cam = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera();
+            net.minecraft.world.phys.Vec3 p = cam.getPosition();
+            double dx = e.getX() - p.x;
+            double dy = e.getY() - p.y;
+            double dz = e.getZ() - p.z;
+            return dx * dx + dy * dy + dz * dz > cutoffSq;
         }
 
         /**
@@ -742,6 +768,18 @@ public final class VehicleScriptRenderers {
                     if (cmd.payload instanceof PolygonModel pm) {
                         drawModelGroup(pm, cmd.name, poseStack, buffer, light, packedOverlay, overrideTex,
                                 colR, colG, colB, colA);
+                    }
+                }
+                case RENDER_BLOCK -> {
+                    //NGTO Builder のミニチュアプレビュー: バニラ BlockState のゴーストを描く
+                    //(a/b/c = ミニチュア内の相対座標)。テクスチャはブロックアトラス側が持つ。
+                    if (cmd.payload instanceof net.minecraft.world.level.block.state.BlockState st
+                            && !st.isAir()) {
+                        poseStack.pushPose();
+                        poseStack.translate(cmd.a, cmd.b, cmd.c);
+                        net.minecraft.client.Minecraft.getInstance().getBlockRenderer()
+                            .renderSingleBlock(st, poseStack, buffer, light, packedOverlay);
+                        poseStack.popPose();
                     }
                 }
             }

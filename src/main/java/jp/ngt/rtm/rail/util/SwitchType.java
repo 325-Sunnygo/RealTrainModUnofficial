@@ -4,7 +4,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -51,7 +50,11 @@ public abstract class SwitchType {
      * TileEntity.updateEntity()のタイミングで呼ばれる
      */
     public void onUpdate(Level world) {
-        Arrays.stream(this.points).forEach(point -> point.onUpdate(world));
+        //軽量化: 全分岐レールコアが両サイド毎tick通る。Arrays.stream は毎tick Stream+ラムダを
+        //アロケートするので素の for に (挙動は完全に同じ、GC 圧を下げるだけ)。
+        for (Point point : this.points) {
+            point.onUpdate(world);
+        }
     }
 
     public abstract RailMap getRailMap(Entity entity);

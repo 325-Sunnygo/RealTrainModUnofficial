@@ -41,6 +41,13 @@ public final class ItemStackCompat {
 
     /** func_77978_p = getTagCompound */
     public jp.ngt.mccompat.nbt.NBTTagCompound func_77978_p() {
+        // MCTEU (com.mattya.mcteunofficial) のミニチュアは、NGTO Builder が読めるよう中身を
+        // NGTObject 形式 ("BlocksData" を含む) に変換して見せる (ソフト連携)。MCTEU 未導入や
+        // データ未解決なら null が返り、従来どおり実 NBT にフォールバックする。
+        net.minecraft.nbt.CompoundTag mcteu = jp.ngt.mcte.McteuMiniatureBridge.getBlocksDataTag(stack);
+        if (mcteu != null) {
+            return new jp.ngt.mccompat.nbt.NBTTagCompound(mcteu);
+        }
         return getTagCompat();
     }
 

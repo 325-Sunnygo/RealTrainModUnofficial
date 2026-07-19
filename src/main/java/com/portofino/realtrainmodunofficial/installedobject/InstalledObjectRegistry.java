@@ -77,6 +77,24 @@ public final class InstalledObjectRegistry {
         return List.copyOf(BY_CATEGORY.getOrDefault(category, List.of()));
     }
 
+    /**
+     * bare name (id "category:pack:name" の末尾。本家の定義名) で検索する。
+     * NGTO Builder のスクリプトは bare name しか持たない (setModelName / ModelPackManager.getModelSet)。
+     * カテゴリ優先: preferred があればそのカテゴリを先に探す (碍子等の同名衝突対策)。
+     */
+    public static InstalledObjectDefinition getByBareName(String bareName, InstalledObjectCategory preferred) {
+        if (bareName == null || bareName.isEmpty()) return null;
+        if (preferred != null) {
+            for (InstalledObjectDefinition def : BY_CATEGORY.getOrDefault(preferred, List.of())) {
+                if (def.getBareName().equalsIgnoreCase(bareName)) return def;
+            }
+        }
+        for (InstalledObjectDefinition def : ALL) {
+            if (def.getBareName().equalsIgnoreCase(bareName)) return def;
+        }
+        return null;
+    }
+
     public static List<InstalledObjectDefinition> getAll() {
         return List.copyOf(ALL);
     }

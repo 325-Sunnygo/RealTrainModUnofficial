@@ -99,6 +99,9 @@ public final class RailDrawQueue {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_BLOCK_ENTITIES) {
             return;
         }
+        //レール焼き込みの「1フレーム上限」枠を毎フレームここでリセットする
+        //(この段階はブロックエンティティ描画=drawBaked 呼び出しの直後・毎フレーム1回)。
+        RailMeshCache.beginFrame();
         flush();
     }
 

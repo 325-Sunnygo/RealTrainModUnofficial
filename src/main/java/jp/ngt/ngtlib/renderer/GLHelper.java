@@ -12,9 +12,16 @@ public final class GLHelper {
 
     public static void disableLighting() {
         //1.21 側でライティングはパイプライン管理 — brightness 記録のみで表現
+        //(フルブライト化はスクリプトが直後の setLightmapMaxBrightness で行う)
     }
 
     public static void enableLighting() {
+        //本家: ライティング復帰。RTMU では「環境光へ戻す」= brightness 負値を記録
+        //(再生側 replay が負値を packedLight リセットとして扱う)。
+        GLRecorder r = GLRecorder.active();
+        if (r != null) {
+            r.brightness(-1);
+        }
     }
 
     public static void setLightmapMaxBrightness() {
@@ -54,22 +61,58 @@ public final class GLHelper {
         return 0;
     }
 
-    //ディスプレイリスト系 (NGTO Builder が使用) — 1.21 では毎フレーム再記録のため
-    //コンパイルはスキップし、描画呼び出しをそのまま実行させる
+    //---- ディスプレイリスト (NGTO Builder のミニチュアプレビューが使用) ----
+    //本家の GL ディスプレイリストを GLRecorder のサブ記録として実装する:
+    //  generateGLList → 非 0 ハンドル (0 を返すと JS 側の `!glList` 判定が毎フレーム真になり
+    //  callList 分岐が永久に実行されず、プレビューが表示されない)。
+    //  startCompile   → 現在のレコーダーを退避し、リスト用レコーダーへ記録を切り替える
+    //                    (本家 GL_COMPILE と同じく、この間の描画はその場では実行されない)。
+    //  endCompile     → 記録を保存し、元のレコーダーへ戻す。
+    //  callList       → 保存した記録を現在のレコーダーへ追記する (=現在の変換で再生)。
+    private static final java.util.Map<Integer, GLRecorder> GL_LISTS =
+        new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.atomic.AtomicInteger NEXT_LIST_ID =
+        new java.util.concurrent.atomic.AtomicInteger(1);
+    private static GLRecorder compilePrev;
+    private static int compilingId;
+
     public static int generateGLList() {
-        return 0;
+        return NEXT_LIST_ID.getAndIncrement();
+    }
+
+    /** 非 old 分岐は generateGLList(null) と呼ぶ (引数は未使用)。 */
+    public static int generateGLList(Object ignored) {
+        return generateGLList();
     }
 
     public static void startCompile(int list) {
+        compilePrev = GLRecorder.active();
+        compilingId = list;
+        GLRecorder rec = new GLRecorder();
+        GL_LISTS.put(list, rec);
+        GLRecorder.activate(rec);
     }
 
     public static void endCompile() {
+        if (compilePrev != null) {
+            GLRecorder.activate(compilePrev);
+        } else {
+            GLRecorder.deactivate();
+        }
+        compilePrev = null;
+        compilingId = 0;
     }
 
     public static void callList(int list) {
+        GLRecorder current = GLRecorder.active();
+        GLRecorder stored = GL_LISTS.get(list);
+        if (current != null && stored != null) {
+            current.appendFrom(stored);
+        }
     }
 
     public static void deleteGLList(int list) {
+        GL_LISTS.remove(list);
     }
 
     public static void transform(double x, double y, double z, float yaw, float pitch, float roll) {

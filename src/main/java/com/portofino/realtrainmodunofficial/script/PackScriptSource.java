@@ -42,6 +42,8 @@ public final class PackScriptSource {
             "var BlockSlab = Java.type('net.minecraft.world.level.block.SlabBlock');\n" +
             "var Block = Java.type('net.minecraft.world.level.block.Block');\n" +
             "var ITileEntityProvider = Java.type('net.minecraft.world.level.block.EntityBlock');\n" +
+            //1.7.10 TextureMap (ブロックアトラス)。NGTO Builder のプレビューが field_110575_b を参照
+            "var TextureMap = Java.type('jp.ngt.mccompat.TextureMap');\n" +
             "var ItemBlock = Java.type('net.minecraft.world.item.BlockItem');\n" +
             //1.7.10 NBT
             "var NBTTagCompound = Java.type('jp.ngt.mccompat.nbt.NBTTagCompound');\n" +
@@ -97,6 +99,9 @@ public final class PackScriptSource {
             {"Packages.net.minecraft.client.renderer.texture.DynamicTexture", "Packages.jp.ngt.mccompat.DynamicTexture"},
             {"Packages.net.minecraft.client.Minecraft", "Packages.jp.ngt.mccompat.Minecraft"},
             {"Packages.net.minecraft.util.math.BlockPos", "Packages.net.minecraft.core.BlockPos"},
+            // NGTO Builder が hasTileEntity() で使う: 1.7.10 ITileEntityProvider = 1.21 EntityBlock
+            // (BE を持つブロックのマーカーインタフェース)。未対応だと設置経路で instanceof が落ちる。
+            {"Packages.net.minecraft.block.ITileEntityProvider", "Packages.net.minecraft.world.level.block.EntityBlock"},
             {"Packages.net.minecraft.world.EnumSkyBlock", "Packages.jp.ngt.mccompat.EnumSkyBlock"},
             {"Packages.net.minecraft.util.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
             {"Packages.net.minecraft.util.math.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
@@ -163,6 +168,14 @@ public final class PackScriptSource {
         }
         //Packages.net.minecraft.block.Block.func_xxx → 互換 static (先に FQN を素の形に落とす)
         out = out.replace("Packages.net.minecraft.block.Block.", "Block.");
+        //ItemBlock.field_150939_a (内包する Block)。1.21 の BlockItem に SRG フィールドは無いが
+        //ランタイムは mojmap なので getBlock() がそのまま呼べる。NGTO Builder のマスク機能が使う。
+        out = out.replace(".field_150939_a", ".getBlock()");
+        //NGTO Builder の hasTileEntity() は 1.12 idiom: block.hasTileEntity(block.func_176203_a(meta))。
+        //1.21 の Block にこれらメソッドは無く、毎ブロック TypeError→catch で大量ログになる。1.21 では
+        //直前の instanceof EntityBlock (ITileEntityProvider) が BE 判定の正解なので、フォールバックは false に落とす。
+        out = out.replace("block.hasTileEntity(block.func_176203_a(blockSet.metadata))", "false");
+        out = out.replace("block.hasTileEntity(blockSet.metadata)", "false");
         for (int i = 0; i < BLOCK_STATIC_PATTERNS.length; i++) {
             out = BLOCK_STATIC_PATTERNS[i].matcher(out).replaceAll(
                     Matcher.quoteReplacement(BLOCK_STATIC_REPLACEMENTS[i]));

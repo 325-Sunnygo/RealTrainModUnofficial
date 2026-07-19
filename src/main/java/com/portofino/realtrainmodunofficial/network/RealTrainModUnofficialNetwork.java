@@ -32,6 +32,9 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(ConfigureSpeakerPayload.TYPE, ConfigureSpeakerPayload.STREAM_CODEC, ConfigureSpeakerPayload::handleOnServer);
         registrar.playToServer(RtmuSettingsPayload.TYPE, RtmuSettingsPayload.STREAM_CODEC, RtmuSettingsPayload::handleOnServer);
         registrar.playToClient(SyncSpeakerSoundsPayload.TYPE, SyncSpeakerSoundsPayload.STREAM_CODEC, SyncSpeakerSoundsPayload::handleOnClient);
+        //乗客シミュレーション: 駅設定 GUI (右クリックで開く/タグ保存)
+        registrar.playToClient(OpenStationScreenPayload.TYPE, OpenStationScreenPayload.STREAM_CODEC, OpenStationScreenPayload::handleOnClient);
+        registrar.playToServer(SetStationTagsPayload.TYPE, SetStationTagsPayload.STREAM_CODEC, SetStationTagsPayload::handleOnServer);
         //SignalControllerMod (masa300) 移植
         registrar.playToServer(SignalControllerPayload.TYPE, SignalControllerPayload.STREAM_CODEC, SignalControllerPayload::handleOnServer);
         //本家 GuiChangeOffset (設置物の微調整)

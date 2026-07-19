@@ -45,6 +45,36 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public int seatRotation;
     public int doorMoveL;
     public int doorMoveR;
+
+    /**
+     * RTMU 追加: 転換クロスシートの向き (E257 等の train スクリプトが読む)。
+     * -1 = 未確定 (誰も乗っていない → スクリプトは進行方向にフォールバック)、
+     * 0 = 前向き / 1 = 後ろ向き。<b>最初のプレイヤーが乗った瞬間の向き</b>で確定し、
+     * 着席後に振り向いても変わらない。全員降りたら未確定に戻る。
+     */
+    private int seatBoardDirection = -1;
+
+    public int getSeatDirection() {
+        return this.seatBoardDirection;
+    }
+
+    @Override
+    protected void addPassenger(Entity passenger) {
+        super.addPassenger(passenger);
+        if (this.seatBoardDirection < 0 && passenger instanceof net.minecraft.world.entity.player.Player) {
+            //乗車時のプレイヤー向きと車両向きの差で前/後ろ向きを決める
+            float rel = Mth.wrapDegrees(passenger.getYRot() - this.getYRot());
+            this.seatBoardDirection = Math.abs(rel) <= 90.0F ? 0 : 1;
+        }
+    }
+
+    @Override
+    protected void removePassenger(Entity passenger) {
+        super.removePassenger(passenger);
+        if (this.getPassengers().stream().noneMatch(p -> p instanceof net.minecraft.world.entity.player.Player)) {
+            this.seatBoardDirection = -1;
+        }
+    }
     public int pantograph_F;
     public int pantograph_B;
     public float wheelRotationR;
@@ -180,6 +210,12 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         }
         float dYaw = net.minecraft.util.Mth.wrapDegrees(this.getYRot() - this.prevRotationYawVehicle);
         float dPitch = net.minecraft.util.Mth.wrapDegrees(this.getXRot() - this.prevRotationPitchVehicle);
+        //ローカルプレイヤーを乗せているなら、この tick の回転量を毎フレームのカメラ補正へ渡す
+        //(RiderViewSmoother がサブtick補間して視点追従を滑らかにする)。直進 (0) でも記録して
+        //前カーブの値を残さない。yRot/yRotO への瞬時適用は従来どおりで、カメラ描画だけ滑らかに。
+        if (this.getPassengers().contains(net.minecraft.client.Minecraft.getInstance().player)) {
+            com.portofino.realtrainmodunofficial.client.RiderViewSmoother.record(dYaw, dPitch);
+        }
         if (dYaw == 0.0F && dPitch == 0.0F) {
             return;
         }

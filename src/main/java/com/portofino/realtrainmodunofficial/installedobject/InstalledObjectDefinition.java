@@ -110,6 +110,24 @@ public class InstalledObjectDefinition {
         this.wireAttachPos = wireAttachPos == null ? Vec3.ZERO : wireAttachPos;
     }
 
+    //本家 ModelConnector_*.json の connectorType ("Relay" 等)。NGTO Builder の Wire ツールが
+    //碍子アイテムの getSubType()==="Relay" でリレー碍子を判定するのに使う。
+    private String subType = "";
+
+    public String getSubType() {
+        return subType;
+    }
+
+    public void setSubType(String subType) {
+        this.subType = subType == null ? "" : subType;
+    }
+
+    /** id ("category:pack:name") の末尾 = 本家の定義名 (スクリプトが比較する bare name)。 */
+    public String getBareName() {
+        int idx = id.lastIndexOf(':');
+        return idx >= 0 ? id.substring(idx + 1) : id;
+    }
+
     public InstalledObjectDefinition(String id, String displayName, String packName, InstalledObjectCategory category,
                                      String modelFile, String scriptPath, Map<String, String> textureOverrides,
                                      Vec3 modelOffset, float modelScale, boolean smoothing,

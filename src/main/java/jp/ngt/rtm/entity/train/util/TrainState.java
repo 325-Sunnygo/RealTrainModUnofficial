@@ -49,6 +49,11 @@ public enum TrainState {
         State_TrainDir(0, "train_dir", 0, 1),
         State_Notch(1, "notch", -8, 5),
         State_Signal(2, "signal", -1, 127),//6
+        /**
+         * RTMU 追加: ドアカット。この車両を 1 にすると、開扉指令 (State_Door) が来ても
+         * ドアを開けない (物理: doorState を 0 扱い)。id 3 は 16 バイト状態配列の空きスロット。
+         */
+        State_DoorCut(3, "door_cut", 0, 1),
         State_Door(4, "door", 0, 3),
         State_Light(5, "light", 0, 2),
         State_Pantograph(6, "pantograph", 0, 1),

@@ -31,6 +31,17 @@ public class RtmBogieRenderer extends EntityRenderer<EntityBogie> {
     }
 
     @Override
+    public boolean shouldRender(EntityBogie bogie, net.minecraft.client.renderer.culling.Frustum frustum,
+                                double camX, double camY, double camZ) {
+        //軽量化: 車体を車両描画距離で消したとき台車だけ浮かないよう、台車も同じ距離で間引く。
+        if (com.portofino.realtrainmodunofficial.RtmuSettings.beyondVehicleRenderDistance(
+                bogie.getX(), bogie.getY(), bogie.getZ(), camX, camY, camZ)) {
+            return false;
+        }
+        return super.shouldRender(bogie, frustum, camX, camY, camZ);
+    }
+
+    @Override
     public void render(EntityBogie bogie, float entityYaw, float partialTicks, PoseStack poseStack,
                        MultiBufferSource buffer, int packedLight) {
         EntityTrainBase train = bogie.getTrain();

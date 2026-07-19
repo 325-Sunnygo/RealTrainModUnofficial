@@ -22,7 +22,12 @@ public final class GLRecorder {
         /**
          * ModelLoader で読んだ PolygonModel のグループ描画 (payload: Object[]{PolygonModel, groupName})
          */
-        DRAW_MODEL_GROUP
+        DRAW_MODEL_GROUP,
+        /**
+         * バニラ BlockState のゴースト描画 (payload: BlockState、a/b/c=相対座標)。
+         * NGTO Builder のミニチュアプレビュー (NGTRenderer.renderNGTObject) 用。
+         */
+        RENDER_BLOCK
     }
 
     /**
@@ -101,7 +106,7 @@ public final class GLRecorder {
     public boolean hasGeometry() {
         for (Cmd cmd : this.cmds) {
             switch (cmd.op) {
-                case RENDER_PARTS, RENDER_GROUPS, DRAW_TESS, DRAW_MODEL_GROUP -> {
+                case RENDER_PARTS, RENDER_GROUPS, DRAW_TESS, DRAW_MODEL_GROUP, RENDER_BLOCK -> {
                     return true;
                 }
                 default -> {
@@ -184,6 +189,20 @@ public final class GLRecorder {
 
     public void drawTess(TessDraw draw) {
         this.cmds.add(new Cmd(Op.DRAW_TESS, 0, 0, 0, 0, null, draw));
+    }
+
+    /** バニラブロックのゴースト描画を記録 (プレビュー用)。 */
+    public void renderBlock(Object blockState, float x, float y, float z) {
+        this.cmds.add(new Cmd(Op.RENDER_BLOCK, x, y, z, 0, null, blockState));
+    }
+
+    /**
+     * 別レコーダーの記録を末尾に追記する (GLHelper のディスプレイリスト callList 用)。
+     */
+    public void appendFrom(GLRecorder other) {
+        if (other != null && other != this) {
+            this.cmds.addAll(other.cmds);
+        }
     }
 
     public void drawModelGroup(Object model, String groupName) {

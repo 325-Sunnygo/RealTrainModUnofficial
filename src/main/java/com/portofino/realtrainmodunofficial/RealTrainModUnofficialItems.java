@@ -142,9 +142,39 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> TICKET_VENDOR_ITEM = ITEMS.register(
         "ticket_vendor", () -> new InstalledObjectItem(InstalledObjectCategory.TICKET_VENDOR)
     );
-    //本家 ItemCamera: 撮り鉄用カメラ (望遠 / 被写界深度 / 流し撮り / 列車追尾AF)
+    //本家 ItemCamera: 撮り鉄用カメラ (望遠 / 被写界深度 / 流し撮り / 列車追尾AF / レンズ交換式)
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.CameraItem> CAMERA_ITEM = ITEMS.register(
         "camera", com.portofino.realtrainmodunofficial.item.CameraItem::new
+    );
+    // ---- 交換レンズ (カメラ構え中に L キーで装着) ----
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.LensItem> LENS_WIDE = ITEMS.register(
+        "lens_wide", () -> new com.portofino.realtrainmodunofficial.item.LensItem(com.portofino.realtrainmodunofficial.client.camera.CameraLens.WIDE)
+    );
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.LensItem> LENS_STANDARD = ITEMS.register(
+        "lens_standard", () -> new com.portofino.realtrainmodunofficial.item.LensItem(com.portofino.realtrainmodunofficial.client.camera.CameraLens.STANDARD)
+    );
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.LensItem> LENS_TELE = ITEMS.register(
+        "lens_tele", () -> new com.portofino.realtrainmodunofficial.item.LensItem(com.portofino.realtrainmodunofficial.client.camera.CameraLens.TELE)
+    );
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.LensItem> LENS_SUPER_TELE = ITEMS.register(
+        "lens_super_tele", () -> new com.portofino.realtrainmodunofficial.item.LensItem(com.portofino.realtrainmodunofficial.client.camera.CameraLens.SUPER_TELE)
+    );
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.LensItem> LENS_SANNI = ITEMS.register(
+        "lens_sanni", () -> new com.portofino.realtrainmodunofficial.item.LensItem(com.portofino.realtrainmodunofficial.client.camera.CameraLens.SANNI)
+    );
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.LensItem> LENS_NIFTY = ITEMS.register(
+        "lens_nifty", () -> new com.portofino.realtrainmodunofficial.item.LensItem(com.portofino.realtrainmodunofficial.client.camera.CameraLens.NIFTY)
+    );
+    // ---- テレコンバーター (カメラ構え中に ; キーで着脱) ----
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.TeleconverterItem> TELECONVERTER_14 = ITEMS.register(
+        "teleconverter_14", () -> new com.portofino.realtrainmodunofficial.item.TeleconverterItem(com.portofino.realtrainmodunofficial.client.camera.Teleconverter.TC14)
+    );
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.TeleconverterItem> TELECONVERTER_20 = ITEMS.register(
+        "teleconverter_20", () -> new com.portofino.realtrainmodunofficial.item.TeleconverterItem(com.portofino.realtrainmodunofficial.client.camera.Teleconverter.TC20)
+    );
+    //リモコン: 2つのブロックを無線レッドストーンでペアリング (シフト+右クリック)
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.RemoteItem> REMOTE_ITEM = ITEMS.register(
+        "remote", com.portofino.realtrainmodunofficial.item.RemoteItem::new
     );
     //本家 ItemTicket: 券売機が発券し改札が消費する。切符=1回, 回数券=11回。
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.TicketItem> TICKET_ITEM = ITEMS.register(

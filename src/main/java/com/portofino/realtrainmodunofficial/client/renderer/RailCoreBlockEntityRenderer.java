@@ -140,21 +140,31 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 //  以前は開通方向 (activeIndex) をキーにしていたが、トングの位置は
                 //  renderSwitchPoint が Point.getMovement() から読んでいるため、
                 //  開通方向だけ見ても転てつを検知できず、焼いたメッシュが固まったままだった。
-                boolean animating = isSwitchAnimating(be, partialTick, maps.length);
-                if (!animating) {
-                    long variant = switchVariantKey(be);
-                    RailDefinition bakedDef = def;
-                    //packedLight はこのメソッド内で再代入しているのでラムダに直接は渡せない
-                    final int bakedLight = packedLight;
-                    boolean forceRebuild = be.shouldRerenderRail;
-                    boolean drew = com.portofino.realtrainmodunofficial.client.render.RailMeshCache.drawBaked(
-                        be.getBlockPos(), variant, model, poseStack, bakedLight, packedOverlay, forceRebuild,
-                        (ps, buf) -> renderLegacy(be, bakedDef, model, maps, 1.0F, ps, buf,
-                            bakedLight, packedOverlay));
-                    if (drew) {
-                        be.shouldRerenderRail = false;
-                        return;
-                    }
+                //分岐トング付きレールも<b>常に焼き込み経路へ通す</b>。
+                //
+                //以前は「トングがアニメ中か」を movement が中間値かで判定し、中間値なら焼かず
+                //毎フレーム逐次描画 (実測 12〜16ms/本) していた。ところが BaruRail の高架レール等は
+                //トングが<b>中間値のまま静止</b>していて永遠に「アニメ中」と誤判定され、視界に数本
+                //あるだけで fps が一桁になっていた (RailOld スパイクの真因)。
+                //
+                //焼き込みキー variant には Point.getMovement() (トング位置) が入っているので、
+                //RailMeshCache は<b>トングが実際に動いた時だけ</b>焼き直す。さらに 1 フレームの
+                //焼き込み本数は上限付き ({@link RailMeshCache#MAX_BAKES_PER_FRAME}) で分散され、
+                //焼き直し待ちの間は直前のメッシュを描くので、静止分岐は焼いて使い回し (ほぼ0ms)、
+                //実際にトングが動いている一瞬もコストが跳ねない。見た目は変わらない。
+                long variant = switchVariantKey(be);
+                RailDefinition bakedDef = def;
+                //packedLight はこのメソッド内で再代入しているのでラムダに直接は渡せない
+                final int bakedLight = packedLight;
+                final long bakedVariant = variant;
+                boolean forceRebuild = be.shouldRerenderRail;
+                boolean drew = com.portofino.realtrainmodunofficial.client.render.RailMeshCache.drawBaked(
+                    be.getBlockPos(), bakedVariant, model, poseStack, bakedLight, packedOverlay, forceRebuild,
+                    (ps, buf) -> renderLegacy(be, bakedDef, model, maps, 1.0F, ps, buf,
+                        bakedLight, packedOverlay));
+                if (drew) {
+                    be.shouldRerenderRail = false;
+                    return;
                 }
                 renderLegacy(be, def, model, maps, partialTick, poseStack, buffer, packedLight, packedOverlay);
             } finally {
@@ -202,7 +212,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         jp.ngt.rtm.rail.util.Point[] points = be.getSwitchPoints();
         if (points != null) {
             for (jp.ngt.rtm.rail.util.Point p : points) {
-                key = key * 31L + (p == null ? 0 : Float.floatToIntBits(p.getMovement()));
+                //getMovement() を 8 段階に量子化して混ぜる。トングは 80tick かけて動く
+                //(1 段 = 1/80 = 0.0125) ので、RS 入力の揺れで moveCount が ±1 微振動しても
+                //量子化値は変わらない。これをしないと、静止したはずのクロスポイント等が毎tick
+                //微振動で variant が変わり、<b>再焼き込みされ続けて重い</b> (bake が下がらない)。
+                //実際に転てつが動く時は 8 段階で焼き直すので見た目はほぼ同じ。
+                int q = p == null ? 0 : Math.round(p.getMovement() * 8.0F);
+                key = key * 31L + q;
             }
         }
         //Point を持たない分岐 (フォールバック描画) 用に開通方向も混ぜる
@@ -211,31 +227,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         return key;
     }
 
-    /**
-     * 転てつのアニメーション中か。動いている間は毎フレーム形が変わるので焼かず、
-     * 従来どおり逐次描画する (焼くと毎フレーム焼き直しになってかえって重い)。
-     */
-    private static boolean isSwitchAnimating(TileEntityLargeRailCore be, float partialTick, int mapCount) {
-        jp.ngt.rtm.rail.util.Point[] points = be.getSwitchPoints();
-        if (points != null) {
-            for (jp.ngt.rtm.rail.util.Point p : points) {
-                if (p == null) {
-                    continue;
-                }
-                float movement = p.getMovement();
-                if (movement > 0.0F && movement < 1.0F) {
-                    return true;
-                }
-            }
-        }
-        if (mapCount > 1) {
-            float progress = be.getSwitchProgress(partialTick);
-            if (progress > 0.0F && progress < 1.0F) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     /**
      * 旧パイプライン本体 (トング付き分岐)。統合メッシュへの焼き込みからも、逐次描画からも
@@ -985,6 +976,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     @Override
     public int getViewDistance() {
-        return 128;
+        //RTMU 設定でレール描画距離を変更可能 (既定 128)。「レールの描画が短い」対策。
+        return com.portofino.realtrainmodunofficial.RtmuSettings.clampRailRenderDistance(
+            com.portofino.realtrainmodunofficial.RtmuSettings.railRenderDistance);
     }
 }

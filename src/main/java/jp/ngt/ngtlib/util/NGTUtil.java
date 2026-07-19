@@ -84,19 +84,48 @@ public final class NGTUtil {
         if (target == null || fieldName == null) {
             return;
         }
-        Class<?> cls = target.getClass();
+        trySetField(target.getClass(), target, value, fieldName);
+    }
+
+    /**
+     * 本家 NGTUtil.setValueToField の 4 引数版 (NGTO Builder の Wire ツールが使用):
+     * {@code setValueToField(TileEntityConnectorBase.class, tileEntity, value, "modelName")}。
+     * 第1引数はフィールド探索の起点クラス。そこに無ければ target の実クラス階層も探す。
+     * どちらにも無ければ (RTMU では碍子=InstalledObjectBlockEntity で modelName フィールドが無い等)
+     * 無害に no-op する — ワイヤー設置自体は継続する。
+     */
+    public static void setValueToField(Class<?> startClass, Object target, Object value, String fieldName) {
+        if (target == null || fieldName == null) {
+            return;
+        }
+        //NGTO Builder の Wire ツール: setModelName が TileEntityConnectorBase.modelName へ reflection で
+        //書き込むが、RTMU の碍子は InstalledObjectBlockEntity (definitionId 管理) なのでブリッジする。
+        //これが無いと Enter で置いた碍子が「選んだモデル」にならない。
+        if ("modelName".equals(fieldName) && value instanceof String name
+                && target instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be) {
+            be.applyScriptModelName(name);
+            return;
+        }
+        if (trySetField(startClass, target, value, fieldName)) {
+            return;
+        }
+        trySetField(target.getClass(), target, value, fieldName);
+    }
+
+    private static boolean trySetField(Class<?> cls, Object target, Object value, String fieldName) {
         while (cls != null) {
             try {
                 java.lang.reflect.Field f = cls.getDeclaredField(fieldName);
                 f.setAccessible(true);
                 f.set(target, value);
-                return;
+                return true;
             } catch (NoSuchFieldException e) {
                 cls = cls.getSuperclass();
             } catch (Exception e) {
-                return;
+                return false;
             }
         }
+        return false;
     }
 
     /**

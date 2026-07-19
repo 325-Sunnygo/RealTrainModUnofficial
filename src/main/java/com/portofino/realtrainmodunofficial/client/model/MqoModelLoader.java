@@ -589,6 +589,11 @@ public final class MqoModelLoader {
             CachedModel previous = MODEL_CACHE.remove(key);
             if (previous != null) {
                 modelCacheBytes -= previous.estimatedBytes();
+                //古いモデルを差し替える時は GPU VBO を解放 (リーク防止)。ただし同じ
+                //オブジェクトを再登録する場合は、今から使う VBO を閉じないようスキップ。
+                if (previous.model != model) {
+                    previous.model.closeGpuResources();
+                }
             }
             CachedModel cached = new CachedModel(model, model.estimateMemoryBytes(), System.nanoTime());
             MODEL_CACHE.put(key, cached);
@@ -613,6 +618,9 @@ public final class MqoModelLoader {
             }
             modelCacheBytes -= cached.estimatedBytes();
             iterator.remove();
+            //追い出したモデルの GPU VBO を解放する。これを怠ると VertexBuffer が native の
+            //まま残り、巡回中に GPU メモリがリークして徐々に重くなっていた (今回の主因)。
+            cached.model.closeGpuResources();
         }
     }
 
@@ -3841,6 +3849,28 @@ public final class MqoModelLoader {
             return false;
         }
 
+        /**
+         * このモデルが確保した GPU VBO を全バッチぶん解放する。モデルがキャッシュから追い出された
+         * 時に呼ぶこと。VertexBuffer は native ハンドルを持ち GC では解放されないため、放置すると
+         * 巡回中に GPU メモリがリークして徐々に重くなる (レールは RailMeshCache が解放しているが、
+         * 車両/オブジェクトのモデルキャッシュは解放していなかった)。GL 呼び出しは描画スレッドへ寄せる。
+         * まだ描画中のエンティティが参照していても、次フレームの getOrBuild* が isInvalid を見て
+         * 作り直すので安全 (追い出されるのは大抵もう描いていないモデル)。
+         */
+        public void closeGpuResources() {
+            if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
+                for (Batch b : batches) {
+                    b.closeVbosNow();
+                }
+            } else {
+                com.mojang.blaze3d.systems.RenderSystem.recordRenderCall(() -> {
+                    for (Batch b : batches) {
+                        b.closeVbosNow();
+                    }
+                });
+            }
+        }
+
         private Boolean cachedHasLightGroups;
 
         /**
@@ -5299,6 +5329,35 @@ public final class MqoModelLoader {
                 return vbo;
             } catch (Throwable t) {
                 return null;
+            }
+        }
+
+        /**
+         * このバッチが確保した GPU VBO を全て解放する。<b>必ず描画スレッドで呼ぶこと</b>
+         * ({@link MqoModel#closeGpuResources()} が保証する)。VertexBuffer は native ハンドルを
+         * 持ち GC では解放されないので、モデルがキャッシュから追い出された時にこれを呼ばないと
+         * GPU メモリがリークし、色々な場所 (= 色々な車両/オブジェクト) を巡るうちに徐々に重くなる。
+         * close 後にビルド系フラグを戻すので、同じモデルが再利用されれば普通に作り直される。
+         */
+        void closeVbosNow() {
+            if (fullbrightVbo != null) {
+                if (!fullbrightVbo.isInvalid()) fullbrightVbo.close();
+                fullbrightVbo = null;
+            }
+            vboBuildFailed = false;
+            vboBuildAttempted = false;
+            if (entityVbo != null) {
+                if (!entityVbo.isInvalid()) entityVbo.close();
+                entityVbo = null;
+            }
+            entityVboLight = Integer.MIN_VALUE;
+            entityVboFailed = false;
+            java.util.Map<Float, com.mojang.blaze3d.vertex.VertexBuffer> bv = biasedVbos;
+            if (bv != null) {
+                for (com.mojang.blaze3d.vertex.VertexBuffer v : bv.values()) {
+                    if (v != null && !v.isInvalid()) v.close();
+                }
+                biasedVbos = null;
             }
         }
     }

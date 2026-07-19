@@ -33,6 +33,15 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
     private static final int TICKET_GATE_MOVE_TICKS = 12;
     private String definitionId = "";
     private String category = InstalledObjectCategory.LIGHT.name();
+    //--- 派生値キャッシュ (definitionId から一意に決まる不変値を毎tick/毎frame 再計算しない) ---
+    //軽量化: shouldHandleCrossingLogic()=toLowerCase×4+contains×9、isBrokenFluorescent()=substring
+    //+toLowerCase+contains を、設置物 1 個ずつ毎servertick/毎frame 走らせると駅 (設置物多数) で
+    //無視できない CPU/GC になる。定義が変わらない限り結果は不変なので definitionId をキーに保持する。
+    //見た目・挙動は一切変えない (NBT には保存しない = ロード後は最初のアクセスで再計算)。
+    private transient String crossingLogicKey;
+    private transient boolean crossingLogicVal;
+    private transient String brokenFluorescentKey;
+    private transient boolean brokenFluorescentVal;
     private float yaw;
     // 壁(横面)挿し時に碍子を横倒しにするためのピッチ(度)。0=通常(縦置き)。
     // 列車検知器ではレールの勾配に使う (レンダラでは yaw の後 = モデル局所のX回転)。
@@ -51,6 +60,8 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
     private BlockPos wireStart;
     private BlockPos wireEnd;
     private boolean powered;
+    /** リモコン (RemoteItem) のペアリングで無線給電されているか。保存せず毎 tick 外部が設定する。 */
+    private transient boolean remotePowered;
     private int barMoveCount;
     private int lightCount = -1;
     private int tickCountOnActive;
@@ -228,8 +239,13 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
      */
     @Override
     public jp.ngt.ngtlib.math.Vec3 getWirePos() {
+        //碍子 (INSULATOR) も対象に含める。NGTO Builder / Baru's Pole の架線スクリプトは
+        //碍子の wirePos (JSON の wirePos=[x,y,z]) を金具・接続点の計算に使い、
+        //null だと render_Wire2 の getAroundInsulatorPosData が wirePos.getX() で落ちる。
+        //碍子/コネクタ以外 (照明・看板等) は従来どおり null (=スクリプト側の `=== null` ガードで弾く)。
         InstalledObjectCategory cat = getCategory();
-        if (cat != InstalledObjectCategory.CONNECTOR_INPUT && cat != InstalledObjectCategory.CONNECTOR_OUTPUT) {
+        if (cat != InstalledObjectCategory.CONNECTOR_INPUT && cat != InstalledObjectCategory.CONNECTOR_OUTPUT
+                && cat != InstalledObjectCategory.INSULATOR) {
             return null;
         }
         InstalledObjectDefinition def = InstalledObjectRegistry.getById(this.definitionId);
@@ -238,6 +254,24 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         }
         net.minecraft.world.phys.Vec3 wp = def.getWireAttachPos();
         return wp == null ? null : new jp.ngt.ngtlib.math.Vec3(wp.x, wp.y, wp.z);
+    }
+
+    /**
+     * NGTO Builder の Wire ツール互換: スクリプトの setModelName
+     * ({@code NGTUtil.setValueToField(TileEntityConnectorBase.class, tile, name, "modelName")}) を
+     * {@link jp.ngt.ngtlib.util.NGTUtil} がここへブリッジする。bare name から碍子定義を解決して適用する。
+     */
+    public void applyScriptModelName(String bareName) {
+        InstalledObjectDefinition def = InstalledObjectRegistry.getByBareName(bareName, InstalledObjectCategory.INSULATOR);
+        if (def == null) {
+            return;
+        }
+        this.definitionId = def.getId();
+        this.category = def.getCategory().name();
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
     }
 
     @Override
@@ -542,6 +576,20 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
             this.powered = powered;
             setChanged();
         }
+    }
+
+    /** リモコンの無線給電を設定 (RemoteRedstoneHandler が毎 tick 呼ぶ)。 */
+    public void setRemotePowered(boolean v) {
+        this.remotePowered = v;
+    }
+
+    public boolean isRemotePowered() {
+        return this.remotePowered;
+    }
+
+    /** 隣接レッドストーン入力があるか、またはリモコンで無線給電されているか。 */
+    private boolean redstoneOn(Level level, BlockPos pos) {
+        return level.getBestNeighborSignal(pos) > 0 || this.remotePowered;
     }
 
     public boolean isPowered() {
@@ -917,10 +965,14 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         setChanged();
     }
 
-    /** 壊れた蛍光灯 (本家 meta==2 / モデル名 *Broken) か。 */
+    /** 壊れた蛍光灯 (本家 meta==2 / モデル名 *Broken) か。定義から不変なので definitionId でキャッシュ。 */
     public boolean isBrokenFluorescent() {
-        return getCategory() == InstalledObjectCategory.FLUORESCENT
-            && getModelName().toLowerCase(java.util.Locale.ROOT).contains("broken");
+        if (!definitionId.equals(brokenFluorescentKey)) {
+            brokenFluorescentKey = definitionId;
+            brokenFluorescentVal = getCategory() == InstalledObjectCategory.FLUORESCENT
+                && getModelName().toLowerCase(java.util.Locale.ROOT).contains("broken");
+        }
+        return brokenFluorescentVal;
     }
 
     /**
@@ -1020,6 +1072,58 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         return InstalledObjectRegistry.getById(definitionId);
     }
 
+    // --- NGTO Builder の Wire ツール互換 ---
+
+    /** Wire ツールが碍子の微調整オフセットを設定する (本家 TileEntityConnectorBase.setOffset)。 */
+    public void setOffset(double x, double y, double z, boolean sync) {
+        this.offsetX = x;
+        this.offsetY = y;
+        this.offsetZ = z;
+        setChanged();
+        if (sync && level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    /**
+     * Wire ツールが「この碍子から (x,y,z) の碍子へワイヤーを張る」ときに呼ぶ (本家 setConnectionTo)。
+     * RTMU の配線描画は wireStart/wireEnd を持つ設置物に対して行われるので、両端を設定して描画対象にする。
+     * connectionType/modelState は本家 API 互換で受け取るだけ (現状 WIRE のケーブルを描くのみ)。
+     */
+    public void setConnectionTo(int x, int y, int z, Object connectionType, Object modelState) {
+        this.wireStart = this.worldPosition;
+        this.wireEnd = new net.minecraft.core.BlockPos(x, y, z);
+        // RTMU の配線描画は「WIRE カテゴリの設置物が、その定義(モデル)のケーブルを wireStart→wireEnd に描く」。
+        // なので接続された碍子を WIRE オブジェクト化する: 定義=選択ワイヤーモデル、category=WIRE。
+        // modelState は WireItem.getModelState() が返す WireModelState (modelId を持つ)。
+        // 選択ワイヤーモデル ID を取り出す。isOldVer=false 経路は WireModelState、
+        // isOldVer=true 経路 (RTMU は VERSION に "1.7.10" を含むのでこちら) は getModelName の String。
+        String wireModelId = null;
+        if (modelState instanceof com.portofino.realtrainmodunofficial.item.WireItem.WireModelState wms) {
+            wireModelId = wms.modelId;
+        } else if (modelState instanceof String s) {
+            wireModelId = s;
+        }
+        if (wireModelId != null && !wireModelId.isEmpty()) {
+            this.definitionId = wireModelId;
+            this.category = InstalledObjectCategory.WIRE.name();
+        }
+        //診断: 選択ワイヤーモデルが取れているか・定義が解決するか (原因特定後に外す)
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+            "[WireDiag] setConnectionTo modelState={} wireModelId='{}' -> definitionId='{}' category={} defResolved={}",
+            modelState == null ? "null" : modelState.getClass().getSimpleName(),
+            wireModelId, this.definitionId, this.category,
+            InstalledObjectRegistry.getById(this.definitionId) != null);
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+            //WIRE の電気グラフにも登録 (再読込時は onLoad が category==WIRE で再登録する)。
+            if (getCategory() == InstalledObjectCategory.WIRE) {
+                jp.ngt.rtm.electric.WireManager.register(level, this.wireStart, this.wireEnd);
+            }
+        }
+    }
+
     /** ロード済み設置物 (WebCTC の信号地図 API が使用。レールコアの LOADED_CORES と同じ方式)。 */
     private static final java.util.Set<InstalledObjectBlockEntity> LOADED_OBJECTS =
             java.util.Collections.synchronizedSet(
@@ -1076,9 +1180,11 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
             String running = definition == null ? null : definition.getRunningSound();
             if (running != null && !running.isBlank()) {
                 ClientHooks.tickCrossingGateSound(be);
-            } else {
-                ClientHooks.stopCrossingGateSound(level, pos);
             }
+            //軽量化: 走行音を持たない設置物 (標識/照明/架線柱/信号機など大多数) は「鳴らす音が無い＝
+            //止める音も無い」。以前はここで毎 client tick stopCrossingGateSound を呼んでいたが、これは
+            //リフレクション + 文字列キー生成の空振り。鳴っている踏切音は LoopingCrossingSound.tick() 自身が
+            //powered off/範囲外/定義変更/撤去を検知して停止するので、毎tick の明示停止は不要 (見た目・音とも不変)。
             return;
         }
         //本家 EntityInstalledObject.onUpdate: サーバー側では毎 tick、パックの
@@ -1100,10 +1206,20 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         //そのままだと明るさ 0 がチャンクに焼き付いてしまう。ここで「最後に出した明るさ」と
         //比較しておくと、設置直後・チャンク再読込・テクスチャ変更のいずれでも拾える
         //(signLastLight は保存しないので、BE が作られた最初の tick では必ず不一致になる)。
+        //スピーカー: レッドストーン入力 or リモコン無線給電の<b>立ち上がり</b>で音を鳴らす。
+        //(通常は電気配線 setElectricity 経由で鳴るが、素のレッドストーン/リモコンでも鳴らせるように)
+        if (be.isSpeaker()) {
+            boolean sig = be.redstoneOn(level, pos);
+            if (sig && !be.powered) {
+                be.playSpeakerSound(1);   //立ち上がりでスロット1の音を再生
+            }
+            be.powered = sig;
+            return;
+        }
         if (be.getCategory() == InstalledObjectCategory.SIGNBOARD) {
             InstalledObjectDefinition signDef = be.getDefinition();
             int lightValue = signDef == null ? 0 : signDef.getLightValue();
-            boolean redstone = level.getBestNeighborSignal(pos) > 0;
+            boolean redstone = be.redstoneOn(level, pos);
             if (be.powered != redstone) {
                 be.powered = redstone;
                 be.setChanged();
@@ -1151,7 +1267,7 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
             boolean changed = false;
             //レッドストーン入力でも開く (本家 Turnstile は切符で openGate だが、
             //自動化/検知ブロック連携用に RS 開扉を追加)
-            if (!be.powered && level.getBestNeighborSignal(pos) > 0) {
+            if (!be.powered && be.redstoneOn(level, pos)) {
                 be.powered = true;
                 be.tickCountOnActive = 0;
                 changed = true;
@@ -1186,7 +1302,8 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         // 踏切のレッドストーン受信を毎tick再評価する。neighborChanged の取りこぼしや
         // ワールド再読込・ワイヤ隣接(hasNeighborSignal が拾いにくいケース)に強くするため、
         // getBestNeighborSignal(>0)で判定して powered を常に信号と同期させる。
-        boolean redstone = level.getBestNeighborSignal(pos) > 0;
+        // リモコン無線給電 (remotePowered) も同じ扱い。
+        boolean redstone = be.redstoneOn(level, pos);
         boolean changed = false;
         if (be.powered != redstone) {
             be.powered = redstone;
@@ -1420,18 +1537,24 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
     }
 
     private boolean shouldHandleCrossingLogic() {
+        //定義から不変。definitionId が同じ間はキャッシュを返す (毎servertick の toLowerCase×4+contains×9 を排除)。
+        if (definitionId.equals(crossingLogicKey)) {
+            return crossingLogicVal;
+        }
         if (getCategory() == InstalledObjectCategory.CROSSING) {
+            crossingLogicKey = definitionId;
+            crossingLogicVal = true;
             return true;
         }
         InstalledObjectDefinition definition = getDefinition();
         if (definition == null) {
-            return false;
+            return false;  //定義未解決: まだキャッシュしない (登録が読めたら次tickで再計算)
         }
         String id = definition.getId() == null ? "" : definition.getId().toLowerCase(java.util.Locale.ROOT);
         String name = definition.getDisplayName() == null ? "" : definition.getDisplayName().toLowerCase(java.util.Locale.ROOT);
         String model = definition.getModelFile() == null ? "" : definition.getModelFile().toLowerCase(java.util.Locale.ROOT);
         String sound = definition.getRunningSound() == null ? "" : definition.getRunningSound().toLowerCase(java.util.Locale.ROOT);
-        return id.contains("crossing")
+        boolean result = id.contains("crossing")
             || id.contains("fumikiri")
             || name.contains("crossing")
             || name.contains("fumikiri")
@@ -1440,5 +1563,8 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
             || sound.contains("crossing")
             || sound.contains("fumikiri")
             || sound.contains("toryanse");
+        crossingLogicKey = definitionId;
+        crossingLogicVal = result;
+        return result;
     }
 }

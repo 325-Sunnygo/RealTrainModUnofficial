@@ -138,4 +138,45 @@ public class WireItem extends Item implements ModelSelectableItem {
             .map(def -> new SelectableModelInfo(def.getId(), def.getDisplayName(), def.getPackName(), def.getButtonTexture()))
             .toList();
     }
+
+    // --- NGTO Builder の Wire ツール互換 (本家 ItemWithModel の API 名で選択モデルを返す) ---
+    // 注意: スクリプトは実 ItemStack ではなく jp.ngt.mccompat.ItemStackCompat (ラッパー) を渡すため、
+    // 引数は Object で受けて unwrap する (ItemStack 型で受けると ClassCastException になる)。
+
+    /** 手持ちワイヤーの選択モデル ID。スクリプトが setConnectionTo の modelName に使う。 */
+    public String getModelName(Object stackLike) {
+        ItemStack stack = jp.ngt.mccompat.ItemStackCompat.unwrap(stackLike);
+        if (stack == null) {
+            return "";
+        }
+        String id = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
+        return id == null ? "" : id;
+    }
+
+    /** 選択モデルの状態。スクリプトは {@code .type.subType} を読み、setConnectionTo にも渡す。 */
+    public WireModelState getModelState(Object stackLike) {
+        return new WireModelState(getModelName(stackLike));
+    }
+
+    /** 選択モデルのサブタイプ (リレー判定に使用。通常ワイヤーは "Relay" 以外)。 */
+    public String getSubType(Object stackLike) {
+        return getModelName(stackLike);
+    }
+
+    /** 本家 ResourceState の {@code .type.subType} を Nashorn から読めるようにする最小互換。 */
+    public static final class WireModelState {
+        public final String modelId;
+        public final WireModelType type;
+        public WireModelState(String modelId) {
+            this.modelId = modelId == null ? "" : modelId;
+            this.type = new WireModelType(this.modelId);
+        }
+    }
+
+    public static final class WireModelType {
+        public final String subType;
+        public WireModelType(String subType) {
+            this.subType = subType == null ? "" : subType;
+        }
+    }
 }

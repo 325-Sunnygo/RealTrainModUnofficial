@@ -283,6 +283,17 @@ public class TrainScriptSystem {
         "RailPosition.REVISION = [[0.0,-0.5],[-0.5,-0.5],[-0.5,0.0],[-0.5,0.499999],[0.0,0.499999],[0.499999,0.499999],[0.499999,0.0],[0.499999,-0.5]];\n";
     private static final String SCRIPT_MODEL_KEY = "__ptScriptModel";
     private static volatile boolean graalPolyglotUnavailable = false;
+
+    // ===== AppleExtended 方式: 共有 polyglot Engine + 車両ごと Context =====
+    // GraalJS の Engine (コンパイル済みコードのキャッシュ) を<b>1 個だけ</b>作って全スクリプトで共有し、
+    // Context (変数空間) だけを毎回新規にする。これで「同じスクリプトを N 両ぶんコンパイル/常駐」する
+    // 無駄が消える (コンパイル 1 回・メモリ大幅削減)。車両別のグローバル状態 (isBrake 等) は Context
+    // 分離で壊れない。polyglot API が module-path から直接使えない (RTMU 既存の問題) ため、AppleExtended と
+    // 同じく<b>リフレクション</b>で正しい ClassLoader から掴む。失敗したら従来経路へ (退行なし)。
+    private static volatile boolean graalReflectionUnavailable = false;
+    private static final Object GRAAL_ENGINE_LOCK = new Object();
+    private static volatile Object SHARED_GRAAL_POLYGLOT_ENGINE;
+    private static volatile ClassLoader SHARED_GRAAL_POLYGLOT_ENGINE_LOADER;
     private static TrainScriptSystem instance;
     private ScriptEngine engine;
     private final Map<UUID, EntityScriptContext> entityContexts = new HashMap<>();
@@ -504,9 +515,143 @@ public class TrainScriptSystem {
         }
     }
 
+    /**
+     * AppleExtended 方式: 共有 polyglot Engine + 車両ごと Context の GraalJS エンジンを
+     * リフレクションで生成する。Engine (コンパイル済みコード) は 1 個共有、Context (変数空間) は毎回新規。
+     * 失敗したら null (呼び出し側は従来経路へ)。
+     */
+    private static ScriptEngine createReflectedGraalEngine(String ecmaVersion) {
+        try {
+            ClassLoader host = resolveScriptHostClassLoader();
+            Class<?> engineClass = loadClassForScriptRuntime("org.graalvm.polyglot.Engine", host);
+            Object polyglotEngine = getOrCreateSharedGraalPolyglotEngine(engineClass, host);
+
+            Class<?> contextClass = loadClassForScriptRuntime("org.graalvm.polyglot.Context", host);
+            Object cb = contextClass.getMethod("newBuilder", String[].class).invoke(null, (Object) new String[]{"js"});
+            Class<?> cbClass = cb.getClass();
+            cbClass.getMethod("allowAllAccess", boolean.class).invoke(cb, true);
+            cbClass.getMethod("allowExperimentalOptions", boolean.class).invoke(cb, true);
+            try {
+                cbClass.getMethod("hostClassLoader", ClassLoader.class).invoke(cb, host);
+            } catch (NoSuchMethodException ignored) {
+            }
+            try {
+                Object allowAll = java.lang.reflect.Proxy.newProxyInstance(
+                    TrainScriptSystem.class.getClassLoader(),
+                    new Class<?>[]{java.util.function.Predicate.class},
+                    (proxy, method, args) -> {
+                        String n = method.getName();
+                        if ("test".equals(n)) return Boolean.TRUE;
+                        if ("toString".equals(n)) return "AllowAll";
+                        if ("hashCode".equals(n)) return System.identityHashCode(proxy);
+                        if ("equals".equals(n)) return proxy == args[0];
+                        return null;
+                    });
+                cbClass.getMethod("allowHostClassLookup", java.util.function.Predicate.class).invoke(cb, allowAll);
+            } catch (NoSuchMethodException ignored) {
+            }
+            //Context オプションは RTMU 従来と同一 (nashorn 互換・構文拡張・ECMA 版) にして挙動を変えない。
+            cbClass.getMethod("option", String.class, String.class).invoke(cb, "js.nashorn-compat", "true");
+            cbClass.getMethod("option", String.class, String.class).invoke(cb, "js.syntax-extensions", "true");
+            cbClass.getMethod("option", String.class, String.class).invoke(cb, "js.ecmascript-version", ecmaVersion);
+
+            Class<?> graalEngineClass =
+                loadClassForScriptRuntime("com.oracle.truffle.js.scriptengine.GraalJSScriptEngine", host);
+            Object se = graalEngineClass.getMethod("create", engineClass, cbClass).invoke(null, polyglotEngine, cb);
+            return se instanceof ScriptEngine ? (ScriptEngine) se : null;
+        } catch (Throwable t) {
+            RealTrainModUnofficial.LOGGER.debug("Reflected shared GraalJS engine unavailable (ECMAScript {}): {}",
+                ecmaVersion, t.toString());
+            return null;
+        }
+    }
+
+    private static Object getOrCreateSharedGraalPolyglotEngine(Class<?> engineClass, ClassLoader host) throws Exception {
+        Object existing = SHARED_GRAAL_POLYGLOT_ENGINE;
+        if (existing != null && SHARED_GRAAL_POLYGLOT_ENGINE_LOADER == host) {
+            return existing;
+        }
+        synchronized (GRAAL_ENGINE_LOCK) {
+            existing = SHARED_GRAAL_POLYGLOT_ENGINE;
+            if (existing != null && SHARED_GRAAL_POLYGLOT_ENGINE_LOADER == host) {
+                return existing;
+            }
+            Object builder = engineClass.getMethod("newBuilder").invoke(null);
+            Class<?> bClass = builder.getClass();
+            bClass.getMethod("allowExperimentalOptions", boolean.class).invoke(builder, true);
+            try {
+                bClass.getMethod("option", String.class, String.class)
+                    .invoke(builder, "engine.WarnInterpreterOnly", "false");
+            } catch (Throwable ignored) {
+            }
+            Object engine = bClass.getMethod("build").invoke(builder);
+            SHARED_GRAAL_POLYGLOT_ENGINE = engine;
+            SHARED_GRAAL_POLYGLOT_ENGINE_LOADER = host;
+            RealTrainModUnofficial.LOGGER.info(
+                "RTMU: shared GraalJS polyglot Engine created — scripts now share compiled code across vehicles.");
+            return engine;
+        }
+    }
+
+    private static ClassLoader resolveScriptHostClassLoader() {
+        ClassLoader ctx = Thread.currentThread().getContextClassLoader();
+        if (ctx != null) {
+            return ctx;
+        }
+        return TrainScriptSystem.class.getClassLoader();
+    }
+
+    private static java.util.List<ClassLoader> getCandidateClassLoaders() {
+        java.util.Set<ClassLoader> ordered = new java.util.LinkedHashSet<>();
+        ClassLoader ctx = Thread.currentThread().getContextClassLoader();
+        if (ctx != null) {
+            ordered.add(ctx);
+        }
+        ClassLoader self = TrainScriptSystem.class.getClassLoader();
+        if (self != null) {
+            ordered.add(self);
+        }
+        ClassLoader sys = ClassLoader.getSystemClassLoader();
+        if (sys != null) {
+            ordered.add(sys);
+        }
+        return new java.util.ArrayList<>(ordered);
+    }
+
+    private static Class<?> loadClassForScriptRuntime(String className, ClassLoader preferred)
+            throws ClassNotFoundException {
+        java.util.Set<ClassLoader> loaders = new java.util.LinkedHashSet<>();
+        if (preferred != null) {
+            loaders.add(preferred);
+        }
+        loaders.addAll(getCandidateClassLoaders());
+        for (ClassLoader loader : loaders) {
+            if (loader == null) {
+                continue;
+            }
+            try {
+                return Class.forName(className, true, loader);
+            } catch (ClassNotFoundException ignored) {
+            }
+        }
+        return Class.forName(className);
+    }
+
     private static ScriptEngine getAvailableScriptEngine(ScriptEngineManager manager) {
         if (manager == null) {
             return null;
+        }
+
+        //最優先: AppleExtended 方式の共有 Engine (コンパイル済みコードを全車両で共有)。
+        if (!graalReflectionUnavailable) {
+            for (String ecmaVersion : PREFERRED_ECMA_VERSIONS) {
+                ScriptEngine shared = createReflectedGraalEngine(ecmaVersion);
+                if (shared != null) {
+                    return shared;
+                }
+            }
+            graalReflectionUnavailable = true;
+            RealTrainModUnofficial.LOGGER.info("RTMU: reflected shared GraalJS engine unavailable; using per-engine fallback.");
         }
 
         if (!graalPolyglotUnavailable) {

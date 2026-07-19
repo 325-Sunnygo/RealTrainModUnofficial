@@ -73,6 +73,22 @@ public final class LegacyScriptSoundManager {
         return e instanceof TrainEntity || e instanceof jp.ngt.rtm.entity.train.EntityTrainBase;
     }
 
+    /**
+     * クライアントのカメラ (プレイヤー視点) から {@code distance} ブロックより遠いか。
+     * 可聴距離外の列車のサウンド処理 (毎tick Nashorn) をスキップする軽量化判定用。
+     * プレイヤー/カメラ不明時は false (= 従来どおり処理する。安全側)。
+     * <p>
+     * 近く (しきい値以内) の列車は一切触らないので、聞こえる音のバグは起きない。
+     */
+    public static boolean beyondCameraRange(Entity entity, double distance) {
+        Minecraft mc = Minecraft.getInstance();
+        Entity camera = mc.getCameraEntity() != null ? mc.getCameraEntity() : mc.player;
+        if (camera == null || entity == null) {
+            return false;
+        }
+        return entity.distanceToSqr(camera) > distance * distance;
+    }
+
     /** 車両定義 ID (パックの ModelTrain_*.json の name)。 */
     private static String vehicleIdOf(Entity e) {
         if (e instanceof TrainEntity t) {

@@ -188,6 +188,10 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
 
         int doorState = this.getTrainStateData(TrainStateType.State_Door.id);
+        //ドアカット: この車両がカット指定なら開扉指令を無視 (閉じたまま/閉じる方向へ)。
+        if (this.getTrainStateData(TrainStateType.State_DoorCut.id) != 0) {
+            doorState = 0;
+        }
         if ((doorState & 1) == 1) {
             if (this.doorMoveR < MAX_DOOR_MOVE) {
                 ++this.doorMoveR;
@@ -411,10 +415,18 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      */
     private void tickServerScript() {
         this.ensureServerScriptLoaded();
-        if (this.serverScriptEngine != null) {
-            com.portofino.realtrainmodunofficial.script.TrainScriptSystem
-                    .invokeServerScriptOnUpdate(this.serverScriptEngine, this);
+        if (this.serverScriptEngine == null) {
+            return;
         }
+        //軽量化: 停車中の列車はサーバースクリプト (毎tick Nashorn invokeFunction = 重い) を
+        //4tick に 1 回へ間引く。ATS/制御・方向幕/種別の DataMap 更新は「動いている時」か
+        //「停車中でも 0.2 秒おき」で十分で、動き出した瞬間 (speed!=0) に毎tick へ戻る。
+        //留置線に大量の列車を置いた時のサーバー tick 負荷を大きく減らす (見た目・挙動は不変)。
+        if (this.getSpeed() == 0.0F && (this.tickCount & 3) != 0) {
+            return;
+        }
+        com.portofino.realtrainmodunofficial.script.TrainScriptSystem
+                .invokeServerScriptOnUpdate(this.serverScriptEngine, this);
     }
 
     private void ensureServerScriptLoaded() {
@@ -531,6 +543,14 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 this.soundScriptEngine =
                         com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadSoundScriptForVehicle(def);
             }
+        }
+
+        //軽量化: カメラから遠い (可聴距離外の) 列車はサウンド処理を毎tick回さない。音が届かない
+        //距離で毎tick Nashorn / 走行音 tick を回すのは無駄。しきい値は 96 ブロックと余裕を持たせ、
+        //<b>近くの聞こえる列車は一切触らない</b>ので音のバグは起きない (ユーザー要望: チャンク外だけ)。
+        //戻ってきたら (96 以内) 従来どおり毎tick に復帰し、登録制サウンドが音量/ピッチを更新し直す。
+        if (com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.beyondCameraRange(this, 96.0)) {
+            return;
         }
 
         if (this.soundScriptEngine != null) {
@@ -888,11 +908,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return new net.minecraft.world.phys.Vec3(w.x, w.y + 0.15D, w.z);
     }
 
-    /** 乗客 NPC (別 jar rtmupassenger) か。EntityType の名前空間で判定 (mod 間参照を避ける)。 */
+    /** 乗客 NPC (RTMU に統合済み) か。統合後は同一 jar なので型で直接判定できる。 */
     private static boolean isRtmuPassenger(Entity rider) {
-        net.minecraft.resources.ResourceLocation key =
-                net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(rider.getType());
-        return key != null && "rtmupassenger".equals(key.getNamespace());
+        return rider instanceof com.portofino.rtmupassenger.entity.PassengerEntity;
     }
 
     @Override

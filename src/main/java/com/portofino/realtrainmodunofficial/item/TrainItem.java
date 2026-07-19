@@ -93,27 +93,19 @@ public class TrainItem extends Item {
         String serverSel = com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.get(player.getUUID());
         String selectedId = (itemSel == null || itemSel.isBlank()) ? serverSel : itemSel;
         VehicleDefinition def = VehicleRegistry.getById(selectedId);
-        boolean fellBack = def == null || !accepts(def);
-        if (fellBack) {
+        if (def == null || !accepts(def)) {
+            //選択があった (serverSel 非空) のに解決できない = サーバーにそのパックが無い可能性を
+            //<b>ログにだけ</b>残す。無選択で既定車両になるのは正常なので、プレイヤーへの通知は出さない
+            //(毎回「選択が届いていません」と出て邪魔だったため撤去)。
+            if (serverSel != null && !serverSel.isBlank()
+                    && com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(serverSel) == null) {
+                RealTrainModUnofficial.LOGGER.warn(
+                    "[RTMU] selected train '{}' not found in registry; placing default", serverSel);
+            }
             def = VehicleRegistry.getAll().stream()
                 .filter(this::accepts)
                 .findFirst()
                 .orElse(null);
-        }
-        if (fellBack) {
-            //診断 (専用サーバーの「全列車が223になる」問題の切り分け用): フォールバック時だけ残す。
-            RealTrainModUnofficial.LOGGER.warn("[RTMU] train fell back to default: itemSel={}, serverSel={}, resolved={}",
-                itemSel == null || itemSel.isBlank() ? "-" : itemSel,
-                serverSel == null || serverSel.isBlank() ? "-" : serverSel,
-                def == null ? "-" : def.getId());
-            //223 フォールバックの主因は「サーバーに選択した列車パックが入っていない」こと
-            //(README 同意ゲートが専用サーバーでパックを弾いていた。PackConsent で修正済み)。
-            //serverSel が出ているのに getById=null なら = サーバーにそのパックが無い。
-            //serverSel が空なら = 選択がサーバーに届いていない (旧クライアント/パケット遮断)。
-            String detail = (serverSel != null && !serverSel.isBlank())
-                ? "サーバーに『" + serverSel + "』のパックが入っていません (サーバーの mods/packs を確認)"
-                : "選択がサーバーに届いていません (クライアント/サーバーの RTMU 更新を確認)";
-            player.displayClientMessage(Component.literal("[RTMU] 既定車両を配置: " + detail), false);
         }
         if (def == null) {
             return InteractionResult.PASS;

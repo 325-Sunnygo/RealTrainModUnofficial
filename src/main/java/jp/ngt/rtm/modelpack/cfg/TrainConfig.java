@@ -10,6 +10,8 @@ import java.util.Arrays;
 public class TrainConfig {
     public String trainName = "";
     public String trainType = "EC";
+    /** 本家 ModelConfig.smoothing (NGTO Builder の renderStatic が getConfig().smoothing を読む)。 */
+    public boolean smoothing;
 
     public boolean muteJointSound;
     /**

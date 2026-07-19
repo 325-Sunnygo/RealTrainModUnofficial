@@ -112,6 +112,16 @@ public final class ClientHooks {
         invokeClient("toggleCamera", new Class<?>[]{});
     }
 
+    /** レンズを持って右クリック → そのレンズを装着 (id = CameraLens.id) */
+    public static void mountCameraLens(String lensId) {
+        invokeClient("mountCameraLens", new Class<?>[]{String.class}, lensId);
+    }
+
+    /** テレコンを持って右クリック → 装着 (id = Teleconverter.id) */
+    public static void attachTeleconverter(String tcId) {
+        invokeClient("attachTeleconverter", new Class<?>[]{String.class}, tcId);
+    }
+
     public static void stopCrossingGateSound(Level level, BlockPos pos) {
         invokeClient("stopCrossingGateSound", new Class<?>[]{Level.class, BlockPos.class}, level, pos);
     }
@@ -124,15 +134,39 @@ public final class ClientHooks {
         invokeClient("showScriptErrorMessage", new Class<?>[]{String.class}, message);
     }
 
+    //軽量化: 解決済み Class / Method をキャッシュする。踏切・スピーカー等の走行音つき設置物は
+    //tickCrossingGateSound を毎 client tick 通るため、その都度 Class.forName + getMethod (リフレクション
+    //走査) を回すのは無駄。このクラス内に「同名・別引数数」のメソッドは無いので name+引数数で一意にキー化できる。
+    private static volatile Class<?> hooksClass;
+    private static final java.util.Map<String, java.lang.reflect.Method> METHOD_CACHE =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
     private static void invokeClient(String methodName, Class<?>[] parameterTypes, Object... args) {
         if (FMLEnvironment.dist != Dist.CLIENT) {
             return;
         }
         try {
-            Class<?> hooks = Class.forName(CLIENT_HOOKS_CLASS);
-            hooks.getMethod(methodName, parameterTypes).invoke(null, args);
+            java.lang.reflect.Method method = resolveClientMethod(methodName, parameterTypes);
+            method.invoke(null, args);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.debug("Client hook {} failed", methodName, e);
         }
+    }
+
+    private static java.lang.reflect.Method resolveClientMethod(String methodName, Class<?>[] parameterTypes)
+            throws ReflectiveOperationException {
+        String key = methodName + "/" + parameterTypes.length;
+        java.lang.reflect.Method cached = METHOD_CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        Class<?> hooks = hooksClass;
+        if (hooks == null) {
+            hooks = Class.forName(CLIENT_HOOKS_CLASS);
+            hooksClass = hooks;
+        }
+        java.lang.reflect.Method method = hooks.getMethod(methodName, parameterTypes);
+        METHOD_CACHE.put(key, method);
+        return method;
     }
 }

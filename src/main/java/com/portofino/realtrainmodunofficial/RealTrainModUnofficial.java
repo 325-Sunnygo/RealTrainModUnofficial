@@ -83,6 +83,20 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.TICKET_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_BOOK_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CAMERA_ITEM.get());
+                //交換レンズ (広角→標準→望遠→超望遠→サンニッパ→撒き餌) とテレコン
+                output.accept(RealTrainModUnofficialItems.LENS_WIDE.get());
+                output.accept(RealTrainModUnofficialItems.LENS_STANDARD.get());
+                output.accept(RealTrainModUnofficialItems.LENS_TELE.get());
+                output.accept(RealTrainModUnofficialItems.LENS_SUPER_TELE.get());
+                output.accept(RealTrainModUnofficialItems.LENS_SANNI.get());
+                output.accept(RealTrainModUnofficialItems.LENS_NIFTY.get());
+                output.accept(RealTrainModUnofficialItems.TELECONVERTER_14.get());
+                output.accept(RealTrainModUnofficialItems.TELECONVERTER_20.get());
+                //リモコン: ブロック2つを無線レッドストーンでペアリング
+                output.accept(RealTrainModUnofficialItems.REMOTE_ITEM.get());
+                //乗客シミュレーション (統合): 駅ブロック / 停止位置目標
+                output.accept(com.portofino.rtmupassenger.PassengerMod.STATION_ITEM.get());
+                output.accept(com.portofino.rtmupassenger.PassengerMod.STOP_TARGET_ITEM.get());
             }).build());
 
     /**
@@ -141,6 +155,8 @@ public class RealTrainModUnofficial {
         RealTrainModUnofficialBlockEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         RealTrainModUnofficialComponents.REGISTRAR.register(modEventBus);
+        //乗客シミュレーション (旧・別 jar rtmupassenger を統合)。本体の名前空間で登録する。
+        com.portofino.rtmupassenger.PassengerMod.register(modEventBus);
         //WebCTC は別 mod (RTMU-WebCTC_1.21.1, webctc サブプロジェクト) へ分離した。
         // スピーカー音源マッピングをサーバー起動時にロードし、プレイヤー接続時に同期する。
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(

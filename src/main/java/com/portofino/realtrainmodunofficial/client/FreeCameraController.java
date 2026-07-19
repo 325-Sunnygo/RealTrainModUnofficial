@@ -190,6 +190,23 @@ public final class FreeCameraController {
     }
 
     /**
+     * フリーカメラ中は E キー等でインベントリを<b>開かせない</b> (ユーザー報告: フリーカメラなのに
+     * E でインベントリが開いてしまう)。飛び回っている最中に画面が開くと操作が奪われ没入も切れるため。
+     * ポーズメニュー (Esc) は脱出用に通す。
+     */
+    @SubscribeEvent
+    public static void onScreenOpening(net.neoforged.neoforge.client.event.ScreenEvent.Opening event) {
+        if (!active) {
+            return;
+        }
+        net.minecraft.client.gui.screens.Screen s = event.getNewScreen();
+        if (s instanceof net.minecraft.client.gui.screens.inventory.InventoryScreen
+                || s instanceof net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen) {
+            event.setCanceled(true);
+        }
+    }
+
+    /**
      * {@code Camera.setup()} 末尾で {@code CameraMixin} が呼ぶ、補間済みカメラ位置。
      * {@code ComputeCameraAngles} イベントは position 確定より前に発火し上書きされてしまうため、
      * 位置の上書きは setup() の TAIL (mixin) で行う。null ならフリーカメラ非アクティブ。

@@ -237,6 +237,19 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 jp.ngt.rtm.entity.npc.macro.MacroRecorder.recDoor(player,
                         jp.ngt.rtm.entity.train.util.TrainState.getState(doorType.id, next));
             }
+            //ドアカット: この運転車両の開扉をカットする (物理でドアを開けない)。
+            case "toggle_door_cut" -> {
+                var cutType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_DoorCut;
+                byte data = train.getTrainStateData(cutType.id);
+                train.setTrainStateData(cutType.id, (byte) (data == 0 ? 1 : 0));
+            }
+            //連結解除: value = 解除する台車側 (0/1)。運転台メニューのボタンから。
+            case "decouple_rtm" -> {
+                jp.ngt.rtm.entity.train.util.Formation formation = train.getFormation();
+                if (formation != null) {
+                    formation.onDisconnectedTrain(train, value == 0 ? 0 : 1);
+                }
+            }
             case "toggle_headlight" -> {
                 byte data = train.getTrainStateData(lightType.id);
                 train.setTrainStateData(lightType.id, (byte) (data == 0 ? 1 : 0));

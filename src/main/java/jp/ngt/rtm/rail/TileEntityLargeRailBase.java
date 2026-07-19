@@ -131,6 +131,21 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         return null;
     }
 
+    /**
+     * スクリプト互換オーバーロード: Baru's Pole (xx_s/xx_w) 等は world に
+     * {@code tileEntity.func_145831_w()} = {@link jp.ngt.mccompat.WorldCompat} を渡す。
+     * Level 版へアンラップして委譲する (Object で受けないと Nashorn のオーバーロード解決が失敗する)。
+     */
+    public static TileEntityLargeRailBase getRailFromCoordinates(Object world, double px, double py, double pz) {
+        Level level = null;
+        if (world instanceof Level l) {
+            level = l;
+        } else if (world instanceof jp.ngt.mccompat.WorldCompat wc) {
+            level = wc.getLevel();
+        }
+        return level == null ? null : getRailFromCoordinates(level, px, py, pz);
+    }
+
     public static TileEntityLargeRailBase getRailFromCoordinates(Level world, double px, double py, double pz) {
         int x = Mth.floor(px);
         int y = Mth.floor(py);

@@ -74,14 +74,15 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         Vec3 center = blockEntity.getRenderCenter();
         double cameraDistanceSq = cameraPos.distanceToSqr(center);
-        if (blockEntity.getCategory() == InstalledObjectCategory.WIRE) {
-            // ワイヤーはケーブル(ジオメトリ)だけを描く。中間に置いた設置物ブロックの定義モデル
-            // (鎖/コネクタ)は描画しない(真ん中に余計なモデルが出ないように)。
-            if (blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
-                renderWire(blockEntity, definition, poseStack, buffer, cameraDistanceSq, cameraPos, packedLight, packedOverlay);
+        // ワイヤー: wireStart/wireEnd があればケーブル(ジオメトリ)を描く。category==WIRE は本家どおり
+        // ケーブルのみ(中間の設置物モデルは出さない)。それ以外 — NGTO Builder の Wire ツールが碍子/ポールに
+        // 張った配線 — はケーブルを描いた上で本体モデルも続けて描く。
+        if (blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
+            renderWire(blockEntity, definition, poseStack, buffer, cameraDistanceSq, cameraPos, packedLight, packedOverlay);
+            if (blockEntity.getCategory() == InstalledObjectCategory.WIRE) {
+                ClientRenderProfiler.endInstalledObject(profilerStart);
+                return;
             }
-            ClientRenderProfiler.endInstalledObject(profilerStart);
-            return;
         }
         if (definition.getModelFile() != null && !definition.getModelFile().isBlank()) {
             MqoModelLoader.MqoModel model = MqoModelLoader.loadModelFromPack(

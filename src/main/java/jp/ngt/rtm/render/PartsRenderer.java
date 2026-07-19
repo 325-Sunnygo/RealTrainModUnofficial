@@ -258,6 +258,22 @@ public class PartsRenderer {
         }
     }
 
+    /**
+     * 本家 GLHelper.disableLighting/enableLighting をレンダラー経由で呼ぶスクリプト互換
+     * (E257 等: 室内灯で {@code setFullBright(); … renderer.enableLighting();})。
+     * enableLighting = 環境光へ復帰 (brightness 負値 = 再生側が packedLight に戻す)。
+     */
+    public void disableLighting() {
+        //フルブライト化はスクリプトが直後に setBrightness/setLightmapMaxBrightness で行う
+    }
+
+    public void enableLighting() {
+        GLRecorder r = GLRecorder.active();
+        if (r != null) {
+            r.brightness(-1);
+        }
+    }
+
     public Level getWorld(Object tile) {
         if (tile instanceof BlockEntity be) {
             return be.getLevel();

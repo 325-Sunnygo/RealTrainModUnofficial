@@ -35,6 +35,12 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
 
     @Override
     public boolean shouldRender(EntityTrain entity, Frustum frustum, double camX, double camY, double camZ) {
+        //軽量化: 車両描画距離が有効なら、それより遠い車両は描画しない (最大負荷=毎フレーム
+        //スクリプト実行を丸ごと省く)。既定 0 = 無制限 = バニラどおり。
+        if (com.portofino.realtrainmodunofficial.RtmuSettings.beyondVehicleRenderDistance(
+                entity.getX(), entity.getY(), entity.getZ(), camX, camY, camZ)) {
+            return false;
+        }
         double half = Math.max(3.0D, entity.getConfig().trainDistance + 3.0D);
         AABB bounds = new AABB(
                 entity.getX() - half, entity.getY() - 2.0D, entity.getZ() - half,

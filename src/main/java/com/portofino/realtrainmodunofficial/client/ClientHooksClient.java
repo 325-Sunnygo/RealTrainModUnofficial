@@ -125,6 +125,18 @@ public final class ClientHooksClient {
         com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.toggle();
     }
 
+    /** レンズを持って右クリック → 装着。 */
+    public static void mountCameraLens(String lensId) {
+        com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.mountLens(
+            com.portofino.realtrainmodunofficial.client.camera.CameraLens.forId(lensId));
+    }
+
+    /** テレコンを持って右クリック → 装着。 */
+    public static void attachTeleconverter(String tcId) {
+        com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.attachTeleconverter(
+            com.portofino.realtrainmodunofficial.client.camera.Teleconverter.forId(tcId));
+    }
+
     /** 券売機 (本家 GuiTicketVendor): 切符 / 回数券 の2ボタン */
     public static void openTicketVendorScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(

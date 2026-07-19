@@ -24,8 +24,6 @@ import java.util.UUID;
  */
 public final class RtmuAutoRail {
 
-    /** レベル 1〜5 → height byte (0/16〜15/16 ブロック相当)。 */
-    private static final byte[] HEIGHT_BY_LEVEL = {0, 3, 7, 11, 15};
     /** カント最大値 (度)。 */
     private static final float MAX_CANT = 8.0F;
 
@@ -142,9 +140,9 @@ public final class RtmuAutoRail {
         //分岐 (3点以上) のカントは扱いが複雑なので自動カントは 2 点レールのみ対象とする。
     }
 
+    /** level (1〜16) → レール高さ byte (0〜15)。0=OFF は呼び出し側で弾く。任意の高さ (9,10 等) が指定可能。 */
     private static byte heightForLevel(int level) {
-        int idx = Math.max(1, Math.min(5, level)) - 1;
-        return HEIGHT_BY_LEVEL[idx];
+        return (byte) (Math.max(1, Math.min(16, level)) - 1);
     }
 
     /**

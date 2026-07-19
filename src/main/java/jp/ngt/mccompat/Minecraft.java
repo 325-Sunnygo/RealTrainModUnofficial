@@ -15,6 +15,35 @@ public final class Minecraft {
     public PlayerCompat field_71439_g;
     /** theWorld (SRG)。refresh() で更新。 */
     public WorldCompat field_71441_e;
+    /**
+     * entityRenderer (SRG)。500 系等の ForceLighting が
+     * {@code func_78483_a(0.0)} (disableLightmap) / {@code func_78463_b(0.0)} (enableLightmap) を呼ぶ。
+     * disable は no-op (直後の setLightmapMaxBrightness が全灯にする)、enable は環境光へ復帰。
+     */
+    public final EntityRendererCompat field_71460_t = new EntityRendererCompat();
+
+    public static final class EntityRendererCompat {
+        /** 1.7.10 disableLightmap */
+        public void func_78483_a(double partialTicks) {
+        }
+
+        /** 1.7.10 enableLightmap → 環境光へ復帰 (brightness 負値 = 再生側が packedLight に戻す) */
+        public void func_78463_b(double partialTicks) {
+            jp.ngt.ngtlib.renderer.GLRecorder r = jp.ngt.ngtlib.renderer.GLRecorder.active();
+            if (r != null) {
+                r.brightness(-1);
+            }
+        }
+
+        /** 1.12 disableLightmap */
+        public void func_175072_h() {
+        }
+
+        /** 1.12 enableLightmap */
+        public void func_180436_i() {
+            func_78463_b(0.0D);
+        }
+    }
 
     private Minecraft() {
     }

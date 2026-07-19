@@ -38,12 +38,12 @@ public class RealTrainModUnofficialClient {
         RtmuSettings.load();
     }
 
-    /** ワールド入室時に RTMU 設定をサーバーへ同期 (敷設時にサーバーが参照するため)。 */
+    /** ワールド入室時に RTMU 設定をサーバーへ同期 (敷設時・乗客上限でサーバーが参照するため)。 */
     @SubscribeEvent
     static void onLoggingIn(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingIn event) {
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
             new com.portofino.realtrainmodunofficial.network.RtmuSettingsPayload(
-                RtmuSettings.autoCant, RtmuSettings.autoHeightLevel));
+                RtmuSettings.autoCant, RtmuSettings.autoHeightLevel, RtmuSettings.maxPassengers));
     }
 
     /**

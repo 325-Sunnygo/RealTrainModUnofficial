@@ -47,3 +47,6 @@ __pycache__
 # build logs (may contain local paths)
 build_err.txt
 *.log
+
+# 乗客simは本体へ統合済み。旧サブプロジェクトはコミットしない
+passenger/

@@ -39,9 +39,42 @@ public final class RailMeshCache {
      */
     private static final int MAX_ENTRIES = 512;
 
+    /**
+     * 1 フレームあたりに新規/再焼き込みするレールの上限。<b>スパイク対策の要。</b>
+     * <p>
+     * 駅・車両基地に入るとチャンクロードで多数のレールが一斉に初回焼き込みされ、
+     * 1 フレームに集中して「レール負荷が普通 10 なのに時々 190」というスタッタになる
+     * (焼き込みは約 2.8ms/本)。ここで 1 フレームの焼き込みを N 本までに制限し、
+     * 残りは次フレーム以降へ回す。<b>最終的な見た目は同じ</b>で、初回だけ数フレーム遅れて
+     * 出る (再焼き待ちは古いメッシュをそのまま描くので不可視にならない)。
+     */
+    private static final int MAX_BAKES_PER_FRAME = 8;
+
+    private static int bakesThisFrame;
+
+    /**
+     * 同一レールを再焼き込みする最短フレーム間隔。<b>クロスポイント等の churn 対策。</b>
+     * <p>
+     * variant (トング位置) は 8 段階に量子化済みだが、量子化の境界でトングが揺れると
+     * variant が毎tick変わり得る。そのまま焼き直すと「静止して見えるのに毎tick再焼き込みされて
+     * 重い」(bake が下がらない) 状態になる。variant/light の変化による焼き直しは、直近に焼いて
+     * から最低このフレーム数は見送り、古いメッシュを描く。強制再焼き (パック再読込・モデル差替) は
+     * 対象外。実アニメは量子化で 8 段階なので、この間隔では見た目が変わらない。
+     */
+    private static final int REBAKE_MIN_FRAMES = 8;
+
+    /** 毎フレーム +1 される描画フレーム番号 (再焼き間隔の判定用)。 */
+    private static int frameCounter;
+
     private static final Map<BlockPos, RailMesh> CACHE = new LinkedHashMap<>(64, 0.75F, true);
 
     private static Level lastLevel;
+
+    /** 毎フレーム先頭 (RailDrawQueue.flush 前) に呼ぶ。焼き込み枠をリセットし、フレーム番号を進める。 */
+    public static void beginFrame() {
+        bakesThisFrame = 0;
+        frameCounter++;
+    }
 
     private RailMeshCache() {
     }
@@ -50,7 +83,7 @@ public final class RailMeshCache {
      * @param variant 同じレールでも見た目が変わる要因 (分岐の開通方向など)。変われば焼き直す。
      */
     private record RailMesh(List<MeshCapture.Section> sections, MqoModelLoader.MqoModel model,
-                            int light, long variant) {
+                            int light, long variant, int bakeFrame) {
         void close() {
             for (MeshCapture.Section section : sections) {
                 section.close();
@@ -116,23 +149,46 @@ public final class RailMeshCache {
         dropIfLevelChanged();
 
         RailMesh mesh = CACHE.get(pos);
-        //モデルが差し替わった (パック再読込 / キャッシュ追い出し) 場合、ライト値が変わった
-        //(頂点にライトを焼いているため) 場合、見た目の要因が変わった場合も焼き直す。
-        if (forceRebuild || mesh == null || mesh.model() != model
-                || mesh.light() != packedLight || mesh.variant() != variant) {
-            RailMesh old = CACHE.remove(pos);
-            if (old != null) {
-                old.close();
+        //必ず焼く要因: 強制再焼き (パック再読込)・未焼き・モデル差替。
+        boolean mustBake = forceRebuild || mesh == null || mesh.model() != model;
+        //任意で焼く要因: ライト or 見た目 (variant=トング位置) が変わった。
+        boolean optionalBake = !mustBake && (mesh.light() != packedLight || mesh.variant() != variant);
+        //churn 対策: 任意再焼きは、直近に焼いてから REBAKE_MIN_FRAMES 経つまで見送り、古いメッシュを
+        //描く。量子化の境界でトングが揺れて variant が毎tick変わっても、再焼きは間隔内に制限される
+        //(静止して見えるクロスポイントが再焼きされ続けて重い、を解消)。見た目は最大数フレーム古いだけ。
+        if (optionalBake && (frameCounter - mesh.bakeFrame()) < REBAKE_MIN_FRAMES) {
+            optionalBake = false;
+        }
+        boolean needsBake = mustBake || optionalBake;
+        if (needsBake) {
+            if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
+                //★スパイク対策: このフレームの焼き込み枠を使い切った → 次フレームへ回す。
+                if (mesh != null) {
+                    //再焼き待ち: 古いメッシュをそのまま描く (光/形が最大数フレーム古いだけ・
+                    //不可視にはしない)。needsBake は次フレームも真なので枠が空き次第焼き直る。
+                    // (下の描画へフォールスルー)
+                } else {
+                    //初回焼き待ち: まだ焼けていない。逐次描画に落とすと結局スパイクするので、
+                    //ここは「描かない」で次フレームへ回す (数フレームで焼けて出る = 分散)。
+                    //true を返すと呼び出し側は逐次描画フォールバックをしない。
+                    return true;
+                }
+            } else {
+                RailMesh old = CACHE.remove(pos);
+                if (old != null) {
+                    old.close();
+                }
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailBake();
+                bakesThisFrame++;
+                mesh = bake(baker, model, packedLight, variant);
+                if (mesh == null) {
+                    //頂点数が上限超え等で焼けなかった → 毎フレーム逐次描画に落ちる (重い)
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
+                    return false;
+                }
+                CACHE.put(pos, mesh);
+                trim();
             }
-            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailBake();
-            mesh = bake(baker, model, packedLight, variant);
-            if (mesh == null) {
-                //頂点数が上限超え等で焼けなかった → 毎フレーム逐次描画に落ちる (重い)
-                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
-                return false;
-            }
-            CACHE.put(pos, mesh);
-            trim();
         }
 
         for (MeshCapture.Section section : mesh.sections()) {
@@ -182,7 +238,7 @@ public final class RailMeshCache {
             if (sections.isEmpty()) {
                 return null;
             }
-            return new RailMesh(sections, model, packedLight, variant);
+            return new RailMesh(sections, model, packedLight, variant, frameCounter);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Rail mesh upload failed", t);
             return null;

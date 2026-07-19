@@ -35,4 +35,49 @@ public final class ModelPackManager {
         byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path);
         return bytes != null ? new String(bytes, java.nio.charset.StandardCharsets.UTF_8) : null;
     }
+
+    /**
+     * 本家 getModelSet(type, name)。NGTO Builder の Wire ツールが
+     * {@code getModelSet("ModelConnector", modelName).getConfig().wirePos} で碍子の電線取付点を読む
+     * (null ガード無しで参照するため、見つからなくても既定 wirePos を返す非 null が必須)。
+     */
+    public ModelSetShim getModelSet(String type, String name) {
+        com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def =
+            com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry.getByBareName(
+                name, com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.INSULATOR);
+        return new ModelSetShim(def);
+    }
+
+    /** getModelSet の戻り値: getConfig().wirePos (double[3]) と getConfig().getName() を提供。 */
+    public static final class ModelSetShim {
+        private final ConfigShim config;
+
+        ModelSetShim(com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def) {
+            this.config = new ConfigShim(def);
+        }
+
+        public ConfigShim getConfig() {
+            return config;
+        }
+    }
+
+    public static final class ConfigShim {
+        /** 本家 ConnectorConfig.wirePos ([x,y,z])。スクリプトが直接 index 参照する。 */
+        public final double[] wirePos;
+        private final String name;
+
+        ConfigShim(com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def) {
+            if (def != null && def.getWireAttachPos() != null) {
+                net.minecraft.world.phys.Vec3 wp = def.getWireAttachPos();
+                this.wirePos = new double[]{wp.x, wp.y, wp.z};
+            } else {
+                this.wirePos = new double[]{0.0D, -0.5D, 0.0D};  //本家の既定 (モデル無し碍子)
+            }
+            this.name = def == null ? "" : def.getBareName();
+        }
+
+        public String getName() {
+            return name;
+        }
+    }
 }

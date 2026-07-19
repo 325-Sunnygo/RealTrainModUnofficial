@@ -143,6 +143,12 @@ public class RtmTrainControlScreen extends Screen {
                 addRenderableWidget(Button.builder(Component.literal(text), b -> send("cycle_custom_button", packed))
                         .bounds(x, y, 52, 22).build());
             }
+        } else if (selectedTab == ControlTab.DEDICATED) {
+            //専用タブ: 内容は募集中。押しても何も起きないプレースホルダボタンだけ置く。
+            addRenderableWidget(Button.builder(
+                    Component.literal("このタブのアイデア募集"),
+                    b -> { /* 何もしない */ })
+                    .bounds(left + 8, top + 8, PANEL_W - 16, 20).build());
         }
         addRenderableWidget(new DoorButton(left + PANEL_W + 20, top + 20, false));
         addRenderableWidget(new DoorButton(left - 84, top + 20, true));
@@ -368,12 +374,33 @@ public class RtmTrainControlScreen extends Screen {
         if (selectedTab != ControlTab.FORMATION) {
             return;
         }
-        //TODO PacketFormation 移植後に編成全体を表示
-        VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
-        String name = def == null ? train.getModelName() : def.getDisplayName();
-        graphics.drawString(font, Component.literal("編成"), left + 8, top + 10, 0x404040, false);
-        graphics.renderFakeItem(new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get()), left + 10, top + 26);
-        graphics.drawString(font, Component.literal("1  " + name), left + 30, top + 30, 0x404040, false);
+        //本家 GuiVehicleControlPanel の編成タブ移植: 連結中の各車両を tab_formation.png の
+        //車両スプライトで並べる。u=制御車で右へ+32、v=先頭(0)/中間(1)/最後尾(2)、5両で改行。
+        jp.ngt.rtm.entity.train.util.Formation formation = train.getFormation();
+        int size = formation == null ? 0 : formation.size();
+        if (size <= 0) {
+            graphics.drawString(font, Component.literal("編成情報なし"), left + 8, top + 10, 0x404040, false);
+            return;
+        }
+        graphics.drawString(font, Component.literal(size + "両編成"), left + 8, top + 8, 0x404040, false);
+        for (int i = 0; i < size; i++) {
+            jp.ngt.rtm.entity.train.util.FormationEntry entry = formation.get(i);
+            if (entry == null || entry.train == null) {
+                continue;
+            }
+            int u = entry.train.isControlCar() ? 1 : 0;
+            int v = (i == 0) ? 0 : (i == size - 1 ? 2 : 1);
+            int x = left + 8 + (i % 5) * 32;
+            int y = top + 25 + (i / 5) * 32;
+            graphics.blit(TAB_FORMATION_TEXTURE, x, y, 192 + u * 32, v * 16, 32, 16, 256, 256);
+            //自分が乗っている(=このメニューを開いた)車両に「ここにいる」マーカー。
+            if (entry.train == train) {
+                graphics.blit(TAB_FORMATION_TEXTURE, x + 12, y - 16, 180, 0, 10, 16, 256, 256);
+            }
+            //号車番号を中央に。
+            String num = String.valueOf(entry.entryId + 1);
+            graphics.drawString(font, num, x + 16 - font.width(num) / 2, y + 4, 0x000000, false);
+        }
     }
 
     private void renderPlayerInventory(GuiGraphics graphics, int left, int top) {
@@ -459,11 +486,14 @@ public class RtmTrainControlScreen extends Screen {
     //タブのアイコン (左から順に並ぶ)。アイテムのテクスチャ自体は本家 RTM と同一なので
     //触らない (入れ替えるとインベントリ内の全アイテムの見た目が変わってしまう)。
     //ここで持たせるアイテムだけを差し替えて、タブの絵柄を変える。
+    //タブ並び順 (左→右): チェスト・バール・レンチ・列車・専用。
     private enum ControlTab {
+        INVENTORY(TAB_INVENTORY_TEXTURE, new ItemStack(Blocks.CHEST)),
         SETTING(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.CROWBAR_ITEM.get())),
         FUNCTION(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.WRENCH_ITEM.get())),
         FORMATION(TAB_FORMATION_TEXTURE, new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get())),
-        INVENTORY(TAB_INVENTORY_TEXTURE, new ItemStack(Blocks.CHEST));
+        //専用タブ: ドアカット・連結解除など運転士の追加操作。アイコンは鉄ドア (ドアカット由来)。
+        DEDICATED(TAB_SETTING_TEXTURE, new ItemStack(net.minecraft.world.item.Items.IRON_DOOR));
 
         final ResourceLocation background;
         final ItemStack icon;
