@@ -122,6 +122,11 @@ public final class ClientHooks {
         invokeClient("attachTeleconverter", new Class<?>[]{String.class}, tcId);
     }
 
+    /** 駅ブロック右クリック → 現在のタグを添えて駅設定 GUI を開く (client のみ)。 */
+    public static void openStationScreen(BlockPos pos, int bits) {
+        invokeClient("openStationScreen", new Class<?>[]{BlockPos.class, int.class}, pos, bits);
+    }
+
     public static void stopCrossingGateSound(Level level, BlockPos pos) {
         invokeClient("stopCrossingGateSound", new Class<?>[]{Level.class, BlockPos.class}, level, pos);
     }

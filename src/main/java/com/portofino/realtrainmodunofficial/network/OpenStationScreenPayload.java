@@ -29,8 +29,10 @@ public record OpenStationScreenPayload(BlockPos pos, int bits) implements Custom
     }
 
     public static void handleOnClient(OpenStationScreenPayload payload, IPayloadContext context) {
+        //★クライアント専用クラス (Screen) をこのクラスから直接参照すると、専用サーバーでの
+        //  playToClient 登録時に Screen のロードが試みられてクラッシュする。ClientHooks (リフレクションで
+        //  クライアント側だけロード) を経由して隔離する。
         context.enqueueWork(() ->
-            net.minecraft.client.Minecraft.getInstance().setScreen(
-                new com.portofino.rtmupassenger.client.StationScreen(payload.pos(), payload.bits())));
+            com.portofino.realtrainmodunofficial.ClientHooks.openStationScreen(payload.pos(), payload.bits()));
     }
 }

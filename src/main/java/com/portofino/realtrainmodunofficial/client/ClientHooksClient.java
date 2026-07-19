@@ -137,6 +137,12 @@ public final class ClientHooksClient {
             com.portofino.realtrainmodunofficial.client.camera.Teleconverter.forId(tcId));
     }
 
+    /** 駅設定 GUI を開く (現在のタグビット付き)。 */
+    public static void openStationScreen(net.minecraft.core.BlockPos pos, int bits) {
+        Minecraft.getInstance().setScreen(
+            new com.portofino.rtmupassenger.client.StationScreen(pos, bits));
+    }
+
     /** 券売機 (本家 GuiTicketVendor): 切符 / 回数券 の2ボタン */
     public static void openTicketVendorScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(
