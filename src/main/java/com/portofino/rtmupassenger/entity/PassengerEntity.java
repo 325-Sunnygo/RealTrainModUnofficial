@@ -149,12 +149,6 @@ public class PassengerEntity extends PathfinderMob {
         this.boardDoorLocal = this.waitSpot == null ? null
                 : TrainDoorLocator.nearestDoorLocal(train,
                         this.waitSpot.getX() + 0.5D, this.waitSpot.getZ() + 0.5D);
-        com.portofino.rtmupassenger.PassengerMod.LOGGER.info(
-                "[PsgDiag] beginBoarding id={} stopTarget={} door={} pos=({},{},{})",
-                this.getId(), this.waitSpot,
-                this.boardDoorLocal == null ? "none(fallback)"
-                        : String.format("local[%.2f,%.2f,%.2f]", this.boardDoorLocal[0], this.boardDoorLocal[1], this.boardDoorLocal[2]),
-                (int) this.getX(), (int) this.getY(), (int) this.getZ());
     }
 
     /**
@@ -438,14 +432,9 @@ public class PassengerEntity extends PathfinderMob {
             this.interiorStart = this.tickCount;
             this.setInteriorMode(true);
             this.state = State.ENTERING;
-            com.portofino.rtmupassenger.PassengerMod.LOGGER.info(
-                    "[PsgDiag] reached door -> ENTERING id={} seat=[{},{},{}]",
-                    this.getId(), seat[0], seat[1], seat[2]);
             return;
         }
         //満席: 待機に戻す
-        com.portofino.rtmupassenger.PassengerMod.LOGGER.info(
-                "[PsgDiag] reached door but NO FREE SEAT id={} -> WAITING", this.getId());
         this.targetTrain = null;
         this.state = State.WAITING;
     }
@@ -511,11 +500,7 @@ public class PassengerEntity extends PathfinderMob {
                 this.state = State.RIDING;
                 this.targetTrain = null;
                 this.walkStage = 0;
-                com.portofino.rtmupassenger.PassengerMod.LOGGER.info(
-                        "[PsgDiag] MOUNTED id={} (boarded ok)", this.getId());
             } else {
-                com.portofino.rtmupassenger.PassengerMod.LOGGER.info(
-                        "[PsgDiag] mount FAILED id={} -> discard", this.getId());
                 this.discard(); //満席で座れなかった (稀)
             }
         }

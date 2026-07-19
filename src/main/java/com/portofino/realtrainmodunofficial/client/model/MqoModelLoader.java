@@ -3984,7 +3984,7 @@ public final class MqoModelLoader {
                         Object renderType = engine.eval("typeof render");
                         hasLegacyRenderFunction = "function".equals(renderType)
                             || (renderType != null && "function".equals(renderType.toString()));
-                        RealTrainModUnofficial.LOGGER.info(
+                        RealTrainModUnofficial.LOGGER.debug(
                             "[ScriptDiag] hasRenderFn={} typeofRender={}",
                             hasLegacyRenderFunction, renderType);
                     }

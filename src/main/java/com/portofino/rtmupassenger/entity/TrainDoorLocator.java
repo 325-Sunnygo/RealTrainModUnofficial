@@ -72,8 +72,6 @@ public final class TrainDoorLocator {
         try {
             VehicleDefinition def = VehicleRegistry.getById(id);
             if (def == null) {
-                com.portofino.rtmupassenger.PassengerMod.LOGGER.info(
-                        "[PsgDiag] door detect: NO DEF for id='{}'", id);
                 return NONE;
             }
             List<VehicleDefinition.DoorAnimationDefinition> doors = new ArrayList<>();
@@ -85,18 +83,14 @@ public final class TrainDoorLocator {
             }
             PolygonModel model = loadModel(def);
             if (model == null || model.groupObjects == null || model.groupObjects.isEmpty()) {
-                com.portofino.rtmupassenger.PassengerMod.LOGGER.info(
-                        "[PsgDiag] door detect: model NOT LOADED for '{}' (file={}, doors defined={})",
-                        id, def.getModelFile(), doors.size());
                 return NONE;
             }
             Vec3 off = def.getModelOffset();
             float scale = def.getModelScale();
-            List<float[]> result = new ArrayList<>();
-            String source;
+            List<float[]> result;
             if (!doors.isEmpty()) {
                 //JSON にドア定義がある車両: そのドアグループ (objects) の重心を使う (正確)。
-                source = "json";
+                result = new ArrayList<>();
                 for (VehicleDefinition.DoorAnimationDefinition door : doors) {
                     float[] c = centroidOfGroups(model, door.objects());
                     if (c != null) {
@@ -105,16 +99,10 @@ public final class TrainDoorLocator {
                 }
             } else {
                 //スクリプト制御でドア定義が無い車両 (E257 等): モデルから「ドア」グループを名前で探す。
-                source = "model-scan";
                 result = scanDoorsFromModel(model, off, scale);
             }
-            com.portofino.rtmupassenger.PassengerMod.LOGGER.info(
-                    "[PsgDiag] door detection for '{}': {} doors found (source={}, model={})",
-                    id, result.size(), source, def.getModelFile());
             return result.isEmpty() ? NONE : List.copyOf(result);
         } catch (Throwable t) {
-            com.portofino.rtmupassenger.PassengerMod.LOGGER.info(
-                    "[PsgDiag] door detection FAILED for '{}': {}", id, String.valueOf(t));
             return NONE;
         }
     }

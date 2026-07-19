@@ -116,7 +116,7 @@ public final class McteuMiniatureBridge {
     private static final java.util.Set<String> DIAG_SEEN = ConcurrentHashMap.newKeySet();
 
     private static void diag(String msg) {
-        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info("[McteuDiag] {}", msg);
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug("[McteuDiag] {}", msg);
     }
 
     /** MCTEU の {@code MiniatureData} を RTMU の NGTObject NBT へ変換する。 */

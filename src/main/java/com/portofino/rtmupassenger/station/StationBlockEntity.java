@@ -130,10 +130,6 @@ public class StationBlockEntity extends BlockEntity {
                 fronts.put(p.getWaitSpot(), p);
             }
         }
-        if (!fronts.isEmpty()) {
-            PassengerMod.LOGGER.info("[PsgDiag] boardable train found at station {} — fronts={} boarding={}",
-                    this.worldPosition, fronts.size(), boarding.size());
-        }
         for (Map.Entry<BlockPos, PassengerEntity> e : fronts.entrySet()) {
             if (boarding.contains(e.getKey())) {
                 continue; //その停止位置目標は今 1 人乗り込み中 → 次は着席後
@@ -202,8 +198,6 @@ public class StationBlockEntity extends BlockEntity {
         level.addFreshEntity(p);
         //総数へ登録 (本当に消えた時に PassengerEntity.remove が解除する)
         PassengerPopulation.get(level).add(p.getUUID());
-        PassengerMod.LOGGER.info("[PsgDiag] spawned id={} at door={} dest={} (total={})",
-                p.getId(), waitSpot, dest, PassengerPopulation.get(level).size());
     }
 
     /** ブロック破壊時: 駅登録を解除する。 */
