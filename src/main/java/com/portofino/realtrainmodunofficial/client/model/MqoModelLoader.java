@@ -1351,6 +1351,7 @@ public final class MqoModelLoader {
             b.baseColorB = colB;
             b.glassTranslucent = textureInfo.hasGlassBand;
             b.texHasTranslucentPixels = textureInfo.hasAnyTranslucentPixel;
+            b.pass1Mask = textureInfo.pass1Mask;
             b.opaqueTexture = textureInfo.opaqueLocation;
             b.windowTexture = textureInfo.windowLocation;
             return b;
@@ -2084,6 +2085,52 @@ public final class MqoModelLoader {
         return false;
     }
 
+    /** pass1 マスクの解像度 (縦横)。粗くてよい: 判定は面の UV 範囲を「含むか」だけ。 */
+    private static final int PASS1_MASK_RES = 128;
+
+    //※小バッチをバッファ経路へ回す案は<b>実測で悪化した</b>ため不採用 (2026-07-20)。
+    //  VBO 経路: 提出ごとに即 GL 描画 → body_main で 313 回/frame。Train 5.14ms/両。
+    //  バッファ経路: まとめて 1 回描くが<b>頂点ごとに CPU で行列変換</b>する →
+    //    15,024 頂点/frame の変換コストが上回り Train 6.85ms/両 へ悪化。
+    //  同じ形状を多数の異なる行列で描く形なので、根本解決にはインスタンシング相当の
+    //  仕組み (同一バッチの複数変換を 1 回の描画にまとめる) が要る。
+
+    /**
+     * pass1 (半透明パス) で実際に色が出るテクセル ({@code 0 < α < 255}) の粗いマスクを作る。
+     *
+     * <p>pass1 は windowTexture (完全不透明な画素を抜いたもの) で描くため、ここが false の
+     * 領域しか踏まない面は<b>頂点を流しても 1 ピクセルも描かれない</b>。その面を pass1 の提出から
+     * 外すことで、見た目を一切変えずに CPU の頂点提出を減らせる。
+     *
+     * <p>マスクは {@link #PASS1_MASK_RES} 角へ縮小して持つ。1 マスに 1 つでも該当テクセルが
+     * あれば true にする (<b>安全側=過大評価</b>。取りこぼして面が消えるより、余分に描くほうが良い)。
+     */
+    private static java.util.BitSet buildPass1Mask(com.mojang.blaze3d.platform.NativeImage img) {
+        try {
+            if (img.format() != com.mojang.blaze3d.platform.NativeImage.Format.RGBA) {
+                return null;
+            }
+            int w = img.getWidth();
+            int h = img.getHeight();
+            if (w <= 0 || h <= 0) {
+                return null;
+            }
+            java.util.BitSet mask = new java.util.BitSet(PASS1_MASK_RES * PASS1_MASK_RES);
+            for (int y = 0; y < h; y++) {
+                int my = y * PASS1_MASK_RES / h;
+                for (int x = 0; x < w; x++) {
+                    int a = (img.getPixelRGBA(x, y) >>> 24) & 0xFF;
+                    if (a > 0x00 && a < 0xFF) {
+                        mask.set(my * PASS1_MASK_RES + (x * PASS1_MASK_RES / w));
+                    }
+                }
+            }
+            return mask.isEmpty() ? null : mask;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
     /**
      * 明確な「ガラス帯」を持つか。alpha 32..224 の中間アルファ(本当に透けるガラス/煙等)が
      * 一定割合(1.5%)以上あれば true。AA 縁の薄い勾配だけ(SL車体の二値カットアウト)は
@@ -2257,6 +2304,8 @@ public final class MqoModelLoader {
                 TextureInfo info = new TextureInfo(baseLoc, resolveLegacyLightTextures(binding, opener), alphaBlendOption || partialAlpha || glassBand, partialAlpha, glassBand, opaqueLoc, windowLoc);
                 //割合判定 (3%/1.5%) は運転席窓のような小さなガラス領域を見逃すため、正確な全画素判定で上書き
                 info.hasAnyTranslucentPixel = hasAnyTranslucentPixel(img);
+                //pass1 で実際に色が出るテクセルの位置。面ごとの提出要否をこれで判定する。
+                info.pass1Mask = buildPass1Mask(img);
                 return info;
             }
         } catch (Exception e) {
@@ -2367,7 +2416,15 @@ public final class MqoModelLoader {
         return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) && path.charAt(1) == ':';
     }
 
-    private static boolean shouldCullModelFaces(Object entity) {
+    private static boolean shouldCullModelFaces(Object rawEntity) {
+        //★replay 経路 (スクリプト車両の通常経路) では scriptRenderer が null になるため、
+        //  ここへ entity が null で渡る。そのまま下の「既定 = 両面」に落ちると、doCulling=true の
+        //  パックの内装まで両面描画になり、裏面が表面と同じ位置に描かれて<b>ポリゴンが二重に
+        //  見える</b> (ユーザー報告)。描画中の車両を代わりに使って doCulling を正しく引く。
+        //  ※既定を true→false にしたのは架線/踏切が裏から消える修正 (W51 架線・Hi03 踏切)。
+        //    既定自体は本家どおりで正しいので戻さない。null の穴だけを塞ぐ。
+        Object entity = rawEntity != null ? rawEntity
+            : com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.currentVehicle();
         if (entity instanceof TrainEntity train) {
             VehicleDefinition def = VehicleRegistry.getById(train.getVehicleId());
             return def != null && def.isDoCulling();
@@ -2767,6 +2824,17 @@ public final class MqoModelLoader {
          * hasPartialAlpha||hasGlassBand だが、registerTextureFromZip が正確な値で上書きする。
          */
         boolean hasAnyTranslucentPixel;
+        /**
+         * pass1 (半透明パス) で<b>実際に色が出る</b>テクセルの粗いマスク ({@link #PASS1_MASK_RES} 角)。
+         *
+         * <p>pass1 は windowTexture (= 完全不透明な画素を抜いたもの) で描くので、色が出るのは
+         * {@code 0 < α < 255} のテクセルだけ。ここを踏まない面は<b>頂点を流しても 1 ピクセルも
+         * 描かれない</b>。E259 の車体/内装がまさにこれで、17,652 頂点/frame を毎フレーム CPU が
+         * 提出していた (窓は面のごく一部)。面ごとに UV 範囲を引いて事前に振り分けるために使う。
+         *
+         * <p>null = 判定不能 (安全側に倒して全面を描く)。
+         */
+        java.util.BitSet pass1Mask;
 
         TextureInfo(ResourceLocation location, ResourceLocation[] emissiveTextures, boolean isTranslucent) {
             this(location, emissiveTextures, isTranslucent, false, false, location, location);
@@ -3023,6 +3091,8 @@ public final class MqoModelLoader {
         boolean glassTranslucent = false;
         /** テクスチャに中間アルファのピクセル (ガラス帯/網等) があるか。無ければ pass1 は描く物が無い。 */
         boolean texHasTranslucentPixels = false;
+        /** pass1 で色が出るテクセルの粗いマスク ({@link MqoModelLoader#buildPass1Mask})。 */
+        java.util.BitSet pass1Mask = null;
         /**
          * depthBias 押し出し用の頂点法線 (頂点ごと3要素、正規化済み)。同位置の全面の平均
          * (facet 閾値なし) なので、同じ位置の頂点は必ず同方向へ動き、押し出しで面が割れない。
@@ -3097,6 +3167,7 @@ public final class MqoModelLoader {
             built.baseColorB = baseColorB;
             built.glassTranslucent = glassTranslucent;
             built.texHasTranslucentPixels = texHasTranslucentPixels;
+            built.pass1Mask = pass1Mask;
             built.biasNormals = biasNormals;
             built.opaqueTexture = opaqueTexture != null ? opaqueTexture : texture;
             built.windowTexture = windowTexture != null ? windowTexture : texture;
@@ -3623,6 +3694,7 @@ public final class MqoModelLoader {
             if (normalizedGroupNames == null || normalizedGroupNames.isEmpty()) {
                 return;
             }
+            long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
             List<Batch> ordered = renderListCache.get(normalizedGroupNames);
             if (ordered == null) {
                 Set<Batch> selected = new LinkedHashSet<>();
@@ -3641,6 +3713,8 @@ public final class MqoModelLoader {
                 renderListCache.put(normalizedGroupNames, ordered);
             }
             if (ordered.isEmpty()) {
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GROUPS, secStart);
                 return;
             }
             Object entity = scriptRenderer != null ? scriptRenderer.getCurrentEntity() : null;
@@ -3662,6 +3736,8 @@ public final class MqoModelLoader {
                 };
             renderSelectedBatches(ordered, poseStack, buffer, packedLight, overlay, translucent,
                 exclusionFilter, null, scriptRenderer, entity, fullbright);
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GROUPS, secStart);
         }
 
         // (Set インスタンス → ソート済み Batch リスト) を IdentityHashMap でキャッシュ。
@@ -3690,6 +3766,7 @@ public final class MqoModelLoader {
             if (normalizedGroupNames == null || normalizedGroupNames.isEmpty() || legacyPass < 2) {
                 return;
             }
+            long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
             // 本家 RenderVehicleBase: i > 0 (前照灯/尾灯) のみ disableLighting + setLightmapMaxBrightness
             // + blend(SRC_ALPHA, ONE_MINUS_SRC_ALPHA) + glColor4f(1,1,1,0.8)。
             // i == 0 (LIGHT) は通常のライティングのまま不透明で描く単なるテクスチャ差し替え。
@@ -3776,6 +3853,8 @@ public final class MqoModelLoader {
                     }
                 }
             }
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GROUPS, secStart);
         }
 
         /**
@@ -4098,6 +4177,7 @@ public final class MqoModelLoader {
             // シェーダー(Iris/Oculus)有効時は、フラットな直接GL経路ではなく法線付きの
             // バッファ経路で描画する。直接GL経路は頂点法線スムージングが効かず、影modで
             // 車体がカクついて見えるため(数値は一切変更しない・経路のみ切替)。
+            long secLoop = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
             if (fullbright && com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
                 fullbright = false;
             }
@@ -4372,15 +4452,47 @@ public final class MqoModelLoader {
                         //列車 (E257 等の大型 MQO + 座席複製) の FPS 低下対策。
                         //メッシュ捕獲中 (レール 1 本を 1 VBO に統合する焼き込み) は、
                         //頂点を捕獲側の VertexConsumer に流す必要があるので VBO 経路を通さない。
-                        if (!captureMode
-                            && !needsBlend && groupTransform == null && depthBias == 0.0F
-                            && overlay == net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY
-                            && scriptRed == 255 && scriptGreen == 255 && scriptBlue == 255 && scriptAlpha == 255
-                            && (scriptRenderer == null || !scriptRenderer.hasUvWindow())
-                            && !com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()
-                            && drawBatchWithEntityVbo(batch, renderType, poseStack, packedLight)) {
-                            continue;
+                        //どのゲートで VBO 経路を落ちたかを記録する (F8 の "VBO:" 行に出る)。
+                        //条件が 8 個あり読むだけでは特定できなかったため、実測で犯人を割り出す。
+                        //評価順は元のままで、判定結果だけを分類している (挙動は不変)。
+                        int vboReason;
+                        if (captureMode) {
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_CAPTURE;
+                        } else if (needsBlend) {
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BLEND;
+                        } else if (groupTransform != null) {
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_TRANSFORM;
+                        } else if (depthBias != 0.0F) {
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
+                        } else if (overlay != net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY) {
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OVERLAY;
+                        } else if (scriptRed != 255 || scriptGreen != 255 || scriptBlue != 255 || scriptAlpha != 255) {
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_COLOR;
+                        } else if (scriptRenderer != null && scriptRenderer.hasUvWindow()) {
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_UV;
+                        } else if (com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_SHADER;
+                        } else {
+                            long secVbo = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
+                            boolean vboDrawn = drawBatchWithEntityVbo(batch, renderType, poseStack, packedLight);
+                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_VBO, secVbo);
+                            if (vboDrawn) {
+                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countVbo(
+                                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK);
+                                //VBO 経路もドローコール数は同じだけ掛かる。重複描画が無いか一緒に数える。
+                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatch(
+                                    batch.groupName, batch.vertexCount,
+                                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK);
+                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatchIdentity(
+                                    batch.groupName,
+                                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK,
+                                    System.identityHashCode(batch));
+                                continue;
+                            }
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BUILD;
                         }
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countVbo(vboReason);
                         //列車のガラス等 (半透明) は専用の遅延バッファへ。エンティティ用の非固定
                         //RenderType は途中フラッシュされるため、車両ごとに描くと「他の車両の
                         //ガラス越しに座席が見えたり消えたりする」(描画順が毎フレーム変わる)。
@@ -4389,24 +4501,50 @@ public final class MqoModelLoader {
                         if (deferred) {
                             targetBuffer = com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.buffer();
                         }
+                        //★pass1 (半透明) では<b>窓のテクセルを踏む面だけ</b>を提出する。
+                        //pass1 は windowTexture (完全不透明な画素を抜いたもの) で描くため、窓を
+                        //踏まない面は頂点を流しても 1 ピクセルも描かれない。実測 (E259) では
+                        //body 8,928 + interior 8,724 頂点/frame の大半がこれで、車体の大部分は
+                        //窓を含まない面だった。見た目は不変のまま提出量だけが落ちる。
+                        //材質 α<1 (色付きガラス全面が半透明) の場合は全面必要なので対象外。
+                        boolean pass1Subset = needsBlend && translucent && batch.translucent
+                            && scriptPassNow < 2 && batch.baseAlpha >= 0.999F;
+                        float[] vData = pass1Subset ? batch.pass1Data() : batch.data;
+                        float[] vBias = pass1Subset ? batch.pass1BiasNormals() : batch.biasNormals;
+                        int vCount = pass1Subset ? batch.pass1VertexCount() : batch.vertexCount;
+                        if (vCount <= 0) {
+                            //pass1 で描くものが 1 面も無いバッチ (窓を持たない車体等)
+                            continue;
+                        }
+                        //どのグループが CPU 経路に落ちているかをログに出す。
+                        //※間引き<b>後</b>の実提出数を渡すこと。batch.vertexCount を渡していたときは
+                        //  最適化が効いても数字が動かず、効果を読み違えた。
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatch(
+                            batch.groupName, vCount, vboReason);
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatchIdentity(
+                            batch.groupName, vboReason, System.identityHashCode(batch));
+                        long secBuf = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
                         VertexConsumer consumer = targetBuffer.getBuffer(renderType);
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GETBUF, secBuf);
                         //計測: CPU が毎フレーム流している頂点数 (F8 オーバーレイに出す)
-                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.addVertices(batch.vertexCount);
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.addVertices(vCount);
+                        long secSub = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
                         PoseStack.Pose pose = poseStack.last();
                         Matrix4f mat = pose.pose();
                         Matrix3f norm = pose.normal();
                         float[] normalOut = new float[3];
-                        for (int i = 0; i < batch.vertexCount; i++) {
+                        for (int i = 0; i < vCount; i++) {
                             int o = i * 8;
-                            float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
-                            float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
-                            float u = batch.data[o + 6], v = batch.data[o + 7];
+                            float x = vData[o], y = vData[o + 1], z = vData[o + 2];
+                            float nx = vData[o + 3], ny = vData[o + 4], nz = vData[o + 5];
+                            float u = vData[o + 6], v = vData[o + 7];
                             if (depthBias != 0.0F) {
                                 //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
                                 float bnx = nx, bny = ny, bnz = nz;
-                                if (batch.biasNormals != null) {
+                                if (vBias != null) {
                                     int bo = i * 3;
-                                    bnx = batch.biasNormals[bo]; bny = batch.biasNormals[bo + 1]; bnz = batch.biasNormals[bo + 2];
+                                    bnx = vBias[bo]; bny = vBias[bo + 1]; bnz = vBias[bo + 2];
                                 }
                                 float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, bnx*bnx + bny*bny + bnz*bnz)));
                                 x += bnx*il*depthBias; y += bny*il*depthBias; z += bnz*il*depthBias;
@@ -4430,6 +4568,8 @@ public final class MqoModelLoader {
                                 .setLight(packedLight)
                                 .setNormal(normalOut[0], normalOut[1], normalOut[2]);
                         }
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_SUBMIT, secSub);
                     }
                 } finally {
                     if (willTransform) {
@@ -4446,6 +4586,8 @@ public final class MqoModelLoader {
                 RenderSystem.disableBlend();
                 RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
             }
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_LOOP, secLoop);
         }
 
         public void render(PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay) {
@@ -4662,8 +4804,8 @@ public final class MqoModelLoader {
             }
         }
 
-        private static java.lang.reflect.Field shaderLightDirsField;
-        private static boolean shaderLightDirsFailed;
+        static java.lang.reflect.Field shaderLightDirsField;
+        static boolean shaderLightDirsFailed;
 
         /**
          * 静的 VBO によるバッチ描画 (エンティティ経路の高速版)。
@@ -5157,6 +5299,8 @@ public final class MqoModelLoader {
         boolean glassTranslucent = false;
         /** テクスチャに中間アルファのピクセル (ガラス帯/網等) があるか。無ければ pass1 は描く物が無い。 */
         boolean texHasTranslucentPixels = false;
+        /** pass1 で色が出るテクセルの粗いマスク ({@link MqoModelLoader#buildPass1Mask})。 */
+        java.util.BitSet pass1Mask = null;
         /**
          * depthBias 押し出し用の頂点法線 (頂点ごと3要素、正規化済み)。同位置の全面の平均
          * (facet 閾値なし)。null なら頂点データの法線で押す (従来動作)。
@@ -5229,6 +5373,106 @@ public final class MqoModelLoader {
         private com.mojang.blaze3d.vertex.VertexBuffer entityVbo;
         private int entityVboLight = Integer.MIN_VALUE;
         private boolean entityVboFailed;
+
+        /** pass1 で実際に描かれる面だけを抜いた頂点列 (遅延生成)。{@link #pass1VertexCount} が -1 なら未計算。 */
+        private float[] pass1Data;
+        private float[] pass1BiasNormals;
+        private int pass1VertexCount = -1;
+
+        float[] pass1Data() {
+            ensurePass1();
+            return pass1Data;
+        }
+
+        /** {@link #pass1Data()} と添字が対応する biasNormals (深度押し出し用)。 */
+        float[] pass1BiasNormals() {
+            ensurePass1();
+            return pass1BiasNormals;
+        }
+
+        int pass1VertexCount() {
+            ensurePass1();
+            return pass1VertexCount;
+        }
+
+        /**
+         * pass1 (半透明パス) で提出する面を絞り込む。
+         *
+         * <p>pass1 は windowTexture (完全不透明な画素を抜いたもの) で描くので、<b>窓のテクセルを
+         * 踏まない面は頂点を流しても 1 ピクセルも描かれない</b>。実測 (E259) では body 8,928 +
+         * interior 8,724 頂点/frame が毎フレーム CPU 提出されており、その大半が「窓を含まない面」
+         * だった。ここで一度だけ振り分けておけば、見た目を変えずに提出量を落とせる。
+         *
+         * <p>判定は面の UV バウンディングボックスなので<b>過大評価side</b>に倒れる
+         * (実際には踏まない面も残りうる)。取りこぼして面が消えるより安全。
+         * マスクが無い / UV がタイリングで [0,1] を外れる場合は全面を描く。
+         */
+        private void ensurePass1() {
+            if (pass1VertexCount >= 0) {
+                return;
+            }
+            if (pass1Mask == null || data == null || vertexCount <= 0 || (vertexCount & 3) != 0) {
+                pass1Data = data;
+                pass1BiasNormals = biasNormals;
+                pass1VertexCount = vertexCount;
+                return;
+            }
+            float[] out = new float[data.length];
+            float[] outBias = biasNormals != null ? new float[biasNormals.length] : null;
+            int n = 0;
+            for (int q = 0; q + 3 < vertexCount; q += 4) {
+                float u0 = Float.MAX_VALUE, u1 = -Float.MAX_VALUE;
+                float v0 = Float.MAX_VALUE, v1 = -Float.MAX_VALUE;
+                for (int k = 0; k < 4; k++) {
+                    int o = (q + k) * 8;
+                    float u = data[o + 6];
+                    float v = data[o + 7];
+                    if (u < u0) u0 = u;
+                    if (u > u1) u1 = u;
+                    if (v < v0) v0 = v;
+                    if (v > v1) v1 = v;
+                }
+                if (pass1MaskHits(u0, u1, v0, v1)) {
+                    System.arraycopy(data, q * 8, out, n * 8, 32);
+                    if (outBias != null) {
+                        System.arraycopy(biasNormals, q * 3, outBias, n * 3, 12);
+                    }
+                    n += 4;
+                }
+            }
+            pass1VertexCount = n;
+            if (n == vertexCount) {
+                pass1Data = data;
+                pass1BiasNormals = biasNormals;
+            } else {
+                pass1Data = java.util.Arrays.copyOf(out, n * 8);
+                pass1BiasNormals = outBias != null ? java.util.Arrays.copyOf(outBias, n * 3) : null;
+            }
+        }
+
+        private boolean pass1MaskHits(float u0, float u1, float v0, float v1) {
+            //タイリング等で UV が [0,1] を外れる面はマスクを引けない → 安全側で描く
+            if (!(u0 >= -0.001F && u1 <= 1.001F && v0 >= -0.001F && v1 <= 1.001F)) {
+                return true;
+            }
+            int x0 = clampMaskIndex((int) Math.floor(u0 * PASS1_MASK_RES));
+            int x1 = clampMaskIndex((int) Math.ceil(u1 * PASS1_MASK_RES));
+            int y0 = clampMaskIndex((int) Math.floor(v0 * PASS1_MASK_RES));
+            int y1 = clampMaskIndex((int) Math.ceil(v1 * PASS1_MASK_RES));
+            for (int y = y0; y <= y1; y++) {
+                int row = y * PASS1_MASK_RES;
+                for (int x = x0; x <= x1; x++) {
+                    if (pass1Mask.get(row + x)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static int clampMaskIndex(int v) {
+            return v < 0 ? 0 : Math.min(v, PASS1_MASK_RES - 1);
+        }
 
         com.mojang.blaze3d.vertex.VertexBuffer getOrBuildEntityVbo(int packedLight) {
             if (entityVboFailed || vertexCount <= 0) {

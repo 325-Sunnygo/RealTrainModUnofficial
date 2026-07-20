@@ -55,10 +55,12 @@ public final class InstalledObjectScriptCache {
         long sig = be.renderStateSignature();
         //ヒット: 記録を再生するだけ (Nashorn 実行なし)。
         if (c.valid && c.sig == sig && c.framesSinceRun < REFRESH_FRAMES) {
+            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(true);
             c.framesSinceRun++;
             VehicleScriptRenderers.replay(c.rec, poseStack, buffer, packedLight, packedOverlay, model, null);
             return;
         }
+        com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(false);
         //ミス: GLRecorder を有効にして renderPreferScript を実行し、スクリプト部を記録。
         //(記録中はスクリプトの GL 命令は記録先へ流れ buffer には出ない。baked は buffer へ直接出る。)
         GLRecorder rec = new GLRecorder();

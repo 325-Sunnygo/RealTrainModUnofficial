@@ -172,6 +172,13 @@ public final class VehicleScriptRenderers {
             return com.portofino.realtrainmodunofficial.RtmuSettings.staticVehicleRefreshFrames();
         }
 
+        /**
+         * 「再記録の結果が前回と一致した車両は再記録間隔を伸ばす」適応バックオフ。
+         * <b>不具合のため無効</b> (詳細は使用箇所のコメント: payload の Set が使い回しインスタンス
+         * のため一致判定が当てにならず、変化中の車両を延命して二重像になる)。
+         */
+        private static final boolean ADAPTIVE_REFRESH_BACKOFF = false;
+
         //状態が変わった直後 (方向転換・ドア操作等) は、スクリプトが pass==1 で進める時間依存
         //アニメ (座席回転・ドア開閉。本パックは 5000ms) がこの間かけて進む。その間はキャッシュ
         //せず毎フレーム描いて滑らかにアニメさせる。5000ms のアニメに余裕を持たせて 6000ms。
@@ -194,6 +201,9 @@ public final class VehicleScriptRenderers {
             int framesSinceRun;
             //この時刻 (currentTimeMillis) までは毎フレーム描く (アニメ進行中とみなす)。
             long animUntilMs;
+            //定期再記録の結果が前回と完全一致した連続回数。一致が続くほど再記録間隔を
+            //伸ばす (適応バックオフ)。状態変化・不一致で 0 に戻る。
+            int identicalRefreshes;
             final List<CachedPass> passes = new ArrayList<>();
         }
 
@@ -248,6 +258,9 @@ public final class VehicleScriptRenderers {
             //滑らかさ維持。走行中のキャッシュは内装のチラつきを招くため行わない)。
             boolean canCache = isFullyStatic(entity);
             if (!canCache) {
+                //計測: 走行中の車両はキャッシュ対象外 = 毎フレーム Nashorn 実行。
+                //軽量化の主戦場がここであることを数値で確かめるために miss として数える。
+                com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(false);
                 this.entityCaches.remove(entity);
                 return renderReal(entity, partialTick, poseStack, buffer, packedLight, packedOverlay, bodyModel, null);
             }
@@ -262,8 +275,23 @@ public final class VehicleScriptRenderers {
             }
             boolean animating = now < ec.animUntilMs;
 
+            //定期再記録 (時間依存アニメの安全網) の間隔。
+            //
+            //★適応バックオフは無効。「再記録の結果が前回と完全一致したら間隔を 10→80f に伸ばす」
+            //  最適化を入れたところ、車内でポリゴンが二重に見える (z-fighting 状の) 不具合が出た。
+            //  原因: RENDER_PARTS/RENDER_GROUPS の payload はスクリプトが<b>使い回す同一の Set
+            //  インスタンス</b> (MqoModelLoader の renderListCache が identity 前提なのと同じ理由)。
+            //  payload を equals で比べると参照が同じなので<b>中身が変化していても「一致」</b>と
+            //  判定され、変化中の車両のキャッシュを最大 2 秒延命してしまう。古い記録と、毎フレーム
+            //  描かれる要素 (方向幕/ドア変形) の位置がずれて二重像になる。
+            //  再開するなら Set の中身をスナップショットして比較すること。
+            int refreshInterval = ADAPTIVE_REFRESH_BACKOFF
+                ? Math.min(cacheRefreshFrames() << Math.min(ec.identicalRefreshes, 3), 120)
+                : cacheRefreshFrames();
+
             //キャッシュヒット: 記録済みパスを再生するだけ (Nashorn 実行なし)。アニメ中は不可。
-            if (!animating && ec.valid && ec.sig == sig && ec.framesSinceRun < cacheRefreshFrames()) {
+            if (!animating && ec.valid && ec.sig == sig && ec.framesSinceRun < refreshInterval) {
+                com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(true);
                 ec.framesSinceRun++;
                 if (!ec.drew) {
                     return false;
@@ -281,8 +309,17 @@ public final class VehicleScriptRenderers {
             }
 
             //ミス or アニメ中: 実際に描画しつつ、各パスの記録を集めてキャッシュに保存。
+            //pureRefresh = 状態変化もアニメも無いのに間隔満了で来た「定期再記録」。
+            //このときだけ前回記録と比較し、完全一致ならバックオフを 1 段進める。
+            boolean pureRefresh = !animating && ec.valid && ec.sig == sig;
+            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(false);
             List<CachedPass> sink = new ArrayList<>();
             boolean drew = renderReal(entity, partialTick, poseStack, buffer, packedLight, packedOverlay, bodyModel, sink);
+            if (pureRefresh && drew == ec.drew && passesIdentical(ec.passes, sink)) {
+                ec.identicalRefreshes = Math.min(ec.identicalRefreshes + 1, 3);
+            } else {
+                ec.identicalRefreshes = 0;
+            }
             ec.valid = true;
             ec.drew = drew;
             ec.sig = sig;
@@ -290,6 +327,66 @@ public final class VehicleScriptRenderers {
             ec.passes.clear();
             ec.passes.addAll(sink);
             return drew;
+        }
+
+        /**
+         * 定期再記録の結果が前回キャッシュと完全一致か (= スクリプト出力が時間に依存していない)。
+         * 一致した再記録は描画結果に何の変化ももたらさないので、次回を先送りしても見た目は不変。
+         */
+        private static boolean passesIdentical(List<CachedPass> before, List<CachedPass> after) {
+            if (before.size() != after.size()) {
+                return false;
+            }
+            for (int i = 0; i < before.size(); i++) {
+                CachedPass x = before.get(i);
+                CachedPass y = after.get(i);
+                if (x.pass != y.pass
+                        || !java.util.Objects.equals(x.excluded, y.excluded)
+                        || !java.util.Objects.equals(x.overlayTexture, y.overlayTexture)
+                        || !recordersIdentical(x.rec, y.rec)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static boolean recordersIdentical(GLRecorder a, GLRecorder b) {
+            List<GLRecorder.Cmd> ca = a.getCommands();
+            List<GLRecorder.Cmd> cb = b.getCommands();
+            if (ca.size() != cb.size()) {
+                return false;
+            }
+            for (int i = 0; i < ca.size(); i++) {
+                GLRecorder.Cmd x = ca.get(i);
+                GLRecorder.Cmd y = cb.get(i);
+                if (x.op != y.op
+                        || Float.floatToIntBits(x.a) != Float.floatToIntBits(y.a)
+                        || Float.floatToIntBits(x.b) != Float.floatToIntBits(y.b)
+                        || Float.floatToIntBits(x.c) != Float.floatToIntBits(y.c)
+                        || Float.floatToIntBits(x.d) != Float.floatToIntBits(y.d)
+                        || !java.util.Objects.equals(x.name, y.name)
+                        || !payloadIdentical(x.payload, y.payload)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static boolean payloadIdentical(Object p, Object q) {
+            if (p == q) {
+                return true;
+            }
+            if (p == null || q == null) {
+                return false;
+            }
+            if (p instanceof GLRecorder.TessDraw tp) {
+                return q instanceof GLRecorder.TessDraw tq
+                        && tp.mode == tq.mode && java.util.Arrays.equals(tp.verts, tq.verts);
+            }
+            //Quaternionf / Set<String> / ResourceLocation / BlockState は equals で比較。
+            //PolygonModel は equals 非オーバーライド = 同一インスタンスのみ一致だが、
+            //モデルオブジェクトは使い回されるのでそれで正しい。
+            return p.equals(q);
         }
 
         /**
@@ -500,6 +597,7 @@ public final class VehicleScriptRenderers {
 
         /** スクリプトの render(entity, pass, partialTick) を 1 パスぶん記録する。 */
         private GLRecorder record(Object entity, int pass, float partialTick) {
+            long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
             GLRecorder rec = new GLRecorder();
             GLRecorder.activate(rec);
             try {
@@ -515,6 +613,8 @@ public final class VehicleScriptRenderers {
             } finally {
                 this.renderer.currentPass = 0;
                 GLRecorder.deactivate();
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_RECORD, secStart);
             }
             //スクリプトが落ちても記録は捨てない。途中まで描いていればそれは活かす
             //(発光パスの途中で落ちる車両が多く、記録ごと捨てるとライトが消える)。
@@ -583,6 +683,7 @@ public final class VehicleScriptRenderers {
 
         /** render() を指定 matId で 1 パス記録する (tessellator オーバーレイ捕捉用)。 */
         private GLRecorder recordMat(Object entity, int pass, float partialTick, int matId) {
+            long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
             GLRecorder rec = new GLRecorder();
             GLRecorder.activate(rec);
             try {
@@ -595,6 +696,8 @@ public final class VehicleScriptRenderers {
                 this.renderer.currentMatId = 0;
                 this.renderer.currentPass = 0;
                 GLRecorder.deactivate();
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_RECORD, secStart);
             }
             this.renderer.consumeScriptFailure();
             return rec;
@@ -642,6 +745,7 @@ public final class VehicleScriptRenderers {
         //方向幕/速度計/ATC/モニタ/室内LED は発光する表示器 (JSON の "Light" マテリアル) なので、
         //既定で FULL_BRIGHT にして昼夜問わず読めるようにする。スクリプトが明示 setBrightness した
         //場合はそれを優先 (負値リセットは表示器なので FULL_BRIGHT に戻す)。
+        long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
         final int fullBright = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
         int light = fullBright;
         ResourceLocation tex = defaultTex;
@@ -681,6 +785,8 @@ public final class VehicleScriptRenderers {
             poseStack.popPose();
             depth--;
         }
+        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_REPLAY, secStart);
     }
 
     static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
@@ -714,6 +820,7 @@ public final class VehicleScriptRenderers {
                                int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
                                PolygonModel bodyGraph, int legacyPass, java.util.Set<String> excluded,
                                ResourceLocation defaultTessTex) {
+        long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
         int light = packedLight;
         ResourceLocation overrideTex = null;
         //スクリプトの glColor4f (発光オーバーレイの強度等に使用)
@@ -805,6 +912,8 @@ public final class VehicleScriptRenderers {
             poseStack.popPose();
             depth--;
         }
+        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_REPLAY, secStart);
     }
 
     private static final int GL_TRIANGLES = 4;
@@ -813,6 +922,7 @@ public final class VehicleScriptRenderers {
 
     private static void drawTess(GLRecorder.TessDraw draw, PoseStack poseStack, MultiBufferSource buffer,
                                  int light, int overlay, ResourceLocation texture) {
+        long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
         ResourceLocation tex = texture != null ? texture
                 : ResourceLocation.withDefaultNamespace("textures/misc/white.png");
         //本家はブレンド有効の即時描画 — 半透明テクスチャ (方向幕/LCD) を正しく合成する
@@ -839,6 +949,8 @@ public final class VehicleScriptRenderers {
                 //LINES 等は未対応
             }
         }
+        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_TESS, secStart);
     }
 
     private static void emitQuad(VertexConsumer vc, PoseStack poseStack, float[] v,
@@ -879,17 +991,90 @@ public final class VehicleScriptRenderers {
         VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z);
     }
 
+    /**
+     * drawModelGroup 用の平坦化済み頂点キャッシュ (モデル → 小文字グループ名 → {x,y,z,u,v,nx,ny,nz}×N)。
+     * <p>
+     * 旧実装は毎フレーム「グループ線形探索 + face ごとの int[]/Vector3f 確保 + 法線計算 + UV 範囲チェック」を
+     * やり直していて、これが列車描画 5ms/両 の主犯だった (F8 実測 mGrp=4.4ms/f。E259 はスクリプトが
+     * 車体モジュールを DRAW_MODEL_GROUP で毎フレーム多数回描く)。頂点は Vertex(final)/uvs ともロード後
+     * 不変なので、展開結果を一度だけ焼いて以降は同じ値を流す (提出内容はビット単位で同一 = 見た目不変)。
+     * <p>
+     * WeakHashMap (PolygonModel は equals 非オーバーライド = identity): リソース再読込で古いモデルごと
+     * 自然に GC される。描画スレッド専用なので同期なし。
+     */
+    private static final java.util.Map<PolygonModel, java.util.Map<String, float[]>> FLAT_GROUP_CACHE =
+        new java.util.WeakHashMap<>();
+    private static final float[] FLAT_EMPTY = new float[0];
+
+    private static float[] flatGroupVerts(PolygonModel pm, String groupName) {
+        java.util.Map<String, float[]> byName = FLAT_GROUP_CACHE.computeIfAbsent(pm, k -> new java.util.HashMap<>());
+        String key = groupName == null ? "" : groupName.toLowerCase(java.util.Locale.ROOT);
+        float[] flat = byName.get(key);
+        if (flat == null) {
+            GroupObject group = null;
+            for (GroupObject g : pm.groupObjects) {
+                if (g.name.equalsIgnoreCase(groupName)) {
+                    group = g;
+                    break;
+                }
+            }
+            flat = buildFlatGroup(group);
+            byName.put(key, flat);
+        }
+        return flat;
+    }
+
+    /** 旧 drawModelGroup の展開ロジックそのまま (四角形はそのまま/三角形は縮退クアッド/5角以上は扇状分割)。 */
+    private static float[] buildFlatGroup(GroupObject group) {
+        if (group == null || group.faces.isEmpty()) {
+            return FLAT_EMPTY;
+        }
+        int quadVerts = 0;
+        for (Face face : group.faces) {
+            int n = face.vertices.length;
+            if (n >= 3) {
+                quadVerts += (n == 4 ? 1 : n - 2) * 4;
+            }
+        }
+        float[] flat = new float[quadVerts * 8];
+        int w = 0;
+        for (Face face : group.faces) {
+            int n = face.vertices.length;
+            if (n < 3) {
+                continue;
+            }
+            for (int t = 0; t < (n == 4 ? 1 : n - 2); t++) {
+                int[] idx = n == 4 ? new int[]{0, 1, 2, 3} : new int[]{0, t + 1, t + 2, t + 2};
+                Vector3f normal = faceNormal(face, idx);
+                for (int k = 0; k < 4; k++) {
+                    Vertex vert = face.vertices[idx[k]];
+                    float u = 0.0F, vv = 0.0F;
+                    if (face.uvs != null && idx[k] * 2 + 1 < face.uvs.length) {
+                        u = face.uvs[idx[k] * 2];
+                        vv = face.uvs[idx[k] * 2 + 1];
+                    }
+                    flat[w++] = vert.x;
+                    flat[w++] = vert.y;
+                    flat[w++] = vert.z;
+                    flat[w++] = u;
+                    flat[w++] = vv;
+                    flat[w++] = normal.x;
+                    flat[w++] = normal.y;
+                    flat[w++] = normal.z;
+                }
+            }
+        }
+        return flat;
+    }
+
     private static void drawModelGroup(PolygonModel pm, String groupName, PoseStack poseStack,
                                        MultiBufferSource buffer, int light, int overlay, ResourceLocation texture,
                                        float colR, float colG, float colB, float colA) {
-        GroupObject group = null;
-        for (GroupObject g : pm.groupObjects) {
-            if (g.name.equalsIgnoreCase(groupName)) {
-                group = g;
-                break;
-            }
-        }
-        if (group == null || group.faces.isEmpty()) {
+        long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
+        float[] flat = flatGroupVerts(pm, groupName);
+        if (flat.length == 0) {
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_MODELGRP, secStart);
             return;
         }
         ResourceLocation tex = texture != null ? texture
@@ -904,31 +1089,31 @@ public final class VehicleScriptRenderers {
         VertexConsumer vc = buffer.getBuffer(lightOverlay ? RenderType.eyes(tex) : RenderType.entityTranslucent(tex));
         PoseStack.Pose pose = poseStack.last();
         Matrix4f mat = pose.pose();
-        for (Face face : group.faces) {
-            int n = face.vertices.length;
-            if (n < 3) {
-                continue;
-            }
-            //四角形はそのまま、三角形は縮退クアッド、5角以上は扇状分割
-            for (int t = 0; t < (n == 4 ? 1 : n - 2); t++) {
-                int[] idx = n == 4 ? new int[]{0, 1, 2, 3} : new int[]{0, t + 1, t + 2, t + 2};
-                Vector3f normal = faceNormal(face, idx);
-                for (int k = 0; k < 4; k++) {
-                    Vertex vert = face.vertices[idx[k]];
-                    float u = 0.0F, vv = 0.0F;
-                    if (face.uvs != null && idx[k] * 2 + 1 < face.uvs.length) {
-                        u = face.uvs[idx[k] * 2];
-                        vv = face.uvs[idx[k] * 2 + 1];
-                    }
-                    VertexConsumer written = VertexWriter.addVertex(vc, mat, vert.x, vert.y, vert.z)
-                            .setColor(colR, colG, colB, colA)
-                            .setUv(u, vv)
-                            .setOverlay(overlay)
-                            .setLight(light);
-                    VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z);
-                }
+        org.joml.Matrix3f nm = pose.normal();
+        //色はバニラ setColor(float×4) の式 (int)(f*255.0F) を 1 回だけ前計算 (結果は同一)。
+        int cr = (int) (colR * 255.0F);
+        int cg = (int) (colG * 255.0F);
+        int cb = (int) (colB * 255.0F);
+        int ca = (int) (colA * 255.0F);
+        //クアッド内の 4 頂点は同一法線 (buildFlatGroup が同じ値を 4 回書く) なので、
+        //法線の行列変換は面ごとに 1 回だけ行う (値は VertexWriter.setNormal と同一)。
+        for (int o = 0; o < flat.length; o += 32) {
+            float nx = flat[o + 5], ny = flat[o + 6], nz = flat[o + 7];
+            float tnx = nm.m00() * nx + nm.m10() * ny + nm.m20() * nz;
+            float tny = nm.m01() * nx + nm.m11() * ny + nm.m21() * nz;
+            float tnz = nm.m02() * nx + nm.m12() * ny + nm.m22() * nz;
+            for (int k = 0; k < 4; k++) {
+                int p = o + k * 8;
+                VertexWriter.addVertex(vc, mat, flat[p], flat[p + 1], flat[p + 2])
+                        .setColor(cr, cg, cb, ca)
+                        .setUv(flat[p + 3], flat[p + 4])
+                        .setOverlay(overlay)
+                        .setLight(light)
+                        .setNormal(tnx, tny, tnz);
             }
         }
+        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_MODELGRP, secStart);
     }
 
     private static Vector3f faceNormal(Face face, int[] idx) {

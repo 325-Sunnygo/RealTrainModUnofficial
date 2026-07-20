@@ -47,6 +47,16 @@ public final class DeferredTranslucentRenderer {
         currentVehicle = entity;
     }
 
+    /**
+     * いま描画中の車両 (無ければ null)。
+     * <p>
+     * replay 経路で entity が null になる問題は遅延判定だけでなく<b>カリング判定でも起きる</b>
+     * ため、{@code MqoModelLoader.shouldCullModelFaces} もこれをフォールバックに使う。
+     */
+    public static Object currentVehicle() {
+        return currentVehicle;
+    }
+
     /** この entity の半透明バッチを遅延バッファへ回すか。 */
     public static boolean shouldDefer(Object entity) {
         if (ShaderCompat.isShaderPackInUse()) {

@@ -56,10 +56,23 @@ public final class ScriptUtil {
     }
 
     public static Object doScriptFunction(ScriptEngine se, String func, Object... args) {
+        //軽量化作業の計測点。描画用 render も含め全スクリプト呼び出しがここを通るので、
+        //1 箇所で総実行時間を取れる (doScriptIgnoreError もこれを経由する)。
+        //計測 OFF のときは nanoTime を呼ばない。
+        if (!com.portofino.realtrainmodunofficial.perf.RtmuProfiler.enabled) {
+            try {
+                return ((Invocable) se).invokeFunction(func, args);
+            } catch (NoSuchMethodException | ScriptException e) {
+                throw new RuntimeException("Script exec error : " + func, e);
+            }
+        }
+        long t0 = System.nanoTime();
         try {
             return ((Invocable) se).invokeFunction(func, args);
         } catch (NoSuchMethodException | ScriptException e) {
             throw new RuntimeException("Script exec error : " + func, e);
+        } finally {
+            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addScriptCall(System.nanoTime() - t0);
         }
     }
 

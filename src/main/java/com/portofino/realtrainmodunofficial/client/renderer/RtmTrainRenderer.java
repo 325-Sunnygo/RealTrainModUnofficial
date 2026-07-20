@@ -2,6 +2,7 @@ package com.portofino.realtrainmodunofficial.client.renderer;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
+import com.portofino.realtrainmodunofficial.client.ClientRenderProfiler;
 import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
@@ -51,6 +52,22 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
     @Override
     public void render(EntityTrain entity, float entityYaw, float partialTicks, PoseStack poseStack,
                        MultiBufferSource buffer, int packedLight) {
+        //計測: 設置される列車は EntityTrain なのに、Profiler の Train カテゴリは旧実装の
+        //TrainEntityRenderer にしか入っておらず常に 0 だった (= 本命のコストが計測外)。
+        long profilerStart =
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.begin();
+        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.beginTrainGeometry();
+        try {
+            renderTrain(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
+        } finally {
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.endTrainGeometry();
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.endTrain(profilerStart);
+        }
+    }
+
+    private void renderTrain(EntityTrain entity, float entityYaw, float partialTicks, PoseStack poseStack,
+                             MultiBufferSource buffer, int packedLight) {
+        long tSec = ClientRenderProfiler.sec();
         VehicleDefinition def = VehicleRegistry.getById(entity.getModelName());
         if (def == null) {
             return;
@@ -64,11 +81,14 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                 .anyMatch(b -> b.modelFile() != null && !b.modelFile().isBlank()
                         && !BogieRenderer.isDummyBogieModel(b.modelFile())
                         && !b.modelFile().toLowerCase(Locale.ROOT).endsWith(".class"));
+        ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_LOOKUP, tSec);
 
         //乗員を車体より先に描画する。車体は半透明バッチ (AlphaBlend) が深度を書くため、
         //列車→乗員の順に描かれると乗員がガラス/車体越しに遮蔽されて透明に見える
         //(本家 1.7.10 は不透明ピクセル先行の 2 パスだったため発生しなかった問題)。
+        tSec = ClientRenderProfiler.sec();
         this.renderRidersFirst(entity, partialTicks, poseStack, buffer, packedLight);
+        ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_RIDERS, tSec);
 
         poseStack.pushPose();
         try {
@@ -84,10 +104,12 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
 
             //本家式スクリプト描画 (Nashorn): 成功したらベイクドパスはスキップ
+            tSec = ClientRenderProfiler.sec();
             com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.Scripted scripted =
                     com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
             boolean scriptRendered = scripted != null && scripted.render(entity, partialTicks, poseStack, buffer,
                     packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, model);
+            ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_SCRIPTED, tSec);
 
             if (!scriptRendered) {
                 MqoModelLoader.GroupPredicate filter =
@@ -103,7 +125,17 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                     TrainEntityRenderer.applyDoorTransform(stack, def.getLeftDoors(), groupName, entity.doorMoveL, true);
                     TrainEntityRenderer.applyDoorTransform(stack, def.getRightDoors(), groupName, entity.doorMoveR, false);
                 };
-                MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, filter, doorTransform);
+                tSec = ClientRenderProfiler.sec();
+                //この経路も entity を渡せない (renderModel の 6 引数版) ため、カリング判定
+                //(shouldCullModelFaces) が車両の doCulling を引けず両面描画に落ちる。
+                //スクリプト経路と同じフォールバックに載せる。
+                com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(entity);
+                try {
+                    MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, filter, doorTransform);
+                } finally {
+                    com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(null);
+                }
+                ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_BAKED, tSec);
             }
 
             //★ 方向幕 (JSON の rollsigns)。
@@ -112,6 +144,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             //旧 TrainEntityRenderer にしか実装が無く、実際に列車を描くこちらには無かったため、
             //京急パックのように「幕はエンジン任せ・車体だけスクリプト」なパックで幕が出なかった。
             //スクリプトの有無で切り分けてはいけない (自前で幕を描くパックは rollsigns を空にしている)。
+            tSec = ClientRenderProfiler.sec();
             TrainEntityRenderer.renderConfiguredRollsigns(
                     entity.getTrainStateData(
                             jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id),
@@ -121,6 +154,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                     entity.getTrainStateData(
                             jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Type.id),
                     def, poseStack, buffer, packedLight);
+            ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_SIGNS, tSec);
         } finally {
             poseStack.popPose();
         }
