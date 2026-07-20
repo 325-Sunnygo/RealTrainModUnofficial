@@ -68,12 +68,10 @@ public final class InstalledObjectPackLoader {
         InstalledObjectRegistry.setDefinitions(LOADED);
         long connectors = LOADED.stream().filter(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT
                 || d.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT).count();
-        RealTrainModUnofficial.LOGGER.info("Loaded {} installed object definition(s) ({} connectors)", LOADED.size(), connectors);
         //カテゴリ別の内訳。「看板の選択画面が空」等の切り分けがログだけでできるようにしておく。
         java.util.Map<InstalledObjectCategory, Long> byCategory = LOADED.stream()
                 .collect(java.util.stream.Collectors.groupingBy(InstalledObjectDefinition::getCategory,
                         java.util.stream.Collectors.counting()));
-        RealTrainModUnofficial.LOGGER.info("  by category: {}", byCategory);
     }
 
     private static void loadFromModJar() {
@@ -110,7 +108,6 @@ public final class InstalledObjectPackLoader {
             Path modRoot = modFile.getFilePath();
             if (modRoot == null) return;
             String packName = RealTrainModUnofficial.MODID;
-            RealTrainModUnofficial.LOGGER.info("Loading built-in installed object definitions from {}", jsonDir);
             try (var stream = Files.list(jsonDir)) {
                 stream.filter(Files::isRegularFile)
                     .filter(p -> isSupportedJson(normalize(p.getFileName().toString())))
@@ -319,12 +316,10 @@ public final class InstalledObjectPackLoader {
         if (!hasInput) {
             LOADED.add(builtinConnector(InstalledObjectCategory.CONNECTOR_INPUT, "Input01", "textures/connector/input.png",
                     "textures/connector/button_Input01.png"));
-            RealTrainModUnofficial.LOGGER.info("Registered built-in connector definition: Input01");
         }
         if (!hasOutput) {
             LOADED.add(builtinConnector(InstalledObjectCategory.CONNECTOR_OUTPUT, "Output01", "textures/connector/output.png",
                     "textures/connector/button_Output01.png"));
-            RealTrainModUnofficial.LOGGER.info("Registered built-in connector definition: Output01");
         }
     }
 

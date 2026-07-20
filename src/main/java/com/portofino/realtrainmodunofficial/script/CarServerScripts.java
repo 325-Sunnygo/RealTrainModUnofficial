@@ -47,7 +47,6 @@ public final class CarServerScripts {
             String source = PackScriptSource.decode(bytes);
             source = PackScriptSource.prepare(source);
             ScriptEngine engine = ScriptUtil.doScript(PackScriptSource.PRELUDE + source);
-            RealTrainModUnofficial.LOGGER.info("Server script initialized: {} ({})", def.getId(), path);
             return new Entry(engine);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init server script for {}", def.getId(), t);

@@ -91,7 +91,6 @@ public final class LegacyStereoDownmix {
             data.limit(base + frames * 2);
             data.position(base);
             AudioFormat mono = new AudioFormat(format.getSampleRate(), 16, 1, true, format.isBigEndian());
-            RealTrainModUnofficial.LOGGER.debug("Downmixed legacy stereo sound to mono: {}", id);
             return new SoundBuffer(data, mono);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to downmix legacy stereo sound {}", id, t);

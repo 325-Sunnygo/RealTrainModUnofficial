@@ -114,7 +114,6 @@ public final class InstalledObjectServerScripts {
             //バイトが化けて構文まで壊れるので、既存のパック用デコーダに任せる。
             String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
             ScriptEngine se = ScriptUtil.doScript(PRELUDE + source);
-            RealTrainModUnofficial.LOGGER.info("[serverScript] 読み込み: {} ({})", def.getId(), path);
             return se;
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("[serverScript] 読み込み失敗: {} ({})", def.getId(), path, t);

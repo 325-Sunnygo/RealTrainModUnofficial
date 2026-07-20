@@ -365,19 +365,16 @@ public class TrainScriptSystem {
     }
 
     public void initialize() {
-        RealTrainModUnofficial.LOGGER.info("Initializing legacy Script System...");
         try {
             ScriptEngineManager manager = new ScriptEngineManager(Thread.currentThread().getContextClassLoader());
             engine = getAvailableScriptEngine(manager);
             if (engine == null) {
-                RealTrainModUnofficial.LOGGER.info("Retrying script engine discovery with TrainScriptSystem class loader.");
                 manager = new ScriptEngineManager(TrainScriptSystem.class.getClassLoader());
                 engine = getAvailableScriptEngine(manager);
             }
             if (engine == null) {
                 RealTrainModUnofficial.LOGGER.warn("JavaScript engine not available. Java 21 requires an external JS engine dependency such as Graal.js.");
             } else {
-                RealTrainModUnofficial.LOGGER.info("JavaScript engine initialized successfully.");
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.error("Failed to initialize JavaScript engine: {}", e.getMessage(), e);
@@ -419,7 +416,6 @@ public class TrainScriptSystem {
         try {
             return doScriptFunctionCompat(scriptEngine, functionName, args);
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Ignoring legacy script function failure: {}", functionName, e);
             return null;
         }
     }
@@ -476,7 +472,6 @@ public class TrainScriptSystem {
     }
 
     public static void loadScriptFromPath(String scriptPath, Object model, String modelName) {
-        RealTrainModUnofficial.LOGGER.info("legacy script load requested: {} for model {}", scriptPath, model == null ? "null" : model.getClass().getSimpleName());
         try {
             ScriptEngine scriptEngine = createScriptEngine();
             if (scriptEngine == null) {
@@ -486,11 +481,9 @@ public class TrainScriptSystem {
 
             Path path = Path.of(scriptPath);
             if (Files.exists(path)) {
-                RealTrainModUnofficial.LOGGER.info("Loading script from filesystem path: {}", path);
                 String script = PackTextDecoder.readText(path);
                 loadScript(scriptPath, script, model, modelName, scriptEngine);
             } else {
-                RealTrainModUnofficial.LOGGER.info("Script path not found on filesystem, skipping direct load: {}", scriptPath);
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.error("Failed to load script for model: {}", scriptPath, e);
@@ -502,7 +495,6 @@ public class TrainScriptSystem {
     }
 
     public static void loadScript(String scriptPath, String script, Object model, String modelName) {
-        RealTrainModUnofficial.LOGGER.info("legacy script load requested from content: {} for model {}", scriptPath, model == null ? "null" : model.getClass().getSimpleName());
         try {
             ScriptEngine scriptEngine = createScriptEngine();
             if (scriptEngine == null) {
@@ -560,8 +552,6 @@ public class TrainScriptSystem {
             Object se = graalEngineClass.getMethod("create", engineClass, cbClass).invoke(null, polyglotEngine, cb);
             return se instanceof ScriptEngine ? (ScriptEngine) se : null;
         } catch (Throwable t) {
-            RealTrainModUnofficial.LOGGER.debug("Reflected shared GraalJS engine unavailable (ECMAScript {}): {}",
-                ecmaVersion, t.toString());
             return null;
         }
     }
@@ -587,8 +577,6 @@ public class TrainScriptSystem {
             Object engine = bClass.getMethod("build").invoke(builder);
             SHARED_GRAAL_POLYGLOT_ENGINE = engine;
             SHARED_GRAAL_POLYGLOT_ENGINE_LOADER = host;
-            RealTrainModUnofficial.LOGGER.info(
-                "RTMU: shared GraalJS polyglot Engine created — scripts now share compiled code across vehicles.");
             return engine;
         }
     }
@@ -651,7 +639,6 @@ public class TrainScriptSystem {
                 }
             }
             graalReflectionUnavailable = true;
-            RealTrainModUnofficial.LOGGER.info("RTMU: reflected shared GraalJS engine unavailable; using per-engine fallback.");
         }
 
         if (!graalPolyglotUnavailable) {
@@ -668,22 +655,18 @@ public class TrainScriptSystem {
                         .option("js.ecmascript-version", ecmaVersion);
                     ScriptEngine scriptEngine = com.oracle.truffle.js.scriptengine.GraalJSScriptEngine.create(polyglotEngine, contextBuilder);
                     if (scriptEngine != null) {
-                        RealTrainModUnofficial.LOGGER.info("Using Graal.js with RTM compatibility on ECMAScript {}.", ecmaVersion);
                         return scriptEngine;
                     }
                 } catch (Throwable e) {
-                    RealTrainModUnofficial.LOGGER.debug("Graal.js polyglot unavailable (ECMAScript {}): {}", ecmaVersion, e.getMessage());
                 }
             }
             graalPolyglotUnavailable = true;
-            RealTrainModUnofficial.LOGGER.info("Graal.js polyglot API not available on module-path; using ScriptEngineManager fallback.");
         }
 
         String[] engineNames = {"javascript", "js", "Graal.js", "graal.js", "nashorn"};
         for (String name : engineNames) {
             ScriptEngine scriptEngine = manager.getEngineByName(name);
             if (scriptEngine != null) {
-                RealTrainModUnofficial.LOGGER.info("Using JavaScript engine '{}'.", name);
                 return scriptEngine;
             }
         }
@@ -704,20 +687,17 @@ public class TrainScriptSystem {
             ScriptEngineFactory factory = (ScriptEngineFactory) factoryClass.getDeclaredConstructor().newInstance();
             ScriptEngine scriptEngine = factory.getScriptEngine();
             if (scriptEngine != null) {
-                RealTrainModUnofficial.LOGGER.info("Using Graal.js ScriptEngineFactory directly.");
                 return scriptEngine;
             }
         } catch (ClassNotFoundException ignored) {
             // Graal.js is not available on the classpath.
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Failed to instantiate Graal.js ScriptEngineFactory, falling back to other engines: {}", e.getMessage());
         }
 
         return null;
     }
 
     private static void loadScript(String scriptPath, String script, Object model, String modelName, ScriptEngine scriptEngine) {
-        RealTrainModUnofficial.LOGGER.info("Executing model script: {} (model={})", scriptPath, model == null ? "null" : model.getClass().getSimpleName());
         try {
             ScriptModelRenderer renderer = new ScriptModelRenderer(model, modelName);
             injectScriptCompatibility(scriptEngine, renderer);
@@ -739,7 +719,6 @@ public class TrainScriptSystem {
             }
             invokeScriptInit(scriptEngine, renderer);
             prepareScriptRuntimeAfterInit(scriptEngine);
-            RealTrainModUnofficial.LOGGER.info("Script loaded for model: {}", scriptPath);
         } catch (ScriptException e) {
             reportScriptError(scriptEngine, "load(model)", e);
             RealTrainModUnofficial.LOGGER.error("Failed to execute script for model: {}, continuing without script", scriptPath, e);
@@ -754,7 +733,6 @@ public class TrainScriptSystem {
         if (scriptEngine == null) {
             return null;
         }
-        RealTrainModUnofficial.LOGGER.info("Executing standalone script: {}", scriptPath);
         try {
             ScriptModelRenderer renderer = new ScriptModelRenderer(null, modelName);
             injectScriptCompatibility(scriptEngine, renderer);
@@ -765,14 +743,10 @@ public class TrainScriptSystem {
             // injectScriptCompatibility 内の eval で var 宣言しても、別の eval をまたぐと
             // Nashorn でグローバルが期待通りに見えないケースがあるため、確実性を最大化。
             script = LEGACY_API_PREPEND + script;
-            RealTrainModUnofficial.LOGGER.info("[PREPEND-CHECK] {} prependLen={} scriptLen={} firstChars={}",
-                scriptPath, LEGACY_API_PREPEND.length(), script.length(),
-                script.substring(0, Math.min(80, script.length())));
             scriptEngine.eval(script);
             prepareScriptRuntimeBeforeInit(scriptEngine);
             invokeScriptInit(scriptEngine, renderer);
             prepareScriptRuntimeAfterInit(scriptEngine);
-            RealTrainModUnofficial.LOGGER.info("Standalone script loaded: {}", scriptPath);
             return scriptEngine;
         } catch (ScriptException e) {
             reportScriptError(scriptEngine, "load(standalone)", e);
@@ -937,7 +911,6 @@ public class TrainScriptSystem {
             try {
                 scriptEngine.eval("load('nashorn:mozilla_compat.js');");
             } catch (Exception ignored) {
-                RealTrainModUnofficial.LOGGER.debug("mozilla_compat.js not available for current JS engine.");
             }
             scriptEngine.eval(
                 "var __trainCoreCompat = { VERSION: " + quoteJs(SCRIPT_CORE_VERSION) + ", getVERSION: function() { return this.VERSION; }, getVersion: function() { return this.VERSION; } };\n" +
@@ -1975,7 +1948,6 @@ public class TrainScriptSystem {
                         .invoke(null, train, namespace, soundName);
                 }
             } catch (Exception e) {
-                RealTrainModUnofficial.LOGGER.debug("Legacy sound bridge failed for {}:{}", namespace, soundName, e);
             }
         }
 
@@ -2893,11 +2865,6 @@ public class TrainScriptSystem {
             }
             // 初回調査用。通常プレイでは script 初期化ログだけでもかなり多くなるため debug に留める。
             if (scriptRegisteredGroups.size() < 200) {
-                RealTrainModUnofficial.LOGGER.debug(
-                    "[registerParts] partsType={} extracted={} usable={} rejected={} totalRegistered={}",
-                    parts == null ? "null" : parts.getClass().getSimpleName(),
-                    names == null ? 0 : names.size(),
-                    usable.size(), rejected, scriptRegisteredGroups.size());
             }
             // RTM 原作の Parts は .render(renderer) で対応グループを描画する。
             // ここで実用版 ScriptParts を返し、bogieF.render(renderer) 等が機能するようにする。
@@ -5464,12 +5431,10 @@ public class TrainScriptSystem {
 
         public void sendChatMessageToAll(Object... args) {
             if (args != null && args.length > 0) {
-                RealTrainModUnofficial.LOGGER.info("[NGTLog] {}", args[0]);
             }
         }
         public void info(Object... args) {
             if (args != null && args.length > 0) {
-                RealTrainModUnofficial.LOGGER.info("[NGTLog] {}", args[0]);
             }
         }
         public void warn(Object... args) {

@@ -90,8 +90,6 @@ public final class LegacyRestorer {
         BLOCKS.addAll(data.blocks);
         total = OBJECTS.size() + ENTITIES.size();
         running = total > 0 || !BLOCKS.isEmpty();
-        RealTrainModUnofficial.LOGGER.info("[convert] 復元開始: オブジェクト {} 個 / エンティティ {} 個",
-                data.objects.size(), data.entities.size());
     }
 
     /** サーバー tick から呼ぶ。 */
@@ -152,9 +150,7 @@ public final class LegacyRestorer {
     private static void finish() {
         running = false;
         if (blocksPlaced > 0) {
-            RealTrainModUnofficial.LOGGER.info("[convert] MOD のブロック {} 個をバニラに戻しました", blocksPlaced);
         }
-        RealTrainModUnofficial.LOGGER.info("[convert] 復元完了: {} 個を配置 / {} 個は失敗", placed, failed);
         MISSING.stream().distinct().sorted().forEach(name ->
                 RealTrainModUnofficial.LOGGER.warn("[convert] モデルが見つかりません (パックを入れてください): {}", name));
         MISSING_POLES.forEach(name ->
@@ -262,8 +258,6 @@ public final class LegacyRestorer {
 
         //本家の "makeRail" = 土台ブロックも作る、"isCreative" = 資材を消費しない
         boolean ok = BlockMarker.createRail(level, rec.x, rec.y, rec.z, rps, prop, true, true);
-        RealTrainModUnofficial.LOGGER.info("[convert] レール {} @ {},{},{} ({} 点) → {}",
-                prop.railModel, rec.x, rec.y, rec.z, rps.size(), ok ? "敷設" : "失敗");
         if (ok) {
             //[診断] 敷いた直後のコアと土台の中身を出す (モデルが「適当なもの」になる原因の切り分け)
             List<RailPosition> sorted = new java.util.ArrayList<>(rps);
@@ -272,8 +266,6 @@ public final class LegacyRestorer {
             BlockPos corePos = new BlockPos(first.blockX, first.blockY, first.blockZ);
             net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(corePos);
             if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore core) {
-                RealTrainModUnofficial.LOGGER.info("[convert-diag] コア @ {}: railModel='{}' block={}",
-                        corePos, core.getProperty().railModel, core.getProperty().block);
             } else {
                 RealTrainModUnofficial.LOGGER.warn("[convert-diag] コアが見つかりません @ {} (be={})", corePos, be);
             }
@@ -294,8 +286,6 @@ public final class LegacyRestorer {
                     }
                 }
             }
-            RealTrainModUnofficial.LOGGER.info("[convert-diag] 土台: 起点あり {} 個 / 起点なし {} 個 (コア周辺13x13)",
-                    okBase, badBase);
         }
         if (ok && com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(prop.railModel) == null) {
             RealTrainModUnofficial.LOGGER.warn("[convert] レールのモデル {} が見つかりません (パックを入れてください)", prop.railModel);
@@ -362,7 +352,6 @@ public final class LegacyRestorer {
             }
         }
         if (removed > 0) {
-            RealTrainModUnofficial.LOGGER.info("[convert] 旧レールの残骸を {} 個取り除きました", removed);
         }
     }
 

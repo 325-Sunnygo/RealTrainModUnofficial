@@ -118,7 +118,6 @@ public final class MqoModelLoader {
     private static final ResourceSearchResult MISSING_RESOURCE = new ResourceSearchResult(null, null, "__missing__");
 
     private static void logModelLoadDetail(String phase, String pattern, Object... args) {
-        RealTrainModUnofficial.LOGGER.debug("[ModelLoad:{}] " + pattern, prependArg(phase, args));
     }
 
     private static Object[] prependArg(String first, Object[] rest) {
@@ -199,10 +198,8 @@ public final class MqoModelLoader {
         if (cached != null) {
             return cached;
         }
-        RealTrainModUnofficial.LOGGER.debug("loadModelForVehicle: vehicleId={}, scriptPath='{}'", def.getId(), scriptPath);
         MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), true);
         if (model != null) {
-            RealTrainModUnofficial.LOGGER.info("loadModelForVehicle: model loaded, loading script");
             loadScriptForModel(model, packPath, scriptPath, def.getId());
             cacheModel(key, model);
         } else {
@@ -252,7 +249,6 @@ public final class MqoModelLoader {
         }
         String inferred = inferVehicleRenderScriptPath(packPath, def.getId(), def.getModelFile());
         if (!inferred.isBlank()) {
-            RealTrainModUnofficial.LOGGER.info("Inferred legacy render script '{}' for vehicle {}", inferred, def.getId());
             return inferred;
         }
         return "";
@@ -454,7 +450,7 @@ public final class MqoModelLoader {
                 }
                 Path modelPackPath = modelResource.packPath();
                 if (modelPackPath == null) {
-                    RealTrainModUnofficial.LOGGER.warn("Resolved MQO had no source pack for {} from {}", modelFile, packPath);
+                    RealTrainModUnofficial.LOGGER.warn("Resolved MQO had no source pack for {} from {}", modelFile, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
                     return null;
                 }
                 logModelLoadDetail("resolved", "modelFile={} resolvedPack={} filePath={} zipEntry={}", modelFile, modelPackPath, modelResource.filePath(), modelResource.zipEntryName());
@@ -485,7 +481,7 @@ public final class MqoModelLoader {
                 }
                 Path modelPackPath = modelResource.packPath();
                 if (modelPackPath == null) {
-                    RealTrainModUnofficial.LOGGER.warn("Resolved MQO had no source pack for {} from {}", modelFile, packPath);
+                    RealTrainModUnofficial.LOGGER.warn("Resolved MQO had no source pack for {} from {}", modelFile, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
                     return null;
                 }
                 logModelLoadDetail("resolved", "modelFile={} resolvedPack={} filePath={} zipEntry={}", modelFile, modelPackPath, modelResource.filePath(), modelResource.zipEntryName());
@@ -509,7 +505,7 @@ public final class MqoModelLoader {
                 return bake(text, opener, textureOverrides, smoothing);
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load MQO {} from {}", modelFile, packPath, e);
+            RealTrainModUnofficial.LOGGER.warn("Failed to load MQO {} from {}", modelFile, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), e);
             return null;
         }
     }
@@ -1636,7 +1632,6 @@ public final class MqoModelLoader {
         String leaf = normalized.contains("/") ? normalized.substring(normalized.lastIndexOf('/') + 1) : normalized;
         boolean hasExplicitPath = !normalized.isBlank();
 
-        RealTrainModUnofficial.LOGGER.info("loadScriptForModel: scriptPath='{}', normalized='{}', leaf='{}', hasExplicitPath={}", scriptPath, normalized, leaf, hasExplicitPath);
 
         try {
             if (hasExplicitPath) {
@@ -1645,7 +1640,6 @@ public final class MqoModelLoader {
                     legacyScript = VehicleModelPackManager.INSTANCE.getScript(leaf);
                 }
                 if (legacyScript != null && !legacyScript.isBlank()) {
-                    RealTrainModUnofficial.LOGGER.info("Loaded legacy script from resource manager: {}, length={}", normalized, legacyScript.length());
                     TrainScriptSystem.loadScript(normalized, legacyScript, model, modelName);
                     return;
                 }
@@ -1654,13 +1648,11 @@ public final class MqoModelLoader {
             if (hasExplicitPath) {
                 String warnKey = packPath + "|" + normalized;
                 if (MISSING_SCRIPT_WARNINGS.add(warnKey)) {
-                    RealTrainModUnofficial.LOGGER.debug("Legacy script lookup failed for {}; falling back to pack search", normalized);
                 }
             }
             // legacy resource manager may not be initialized or the script may not be available
         }
 
-        RealTrainModUnofficial.LOGGER.info("Attempting to load legacy model script '{}' from pack {}", hasExplicitPath ? normalized : "(fallback search)", packPath);
         try {
             if (Files.isDirectory(packPath)) {
                 Path scriptFile = null;
@@ -1671,15 +1663,13 @@ public final class MqoModelLoader {
                     }
                 }
                 if (scriptFile != null && Files.exists(scriptFile)) {
-                    RealTrainModUnofficial.LOGGER.info("Found model script at {}", scriptFile);
                     String script = PackTextDecoder.readText(scriptFile);
                     script = preprocessScriptIncludesForDirectory(scriptFile, rootDirectory(packPath));
-                    RealTrainModUnofficial.LOGGER.info("Script file loaded, length={}", script.length());
                     TrainScriptSystem.loadScript(normalized, script, model, modelName);
                 } else {
                     Path fallback = findFallbackScriptFile(packPath);
                     if (fallback != null) {
-                        RealTrainModUnofficial.LOGGER.warn("Model script {} not found in pack directory {}; using fallback {}", normalized, packPath, fallback);
+                        RealTrainModUnofficial.LOGGER.warn("Model script {} not found in pack directory {}; using fallback {}", normalized, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), fallback);
                         String script = PackTextDecoder.readText(fallback);
                         script = preprocessScriptIncludesForDirectory(fallback, rootDirectory(packPath));
                         TrainScriptSystem.loadScript(fallback.toString(), script, model, modelName);
@@ -1689,10 +1679,10 @@ public final class MqoModelLoader {
                             if (external != null && !packPath.equals(external.packPath())) {
                                 loadScriptFromResource(model, external, normalized, modelName);
                             } else {
-                                RealTrainModUnofficial.LOGGER.warn("Model script not found in pack directory: {} (normalized={})", packPath, normalized);
+                                RealTrainModUnofficial.LOGGER.warn("Model script not found in pack directory: {} (normalized={})", com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), normalized);
                             }
                         } else {
-                            RealTrainModUnofficial.LOGGER.warn("No fallback model script found in pack directory: {}", packPath);
+                            RealTrainModUnofficial.LOGGER.warn("No fallback model script found in pack directory: {}", com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
                         }
                     }
                 }
@@ -1706,7 +1696,6 @@ public final class MqoModelLoader {
                         }
                     }
                     if (entry != null) {
-                        RealTrainModUnofficial.LOGGER.info("Found model script in pack zip: {}", entry.getName());
                         try (InputStream in = zf.getInputStream(entry)) {
                             String script = PackTextDecoder.readText(in);
                             script = preprocessScriptIncludesForZip(zf, entry.getName(), script);
@@ -1715,7 +1704,7 @@ public final class MqoModelLoader {
                     } else {
                         ZipEntry fallback = findFallbackScriptEntry(zf);
                         if (fallback != null) {
-                            RealTrainModUnofficial.LOGGER.warn("Model script {} not found in pack zip {}; using fallback {}", normalized, packPath, fallback.getName());
+                            RealTrainModUnofficial.LOGGER.warn("Model script {} not found in pack zip {}; using fallback {}", normalized, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), fallback.getName());
                             try (InputStream in = zf.getInputStream(fallback)) {
                                 String script = PackTextDecoder.readText(in);
                                 script = preprocessScriptIncludesForZip(zf, fallback.getName(), script);
@@ -1727,17 +1716,17 @@ public final class MqoModelLoader {
                                 if (external != null && !packPath.equals(external.packPath())) {
                                     loadScriptFromResource(model, external, normalized, modelName);
                                 } else {
-                                    RealTrainModUnofficial.LOGGER.warn("Model script not found in pack zip: {} (normalized={})", packPath, normalized);
+                                    RealTrainModUnofficial.LOGGER.warn("Model script not found in pack zip: {} (normalized={})", com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), normalized);
                                 }
                             } else {
-                                RealTrainModUnofficial.LOGGER.warn("No fallback model script found in pack zip: {}", packPath);
+                                RealTrainModUnofficial.LOGGER.warn("No fallback model script found in pack zip: {}", com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
                             }
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load script {} from pack {}", scriptPath, packPath, e);
+            RealTrainModUnofficial.LOGGER.warn("Failed to load script {} from pack {}", scriptPath, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), e);
         }
     }
 
@@ -1818,7 +1807,7 @@ public final class MqoModelLoader {
                 }
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load standalone script {} from {}", scriptPath, packPath, e);
+            RealTrainModUnofficial.LOGGER.warn("Failed to load standalone script {} from {}", scriptPath, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), e);
         }
         return null;
     }
@@ -2309,7 +2298,6 @@ public final class MqoModelLoader {
                 return info;
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Could not load texture {}: {}", binding.path(), e.getMessage());
         }
         ResourceLocation fallback = fallbackTexture();
         return new TextureInfo(fallback, new ResourceLocation[0], false);
@@ -4075,9 +4063,6 @@ public final class MqoModelLoader {
                         Object renderType = engine.eval("typeof render");
                         hasLegacyRenderFunction = "function".equals(renderType)
                             || (renderType != null && "function".equals(renderType.toString()));
-                        RealTrainModUnofficial.LOGGER.debug(
-                            "[ScriptDiag] hasRenderFn={} typeofRender={}",
-                            hasLegacyRenderFunction, renderType);
                     }
                     if (Boolean.TRUE.equals(hasLegacyRenderFunction)) {
                         boolean rendered;
@@ -4641,9 +4626,6 @@ public final class MqoModelLoader {
                 GroupPredicate translucentFilter = groupFilter;
                 if (hasScript && scriptRenderer != null && bakedFilterLogCount < 3) {
                     bakedFilterLogCount++;
-                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-                        "[BakedFilter:preferScript] hasScriptRenderedGroups={}",
-                        scriptRenderer.hasScriptRenderedGroups());
                 }
                 if (hasScript && scriptRenderer != null && scriptRenderer.hasScriptRenderedGroups()) {
                     opaqueFilter = groupName ->
@@ -4731,9 +4713,6 @@ public final class MqoModelLoader {
             // baked render の filter 適用状態を一度だけ可視化する。
             if (hasScript && scriptRenderer != null && bakedFilterLogCount < 3) {
                 bakedFilterLogCount++;
-                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-                    "[BakedFilter] hasScriptRenderedGroups={}",
-                    scriptRenderer.hasScriptRenderedGroups());
             }
             if (hasScript && scriptRenderer != null && scriptRenderer.hasScriptRenderedGroups()) {
                 opaqueFilter = groupName ->

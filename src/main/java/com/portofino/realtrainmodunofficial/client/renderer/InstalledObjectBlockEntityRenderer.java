@@ -96,9 +96,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                 // 診断: 改札の扉グループ名と barMoveCount を1回だけ記録(扉トランスフォームの対象特定用)。
                 if (blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE
                     && TICKET_GATE_LOGGED.add(definition.getId())) {
-                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug(
-                        "[RTM-DBG] ticketGate id={} barMove={} groups={}",
-                        definition.getId(), blockEntity.getBarMoveCount(), model.getAllNormalizedGroupNames());
                 }
                 boolean pushed = false;
                 try {
@@ -380,10 +377,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         if (definition == null || !WIRE_ROUTE_LOGGED.add(definition.getId())) {
             return;
         }
-        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-            "[wire-route] id={} pack={} modelFile={} scriptPath={} hasScript={} modelLoaded={}",
-            definition.getId(), definition.getPackName(), definition.getModelFile(),
-            wireScript == null ? "(null)" : wireScript, hasScript, model != null);
     }
 
     private static final java.util.Set<String> WIRE_SCRIPT_LOGGED =
@@ -394,8 +387,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         if (definition == null || !WIRE_SCRIPT_LOGGED.add(definition.getId())) {
             return;
         }
-        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-            "[wire-route] id={} rendererReady={} scriptDrew={}", definition.getId(), hasRenderer, drawn);
     }
 
     private static boolean hasRenderableWireModel(InstalledObjectDefinition definition) {

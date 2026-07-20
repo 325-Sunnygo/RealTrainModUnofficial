@@ -65,9 +65,7 @@ public final class TimeTableManager {
         loadFromPacks();
         loadFromUserDir();
         if (entries.isEmpty()) {
-            RealTrainModUnofficial.LOGGER.debug("[TTM] no timetable found");
         } else {
-            RealTrainModUnofficial.LOGGER.debug("[TTM] loaded {} timetable(s): {}", entries.size(), entries.keySet());
         }
     }
 
@@ -91,7 +89,6 @@ public final class TimeTableManager {
                 }
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("[TTM] resource scan failed", e);
         }
     }
 
@@ -126,14 +123,12 @@ public final class TimeTableManager {
                 }
             }
         } catch (IOException e) {
-            RealTrainModUnofficial.LOGGER.debug("[TTM] user dir scan failed", e);
         }
     }
 
     private void put(String name, byte[] bytes) {
         try {
             entries.put(name, new TimeTable(name, readCsv(bytes)));
-            RealTrainModUnofficial.LOGGER.debug("[TTM] load TT : {}", name);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("[TTM] failed to parse {}", name, e);
         }

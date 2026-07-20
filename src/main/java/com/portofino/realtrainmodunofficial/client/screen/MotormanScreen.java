@@ -145,7 +145,6 @@ public class MotormanScreen extends Screen {
         try {
             List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
             PacketDistributor.sendToServer(new MotormanMacroPayload(this.entityId, String.join("\n", lines)));
-            RealTrainModUnofficial.LOGGER.info("[Motorman] set macro: {}", file.getFileName());
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("[Motorman] macro read failed: {}", e.toString());
         }

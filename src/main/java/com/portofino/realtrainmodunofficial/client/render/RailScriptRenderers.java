@@ -96,7 +96,6 @@ public final class RailScriptRenderers {
             se.put("renderer", renderer);
             ModelObject modelObject = new ModelObject(new TextureSet[]{new TextureSet(new Material(null))});
             renderer.init(null, modelObject);
-            RealTrainModUnofficial.LOGGER.info("Rail script renderer initialized: {} ({})", def.getId(), rcName);
             return new Scripted(renderer, se);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init rail script renderer for {}", def.getId(), t);

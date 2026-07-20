@@ -47,7 +47,6 @@ public final class BundledPackInstaller {
                 Path oldCopy = modsDir.resolve(fileName);
                 if (Files.exists(oldCopy)) {
                     Files.delete(oldCopy);
-                    RealTrainModUnofficial.LOGGER.info("Moved bundled pack from mods to {}: {}", DefaultAssetsFolder.NAME, fileName);
                 }
             }
             //パック作者の Readme 等 (zip 以外) も zip と同じフォルダに置く
@@ -67,7 +66,6 @@ public final class BundledPackInstaller {
             Path target = modsDir.resolve(fileName);
             if (Files.exists(target)) {
                 Files.delete(target);
-                RealTrainModUnofficial.LOGGER.info("Removed deprecated bundled pack from mods folder: {}", fileName);
             }
         }
     }

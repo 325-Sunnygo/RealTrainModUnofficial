@@ -116,7 +116,6 @@ public class VehicleFormationItem extends Item {
         double currentZ = spawnData.z;
         float currentYaw = spawnData.yaw;
         
-        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info("Spawn train at x={}, y={}, z={}, yaw={}", currentX, currentY, currentZ, currentYaw);
         
         List<TrainEntity> spawnedTrains = new ArrayList<>();
         double previousHalfLength = 0.0D;

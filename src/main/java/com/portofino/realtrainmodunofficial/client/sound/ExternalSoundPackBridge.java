@@ -103,7 +103,6 @@ public final class ExternalSoundPackBridge {
                         copiedAnySoundAsset |= collectFromArchive(candidate, mergedSoundDefs);
                     }
                 } catch (Exception e) {
-                    RealTrainModUnofficial.LOGGER.debug("Could not scan external sound assets from {}", candidate, e);
                 }
             }
             boolean wroteAnyJson = writeMergedSoundsJson(mergedSoundDefs);
@@ -113,7 +112,6 @@ public final class ExternalSoundPackBridge {
             //(以前は空だと pack ごと削除して null=未登録にしていたため、その状況では同意しても
             // 再読込で音が復活しなかった。)
             if (!copiedAnySoundAsset && !wroteAnyJson) {
-                RealTrainModUnofficial.LOGGER.debug("External sound bridge: no external sounds yet (empty pack registered)");
             }
             writePackMeta();
             return GENERATED_PACK_ROOT;
@@ -147,7 +145,6 @@ public final class ExternalSoundPackBridge {
                     }
                 });
             } catch (IOException e) {
-                RealTrainModUnofficial.LOGGER.debug("Could not list sound candidate root {}", root, e);
             }
         }
         return new ArrayList<>(unique);
@@ -361,7 +358,6 @@ public final class ExternalSoundPackBridge {
                 target.add(sanitizeSoundPath(entry.getKey()), normalizeSoundEvent(namespace, entry.getValue()));
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Could not merge sounds.json for namespace {}", namespace, e);
         }
     }
 

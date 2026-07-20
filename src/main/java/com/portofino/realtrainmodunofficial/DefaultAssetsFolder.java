@@ -30,7 +30,7 @@ public final class DefaultAssetsFolder {
         try {
             Files.createDirectories(dir);
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Could not create default assets folder {}", dir, e);
+            RealTrainModUnofficial.LOGGER.warn("Could not create default assets folder {}", com.portofino.realtrainmodunofficial.util.LogPaths.safe(dir), e);
         }
         return dir;
     }

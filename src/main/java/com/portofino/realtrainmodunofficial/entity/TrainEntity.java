@@ -1518,16 +1518,6 @@ public class TrainEntity extends Entity {
                         stallLogCooldown = 20;
                         jp.ngt.rtm.rail.util.RailMap fm = frontRailAnchor.map();
                         jp.ngt.rtm.rail.util.RailMap rm = rearRailAnchor.map();
-                        RealTrainModUnofficial.LOGGER.debug(
-                            "[RTM-DBG] TELEPORT-REJECT veh={} jump={} allowed={} from=({},{}) to=({},{})",
-                            getVehicleId(), (float) Math.sqrt(jumpSq), (float) allowed,
-                            (float) preX, (float) preZ, (float) candidateCenter.x(), (float) candidateCenter.z());
-                        RealTrainModUnofficial.LOGGER.debug(
-                            "[RTM-DBG]   front: pos=({},{}) idx={}/{} dir={} map={} | rear: pos=({},{}) idx={}/{} dir={} map={}",
-                            (float) front.x(), (float) front.z(), (float) frontRailAnchor.index(), frontRailAnchor.split(), frontRailAnchor.travelDirection(),
-                            fm == null ? "null" : (fm.getClass().getSimpleName() + railEndpoints(fm)),
-                            (float) rear.x(), (float) rear.z(), (float) rearRailAnchor.index(), rearRailAnchor.split(), rearRailAnchor.travelDirection(),
-                            rm == null ? "null" : (rm.getClass().getSimpleName() + railEndpoints(rm)));
                     }
                     return true;
                     }
@@ -1684,7 +1674,6 @@ public class TrainEntity extends Entity {
         if (controllerDirection > 0) {
             RailAnchor movedFront = advanceBogieAnchor(frontRailAnchor, distanceMeters, frontPathDirection);
             if (!isRailAnchorUsable(movedFront)) {
-                RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] PAIR-FAIL movedFront unusable");
                 return false;
             }
             RailSample movedFrontSample = sampleBogieRail(movedFront.map(), movedFront.split(), movedFront.index());
@@ -1692,7 +1681,6 @@ public class TrainEntity extends Entity {
             // 遠点回避)。前回位置近傍に無い(レール端越え等)場合だけアーク逆算にフォールバックする。
             RailAnchor bestRear = deriveTrailingAnchor(rearRailAnchor, movedFrontSample, Math.abs(span), movedFront);
             if (!isRailAnchorUsable(bestRear)) {
-                RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] PAIR-FAIL bestRear");
                 return false;
             }
             frontRailAnchor = movedFront;
@@ -1704,14 +1692,12 @@ public class TrainEntity extends Entity {
 
         RailAnchor movedRear = advanceBogieAnchor(rearRailAnchor, distanceMeters, rearPathDirection);
         if (!isRailAnchorUsable(movedRear)) {
-            RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] PAIR-FAIL movedRear unusable");
             return false;
         }
         RailSample movedRearSample = sampleBogieRail(movedRear.map(), movedRear.split(), movedRear.index());
         // 本家RTM式: 前台車は「前回位置の近傍」で後台車から台車間隔の弦距離になる点を探す(連続性優先)。
         RailAnchor bestFront = deriveTrailingAnchor(frontRailAnchor, movedRearSample, Math.abs(span), movedRear);
         if (!isRailAnchorUsable(bestFront)) {
-            RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] PAIR-FAIL bestFront");
             return false;
         }
         rearRailAnchor = movedRear;
@@ -2038,9 +2024,6 @@ public class TrainEntity extends Entity {
                 RailFollowContext snapped = findRailContextBeyondBoundary(map, split, boundaryIndex, travelDirection);
                 if (snapped == null) {
                     RailSample bSample = sampleRail(map, split, boundaryIndex);
-                    RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] AAP no-conn: boundary={} dir={} rem={} pos=({},{},{})",
-                        boundaryIndex, travelDirection, (float) remaining,
-                        (float) bSample.x, (float) bSample.y, (float) bSample.z);
                     index = boundaryIndex;
                     break;
                 }
@@ -2205,8 +2188,6 @@ public class TrainEntity extends Entity {
             if (next == null) {
                 RailFollowContext snapped = findRailContextBeyondBoundary(map, split, boundaryIndex, travelDirection);
                 if (snapped == null) {
-                    RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] ABA no-conn: boundary={} dir={} rem={}",
-                        boundaryIndex, travelDirection, (float) remaining);
                     return null;
                 }
                 map = snapped.map();
@@ -2300,8 +2281,6 @@ public class TrainEntity extends Entity {
         }
         railLookupIncludeAllSegments = false;
         if (best == null) {
-            RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] findConn FAIL: bpos=({},{},{}) outYaw={}",
-                (float) boundary.x, (float) boundary.y, (float) boundary.z, (float) outgoingYaw);
         }
         return best;
     }
@@ -2320,9 +2299,6 @@ public class TrainEntity extends Entity {
         RailSample sample = sampleRail(map, split, endpointIndex);
         double distSq = new Vec3(sample.x, sample.y, sample.z).distanceToSqr(boundaryPos);
         if (!sameEndpoint && distSq > RAIL_CONNECTION_MAX_DISTANCE_SQ) {
-            if (distSq < 4.0D) RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] eval reject dist: distSq={} pos=({},{},{}) bpos=({},{},{})",
-                (float) distSq, (float) sample.x, (float) sample.y, (float) sample.z,
-                (float) boundaryPos.x, (float) boundaryPos.y, (float) boundaryPos.z);
             return null;
         }
 
@@ -2338,8 +2314,6 @@ public class TrainEntity extends Entity {
         // 正しい継続は進行方向が揃う(yaw差小)。逆走接続はスイッチ内への逆流なので常に不可とする。
         boolean reversal = yawDiff > 90.0F;
         if ((!sameEndpoint && yawDiff > RAIL_CONNECTION_MAX_YAW_DIFF) || reversal) {
-            if (distSq < 1.0D) RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] eval reject yaw: yawDiff={} outYaw={} candYaw={} distSq={} same={}",
-                (float) yawDiff, (float) outgoingYaw, (float) candidateYaw, (float) distSq, sameEndpoint);
             return null;
         }
         double score = distSq + yawDiff * 0.02D + (sameEndpoint ? -200.0D : 0.0D);
@@ -5795,24 +5769,10 @@ public class TrainEntity extends Entity {
 
         int byBogie = findSeatByClickedBogie(def, clickOffsetWorld);
         if (byBogie >= 0) {
-            RealTrainModUnofficial.LOGGER.debug(
-                "Selected seat by bogie click: vehicle={}, seatIndex={}, clickOffset={}, player={}",
-                getVehicleId(),
-                byBogie,
-                clickOffsetWorld,
-                player.getName().getString()
-            );
             return byBogie;
         }
 
         int fallback = findNearestSeatToLocalClick(def, worldToLocal(position().add(clickOffsetWorld)));
-        RealTrainModUnofficial.LOGGER.debug(
-            "Selected seat by nearest JSON seat: vehicle={}, seatIndex={}, clickOffset={}, player={}",
-            getVehicleId(),
-            fallback,
-            clickOffsetWorld,
-            player.getName().getString()
-        );
         return fallback;
     }
 
@@ -5866,15 +5826,6 @@ public class TrainEntity extends Entity {
         Vec3 nearestOffset = localToWorld(nearest.position()).subtract(position());
         boolean frontBogie = nearestOffset.dot(forward) >= 0.0D;
         int seatIndex = frontBogie ? resolveFrontSeatIndex(def) : resolveRearSeatIndex(def);
-        RealTrainModUnofficial.LOGGER.debug(
-            "Clicked bogie resolved to seat: vehicle={}, bogieIndex={}, frontBogie={}, seatIndex={}, clickOffset={}, bestDistance={}",
-            getVehicleId(),
-            nearestIndex,
-            frontBogie,
-            seatIndex,
-            clickOffsetWorld,
-            bestDistance
-        );
         return seatIndex;
     }
 
@@ -5923,7 +5874,6 @@ public class TrainEntity extends Entity {
 
     private InteractionResult tryRideWithSeat(Player player, int seatIndex) {
         if (seatIndex < 0) {
-            RealTrainModUnofficial.LOGGER.debug("Ride denied: invalid seat index {} for vehicle {}", seatIndex, getVehicleId());
             return InteractionResult.PASS;
         }
         if (player.getVehicle() != null) {
@@ -5944,32 +5894,9 @@ public class TrainEntity extends Entity {
         if (isDriverSeatIndex(seatIndex)) {
             setReverser(getDefaultReverserForSeat(def, seatIndex));
         }
-        RealTrainModUnofficial.LOGGER.info(
-            "Ride request: vehicle={}, player={}, seatIndex={}, isDriverSeat={}, clickPassengers={}",
-            getVehicleId(),
-            player.getName().getString(),
-            seatIndex,
-            isDriverSeatIndex(seatIndex),
-            seatAssignments.size()
-        );
-        RealTrainModUnofficial.LOGGER.debug(
-            "Try mount: player='{}' vehicle='{}' seat={} passengers={}/{} canAddPassenger={}",
-            player.getName().getString(),
-            getVehicleId(),
-            seatIndex,
-            seatAssignments.size(),
-            Math.max(1, getSeatCount(VehicleRegistry.getById(getVehicleId()))),
-            this.canAddPassenger(player)
-        );
         if (player.startRiding(seatEntity, true)) {
             //転換クロスシート: 座った向きに合わせて編成全体の座席を転換する
             updateSeatDirectionFor(player);
-            RealTrainModUnofficial.LOGGER.info(
-                "Player '{}' mounted vehicle '{}' at seat {}",
-                player.getName().getString(),
-                getVehicleId(),
-                seatIndex
-            );
             return InteractionResult.SUCCESS;
         }
 

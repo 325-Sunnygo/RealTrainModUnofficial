@@ -98,7 +98,6 @@ public final class VehicleScriptRenderers {
             //init 内の一部機能 (モニタ等) が失敗しても登録済み Parts で描画を続行する
             renderer.init(modelSet, modelObject);
 
-            RealTrainModUnofficial.LOGGER.info("Vehicle script renderer initialized: {} ({})", def.getId(), rcName);
             return new Scripted(renderer, se, modelObject);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init vehicle script renderer for {}", def.getId(), t);
@@ -143,7 +142,6 @@ public final class VehicleScriptRenderers {
                 }
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Failed to build model graph for {}: {}", def.getId(), e.toString());
         }
         if (mo.model == null) {
             mo.model = new PolygonModel();

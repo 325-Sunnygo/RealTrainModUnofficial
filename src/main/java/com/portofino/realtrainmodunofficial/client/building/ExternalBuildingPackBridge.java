@@ -104,11 +104,9 @@ public final class ExternalBuildingPackBridge {
                             written++;
                         }
                     } catch (Exception ex) {
-                        RealTrainModUnofficial.LOGGER.debug("Skip external building block {}", e.blockId(), ex);
                     }
                 }
             } catch (Exception ex) {
-                RealTrainModUnofficial.LOGGER.debug("Could not read building mod {}", jarEntries.getKey(), ex);
             }
         }
         if (written == 0) {

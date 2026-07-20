@@ -58,9 +58,6 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
             } catch (Throwable t) {
                 if (!WIRE_DIAG_WARNED) {
                     WIRE_DIAG_WARNED = true;
-                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug(
-                        "[WireRenderDiag] renderWireDynamic failed: vec={} -> {}", vec,
-                        String.valueOf(t.getCause() != null ? t.getCause() : t));
                 }
             }
         }

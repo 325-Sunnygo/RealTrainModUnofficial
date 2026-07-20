@@ -94,8 +94,6 @@ public final class ExternalBuildingBlocks {
         }
         BLOCKS.register(modBus);
         ITEMS.register(modBus);
-        RealTrainModUnofficial.LOGGER.info(
-            "Loaded {} external 1.7.10 building block(s) from mods folder", ENTRIES.size());
     }
 
     private static void scan() {
@@ -113,7 +111,6 @@ public final class ExternalBuildingBlocks {
                 }
             });
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Could not list mods dir for building blocks", e);
             return;
         }
         //決定的な順序 (レジストリ/リソースパックで ID が安定するように)。
@@ -183,7 +180,6 @@ public final class ExternalBuildingBlocks {
                 ENTRIES.add(new Entry(blockId, jar, name, mcmeta, display, transparent));
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Could not scan building mod {}", jar.getFileName(), e);
         }
     }
 

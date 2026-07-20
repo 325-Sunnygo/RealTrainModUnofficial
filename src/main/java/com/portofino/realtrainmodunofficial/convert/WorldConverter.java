@@ -110,7 +110,6 @@ public final class WorldConverter {
     public static Report convert(Path source, Path savesDir) throws IOException {
         String name = source.getFileName().toString();
         Path output = uniquePath(savesDir.resolve(name + " (RTMU)"));
-        RealTrainModUnofficial.LOGGER.info("[convert] {} -> {}", source, output);
 
         copyTree(source, output);
 
@@ -123,8 +122,6 @@ public final class WorldConverter {
         scanWorld(output, scan);
 
         if (!scan.blocks.isEmpty()) {
-            RealTrainModUnofficial.LOGGER.info("[convert] {}: MOD のブロック {} 個をバニラに読み替えます",
-                    name, scan.blocks.size());
         }
         scan.unknownBlocks.forEach((n, c) ->
                 RealTrainModUnofficial.LOGGER.warn("[convert] {}: 対応表に無い MOD ブロック {} ({} 個)", name, n, c));
@@ -139,10 +136,7 @@ public final class WorldConverter {
         Set<Integer> railIds = LegacyBlockIds.railBlockIds(blockIds);
         int stripped = railIds.isEmpty() ? 0 : stripBlocks(output, railIds);
         if (stripped > 0) {
-            RealTrainModUnofficial.LOGGER.info("[convert] {}: 旧レールのブロックを {} 個消しました ({})",
-                    name, stripped, railIds.size() + " 種類");
         } else if (railIds.isEmpty() && !blockIds.isEmpty()) {
-            RealTrainModUnofficial.LOGGER.info("[convert] {}: 旧 RTM のレールブロックは見つかりませんでした", name);
         }
 
         RestoreData data = new RestoreData();
@@ -155,8 +149,6 @@ public final class WorldConverter {
 
         fixLevelDat(output);
 
-        RealTrainModUnofficial.LOGGER.info("[convert] {}: chunks={} objects={} entities={}",
-                name, scan.chunks, scan.objects.size(), scan.entities.size());
         scan.unknown.forEach((id, count) ->
                 RealTrainModUnofficial.LOGGER.warn("[convert] {}: 未対応の id {} ({} 個)", name, id, count));
 

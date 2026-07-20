@@ -175,8 +175,6 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
     }
 
     private static void sendAnchor(net.minecraft.core.BlockPos pos, RailPosition rp) {
-        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-                "[MarkerAnchor] send pos={} yaw={} lenH={} pitch={}", pos, rp.anchorYaw, rp.anchorLengthHorizontal, rp.anchorPitch);
         net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                 new com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload(pos, rp.writeToNBT()));
     }

@@ -69,8 +69,6 @@ public final class PackZip {
                 throw e;
             }
         }
-        RealTrainModUnofficial.LOGGER.info(
-            "Pack {} has non-UTF-8 (Shift-JIS) entry names; reloading with Shift-JIS", packName);
         try (InputStream in = opener.open()) {
             reader.read(in, SHIFT_JIS);
         }

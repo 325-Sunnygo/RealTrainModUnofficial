@@ -109,7 +109,6 @@ public final class MachineScriptRenderers {
             cfg.init();
             renderer.init(new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(cfg), mo);
 
-            RealTrainModUnofficial.LOGGER.info("Machine script renderer initialized: {} ({})", def.getId(), rcName);
             return new Scripted(renderer, mo);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init machine script renderer for {}", def.getId(), t);

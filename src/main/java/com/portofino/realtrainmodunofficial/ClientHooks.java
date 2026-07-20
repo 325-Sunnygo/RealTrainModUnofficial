@@ -154,7 +154,6 @@ public final class ClientHooks {
             java.lang.reflect.Method method = resolveClientMethod(methodName, parameterTypes);
             method.invoke(null, args);
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Client hook {} failed", methodName, e);
         }
     }
 

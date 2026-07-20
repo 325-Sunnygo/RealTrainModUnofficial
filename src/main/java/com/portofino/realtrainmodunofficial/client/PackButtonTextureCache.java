@@ -52,7 +52,6 @@ public final class PackButtonTextureCache {
                 }
                 return registerDynamicTexture(packName, texturePath, fallbackImage);
             } catch (Exception e) {
-                RealTrainModUnofficial.LOGGER.debug("Could not globally resolve buttonTexture {} from {}", texturePath, packName, e);
                 return null;
             }
         }
@@ -68,7 +67,6 @@ public final class PackButtonTextureCache {
             }
             return registerDynamicTexture(packName, texturePath, image);
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Could not load buttonTexture {} from {}", texturePath, packName, e);
             return null;
         }
     }

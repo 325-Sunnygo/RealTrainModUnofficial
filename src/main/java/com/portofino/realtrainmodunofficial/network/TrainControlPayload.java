@@ -55,7 +55,6 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 return;
             }
             if (!(player.level().getEntity(payload.trainEntityId()) instanceof TrainEntity train)) {
-                RealTrainModUnofficial.LOGGER.info("Train control ignored: train {} not found for action {}", payload.trainEntityId(), payload.action());
                 return;
             }
             TrainEntity sourceTrain = train;
@@ -88,30 +87,12 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             boolean driverPassenger = sourceTrain.isDriverPassenger(player) || train.isDriverPassenger(player);
             boolean dismountAction = "dismount".equals(payload.action());
             if (!dismountAction && !sameFormationRide && !assignedSeat && !driverPassenger) {
-                RealTrainModUnofficial.LOGGER.info(
-                    "Train control ignored: player={} action={} requestedTrain={} sourceTrain={} sameFormationRide={} assignedSeat={}",
-                    player.getName().getString(),
-                    payload.action(),
-                    train.getVehicleId(),
-                    sourceTrain.getVehicleId(),
-                    sameFormationRide,
-                    assignedSeat
-                );
                 return;
             }
             if (!dismountAction && driverPassenger) {
                 controlTrain.markDriverControl(player);
                 sourceTrain.markDriverControl(player);
             }
-            RealTrainModUnofficial.LOGGER.info(
-                "Train control accepted: player={} action={} train={} head={} notch={} reverser={}",
-                player.getName().getString(),
-                payload.action(),
-                sourceTrain.getVehicleId(),
-                controlTrain.getVehicleId(),
-                controlTrain.getNotch(),
-                controlTrain.getReverser()
-            );
 
             switch (payload.action()) {
                 case "mascon_power" -> {

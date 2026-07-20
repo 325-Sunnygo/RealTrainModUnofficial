@@ -49,10 +49,6 @@ public final class SrbRailBridge {
     /** SRB の buildNormalRail 相当(2点間に通常レール)。 */
     public boolean buildNormalRail(Object world, RailPosition start, RailPosition end, Object modelId) {
         Level level = toLevel(world);
-        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug(
-            "[RTM-DBG] SRB buildNormalRail level={} start={} end={} model={}",
-            level != null, start != null ? (start.blockX + "," + start.blockY + "," + start.blockZ) : "null",
-            end != null ? (end.blockX + "," + end.blockY + "," + end.blockZ) : "null", toModelId(modelId));
         if (level == null || start == null || end == null) {
             return false;
         }
@@ -60,7 +56,6 @@ public final class SrbRailBridge {
         rps.add(start);
         rps.add(end);
         boolean ok = buildRailFaithful(level, rps, toModelId(modelId));
-        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] SRB buildNormalRail result={}", ok);
         return ok;
     }
 
@@ -209,7 +204,6 @@ public final class SrbRailBridge {
         try {
             RailPosition[] rps = core.getRailPositions();
             if (rps == null) {
-                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] SRB railCoreAt {} rps=null", tag);
                 return;
             }
             StringBuilder sb = new StringBuilder();
@@ -219,9 +213,7 @@ public final class SrbRailBridge {
                 sb.append(String.format("[%d]pos(%.2f,%.2f,%.2f) yaw=%.1f pitch=%.1f dir=%d ",
                     i, rp.posX, rp.posY, rp.posZ, rp.anchorYaw, rp.anchorPitch, rp.direction));
             }
-            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] SRB railCoreAt {} {}", tag, sb);
         } catch (Throwable t) {
-            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug("[RTM-DBG] SRB railCoreAt {} err {}", tag, t.toString());
         }
     }
 

@@ -37,7 +37,6 @@ public class VehiclePackLoader {
         loadFromExternalDirectories();
         loadFromGameDirectories();
         VehicleRegistry.setDefinitions(LOADED);
-        RealTrainModUnofficial.LOGGER.info("Loaded {} vehicle definition(s)", LOADED.size());
         dumpLoadedList();
     }
 
@@ -58,7 +57,6 @@ public class VehiclePackLoader {
                 .collect(java.util.stream.Collectors.toList());
             Files.write(out, lines, java.nio.charset.StandardCharsets.UTF_8);
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Could not write loaded_vehicles.txt: {}", e.toString());
         }
     }
 
@@ -98,8 +96,6 @@ public class VehiclePackLoader {
                         }
                     });
             }
-            RealTrainModUnofficial.LOGGER.info("Loaded {} bundled train (ModelTrain_) and {} bundled car (ModelVehicle_) definition(s)",
-                    trains[0], cars[0]);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not load bundled car definitions", e);
         }
@@ -138,7 +134,6 @@ public class VehiclePackLoader {
 
     private static void scanPackRoot(Path dir) throws IOException {
         if (!Files.isDirectory(dir)) return;
-        RealTrainModUnofficial.LOGGER.info("Scanning vehicle pack root: {}", dir);
         try (var stream = Files.list(dir)) {
             stream.forEach(path -> {
                 try {
@@ -174,12 +169,10 @@ public class VehiclePackLoader {
                     }
                     if (Files.isDirectory(path)) {
                         if (looksLikeVehiclePackDirectory(path)) {
-                            RealTrainModUnofficial.LOGGER.info("Scanning vehicle pack directory: {}", path);
                             loadVehiclePackDirectory(path);
                         }
                     } else if (isSupportedArchive(path)) {
                         // 配布形式に依らず同じ入口で処理できるよう、archive としてまとめて扱う。
-                        RealTrainModUnofficial.LOGGER.info("Scanning vehicle pack archive: {}", path.getFileName());
                         loadVehicleZip(path);
                     }
                 } catch (Exception e) {
@@ -245,7 +238,6 @@ public class VehiclePackLoader {
             Path ownArchive = modFile.getFile().getFilePath();
             return ownArchive != null && Files.isSameFile(path, ownArchive);
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("Could not compare vehicle archive against mod jar: {}", path, e);
             return false;
         }
     }

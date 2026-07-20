@@ -541,10 +541,6 @@ public class MarkerBlock extends BaseEntityBlock {
         Block coreBlock = RealTrainModUnofficialBlocks.LARGE_RAIL_CORE.get();
         level.setBlock(corePos, coreBlock.defaultBlockState(), Block.UPDATE_ALL);
 
-        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug(
-            "[RTM-DBG] BUILD normalRail start(blk={},{},{} h={} yaw={} posY={}) end(blk={},{},{} h={} yaw={} posY={})",
-            start.blockX, start.blockY, start.blockZ, start.height, start.anchorYaw, (float) start.posY,
-            end.blockX, end.blockY, end.blockZ, end.height, end.anchorYaw, (float) end.posY);
         BlockEntity coreBe = level.getBlockEntity(corePos);
         if (coreBe instanceof LargeRailCoreBlockEntity core) {
             core.setRailPositions(new RailPosition[]{start, end});

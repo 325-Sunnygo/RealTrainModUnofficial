@@ -85,8 +85,6 @@ public final class WireScriptRenderers {
             }
             if (!(instance instanceof WirePartsRenderer renderer)) {
                 //架線以外の renderClass (BasicWire 等が別クラスを指す場合) は従来描画に任せる
-                RealTrainModUnofficial.LOGGER.info("[wire] renderClass {} は WirePartsRenderer ではありません ({}) → 従来描画",
-                        rcName, def.getId());
                 return INVALID;
             }
             renderer.setScript(se);
@@ -116,7 +114,6 @@ public final class WireScriptRenderers {
             mo.model = modelBytes != null ? ModelLoader.parse(modelBytes, def.getModelFile()) : new PolygonModel();
 
             renderer.init(null, mo);
-            RealTrainModUnofficial.LOGGER.info("Wire script renderer initialized: {} ({})", def.getId(), rcName);
             return new Scripted(renderer, mo, resolveDefaultTexture(def));
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init wire script renderer for {}", def.getId(), t);

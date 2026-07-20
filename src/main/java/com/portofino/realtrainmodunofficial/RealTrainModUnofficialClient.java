@@ -27,8 +27,6 @@ public class RealTrainModUnofficialClient {
     @SubscribeEvent
     static void onClientSetup(FMLClientSetupEvent event) {
         // クライアントのセットアップ・コード
-        RealTrainModUnofficial.LOGGER.info("HELLO FROM CLIENT SETUP");
-        RealTrainModUnofficial.LOGGER.info("MINECRAFT NAME >> {}", Minecraft.getInstance().getUser().getName());
         com.portofino.realtrainmodunofficial.script.TrainScriptSystem.getInstance().initialize();
         VehicleModelPackManager.INSTANCE.initialize(Minecraft.getInstance().getResourceManager());
         PackRequirementWarnings.refresh();

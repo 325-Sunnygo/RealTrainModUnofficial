@@ -51,7 +51,6 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
     public void initialize(ResourceManager resourceManager) {
         if (initialized) return;
         
-        RealTrainModUnofficial.LOGGER.info("Initializing legacy Model Pack Manager...");
         
         try {
             this.resourceManager = resourceManager;
@@ -65,7 +64,6 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
             validateAndRegisterResources();
             
             initialized = true;
-            RealTrainModUnofficial.LOGGER.info("legacy Model Pack Manager initialized successfully");
             
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.error("Failed to initialize legacy Model Pack Manager", e);
@@ -112,7 +110,6 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
             ResourceConfig config = parseResourceConfig(configObj, packId);
             resourceConfigs.put(packId, config);
             
-            RealTrainModUnofficial.LOGGER.debug("Loaded vehicle config: {}", packId);
         }
     }
     
@@ -379,7 +376,6 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
                 loadedPacks.put(packId, pack);
                 activePacks.add(packId);
                 
-                RealTrainModUnofficial.LOGGER.debug("Loaded model pack: {}", packId);
             } catch (Exception e) {
                 RealTrainModUnofficial.LOGGER.warn("Failed to load model pack: {}", packId, e);
             }

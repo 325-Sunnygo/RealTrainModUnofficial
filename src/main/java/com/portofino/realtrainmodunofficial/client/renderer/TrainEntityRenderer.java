@@ -228,17 +228,6 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             // 初回スポーン時に1回だけ詳細ログを吐く（スパム防止）。
             if (LOGGED_VEHICLES.add(entity.getVehicleId())) {
                 java.util.Set<String> allGroups = model.getAllNormalizedGroupNames();
-                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-                    "[Render] vehicle={} script={} scriptRunning={} bogies={} groupsCount={}",
-                    entity.getVehicleId(),
-                    def.hasScript(),
-                    modelScriptRunning,
-                    def.getBogies().size(),
-                    allGroups.size()
-                );
-                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-                    "[Render] all groups: {}", allGroups
-                );
             }
             // 列車の実座標から取り直した lightmap を使用し、室内灯OFFの外装が夜に白く浮かないようにする。
             // 発光 pass は MqoModelLoader/TrainScriptSystem 側で室内灯ONの内装だけに制限する。

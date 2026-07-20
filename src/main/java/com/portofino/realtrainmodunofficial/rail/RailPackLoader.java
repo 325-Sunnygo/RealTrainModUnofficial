@@ -39,7 +39,6 @@ public class RailPackLoader {
         loadFromExternalDirectories();
         loadFromGameDirectories();
         RailRegistry.setDefinitions(LOADED);
-        RealTrainModUnofficial.LOGGER.info("Loaded {} rail definition(s)", LOADED.size());
     }
 
     private static void loadFromModJar() {
@@ -83,7 +82,6 @@ public class RailPackLoader {
                         }
                     });
             }
-            RealTrainModUnofficial.LOGGER.info("Loaded {} bundled rail (ModelRail_) definition(s)", count[0]);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Could not load bundled rail definitions", e);
         }
@@ -134,7 +132,6 @@ public class RailPackLoader {
                         loadRailPackFile(zipPath, zipPath.getFileName().toString());
                         int added = LOADED.size() - before;
                         if (added > 0) {
-                            RealTrainModUnofficial.LOGGER.info("Loaded {} rail definition(s) from {}", added, zipPath.getFileName());
                         }
                     } catch (Exception e) {
                         RealTrainModUnofficial.LOGGER.warn("Failed to load rail pack {}", zipPath.getFileName(), e);
@@ -203,7 +200,6 @@ public class RailPackLoader {
                 loadRailPack(input, nested.name(), depth + 1, charset);
                 int added = LOADED.size() - before;
                 if (added > 0) {
-                    RealTrainModUnofficial.LOGGER.info("Loaded {} rail definition(s) from nested pack {} in {}", added, nested.name(), packName);
                 }
             }
         }

@@ -41,9 +41,6 @@ public final class ConvertEvents {
                 Path gameDir = net.minecraft.client.Minecraft.getInstance().gameDirectory.toPath();
                 List<WorldConverter.Report> reports = WorldConverter.convertAll(gameDir, gameDir.resolve("saves"));
                 for (WorldConverter.Report report : reports) {
-                    RealTrainModUnofficial.LOGGER.info(
-                            "[convert] 「{}」を変換しました → {} (RTM オブジェクト {} 個 / 列車 {} 両)",
-                            report.name(), report.output().getFileName(), report.objects(), report.entities());
                 }
             });
         }

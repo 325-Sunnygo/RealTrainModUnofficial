@@ -96,7 +96,6 @@ public final class RtmuOnlineServices {
                     .GET().build();
             HttpResponse<String> res = newClient().send(req, HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() != 200) {
-                RealTrainModUnofficial.LOGGER.debug("[Online] update check http {}", res.statusCode());
                 return;
             }
             JsonObject json = JsonParser.parseString(res.body()).getAsJsonObject();
@@ -108,12 +107,9 @@ public final class RtmuOnlineServices {
             String current = normalizeVersion(currentModVersion());
             if (!latest.isEmpty() && !current.isEmpty() && compareVersions(latest, current) > 0) {
                 updateLatestVersion = latest;
-                RealTrainModUnofficial.LOGGER.info("[Online] RTMU update available: {} (current {})", latest, current);
             } else {
-                RealTrainModUnofficial.LOGGER.info("[Online] RTMU is up to date ({} / latest {})", current, latest);
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.debug("[Online] update check failed: {}", e.toString());
         }
     }
 
@@ -183,7 +179,6 @@ public final class RtmuOnlineServices {
                     .GET().build();
             HttpResponse<String> res = newClient().send(req, HttpResponse.BodyHandlers.ofString());
             if (res.statusCode() != 200) {
-                RealTrainModUnofficial.LOGGER.debug("[Online] ban list http {}", res.statusCode());
                 return;
             }
             Set<String> names = new HashSet<>();
@@ -201,7 +196,6 @@ public final class RtmuOnlineServices {
             }
         } catch (Exception e) {
             //サーバーが落ちている/オフライン → 安全側 (BAN しない)。
-            RealTrainModUnofficial.LOGGER.debug("[Online] ban check failed: {}", e.toString());
         }
     }
 }

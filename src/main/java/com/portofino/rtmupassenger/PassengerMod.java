@@ -83,7 +83,6 @@ public final class PassengerMod {
         BLOCK_ENTITIES.register(modEventBus);
         ENTITIES.register(modEventBus);
         modEventBus.addListener(PassengerMod::registerAttributes);
-        LOGGER.info("RTMU passenger simulation registered (integrated into RTMU)");
     }
 
     private static void registerAttributes(EntityAttributeCreationEvent event) {
