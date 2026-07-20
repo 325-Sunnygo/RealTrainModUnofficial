@@ -51,6 +51,8 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
     private float mountRoll;
     // 本家 meta 相当のクリック面 (0-5)。-1 = 旧方式
     private int mountFace = -1;
+    // 本家 ResourceState.color 相当 (電線の頂点色)。既定 0xFFFFFF = 白。0 だと電線が黒くなる。
+    private int wireColor = 0xFFFFFF;
     // 本家 TileEntityPlaceable の微調整 (GuiChangeOffset): 追加回転とスケール。
     // オフセットは renderOffset (offsetX/Y/Z) を共用する。
     private float adjustRoll;
@@ -283,6 +285,8 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         tag.putFloat("MountPitch", mountPitch);
         tag.putFloat("MountRoll", mountRoll);
         tag.putInt("MountFace", mountFace);
+        //本家 ResourceState と同じキー名 (本家ワールドのデータをそのまま読める)。
+        tag.putInt("Color", wireColor);
         tag.putFloat("AdjustRoll", adjustRoll);
         tag.putFloat("AdjustPitch", adjustPitch);
         tag.putFloat("AdjustYaw", adjustYaw);
@@ -346,6 +350,8 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         mountPitch = tag.getFloat("MountPitch");
         mountRoll = tag.getFloat("MountRoll");
         mountFace = tag.contains("MountFace") ? tag.getInt("MountFace") : -1;
+        //未設定なら本家 ResourceState.color の既定 (0xFFFFFF = 白)。0 にすると電線が黒くなる。
+        wireColor = tag.contains("Color") ? tag.getInt("Color") : 0xFFFFFF;
         adjustRoll = tag.getFloat("AdjustRoll");
         adjustPitch = tag.getFloat("AdjustPitch");
         adjustYaw = tag.getFloat("AdjustYaw");
@@ -1070,6 +1076,21 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
 
     public InstalledObjectDefinition getDefinition() {
         return InstalledObjectRegistry.getById(definitionId);
+    }
+
+    /**
+     * 本家 {@code ResourceState.color} 相当。電線スクリプトが
+     * {@code renderer.getColor(tileEntity)} で読み、頂点色にそのまま使う。
+     * <p>
+     * 既定は本家と同じ {@code 0xFFFFFF} (白)。0 にすると電線が真っ黒になる。
+     */
+    public int getWireColor() {
+        return wireColor;
+    }
+
+    public void setWireColor(int color) {
+        this.wireColor = color;
+        setChanged();
     }
 
     // --- NGTO Builder の Wire ツール互換 ---

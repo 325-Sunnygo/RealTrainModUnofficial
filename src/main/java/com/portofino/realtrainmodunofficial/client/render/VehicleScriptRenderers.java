@@ -696,10 +696,24 @@ public final class VehicleScriptRenderers {
      * @param excluded   本家 ResourceState.exclusionParts。スクリプトが「今は描かない」と指定した
      *                   パーツ (ドアが開いた側の扉など)。null なら除外なし。
      */
+    static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
+                       int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
+                       PolygonModel bodyGraph, int legacyPass, java.util.Set<String> excluded) {
+        replay(rec, poseStack, buffer, packedLight, packedOverlay, model, bodyGraph, legacyPass, excluded, null);
+    }
+
+    /**
+     * @param defaultTessTex スクリプトが {@code bindTexture} を呼ばずに tessellator で描く場合に使う
+     *                       テクスチャ (モデル定義の "default")。<b>架線スクリプトはこれに依存する</b>:
+     *                       本家は描画前にモデルの default テクスチャを bind してからスクリプトを
+     *                       呼ぶため、RenderSimpleCatenary.js は自分では bind せず UV だけ指定する。
+     *                       null のままだと白テクスチャへ落ちて、架線が単色の板になる。
+     */
     @SuppressWarnings("unchecked")
     static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                                int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
-                               PolygonModel bodyGraph, int legacyPass, java.util.Set<String> excluded) {
+                               PolygonModel bodyGraph, int legacyPass, java.util.Set<String> excluded,
+                               ResourceLocation defaultTessTex) {
         int light = packedLight;
         ResourceLocation overrideTex = null;
         //スクリプトの glColor4f (発光オーバーレイの強度等に使用)
@@ -761,7 +775,10 @@ public final class VehicleScriptRenderers {
                 }
                 case DRAW_TESS -> {
                     if (cmd.payload instanceof GLRecorder.TessDraw draw) {
-                        drawTess(draw, poseStack, buffer, light, packedOverlay, overrideTex);
+                        //スクリプトが bind していなければモデル定義の default テクスチャで描く
+                        //(架線スクリプトは bind せず UV だけ指定するため、ここが無いと白板になる)。
+                        drawTess(draw, poseStack, buffer, light, packedOverlay,
+                                overrideTex != null ? overrideTex : defaultTessTex);
                     }
                 }
                 case DRAW_MODEL_GROUP -> {

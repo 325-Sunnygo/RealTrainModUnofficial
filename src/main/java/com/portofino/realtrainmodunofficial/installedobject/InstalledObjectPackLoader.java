@@ -455,6 +455,11 @@ public final class InstalledObjectPackLoader {
             //本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate が回るスクリプト
             //(列車検知器は全ての処理をここに書く)。
             def.setServerScriptPath(getString(obj, "serverScriptPath"));
+            //本家 ModelConfig.doCulling (既定 false = 両面描画)。本家 ModelObject.render は
+            //車両も設置オブジェクトも同じ経路で !doCulling のとき GL_CULL_FACE を切る。
+            //未移植だったため設置オブジェクトが常に片面になり、片面モデリングの架線・踏切が
+            //裏側から消えていた。
+            def.setDoCulling(getBoolean(obj, "doCulling", false));
             LOADED.add(def);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse installed object json {} in {}: {}", path, packName, e.getMessage());

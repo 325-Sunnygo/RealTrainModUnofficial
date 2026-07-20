@@ -42,6 +42,8 @@ public class InstalledObjectDefinition {
     // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate(entity, executer) が呼ばれる
     // スクリプト (列車検知器など)。コンストラクタ引数が既に多いので setter で後付けする。
     private String serverScriptPath = "";
+    // 本家 ModelConfig.doCulling (既定 false = 両面描画)。上と同じくコンストラクタが肥大するため setter。
+    private boolean doCulling = false;
     // 本家 MachineConfig.rotateByMetadata。true の照明 (サーチライト/回転灯/灯台灯) は
     // RenderMachine と同じく「クリック面 (meta 0-5) の回転 ∘ プレイヤー向き」で描く。
     private boolean rotateByMetadata = false;
@@ -60,6 +62,23 @@ public class InstalledObjectDefinition {
 
     public void setServerScriptPath(String serverScriptPath) {
         this.serverScriptPath = serverScriptPath == null ? "" : serverScriptPath;
+    }
+
+    /**
+     * 本家 ModelConfig.doCulling。<b>既定 false = 両面描画</b>。
+     *
+     * <p>本家 ModelObject.render は車両も設置オブジェクトも通る共通経路で、
+     * {@code if (!cfg.doCulling) GL11.glDisable(GL_CULL_FACE);} と一律に扱う。
+     * RTMU はこれを車両にしか移植しておらず、設置オブジェクトは常に片面カリングしていたため、
+     * 片面でモデリングされた架線や踏切のパネルが<b>裏側から見ると消えていた</b>
+     * (報告: W51 規格の架線、Hi03 ストラクチャパックの踏切)。
+     */
+    public boolean isDoCulling() {
+        return doCulling;
+    }
+
+    public void setDoCulling(boolean doCulling) {
+        this.doCulling = doCulling;
     }
 
     public boolean hasServerScript() {

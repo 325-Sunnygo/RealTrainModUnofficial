@@ -41,7 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class WireScriptRenderers {
 
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
-    private static final Scripted INVALID = new Scripted(null, null);
+    private static final Scripted INVALID = new Scripted(null, null, null);
 
     private WireScriptRenderers() {
     }
@@ -117,11 +117,31 @@ public final class WireScriptRenderers {
 
             renderer.init(null, mo);
             RealTrainModUnofficial.LOGGER.info("Wire script renderer initialized: {} ({})", def.getId(), rcName);
-            return new Scripted(renderer, mo);
+            return new Scripted(renderer, mo, resolveDefaultTexture(def));
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init wire script renderer for {}", def.getId(), t);
             return INVALID;
         }
+    }
+
+    /**
+     * モデル定義の "default" テクスチャ (無ければ最初の 1 つ) をパックアセットとして解決する。
+     * 架線スクリプトが bindTexture を呼ばないため、tessellator 描画の既定テクスチャに使う。
+     */
+    private static net.minecraft.resources.ResourceLocation resolveDefaultTexture(InstalledObjectDefinition def) {
+        Map<String, String> overrides = def.getTextureOverrides();
+        if (overrides == null || overrides.isEmpty()) {
+            return null;
+        }
+        String path = overrides.get("default");
+        if (path == null) {
+            path = overrides.values().iterator().next();
+        }
+        int meta = path.indexOf("|ptmeta=");
+        if (meta >= 0) {
+            path = path.substring(0, meta);
+        }
+        return NGTFileLoader.resolvePackTexture(path);
     }
 
     private static final java.util.Set<String> WARNED_EMPTY = java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -129,10 +149,19 @@ public final class WireScriptRenderers {
     public static final class Scripted {
         private final WirePartsRenderer renderer;
         private final ModelObject modelObject;
+        /**
+         * モデル定義の "default" テクスチャ。<b>架線スクリプトは自分で bindTexture を呼ばない</b>
+         * (本家は描画前に host 側がモデルの default テクスチャを bind してからスクリプトを呼ぶ)。
+         * RenderSimpleCatenary.js は UV だけ指定して simpleCatenary.png を貼る前提なので、
+         * これを tessellator 描画の既定テクスチャとして渡さないと白い板になる。
+         */
+        private final net.minecraft.resources.ResourceLocation defaultTexture;
 
-        Scripted(WirePartsRenderer renderer, ModelObject modelObject) {
+        Scripted(WirePartsRenderer renderer, ModelObject modelObject,
+                 net.minecraft.resources.ResourceLocation defaultTexture) {
             this.renderer = renderer;
             this.modelObject = modelObject;
+            this.defaultTexture = defaultTexture;
         }
 
         /**
@@ -144,13 +173,18 @@ public final class WireScriptRenderers {
                               net.minecraft.world.phys.Vec3 to, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
-            if (this.renderer == null || model == null) {
+            //★model == null を弾かないこと。BasicWireBlack / SimpleCatenary の modelFile は
+            //"Model_none.mqo" (モデル無し) で、架線の見た目は<b>全てスクリプトの tessellator</b>が
+            //描く。ここで弾いていたため、これらの架線がスクリプトを実行されず、RTMU 独自の
+            //ハードコード単線描画 (黒いたるみ線 1 本) に落ちていた。本家はトロリ線とハンガーを
+            //含む板をテクスチャで描くので、見た目がまったく違っていた。
+            if (this.renderer == null) {
                 return false;
             }
             GLRecorder rec = new GLRecorder();
             GLRecorder.activate(rec);
             try {
-                this.renderer.modelGroupNames = model.getOriginalGroupNames();
+                this.renderer.modelGroupNames = model != null ? model.getOriginalGroupNames() : java.util.Set.of();
                 //本家 RenderElectricalWiring: 原点は<b>接続元の取付点</b>、vec は相手までの相対ベクトル
                 Vec3 vec = new Vec3(to.x - from.x, to.y - from.y, to.z - from.z);
                 rec.push();
@@ -172,7 +206,8 @@ public final class WireScriptRenderers {
                 return false;
             }
             VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model,
-                    this.modelObject != null ? this.modelObject.model : null);
+                    this.modelObject != null ? this.modelObject.model : null,
+                    jp.ngt.rtm.render.RenderPass.NORMAL.id, null, this.defaultTexture);
             return true;
         }
     }

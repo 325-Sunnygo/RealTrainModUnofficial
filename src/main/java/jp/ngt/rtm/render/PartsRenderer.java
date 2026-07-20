@@ -162,6 +162,30 @@ public class PartsRenderer {
         return "";
     }
 
+    /**
+     * 本家 PartsRenderer.getColor: 対象の {@code ResourceState.color} (プレイヤーが設定する色)。
+     * <pre>
+     * return entity instanceof IResourceSelector
+     *      ? ((IResourceSelector) entity).getResourceState().color : 0;
+     * </pre>
+     *
+     * <p><b>未実装だったため電線スクリプトが動いていなかった。</b> RenderBasicWire.js は
+     * {@code tessellator.setColorOpaque_I(renderer.getColor(tileEntity))} を呼ぶので、
+     * このメソッドが無いと TypeError でスクリプトごと落ち、呼び出し側が「何も描かなかった」と
+     * 判断して RTMU 独自のハードコード色 (ほぼ黒) のフォールバックに切り替わる。
+     * 結果、既定のワイヤーが真っ黒な電線になっていた。
+     *
+     * <p>色を持たない対象では本家 {@code ResourceState.color} の既定
+     * {@code 16777215} (0xFFFFFF = 白) を返す。本家が 0 を返すのは
+     * {@code IResourceSelector} ですらない場合だけで、電線の TileEntity は該当しない。
+     */
+    public int getColor(Object entity) {
+        if (entity instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity io) {
+            return io.getWireColor();
+        }
+        return 16777215;
+    }
+
     public int getMCTime() {
         Level level = Minecraft.getInstance().level;
         return level == null ? 0 : (int) (level.getDayTime() % 24000L);

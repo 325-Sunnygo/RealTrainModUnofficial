@@ -2379,7 +2379,19 @@ public final class MqoModelLoader {
             VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
             return def != null && def.isDoCulling();
         }
-        return true;
+        //設置オブジェクト (架線/踏切/ポール/信号) も本家は同じ ModelObject.render を通り、
+        //doCulling に従う。定義から引く。
+        if (entity instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity io) {
+            com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def = io.getDefinition();
+            return def != null && def.isDoCulling();
+        }
+        //★既定は false (両面描画)。本家 ModelObject.render:
+        //    if (!cfg.doCulling) { GL11.glDisable(GL_CULL_FACE); }
+        //は車両・設置オブジェクトを問わない共通処理で、doCulling の既定は false。
+        //ここを true にしていたため、車両以外 (設置オブジェクト/レール) が常に片面描画になり、
+        //片面でモデリングされた架線や踏切のパネルが裏側から見ると消えていた
+        //(報告: W51 規格の架線、Hi03 ストラクチャパックの踏切)。
+        return false;
     }
 
 

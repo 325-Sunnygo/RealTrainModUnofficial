@@ -304,7 +304,12 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         //呼ばずに自前の近似 (モデルを線に沿って等間隔で並べる) で描いていたため、
         //Baru's Pole のような作り込んだパックが本家と違う見た目になっていた。
         //スクリプトが何も描けなかったときは false が返るので、従来描画にそのまま落ちる。
-        if (model != null && hasScript) {
+        //★model == null でもスクリプトを走らせること。BasicWireBlack / SimpleCatenary の
+        //modelFile は "Model_none.mqo" (モデル無し) で、架線の見た目は全てスクリプトの
+        //tessellator が描く。model != null を条件にしていたため、これらが下の
+        //renderBasicWireCable (黒いたるみ線 1 本) に落ち、本家のトロリ線+ハンガー付き
+        //架線とまったく違う見た目になっていた。
+        if (hasScript) {
             com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.Scripted scripted =
                 com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.get(definition);
             boolean drawn = scripted != null && scripted.render(blockEntity, from, to, 1.0F, poseStack, buffer,

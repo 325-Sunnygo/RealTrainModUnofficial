@@ -53,6 +53,19 @@ public final class NGTTessellator {
         this.setColorRGBA_F(red, green, blue, 1.0F);
     }
 
+    /**
+     * 本家 Tessellator.setColorOpaque_I: パック済み RGB を不透明色として設定する。
+     *
+     * <p><b>これが未実装だったため、本家の電線スクリプトが動いていなかった。</b>
+     * RenderBasicWire.js は {@code tessellator.setColorOpaque_I(renderer.getColor(tileEntity))} を
+     * 呼ぶので、TypeError でスクリプトごと落ち、呼び出し側が「何も描かなかった」と判断して
+     * RTMU 独自のハードコード色 (ほぼ黒) のフォールバック描画に切り替わっていた。
+     * 結果、既定のワイヤー (BasicWireBlack / シンプルカテナリー) が真っ黒な電線に見えていた。
+     */
+    public void setColorOpaque_I(int color) {
+        this.setColorRGBA((color >>> 16) & 0xFF, (color >>> 8) & 0xFF, color & 0xFF, 255);
+    }
+
     public void setNormal(float x, float y, float z) {
     }
 

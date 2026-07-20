@@ -11,7 +11,14 @@ import java.util.function.Supplier;
  * スクリプトは getDataMap() / getResourceName() / add|removeExclusionParts() を使う。
  */
 public class ResourceState {
-    public int color;
+    /**
+     * 本家 ResourceState.color の既定値は {@code 16777215} (0xFFFFFF = 白)。
+     * <p>
+     * Java の既定値 0 のままにしていると黒になる。電線スクリプトは
+     * {@code tessellator.setColorOpaque_I(renderer.getColor(tileEntity))} でこの値を
+     * そのまま頂点色に使うため、既定 0 では<b>電線が真っ黒</b>になる。
+     */
+    public int color = 16777215;
 
     private final DataMap dataMap = new DataMap();
     private final Supplier<String> nameSupplier;
