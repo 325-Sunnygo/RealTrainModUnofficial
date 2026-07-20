@@ -159,6 +159,160 @@ public class EntityBogie extends Entity {
     private static long lastRailLostLog;
 
     /**
+     * 分岐で台車が追従すべきレールマップを選ぶ。
+     *
+     * <p>本家は {@code getNearestPoint(台車).getActiveRailMap()} = <b>根元点が最も近い分岐点</b>の
+     * マップを掴むだけで、台車が実際に走っている線とも開通方向とも無関係だった。枝の端点が近いと
+     * <b>反対側の線路</b>のマップを掴み、台車だけがそちらへ TP して分岐通過後に合流し直す、という
+     * 不具合になっていた。ここでは「①開通(アクティブ)中 ②現レールと連続 (canConnect) ③台車に最も近い」
+     * の 3 条件で選ぶ。開通側に該当が無い場合 (背向進入など) は全分岐から連続するものを選ぶ。
+     */
+    private RailMap selectSwitchRailMap(jp.ngt.rtm.rail.util.SwitchType sw, double px, double pz) {
+        //★最優先: 同じ列車のもう一方の台車が既にこの分岐の枝に乗っているなら、必ず<b>同じ枝</b>を使う。
+        //  分岐の根元付近では2本の枝が近接しているため、台車ごとに独立して選ぶと前後で判定が割れ、
+        //  片方が直進側・片方が分岐側になって車体が引き裂かれる (台車が分離して残る) 。
+        RailMap sibling = this.siblingBogieSwitchRailMap(sw);
+        if (sibling != null) {
+            return sibling;
+        }
+        //開通(アクティブ)側の最寄り枝と、全枝の最寄り枝をそれぞれ求める。
+        double[] activeSq = new double[]{Double.MAX_VALUE};
+        RailMap active = this.pickNearestConnectable(sw.getActiveRailMap(), px, pz, activeSq);
+        jp.ngt.rtm.rail.util.RailMapSwitch[] allArr = sw.getAllRailMap();
+        double[] nearestSq = new double[]{Double.MAX_VALUE};
+        RailMap nearest = this.pickNearestConnectable(
+                allArr == null ? null : java.util.Arrays.asList(allArr), px, pz, nearestSq);
+
+        //★台車が開通枝の上(近く)にいる = 根元から進路を選ぶ通常の進入 → 開通方向に従う。
+        if (active != null && activeSq[0] <= ON_RAIL_DIST_SQ) {
+            return active;
+        }
+        //★開通枝が遠い = 台車はすでに別の枝の上を走っている。ここで開通枝へ乗せ替えると
+        //  台車だけが数ブロック離れた別線へ TP する (走行中に分岐が切り替わった場合など)。
+        //  実際に乗っている枝をそのまま継続させる。
+        if (nearest != null) {
+            return nearest;
+        }
+        if (active != null) {
+            return active;
+        }
+        //フォールバック: 本家どおりの最近点ベース
+        jp.ngt.rtm.rail.util.Point np = sw.getNearestPoint(this);
+        return np != null ? np.getActiveRailMap(this.level()) : null;
+    }
+
+    /**
+     * 同じ列車のもう一方の台車が、この分岐のいずれかの枝に乗っていればその枝を返す (無ければ null)。
+     * 前後の台車を必ず同じ枝に乗せ、車体が別々の枝へ引き裂かれる (台車が分離する) のを防ぐ。
+     */
+    private RailMap siblingBogieSwitchRailMap(jp.ngt.rtm.rail.util.SwitchType sw) {
+        EntityTrainBase train = this.getTrain();
+        if (train == null) {
+            return null;
+        }
+        jp.ngt.rtm.rail.util.RailMapSwitch[] all = sw.getAllRailMap();
+        if (all == null) {
+            return null;
+        }
+        for (int i = 0; i < 2; i++) {
+            EntityBogie other = train.getBogie(i);
+            if (other == null || other == this) {
+                continue;
+            }
+            RailMap orm = other.currentRailMap;
+            if (orm == null) {
+                continue;
+            }
+            for (jp.ngt.rtm.rail.util.RailMapSwitch rm : all) {
+                if (rm == orm) {
+                    return rm;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** 台車が「その枝の上に乗っている」とみなす距離の2乗 (1 ブロック)。 */
+    private static final double ON_RAIL_DIST_SQ = 1.0D;
+
+    /** 候補のうち「現レールと連続」かつ「台車に最も近い」ものを返す。距離の2乗を outSq[0] へ返す。 */
+    private RailMap pickNearestConnectable(java.util.List<jp.ngt.rtm.rail.util.RailMapSwitch> maps,
+                                           double px, double pz, double[] outSq) {
+        if (maps == null || maps.isEmpty()) {
+            return null;
+        }
+        RailMap best = null;
+        double bestSq = Double.MAX_VALUE;
+        for (jp.ngt.rtm.rail.util.RailMapSwitch rm : maps) {
+            if (rm == null) {
+                continue;
+            }
+            if (this.currentRailMap != null && !this.currentRailMap.canConnect(rm)) {
+                continue;
+            }
+            double d = distToRailMapSq(rm, px, pz);
+            if (d < bestSq) {
+                bestSq = d;
+                best = rm;
+            }
+        }
+        outSq[0] = bestSq;
+        return best;
+    }
+
+    /**
+     * レール曲線と点 (px,pz) の最短距離の2乗 (サンプリング近似)。
+     *
+     * <p><b>サンプル密度はレール長に比例させること</b>。固定 16 分割にしていたときは、長さ 40m の
+     * 分岐でサンプル間隔が 2.6m になり、曲線上に乗っている台車でも「2.6 離れている」と誤測定した。
+     * この距離で<b>どの枝に乗るかを選んでいる</b>ため、数ブロックしか離れていない枝を区別できず、
+     * 反対側の線路の枝を選んで台車が TP する原因になっていた。
+     */
+    private static double distToRailMapSq(RailMap rm, double px, double pz) {
+        //32 サンプル/m = 約 0.03 ブロック分解能。枝の判別には十分で、分岐進入時のみの呼び出しなので軽い。
+        return distToRailMapSq(rm, px, pz, 32.0D, 64.0D);
+    }
+
+    private static double distToRailMapSq(RailMap rm, double px, double pz,
+                                          double samplesPerMeter, double minSplit) {
+        int split = (int) Math.max(minSplit, rm.getLength() * samplesPerMeter);
+        int idx = rm.getNearlestPoint(split, px, pz);
+        double[] p = rm.getRailPos(split, idx);//{z, x}
+        double dz = p[0] - pz;
+        double dx = p[1] - px;
+        return dx * dx + dz * dz;
+    }
+
+    /**
+     * 描画専用: 分岐器の全枝のうち (px,pz) に最も近いものを返す (<b>開通方向は見ない</b>)。
+     *
+     * <p>この選択は「どちらの枝に描くか」を決めるだけなので、サーバ側の進路選択のような細かい
+     * 分解能は要らない。<b>毎フレーム・台車ごとに呼ばれる</b>ため、サンプル密度は枝を区別できる
+     * 最低限 (4 サンプル/m) に抑える。分岐の根元では枝同士が数 cm しか離れておらず、そこで取り違えても
+     * 描画位置の差は数 cm で見えない。枝が離れるほど判定は明確になるので、実用上これで十分。
+     */
+    private static RailMap nearestSwitchRailMapForRender(jp.ngt.rtm.rail.util.SwitchType sw,
+                                                         double px, double pz) {
+        jp.ngt.rtm.rail.util.RailMapSwitch[] all = sw.getAllRailMap();
+        if (all == null) {
+            return null;
+        }
+        RailMap best = null;
+        double bestSq = Double.MAX_VALUE;
+        for (jp.ngt.rtm.rail.util.RailMapSwitch rm : all) {
+            if (rm == null) {
+                continue;
+            }
+            double d = distToRailMapSq(rm, px, pz, 4.0D, 32.0D);
+            if (d < bestSq) {
+                bestSq = d;
+                best = rm;
+            }
+        }
+        return best;
+    }
+
+    /**
      * レールに乗っているか (currentRailMap 保持)。停車中のピッチ維持判定に使用。
      */
     public boolean hasRailMap() {
@@ -276,9 +430,8 @@ public class EntityBogie extends Entity {
                 //新しいレール上に移動
                 RailMap railMap;
                 if (coreObj instanceof TileEntityLargeRailSwitchCore switchObj) {
-                    railMap = switchObj.getSwitch() != null
-                            ? switchObj.getSwitch().getNearestPoint(this).getActiveRailMap(this.level())
-                            : null;
+                    jp.ngt.rtm.rail.util.SwitchType sw = switchObj.getSwitch();
+                    railMap = sw != null ? this.selectSwitchRailMap(sw, px, pz) : null;
                 } else {
                     railMap = coreObj.getRailMap(this);
                 }
@@ -412,11 +565,23 @@ public class EntityBogie extends Entity {
         if (coreObj == null) {
             return null;
         }
-        //resetRailObj と同じ分岐でレールマップを取得 (分岐器/ポイント対応)
+        //★分岐器では「開通している側」ではなく<b>車体が実際に居る側の枝</b>へ吸着すること。
+        //
+        //以前はここで getActiveRailMap() を呼び、分岐器の開通方向へ無条件にスナップしていた。
+        //しかし開通方向と列車の実際の進路は一致するとは限らない (対向側から割り出して通過する、
+        //通過中に転換される、そもそもサーバの進路選択と食い違う)。その結果<b>台車だけが反対側の
+        //線路に描かれ、分岐を抜けてレールが1本に戻ると車体の位置へ戻る</b> = 「分岐で台車が消えて
+        //反対側の線路から出てきて、合流したら合体して走る」という報告そのものの症状になっていた。
+        //
+        //厄介なのは<b>物理(サーバ)は最初から正しく走っている</b>点で、ログには一切異常が出ない。
+        //台車間距離もレール距離も正常値のままなので、物理側をいくら調べても原因に辿り着けない。
+        //
+        //cx/cz は同期済みの車体位置から求めた弦上の点 = 列車が本当に居る場所なので、各枝との
+        //距離を測って最も近い枝へ吸着すれば、サーバがどちらを選んでいても描画は自動的に一致する。
         RailMap railMap;
         if (coreObj instanceof TileEntityLargeRailSwitchCore switchObj) {
             railMap = switchObj.getSwitch() != null
-                    ? switchObj.getSwitch().getNearestPoint(this).getActiveRailMap(this.level())
+                    ? nearestSwitchRailMapForRender(switchObj.getSwitch(), cx, cz)
                     : null;
         } else {
             railMap = coreObj.getRailMap(this);

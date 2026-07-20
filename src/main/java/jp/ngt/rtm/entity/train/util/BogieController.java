@@ -180,35 +180,9 @@ public class BogieController {
         y += vec.getY() - EntityTrainBase.TRAIN_HEIGHT;
         z += vec.getZ();
 
-        //車体サスペンション: Y の段差成分だけにばね-ダンパー応答 (フィールド定義部のコメント参照)。
-        //ピッチはレール実測値のまま (傾けて地形へめり込むのを防ぐ)。
-        double targetY = y;
-        if (!this.suspInit || Math.abs(targetY - this.suspY) > SUSP_SNAP) {
-            this.suspInit = true;
-            this.suspY = targetY;
-            this.suspYVel = 0.0D;
-            this.suspTargetVelY = 0.0D;
-        } else {
-            //定速成分は平滑化した目標速度で追従 (生の差分はレール分割点の量子化ノイズを含む)
-            double rawVelY = targetY - this.suspPrevTargetY;
-            this.suspTargetVelY += (rawVelY - this.suspTargetVelY) * SUSP_VEL_SMOOTH;
-            this.suspY += this.suspTargetVelY;
-            //残差 (継ぎ目・勾配の折れによる段差) をばね-ダンパーで吸収 —
-            //ふわっと沈んで一度だけ小さく揺り戻す
-            double errY = targetY - this.suspY;
-            this.suspYVel = this.suspYVel * SUSP_DAMPING + errY * SUSP_SPRING;
-            this.suspY += this.suspYVel;
-            //可動域クランプ: 目標から沈み/浮きを小さく制限し、地面へめり込ませない
-            if (this.suspY < targetY - SUSP_MAX_DROP) {
-                this.suspY = targetY - SUSP_MAX_DROP;
-                if (this.suspYVel < 0.0D) this.suspYVel = 0.0D;
-            } else if (this.suspY > targetY + SUSP_MAX_RISE) {
-                this.suspY = targetY + SUSP_MAX_RISE;
-                if (this.suspYVel > 0.0D) this.suspYVel = 0.0D;
-            }
-        }
-        this.suspPrevTargetY = targetY;
-        y = this.suspY;
+        //車体サスペンション (RTMU独自の「沈んで揺り戻す」上下動) は<b>坂で列車が沈んで戻るを
+        //繰り返して見える</b>と報告されたため無効化。車体 Y は台車中点の理想値をそのまま使い、
+        //レールにぴったり乗せる (上下振動なし)。※フィールド/onRailJoint は将来の再利用のため残置。
 
         train.setPositionAndRotationDirect(x, y, z, yaw, pitch);
         train.updateRoll(roll);

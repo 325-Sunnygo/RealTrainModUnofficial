@@ -25,11 +25,15 @@ public class RealTrainModUnofficial {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     /**
-     * ビルド刻印。バージョン番号 (1.0.9) を再利用してビルドし直しているため、
+     * ビルド刻印。同じバージョン番号を再利用してビルドし直しているため、
      * サーバー/クライアントに<b>どのビルド</b>が入っているかはこれでしか判別できない。
      * 起動ログに出る。ビルドを更新するたびに日付+連番を上げること。
+     * <p>
+     * <b>ここのバージョンは gradle.properties の mod_version と必ず合わせること。</b>
+     * 報告者から送られるログの判別材料がこれなので、古い番号が残っていると
+     * 「どのビルドで起きたか」を取り違える。
      */
-    public static final String BUILD_TAG = "1.0.9 build 2026-07-18e (sel-fix+getResourceSet+223light)";
+    public static final String BUILD_TAG = "1.0.10 build 2026-07-20a (switch-render-snap+slope-susp)";
 
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
         DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
