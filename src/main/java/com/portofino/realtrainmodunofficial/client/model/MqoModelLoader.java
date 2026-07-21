@@ -1391,7 +1391,12 @@ public final class MqoModelLoader {
         // 車体下「影板」は元MQO上で y=-98 / z=±900 付近なので、ここでは -0.98 / ±9.0
         // として判定する。
         boolean underBody = faceMinY < -0.10F;
-        boolean broadHorizontalPlate = faceMinY < -0.05F && dy < 0.035F && dx > 0.45F && dz > 1.20F;
+        //★閾値 -0.05→-0.55: 以前は faceMinY<-0.05 の広い水平板を影板とみなしていたが、これは
+        //  <b>内装の床</b>まで巻き込んでいた (都電/市電 tkt4100 の床は faceMinY=-0.15, 0.74×6.19 の
+        //  水平板で該当し、間引かれて「床が割れる」不具合になった。報告 2026-07-21)。真の床下影板は
+        //  faceMinY<-0.62 (veryLow/lowUnderbody と同じ床下レベル) にあるので、内装床 (-0.15付近) と
+        //  分離できる。-0.55 なら床下影は捕捉しつつ内装床は残す。
+        boolean broadHorizontalPlate = faceMinY < -0.55F && dy < 0.035F && dx > 0.45F && dz > 1.20F;
         boolean veryLowFlatPlate = faceMinY < -0.75F && dy < 0.05F && (dz > 0.45F || dx > 0.80F);
         boolean lowUnderbodyPlate = faceMinY < -0.62F && dy < 0.012F && dx > 0.42F && dz > 0.62F;
         boolean unnamedLegacyShadowPlate = faceMinY < -0.90F && dy < 0.008F && dx > 0.90F && dz > 2.0F;
@@ -3671,6 +3676,69 @@ public final class MqoModelLoader {
         }
 
         /**
+         * 通常表示では描かないヘルパーグループか (正規化済み=小文字前提)。
+         * {@code RtmTrainRenderer.shouldRenderGroup} のヘルパー判定 (台車除外を除く) と同一で、
+         * スクリプト経路と baked 経路で挙動を揃えるための単一実装。
+         * <ul>
+         *   <li>影 (shadow/影) — 偽影ポリゴン。深度を書いてレールを透かすため 1.21 では描かない</li>
+         *   <li>_ms/_kage — 影の別名。_guide/_atari/[obj] — ガイド/当たり判定用の非表示補助</li>
+         *   <li>連結曲げ用の角度異体 (末尾 "-NN" で NN>=10、"(mx)" は先に剥がす)</li>
+         * </ul>
+         */
+        /**
+         * <b>常に非表示のヘルパー</b>グループか (影・ガイド・当たり判定のみ)。
+         * {@link #isNonRenderingHelperGroup} と違い<b>連結曲げの角度異体 (-NN) は除外しない</b>。
+         * 角度異体を一括で消すと SL (C57 等) の本体ジオメトリまで巻き込んで消える回帰が出たため、
+         * スクリプト経路の renderNamedGroups では確実に不要な影/補助のみを落とす。
+         */
+        static boolean isShadowHelperGroup(String n) {
+            if (n == null || n.isBlank()) {
+                return false;
+            }
+            if (n.contains("影") || n.contains("shadow")) {
+                return true;
+            }
+            //★_ms は影ではない。KQ (BarusKeikyu) 等は車体/内装/窓/運転台の実グループに _ms を使う
+            //  (body_o_ms=782頂点, body_i_ms=6731頂点, body_a_ms, cab_ms)。以前ここで _ms を除去して
+            //  いたため「内装と外装が一部剥がれる」不具合が出た (報告 2026-07-21)。除去は 影/shadow と
+            //  明確に影を意味する _kage のみに限定する。
+            if (n.endsWith("_kage") || n.contains("_kage_")) {
+                return true;
+            }
+            return n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari");
+        }
+
+        static boolean isNonRenderingHelperGroup(String n) {
+            if (n == null || n.isBlank()) {
+                return false;
+            }
+            if (n.contains("影") || n.contains("shadow")) {
+                return true;
+            }
+            if (n.endsWith("_ms") || n.endsWith("_kage") || n.contains("_ms_") || n.contains("_kage_")) {
+                return true;
+            }
+            if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) {
+                return true;
+            }
+            String s = n.endsWith("(mx)") ? n.substring(0, n.length() - 4) : n;
+            int dash = s.lastIndexOf('-');
+            if (dash <= 0 || dash == s.length() - 1) {
+                return false;
+            }
+            for (int i = dash + 1; i < s.length(); i++) {
+                if (!Character.isDigit(s.charAt(i))) {
+                    return false;
+                }
+            }
+            try {
+                return Integer.parseInt(s.substring(dash + 1)) >= 10;
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+
+        /**
          * @param excludedGroups 本家 ResourceState.exclusionParts (正規化済み)。
          *                       RTM 標準スクリプトはドアの開閉をこれで表現する
          *                       (開いた側の扉パーツを除外リストに入れて消す)。null/空なら除外なし。
@@ -3687,6 +3755,15 @@ public final class MqoModelLoader {
             if (ordered == null) {
                 Set<Batch> selected = new LinkedHashSet<>();
                 for (String name : normalizedGroupNames) {
+                    //★スクリプト経路のヘルパーグループ除外 —— <b>影 (shadow) のみ</b>に限定。
+                    //  以前は連結曲げ用の角度異体 (body-30/-90/-180) も一括除外していたが、SL (C57 等) で
+                    //  「一部パーツが描画されない/黒い塊になる」回帰が出た (報告 2026-07-21)。角度異体は
+                    //  重なって見える副作用があるものの、本体ジオメトリを巻き込んで消すリスクの方が重い。
+                    //  偽影 (shadow/影/_ms/_kage 等) は 1.21 で深度を書いてレールを透かす害だけなので除外を維持。
+                    //  角度異体の重なりは別途「現在の連結角に一致する 1 つだけ描く」正攻法で対処する (TODO)。
+                    if (isShadowHelperGroup(name)) {
+                        continue;
+                    }
                     List<Batch> batches = batchesByNormalizedGroup.get(name);
                     if (batches != null && !batches.isEmpty()) {
                         selected.addAll(batches);

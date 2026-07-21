@@ -33,7 +33,7 @@ public class RealTrainModUnofficial {
      * 報告者から送られるログの判別材料がこれなので、古い番号が残っていると
      * 「どのビルドで起きたか」を取り違える。
      */
-    public static final String BUILD_TAG = "1.0.11 build 2026-07-20d (train-render-perf+replay-culling-fix)";
+    public static final String BUILD_TAG = "1.0.12 (model-select rebuilt 本家-style + crisp 1:1 button textures; sign/signboard texture grid; pick-block copies installed objects; block-detection signal packs; driver seat lowered; select screens hide HUD/minimap)";
 
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
         DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);

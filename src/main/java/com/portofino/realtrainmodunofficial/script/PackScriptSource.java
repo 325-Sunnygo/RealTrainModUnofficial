@@ -64,6 +64,8 @@ public final class PackScriptSource {
             bindOpt("TileEntityLargeRailBase", "jp.ngt.rtm.rail.TileEntityLargeRailBase") +
             bindOpt("TileEntityLargeRailCore", "jp.ngt.rtm.rail.TileEntityLargeRailCore") +
             bindOpt("NGTLog", "jp.ngt.ngtlib.io.NGTLog") +
+            //SL パックが蒸気/煙で使う (importPackage は no-op なので未修飾名を直接束縛)
+            bindOpt("EnumParticleTypes", "jp.ngt.mccompat.EnumParticleTypes") +
             bindOpt("NGTMath", "jp.ngt.ngtlib.math.NGTMath") +
             bindOpt("Vec3", "jp.ngt.ngtlib.math.Vec3") +
             bindOpt("NGTUtil", "jp.ngt.ngtlib.util.NGTUtil") +
@@ -105,6 +107,7 @@ public final class PackScriptSource {
             {"Packages.net.minecraft.world.EnumSkyBlock", "Packages.jp.ngt.mccompat.EnumSkyBlock"},
             {"Packages.net.minecraft.util.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
             {"Packages.net.minecraft.util.math.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
+            {"Packages.net.minecraft.util.EnumParticleTypes", "Packages.jp.ngt.mccompat.EnumParticleTypes"},
     };
 
     /**

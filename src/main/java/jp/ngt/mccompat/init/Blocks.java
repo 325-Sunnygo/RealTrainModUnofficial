@@ -28,6 +28,10 @@ public final class Blocks {
     public static final Block field_150339_S = net.minecraft.world.level.block.Blocks.IRON_BLOCK;
     /** stained_hardened_clay (白色ハードクレイ相当) */
     public static final Block field_150406_ce = net.minecraft.world.level.block.Blocks.WHITE_TERRACOTTA;
+    /** hardened_clay (無着色テラコッタ、メタ無し) — 信号のブロック検知が向き決めに使う */
+    public static final Block field_150405_ch = net.minecraft.world.level.block.Blocks.TERRACOTTA;
+    /** glass_pane (無着色、メタ無し) */
+    public static final Block field_150410_aZ = net.minecraft.world.level.block.Blocks.GLASS_PANE;
 
     // ---- レッドストーン出力系 (列車検知器のサーバースクリプトが置く) ----
     //
@@ -48,4 +52,55 @@ public final class Blocks {
     public static final Block field_150429_aA = net.minecraft.world.level.block.Blocks.REDSTONE_TORCH;
     /** lever */
     public static final Block field_150442_at = net.minecraft.world.level.block.Blocks.LEVER;
+
+    // ---- 1.7.10 メタ互換: 1.21 の色別ブロック → (白色版=基準ブロック, 色メタ 0-15) ----
+    // 信号機のブロック検知スクリプト (searchBlockAndMeta) が色ガラス/羊毛/テラコッタの<b>メタ</b>を
+    // 灯火状態として読むが、1.21 は色ごとに別ブロックでメタが無い。そこで getBlock (func_147439_a) は
+    // 色別ブロックを白色版へ正規化し、getMetadata (func_72805_g) は色番号(0-15)を返すことで
+    // 1.7.10 の「1ブロック+メタ16色」を再現する。[[rtmu-api-sweep-complete]] の受け皿方式。
+    private static final String[] COLORS_16 = {
+        "white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
+        "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"
+    };
+    private static final java.util.Map<Block, Block> CANON = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<Block, Integer> META = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 色別ブロックを白色版(1.7.10 の基準ブロック)へ正規化。非色ブロックはそのまま返す。 */
+    public static Block canonical(Block block) {
+        if (block == null) return null;
+        Block b = CANON.get(block);
+        if (b == null) { decodeColor(block); b = CANON.get(block); }
+        return b;
+    }
+
+    /** 色別ブロックの 1.7.10 相当メタ (0-15, DyeColor 順)。非色ブロックは 0。 */
+    public static int colorMeta(Block block) {
+        if (block == null) return 0;
+        Integer m = META.get(block);
+        if (m == null) { decodeColor(block); m = META.get(block); }
+        return m;
+    }
+
+    private static void decodeColor(Block block) {
+        Block base = block;
+        int meta = 0;
+        try {
+            String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
+            for (int i = 0; i < COLORS_16.length; i++) {
+                String prefix = COLORS_16[i] + "_";
+                if (path.startsWith(prefix)) {
+                    // 同じ系列の白色版が実在するときだけ色ファミリと判定 (orange_tulip 等は除外)。
+                    Block white = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                        .getOptional(net.minecraft.resources.ResourceLocation.withDefaultNamespace(
+                            "white_" + path.substring(prefix.length())))
+                        .orElse(null);
+                    if (white != null) { base = white; meta = i; }
+                    break;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        CANON.put(block, base);
+        META.put(block, meta);
+    }
 }

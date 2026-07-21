@@ -321,6 +321,21 @@ public class PartsRenderer {
         return NGTMath.sigmoid(x, c);
     }
 
+    /**
+     * 本家 PartsRenderer.spawnParticle: 粒子名 (文字列) で粒子を出す。
+     * SL パックの蒸気/煙演出が {@code renderer.spawnParticle(entity, "explode", ...)} で呼ぶ。
+     * 実体が無いと render() が TypeError で落ち、素モデル描画へフォールバックして
+     * 連結曲げ変種や shadow が現れる (報告: SL 運転時)。クライアント側のみ動作。
+     */
+    public void spawnParticle(Object entity, String name, double posX, double posY, double posZ,
+                              double speedX, double speedY, double speedZ) {
+        Level level = getWorld(entity);
+        if (level != null && level.isClientSide) {
+            level.addParticle(jp.ngt.mccompat.EnumParticleTypes.particleByLegacyName(name),
+                    posX, posY, posZ, speedX, speedY, speedZ);
+        }
+    }
+
     public void debug(String msg) {
         jp.ngt.ngtlib.io.NGTLog.debug(msg);
     }

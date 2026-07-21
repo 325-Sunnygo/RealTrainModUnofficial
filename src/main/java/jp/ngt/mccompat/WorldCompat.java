@@ -200,15 +200,20 @@ public class WorldCompat {
         return pos != null ? this.level.getBlockEntity(pos) : null;
     }
 
-    /** func_147439_a = getBlock(x,y,z) */
+    /** func_147439_a = getBlock(x,y,z)。色別ブロックは白色版に正規化 (1.7.10 の base+meta 照合用)。 */
     public net.minecraft.world.level.block.Block func_147439_a(double x, double y, double z) {
         BlockPos pos = new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z));
-        return this.level.getBlockState(pos).getBlock();
+        return jp.ngt.mccompat.init.Blocks.canonical(this.level.getBlockState(pos).getBlock());
     }
 
-    /** func_72805_g = getBlockMetadata (1.21 にメタは無い) */
+    /**
+     * func_72805_g = getBlockMetadata。1.21 にメタは無いが、色ガラス/羊毛/テラコッタ等は
+     * 色番号 (0-15, DyeColor 順) をメタとして返す。信号機のブロック検知がこのメタで灯火状態を読むため。
+     * それ以外のブロックは 0。
+     */
     public int func_72805_g(double x, double y, double z) {
-        return 0;
+        BlockPos pos = new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z));
+        return jp.ngt.mccompat.init.Blocks.colorMeta(this.level.getBlockState(pos).getBlock());
     }
 
     /** func_147471_g = markBlockForUpdate */
@@ -235,6 +240,35 @@ public class WorldCompat {
      */
     public boolean isRemote() {
         return this.level.isClientSide;
+    }
+
+    /**
+     * 本家 World.func_175688_a (spawnParticle, 1.8+): EnumParticleTypes を受ける粒子生成。
+     * SL パックが蒸気/煙を出すのに使う ({@code field_70170_p.func_175688_a(EnumParticleTypes.X, ...)})。
+     * 末尾の可変長 int (粒子パラメータ) は 1.21 では無視する。クライアント専用。
+     */
+    public void func_175688_a(Object particleType, double x, double y, double z,
+                             double vx, double vy, double vz, int... params) {
+        net.minecraft.core.particles.ParticleOptions options = null;
+        if (particleType instanceof jp.ngt.mccompat.EnumParticleTypes t) {
+            options = t.particle;
+        } else if (particleType instanceof net.minecraft.core.particles.ParticleOptions p) {
+            options = p;
+        }
+        if (options != null && this.level != null && this.level.isClientSide) {
+            this.level.addParticle(options, x, y, z, vx, vy, vz);
+        }
+    }
+
+    /**
+     * 本家 World.func_72869_a (spawnParticle, 1.7.10): 粒子名 (文字列) を受ける旧経路。
+     */
+    public void func_72869_a(String name, double x, double y, double z,
+                            double vx, double vy, double vz) {
+        if (this.level != null && this.level.isClientSide) {
+            this.level.addParticle(jp.ngt.mccompat.EnumParticleTypes.particleByLegacyName(name),
+                    x, y, z, vx, vy, vz);
+        }
     }
 
     /**

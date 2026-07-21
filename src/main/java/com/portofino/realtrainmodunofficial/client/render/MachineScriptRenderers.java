@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class MachineScriptRenderers {
 
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
-    private static final Scripted INVALID = new Scripted(null, null);
+    private static final Scripted INVALID = new Scripted(null, null, false);
 
     private MachineScriptRenderers() {
     }
@@ -54,10 +54,14 @@ public final class MachineScriptRenderers {
             }
             String source = new String(bytes, StandardCharsets.UTF_8);
 
+            // 機械/信号スクリプトも列車と同じフル・プレリュード + 互換リマップを使う。
+            // 以前は GL11/GL12/MathHelper だけの最小プレリュードだったため、信号のブロック検知が
+            // 使う Blocks (jp.ngt.mccompat.init.Blocks) や NGTMath 等が未定義で
+            // "ReferenceError: Blocks is not defined" となりスクリプトが落ち、素モデルで全レンズが
+            // 描画されていた ([[rtmu-block-detection-signals]])。
             ScriptEngine se = ScriptUtil.doScript(
-                    "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n" +
-                    "var GL12 = GL11;\n" +
-                    "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n" + source);
+                    com.portofino.realtrainmodunofficial.script.PackScriptSource.PRELUDE
+                        + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source));
             Object rcName = se.get("renderClass");
             if (rcName == null) {
                 return INVALID;
@@ -109,7 +113,7 @@ public final class MachineScriptRenderers {
             cfg.init();
             renderer.init(new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(cfg), mo);
 
-            return new Scripted(renderer, mo);
+            return new Scripted(renderer, mo, source.contains("searchBlockAndMeta"));
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init machine script renderer for {}", def.getId(), t);
             return INVALID;
@@ -119,6 +123,8 @@ public final class MachineScriptRenderers {
     public static final class Scripted {
         private final TileEntityPartsRenderer renderer;
         private final ModelObject modelObject;
+        /** スクリプトが searchBlockAndMeta で真下のブロックから現示を決めるブロック検知型か。 */
+        private final boolean blockDetection;
 
         //設置オブジェクトごとのスクリプト描画キャッシュ。信号機/看板は状態が変わらない間
         //Nashorn を再実行せず記録を再生する (172 個の毎フレーム実行が主なコストだった)。
@@ -135,9 +141,15 @@ public final class MachineScriptRenderers {
             GLRecorder rec;
         }
 
-        Scripted(TileEntityPartsRenderer renderer, ModelObject modelObject) {
+        Scripted(TileEntityPartsRenderer renderer, ModelObject modelObject, boolean blockDetection) {
             this.renderer = renderer;
             this.modelObject = modelObject;
+            this.blockDetection = blockDetection;
+        }
+
+        /** ブロック検知型 (searchBlockAndMeta) の信号か。true なら RTMU の点灯 overlay を掛けない。 */
+        public boolean isBlockDetection() {
+            return this.blockDetection;
         }
 
         /**

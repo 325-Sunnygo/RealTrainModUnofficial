@@ -142,6 +142,36 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> TICKET_VENDOR_ITEM = ITEMS.register(
         "ticket_vendor", () -> new InstalledObjectItem(InstalledObjectCategory.TICKET_VENDOR)
     );
+
+    /**
+     * カテゴリに対応する設置物アイテム。中ボタン(ピックブロック)で設置済みの照明/信号/碍子/架線柱などを
+     * コピーする用。WIRE 等 InstalledObjectItem を持たないカテゴリは null。
+     */
+    public static net.minecraft.world.item.Item getInstalledObjectItem(InstalledObjectCategory category) {
+        if (category == null) {
+            return null;
+        }
+        return switch (category) {
+            case CROSSING -> CROSSING_GATE_ITEM.get();
+            case LIGHT -> LIGHT_ITEM.get();
+            case SIGNBOARD -> SIGNBOARD_ITEM.get();
+            case PIPE -> PIPE_ITEM.get();
+            case INSULATOR -> INSULATOR_ITEM.get();
+            case SIGNAL -> SIGNAL_ITEM.get();
+            case TRAIN_DETECTOR -> TRAIN_DETECTOR_ITEM.get();
+            case OVERHEAD_LINE_POLE -> OVERHEAD_LINE_POLE_ITEM.get();
+            case TICKET_GATE -> TICKET_GATE_ITEM.get();
+            case SPEAKER -> SPEAKER_ITEM.get();
+            case CONNECTOR_INPUT -> CONNECTOR_INPUT_ITEM.get();
+            case CONNECTOR_OUTPUT -> CONNECTOR_OUTPUT_ITEM.get();
+            case FLUORESCENT -> FLUORESCENT_ITEM.get();
+            case RAILROAD_SIGN -> RAILROAD_SIGN_ITEM.get();
+            case BUMPING_POST -> BUMPING_POST_ITEM.get();
+            case POINT -> POINT_MACHINE_ITEM.get();
+            case TICKET_VENDOR -> TICKET_VENDOR_ITEM.get();
+            default -> null;
+        };
+    }
     //本家 ItemCamera: 撮り鉄用カメラ (望遠 / 被写界深度 / 流し撮り / 列車追尾AF / レンズ交換式)
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.CameraItem> CAMERA_ITEM = ITEMS.register(
         "camera", com.portofino.realtrainmodunofficial.item.CameraItem::new

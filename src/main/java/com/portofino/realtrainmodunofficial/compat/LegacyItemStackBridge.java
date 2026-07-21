@@ -17,6 +17,7 @@ public final class LegacyItemStackBridge {
     public static final String LEGACY_DATA_LIST = "DataList";
     public static final String LEGACY_DATA_MAP_ARG = "LegacyDataMapArg";
     public static final String LEGACY_STATE_NAME = "Name";
+    public static final String LEGACY_STATE_COLOR = "Color";
 
     private LegacyItemStackBridge() {
     }
@@ -66,6 +67,54 @@ public final class LegacyItemStackBridge {
             writeLegacyStateArg(tag, safeDataMap);
         }
         CustomData.set(DataComponents.CUSTOM_DATA, stack, tag);
+    }
+
+    /**
+     * 本家 GuiSelectModel のカスタム名 (State.Name) と色 (State.Color) も併せて確定させる版。
+     * dataMap の有無に関わらず State.Name / State.Color を書く。
+     */
+    public static void setSelectedModelData(ItemStack stack, String modelId, String dataMapValue,
+                                            String customName, int color) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        setSelectedModelData(stack, modelId, dataMapValue);
+        CompoundTag tag = getLegacyCustomData(stack);
+        CompoundTag state = tag.contains(LEGACY_STATE, Tag.TAG_COMPOUND)
+            ? tag.getCompound(LEGACY_STATE)
+            : new CompoundTag();
+        String safeName = (customName == null || customName.isBlank()) ? "no_name" : customName;
+        state.putString(LEGACY_STATE_NAME, safeName);
+        state.putInt(LEGACY_STATE_COLOR, color);
+        tag.put(LEGACY_STATE, state);
+        CustomData.set(DataComponents.CUSTOM_DATA, stack, tag);
+    }
+
+    /** State.Name (本家カスタム名)。未設定 / "no_name" は "" を返す。 */
+    public static String getSelectedCustomName(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return "";
+        }
+        CompoundTag tag = getLegacyCustomData(stack);
+        if (!tag.contains(LEGACY_STATE, Tag.TAG_COMPOUND)) {
+            return "";
+        }
+        String name = tag.getCompound(LEGACY_STATE).getString(LEGACY_STATE_NAME);
+        return (name == null || name.isBlank() || "no_name".equals(name)) ? "" : name;
+    }
+
+    /** State.Color (本家色)。未設定は 0xFFFFFF。 */
+    public static int getSelectedColor(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return 0xFFFFFF;
+        }
+        CompoundTag tag = getLegacyCustomData(stack);
+        if (!tag.contains(LEGACY_STATE, Tag.TAG_COMPOUND)) {
+            return 0xFFFFFF;
+        }
+        CompoundTag state = tag.getCompound(LEGACY_STATE);
+        return state.contains(LEGACY_STATE_COLOR, Tag.TAG_ANY_NUMERIC)
+            ? state.getInt(LEGACY_STATE_COLOR) : 0xFFFFFF;
     }
 
     private static CompoundTag getLegacyCustomData(ItemStack stack) {

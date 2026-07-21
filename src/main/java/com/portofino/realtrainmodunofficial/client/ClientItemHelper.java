@@ -2,6 +2,7 @@ package com.portofino.realtrainmodunofficial.client;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.client.screen.ModelSelectScreen;
+import com.portofino.realtrainmodunofficial.client.screen.SignSelectGridScreen;
 import com.portofino.realtrainmodunofficial.client.screen.TrainFormationScreen;
 import com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
@@ -44,7 +45,8 @@ public final class ClientItemHelper {
      * 1.0.7 の挙動に戻す。
      */
     private static void commitSelection(ItemStack stack, ModelSelectScreen.SelectionResult selection) {
-        PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue()));
+        PacketDistributor.sendToServer(new SelectModelPayload(
+            selection.modelId(), selection.dataMapValue(), selection.customName(), selection.color()));
     }
 
     /** 手持ち (メイン→オフ) から選択式アイテムのスタックを探す。引数なし選択画面用。 */
@@ -81,7 +83,9 @@ public final class ClientItemHelper {
             infos,
             selection -> commitSelection(stack, selection),
             LegacyItemStackBridge.getSelectedModelId(stack),
-            LegacyItemStackBridge.getSelectedDataMap(stack)
+            LegacyItemStackBridge.getSelectedDataMap(stack),
+            LegacyItemStackBridge.getSelectedCustomName(stack),
+            LegacyItemStackBridge.getSelectedColor(stack)
         ));
     }
 
@@ -99,7 +103,9 @@ public final class ClientItemHelper {
             infos,
             selection -> commitSelection(stack, selection),
             LegacyItemStackBridge.getSelectedModelId(stack),
-            LegacyItemStackBridge.getSelectedDataMap(stack)
+            LegacyItemStackBridge.getSelectedDataMap(stack),
+            LegacyItemStackBridge.getSelectedCustomName(stack),
+            LegacyItemStackBridge.getSelectedColor(stack)
         ));
     }
 
@@ -180,9 +186,12 @@ public final class ClientItemHelper {
         Minecraft.getInstance().setScreen(new ModelSelectScreen(
             Component.translatable("screen.realtrainmodunofficial.select_car"),
             infos,
-            selection -> PacketDistributor.sendToServer(new SelectModelPayload(selection.modelId(), selection.dataMapValue())),
+            selection -> PacketDistributor.sendToServer(new SelectModelPayload(
+                selection.modelId(), selection.dataMapValue(), selection.customName(), selection.color())),
             LegacyItemStackBridge.getSelectedModelId(stack),
-            LegacyItemStackBridge.getSelectedDataMap(stack)
+            LegacyItemStackBridge.getSelectedDataMap(stack),
+            LegacyItemStackBridge.getSelectedCustomName(stack),
+            LegacyItemStackBridge.getSelectedColor(stack)
         ));
     }
 
@@ -191,6 +200,19 @@ public final class ClientItemHelper {
     }
 
     public static void openInstalledObjectSelectScreen(Player player, ItemStack stack, InstalledObjectCategory category) {
+        // 標識/看板は本家式のテクスチャ・グリッド選択画面。
+        if (category == InstalledObjectCategory.SIGNBOARD || category == InstalledObjectCategory.RAILROAD_SIGN) {
+            List<SignSelectGridScreen.Item> items = InstalledObjectRegistry.getByCategory(category).stream()
+                .map(d -> new SignSelectGridScreen.Item(d.getId(), d.getDisplayName(), d.getPackName(), d.getButtonTexture()))
+                .toList();
+            Minecraft.getInstance().setScreen(new SignSelectGridScreen(
+                Component.translatable(getInstalledObjectTitleKey(category)),
+                items,
+                id -> PacketDistributor.sendToServer(new SelectModelPayload(id)),
+                LegacyItemStackBridge.getSelectedModelId(stack)
+            ));
+            return;
+        }
         List<ModelSelectScreen.ModelInfo> infos = InstalledObjectRegistry.getByCategory(category).stream()
             .map(d -> new ModelSelectScreen.ModelInfo(d.getId(), d.getDisplayName(), d.getPackName(), d.getButtonTexture()))
             .toList();
@@ -211,18 +233,17 @@ public final class ClientItemHelper {
      */
     public static void openRailroadSignScreen(
             com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity blockEntity) {
-        List<ModelSelectScreen.ModelInfo> infos =
+        List<SignSelectGridScreen.Item> items =
             InstalledObjectRegistry.getByCategory(InstalledObjectCategory.RAILROAD_SIGN).stream()
-                .map(d -> new ModelSelectScreen.ModelInfo(d.getId(), d.getDisplayName(), d.getPackName(), d.getButtonTexture()))
+                .map(d -> new SignSelectGridScreen.Item(d.getId(), d.getDisplayName(), d.getPackName(), d.getButtonTexture()))
                 .toList();
         net.minecraft.core.BlockPos pos = blockEntity.getBlockPos();
-        Minecraft.getInstance().setScreen(new ModelSelectScreen(
+        Minecraft.getInstance().setScreen(new SignSelectGridScreen(
             Component.translatable(getInstalledObjectTitleKey(InstalledObjectCategory.RAILROAD_SIGN)),
-            infos,
-            selection -> PacketDistributor.sendToServer(
-                new com.portofino.realtrainmodunofficial.network.SetObjectModelPayload(pos, selection.modelId())),
-            blockEntity.getDefinitionId(),
-            ""
+            items,
+            id -> PacketDistributor.sendToServer(
+                new com.portofino.realtrainmodunofficial.network.SetObjectModelPayload(pos, id)),
+            blockEntity.getDefinitionId()
         ));
     }
 

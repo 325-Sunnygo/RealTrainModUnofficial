@@ -86,6 +86,8 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      * ({@code StandingRideClient}) と乗客 NPC の車内歩行で共通に使う唯一の基準。
      */
     public static final double INTERIOR_FLOOR_OFFSET = -0.75D;
+    /** 運転席の座り高さ補正。JSON playerPos_Y に足すオフセット。「高すぎる」指摘で JSON より少し下げる (負値)。 */
+    public static final double DRIVER_SEAT_Y_OFFSET = -0.2D;
 
     public BogieController bogieController = new BogieController();
     private Formation formation;
@@ -941,11 +943,13 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             v31 = v31.rotateAroundZ(-this.rotationRoll);
             v31 = v31.rotateAroundX(this.getXRot());
             v31 = v31.rotateAroundY(this.getYRot());
-            //座位: playerPos は本家で搭乗者の腰位置。1.21 は渡した Y がほぼ腰になるため
-            //追加リフトはせず、モデル床に合うよう少し下げる。
+            //座位の高さ補正。playerPos (JSON, 列車ごとに Y が異なる) を基準にした一定オフセット。
+            //以前は +0.15 だったが「高すぎる」との指摘で、<b>JSON値より少し下げた</b>負オフセットにする
+            //(運転士が座面に沈むように)。列車ごとの高さ差は playerPos_Y (v31.getY()) が担う。
+            //値を変えたいときはこの DRIVER_SEAT_Y_OFFSET を調整する。
             move.accept(rider,
                     this.getX() + v31.getX(),
-                    this.getY() + v31.getY() - 0.35D,
+                    this.getY() + v31.getY() + DRIVER_SEAT_Y_OFFSET,
                     this.getZ() + v31.getZ());
         }
     }

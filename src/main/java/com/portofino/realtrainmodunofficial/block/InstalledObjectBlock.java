@@ -52,6 +52,28 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         return RenderShape.INVISIBLE;
     }
 
+    /**
+     * 中ボタン(ピックブロック): 設置済みの照明/信号/碍子/架線柱などを、そのモデルが選択済みの
+     * 設置アイテムとしてコピーする。レール以外のモデルも中ボタンでコピーできるようにする要望対応。
+     */
+    @Override
+    public ItemStack getCloneItemStack(net.minecraft.world.level.LevelReader level, BlockPos pos, BlockState state) {
+        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
+            net.minecraft.world.item.Item item =
+                RealTrainModUnofficialItems.getInstalledObjectItem(be.getCategory());
+            if (item != null) {
+                ItemStack stack = new ItemStack(item);
+                String defId = be.getDefinitionId();
+                if (defId != null && !defId.isBlank()) {
+                    // 選択モデルをこの設置物の定義に合わせる (置くと同じ物になる)。
+                    com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.setSelectedModelData(stack, defId, "");
+                }
+                return stack;
+            }
+        }
+        return super.getCloneItemStack(level, pos, state);
+    }
+
     // 照明カテゴリかつレッドストーンで点灯中のときブロック光源レベル15を返す。
     // 看板は本家 BlockSignBoard.getLightValue 準拠 (設定の lightValue による)。
     @Override

@@ -44,6 +44,8 @@ public class TileEntitySignalController extends BlockEntity {
         this(com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities.SIGNAL_CONTROLLER.get(), pos, state);
     }
 
+    /** 信号状態の毎5秒フルダンプ + RS変化ログ (NGTLog.debug は INFO 出力)。ログを埋め尽くすので既定オフ。 */
+    private static final boolean DEBUG_LOG = false;
     private long lastDebugLog;
     private boolean prevRSPowered;
 
@@ -56,10 +58,12 @@ public class TileEntitySignalController extends BlockEntity {
             return;
         }
         boolean debug = false;
-        long now = System.currentTimeMillis();
-        if (now - lastDebugLog > 5000L) {
-            lastDebugLog = now;
-            debug = true;
+        if (DEBUG_LOG) {
+            long now = System.currentTimeMillis();
+            if (now - lastDebugLog > 5000L) {
+                lastDebugLog = now;
+                debug = true;
+            }
         }
         int MAXSIGNALLEVEL = 6;
         List<Integer> nextSignalList = new ArrayList<>();
@@ -78,8 +82,10 @@ public class TileEntitySignalController extends BlockEntity {
                 || world.getDirectSignalTo(this.worldPosition) > 0;
         if (isRSPowered != this.prevRSPowered) {
             this.prevRSPowered = isRSPowered;
-            jp.ngt.ngtlib.io.NGTLog.debug("[SignalController] %s RS changed -> %s",
-                    this.worldPosition.toShortString(), String.valueOf(isRSPowered));
+            if (DEBUG_LOG) {
+                jp.ngt.ngtlib.io.NGTLog.debug("[SignalController] %s RS changed -> %s",
+                        this.worldPosition.toShortString(), String.valueOf(isRSPowered));
+            }
         }
 
         //表示する信号機の制御 (変化したときだけ変更して負荷を減らす — 原作コメント)

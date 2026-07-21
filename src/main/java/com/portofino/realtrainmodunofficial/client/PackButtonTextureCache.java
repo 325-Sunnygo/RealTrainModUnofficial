@@ -30,6 +30,8 @@ public final class PackButtonTextureCache {
                                     int sourceX, int sourceY, int sourceWidth, int sourceHeight) {}
 
     private static final Map<String, ButtonTextureInfo> CACHE = new ConcurrentHashMap<>();
+    /** 表示解像度へニアレスト焼き直し済みテクスチャ (key = pack|path|WxH → location)。 */
+    private static final Map<String, ResourceLocation> SCALED = new ConcurrentHashMap<>();
 
     private PackButtonTextureCache() {
     }
@@ -71,6 +73,127 @@ public final class PackButtonTextureCache {
         }
     }
 
+    /**
+     * buttonTexture のソース矩形を<b>ニアレストで target サイズへ焼き直した</b>テクスチャの location。
+     * これを 1:1 (target と同じ UV サイズ) で blit すれば、GUI の描画経路が線形補間を強制していても
+     * スケーリングが起きない (テクセル=ピクセル) ので<b>必ず鮮明</b>になる。にじみ対策の本命。
+     * target は「ボタンの GUI サイズ × guiScale」を渡すこと (画面ピクセルと 1:1 になる)。失敗時は素の location。
+     */
+    public static ResourceLocation getCrisp(String packName, String texturePath, int targetW, int targetH) {
+        ButtonTextureInfo base = get(packName, texturePath);
+        if (base == null) {
+            return null;
+        }
+        if (targetW < 1 || targetH < 1) {
+            return base.location();
+        }
+        String key = packName + "|" + texturePath + "|" + targetW + "x" + targetH;
+        ResourceLocation cached = SCALED.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        ResourceLocation result = base.location();
+        try {
+            NativeImage src = readImage(packName, texturePath);
+            if (src != null) {
+                int[] region = computeSourceRegion(src.getWidth(), src.getHeight());
+                NativeImage out = nearestScale(src, region[0], region[1], targetW, targetH);
+                src.close();
+                ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
+                    RealTrainModUnofficial.MODID,
+                    "dynamic/button_crisp/" + sanitize(packName) + "/" + sanitize(texturePath)
+                        + "/" + targetW + "x" + targetH);
+                DynamicTexture tex = new DynamicTexture(out);
+                Minecraft.getInstance().getTextureManager().register(loc, tex);
+                result = loc;
+            }
+        } catch (Exception ignored) {
+            // 読み込み/生成不可なら素の location にフォールバック。
+        }
+        SCALED.put(key, result);
+        return result;
+    }
+
+    /**
+     * {@link #getCrisp} の<b>全画像</b>版。ボタン矩形(左上62.5%×12.5%)ではなく画像全体を
+     * ニアレストで target へ焼き直す。標識/看板のように buttonTexture が 160×32 ボタン形式でなく
+     * <b>実寸のフル画像</b>のものはこちらを使う (region 切り出しだと絵が見切れる)。
+     * 呼び出し側で元画像のアスペクト比に合わせた target を渡すこと (歪み防止)。
+     */
+    public static ResourceLocation getCrispFull(String packName, String texturePath, int targetW, int targetH) {
+        ButtonTextureInfo base = get(packName, texturePath);
+        if (base == null) {
+            return null;
+        }
+        if (targetW < 1 || targetH < 1) {
+            return base.location();
+        }
+        String key = packName + "|" + texturePath + "|full|" + targetW + "x" + targetH;
+        ResourceLocation cached = SCALED.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        ResourceLocation result = base.location();
+        try {
+            NativeImage src = readImage(packName, texturePath);
+            if (src != null) {
+                NativeImage out = nearestScale(src, src.getWidth(), src.getHeight(), targetW, targetH);
+                src.close();
+                ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
+                    RealTrainModUnofficial.MODID,
+                    "dynamic/button_full/" + sanitize(packName) + "/" + sanitize(texturePath)
+                        + "/" + targetW + "x" + targetH);
+                DynamicTexture tex = new DynamicTexture(out);
+                Minecraft.getInstance().getTextureManager().register(loc, tex);
+                result = loc;
+            }
+        } catch (Exception ignored) {
+        }
+        SCALED.put(key, result);
+        return result;
+    }
+
+    /** ソース矩形 (0,0)-(srcW,srcH) をニアレストで dstW×dstH に焼き直した新規画像。 */
+    private static NativeImage nearestScale(NativeImage src, int srcW, int srcH, int dstW, int dstH) {
+        NativeImage out = new NativeImage(NativeImage.Format.RGBA, dstW, dstH, false);
+        int sw = Math.max(1, srcW);
+        int sh = Math.max(1, srcH);
+        for (int y = 0; y < dstH; y++) {
+            int sy = Math.min(sh - 1, (int) ((long) y * sh / dstH));
+            for (int x = 0; x < dstW; x++) {
+                int sx = Math.min(sw - 1, (int) ((long) x * sw / dstW));
+                out.setPixelRGBA(x, y, src.getPixelRGBA(sx, sy));
+            }
+        }
+        return out;
+    }
+
+    /** RTM 256-UV のボタンソース矩形 (正方キャンバスの左上 62.5%×12.5%)。 */
+    private static int[] computeSourceRegion(int width, int height) {
+        if (width >= 160 && height >= 128) {
+            return new int[]{
+                Math.min(width, Math.round(width * 160.0F / 256.0F)),
+                Math.min(height, Math.round(height * 32.0F / 256.0F))
+            };
+        }
+        return new int[]{Math.min(width, 160), Math.min(height, 32)};
+    }
+
+    /** パックから buttonTexture の NativeImage を読み込む (登録しない)。呼び出し側で close する。 */
+    private static NativeImage readImage(String packName, String texturePath) throws Exception {
+        Path packPath = RailPackLoader.resolvePackPath(packName);
+        NativeImage image = null;
+        if (packPath != null) {
+            image = Files.isDirectory(packPath)
+                ? loadFromDirectory(packPath, texturePath)
+                : loadFromArchive(packPath, texturePath);
+        }
+        if (image == null) {
+            image = loadBySearchingAllPacks(texturePath);
+        }
+        return image;
+    }
+
     private static ButtonTextureInfo registerDynamicTexture(String packName, String texturePath, NativeImage image) {
         ResourceLocation location = ResourceLocation.fromNamespaceAndPath(
             RealTrainModUnofficial.MODID,
@@ -78,12 +201,48 @@ public final class PackButtonTextureCache {
         );
         int width = image.getWidth();
         int height = image.getHeight();
-        // RTM 本家どおり、テクスチャは (0,0) から 160×32 をそのまま使う。
-        // 以前は余白検出クロップ+アスペクト比維持で縮小していたため余白だらけになっていた。
-        int srcW = Math.min(width, 160);
-        int srcH = Math.min(height, 32);
-        Minecraft.getInstance().getTextureManager().register(location, new DynamicTexture(image));
+        // RTM 本家のボタン UV は 256px 空間で (0,0)-(160,32) を <b>固定倍率 f=1/256</b> で描く。
+        // = テクスチャ左上の <b>62.5% × 12.5%</b> をサンプルする (解像度に依らずこの割合)。
+        // 実際のボタン画像は正方キャンバス (256/512/652…) の左上にこの比率で描かれているので、
+        // ソース矩形も解像度に比例させないと、512/652px 等で左上のごく一部だけ拾って
+        // 2〜4倍に拡大 = 文字化け/巨大化する (旧 min(w,160)/min(h,32) の不具合)。
+        int srcW;
+        int srcH;
+        if (width >= 160 && height >= 128) {
+            // 256 以上の(ほぼ)正方ボタンキャンバス: 左上 160/256 × 32/256。
+            srcW = Math.min(width, Math.round(width * 160.0F / 256.0F));
+            srcH = Math.min(height, Math.round(height * 32.0F / 256.0F));
+        } else {
+            // 想定外 (小さい/横長) のファイルは従来どおり左上 160×32 (無ければ全体)。
+            srcW = Math.min(width, 160);
+            srcH = Math.min(height, 32);
+        }
+        DynamicTexture dynamicTexture = new DynamicTexture(image);
+        // GUI ボタンはピクセル等倍で鮮明に見せたい。DynamicTexture は既定で線形補間が効いて
+        // 拡大縮小時ににじむ (ユーザー報告「ボタンがぼやける」)。最近傍・ミップマップ無しに固定する。
+        // setFilter だけだと 1.21.1 では bind されず効かない場合があるので、テクスチャを明示バインドして
+        // 低レベル (glTexParameter) でも GL_NEAREST を強制する。RTM 本家 (1.7.10) も GUI は最近傍。
+        // 登録 (= GPU アップロード) してから最近傍を設定する。アップロード前に setFilter しても
+        // 上書きされる実装があるため、順序が重要。
+        Minecraft.getInstance().getTextureManager().register(location, dynamicTexture);
+        dynamicTexture.setFilter(false, false);
+        forceNearestFilter(dynamicTexture);
         return new ButtonTextureInfo(location, width, height, 0, 0, srcW, srcH);
+    }
+
+    /** バインドして MIN/MAG フィルタを GL_NEAREST に固定 (にじみ防止)。 */
+    private static void forceNearestFilter(DynamicTexture texture) {
+        try {
+            com.mojang.blaze3d.systems.RenderSystem.bindTexture(texture.getId());
+            com.mojang.blaze3d.platform.GlStateManager._texParameter(
+                org.lwjgl.opengl.GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL11.GL_TEXTURE_MIN_FILTER,
+                org.lwjgl.opengl.GL11.GL_NEAREST);
+            com.mojang.blaze3d.platform.GlStateManager._texParameter(
+                org.lwjgl.opengl.GL11.GL_TEXTURE_2D, org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER,
+                org.lwjgl.opengl.GL11.GL_NEAREST);
+        } catch (Exception ignored) {
+            // 描画スレッド外など不可の場合は setFilter に委ねる。
+        }
     }
 
     private static NativeImage loadFromDirectory(Path packPath, String texturePath) throws Exception {

@@ -182,24 +182,41 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     //架線柱 (RenderConnectablePole.js): 隣の柱とつながる腕を出す。
                     //転轍機 (RenderPoint01.js): getMovingCount でレバーを ±30 度回す。
                     //どれも本家スクリプトが向き・部品の出し分けを全部やるので、この経路に載せる必要がある。
-                    if ((blockEntity.getCategory() == InstalledObjectCategory.CROSSING
+                    boolean machineScriptCategory = blockEntity.getCategory() == InstalledObjectCategory.CROSSING
                             || blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE
                             || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
                             || blockEntity.getCategory() == InstalledObjectCategory.FLUORESCENT
                             || blockEntity.getCategory() == InstalledObjectCategory.OVERHEAD_LINE_POLE
                             || blockEntity.getCategory() == InstalledObjectCategory.PIPE
-                            || blockEntity.getCategory() == InstalledObjectCategory.POINT)
-                            && definition.getScriptPath() != null && !definition.getScriptPath().isBlank()) {
-                        com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.Scripted machineScripted =
-                            com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(definition);
-                        if (machineScripted != null
+                            || blockEntity.getCategory() == InstalledObjectCategory.POINT;
+                    boolean hasMachineScript = definition.getScriptPath() != null && !definition.getScriptPath().isBlank();
+                    // これらのブロック検知信号パックは json の machineType が "Light" のため SIGNAL でなく
+                    // LIGHT に分類され、本来スクリプト経路に載らず素モデルで全レンズが描かれていた(=複数点灯)。
+                    // → LIGHT でも「ブロック検知スクリプト(searchBlockAndMeta)」のときだけスクリプト経路に載せる。
+                    // 通常の照明ランプ(検知しない)は従来どおり素モデル描画のまま。
+                    com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.Scripted machineScripted =
+                        (hasMachineScript && (machineScriptCategory
+                            || blockEntity.getCategory() == InstalledObjectCategory.LIGHT))
+                            ? com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(definition)
+                            : null;
+                    boolean useMachineScript = machineScripted != null
+                            && (machineScriptCategory
+                                || (blockEntity.getCategory() == InstalledObjectCategory.LIGHT
+                                    && machineScripted.isBlockDetection()));
+                    if (useMachineScript
                                 && machineScripted.render(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
                             //警報灯/現示灯の発光オーバーレイ (スクリプトの pass2 は diffuse で減光する
                             //ことがあるため、ここで確実に全光量の発光を重ねる)。
                             //信号はスクリプトが点灯パーツを描いても素のテクスチャ (消灯レンズ) のままなので、
                             //点灯用テクスチャを貼った現示灯をここで重ねる。
-                            if (blockEntity.getCategory() == InstalledObjectCategory.CROSSING
-                                    || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL) {
+                            // ブロック検知型の信号 (searchBlockAndMeta でスクリプトが現示を全制御) は
+                            // RTMU の点灯 overlay を掛けない。掛けると内蔵の信号状態で別のレンズも光り、
+                            // 現示と無関係に複数レンズが点灯してしまう (ユーザー報告)。踏切と通常信号は従来どおり。
+                            boolean scriptDrivenSignal = blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
+                                    && machineScripted.isBlockDetection();
+                            if ((blockEntity.getCategory() == InstalledObjectCategory.CROSSING
+                                    || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL)
+                                    && !scriptDrivenSignal) {
                                 renderActiveLights(blockEntity, definition, poseStack, buffer, packedOverlay);
                             }
                             poseStack.popPose();
@@ -207,7 +224,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             ClientRenderProfiler.endInstalledObject(profilerStart);
                             return;
                         }
-                    }
                     MqoModelLoader.GroupPredicate filter = groupName ->
                         shouldRenderDefinedObjectGroup(groupName, definition)
                             && (!(far || compatibilityHeavy || customCrossingGateRendering)
