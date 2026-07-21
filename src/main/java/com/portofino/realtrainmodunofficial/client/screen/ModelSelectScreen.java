@@ -183,13 +183,18 @@ public class ModelSelectScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float pt) {
-        // 本家式: 1.21 の背景すりガラス(ぼかし)も全面暗転もしない。世界はクッキリのまま。
-        // 全面塗りはボタンにも被って暗く見えるので<b>何も描かない</b> (背景は素の世界)。
+        // ここには黒を描かない。super.render() (= Screen.render) がこの renderBackground を
+        // もう一度呼ぶため、ここに黒を置くと「ボタンを描いた後」にもう一枚黒が重なり、
+        // ボタンだけ暗くなる (field は後描画なので明るいまま、という不具合)。
+        // 全画面の黒は render() の先頭で 1 回だけ敷く。
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
-        renderBackground(g, mouseX, mouseY, pt);
+        // 全画面「半透明の黒」を一番下に<b>一度だけ</b>敷く (world はうっすら透ける)。
+        // renderBackground には置かない — super.render() がそれを再度呼び、ボタンの上に黒が重なって
+        // ボタンだけ暗くなるため。ここで先に敷けば、この後に描くボタン/フィールドは黒に載る=暗くならない。
+        g.fill(0, 0, width, height, 0xB0000000);
 
         // タイトルは影付きで、明るい空を背景にしても読めるように。
         g.drawString(font, getTitle(), LIST_LEFT, 8, 0xFFFFFF, true);
@@ -225,7 +230,8 @@ public class ModelSelectScreen extends Screen {
 
     private void drawItem(GuiGraphics g, ModelInfo m, int left, int top, boolean selected, int mouseX, int mouseY) {
         boolean hovered = mouseX >= left && mouseX < left + BTN_W && mouseY >= top && mouseY < top + BTN_H;
-        g.fill(left, top, left + BTN_W, top + BTN_H, 0xFF1A1A2E);
+        // 土台は renderBackground の全画面「半透明の黒」に任せ、ここではその上に RTM ボタンテクスチャを重ねる。
+        // 選択/ホバー時だけ明るみを足す。
         if (selected) {
             g.fill(left, top, left + BTN_W, top + BTN_H, 0x66FFFFFF);
         } else if (hovered) {

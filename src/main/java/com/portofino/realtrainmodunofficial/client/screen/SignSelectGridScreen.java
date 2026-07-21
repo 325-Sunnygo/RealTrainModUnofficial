@@ -110,7 +110,9 @@ public class SignSelectGridScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
-        renderBackground(g, mouseX, mouseY, pt);
+        // モデル選択画面と同じく、全画面「半透明の黒」を先頭で 1 回だけ敷く。
+        // renderBackground に置くと super.render() の再呼び出しでタイルの上にも重なって暗くなるため。
+        g.fill(0, 0, width, height, 0xB0000000);
         g.drawString(font, getTitle(), 12, 8, 0xFFFFFF, true);
 
         int scale = Math.max(1, (int) Math.round(Minecraft.getInstance().getWindow().getGuiScale()));
