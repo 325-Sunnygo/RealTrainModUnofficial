@@ -197,6 +197,10 @@ public final class VehicleScriptRenderers {
             boolean drew;
             long sig;
             int framesSinceRun;
+            //スクリプトが getTick を読む車両 (TIMS モニター等 = 時間依存)。静止していても毎 tick
+            //再記録しないと、モニター側の「tick % N === 0」更新ゲートがキャッシュ再記録の間隔と
+            //噛み合わず不定期発火する (更新間隔が不安定に見える)。
+            boolean timeDependent;
             //この時刻 (currentTimeMillis) までは毎フレーム描く (アニメ進行中とみなす)。
             long animUntilMs;
             //定期再記録の結果が前回と完全一致した連続回数。一致が続くほど再記録間隔を
@@ -254,13 +258,29 @@ public final class VehicleScriptRenderers {
                               MqoModelLoader.MqoModel bodyModel) {
             //完全静止した車両だけキャッシュ対象にする (アニメ中/走行中の車両は毎フレーム描いて
             //滑らかさ維持。走行中のキャッシュは内装のチラつきを招くため行わない)。
-            boolean canCache = isFullyStatic(entity);
+            //
+            //★時間依存モニター (getTick を読む車両 = TIMS/速度計等) は<b>静止していてもキャッシュしない</b>。
+            //  スクリプトは自前で「currentTick % updateTick === 0」の更新ゲートを持っており、RTMU が
+            //  再記録間隔で throttle するとその周期と噛み合わず (混信) 更新が飛び飛びになる。毎フレーム
+            //  素で描けば、更新タイミングは<b>完全にスクリプトの getTick ロジック任せ</b>になる (RTMU は不干渉)。
+            EntityCache ecExisting = this.entityCaches.get(entity);
+            boolean timeDependent = ecExisting != null && ecExisting.timeDependent;
+            boolean canCache = isFullyStatic(entity) && !timeDependent;
             if (!canCache) {
-                //計測: 走行中の車両はキャッシュ対象外 = 毎フレーム Nashorn 実行。
-                //軽量化の主戦場がここであることを数値で確かめるために miss として数える。
+                //計測: 走行中/時間依存の車両はキャッシュ対象外 = 毎フレーム Nashorn 実行。
                 com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(false);
-                this.entityCaches.remove(entity);
-                return renderReal(entity, partialTick, poseStack, buffer, packedLight, packedOverlay, bodyModel, null);
+                //描画中に getTick が読まれたら「時間依存」と記録し、以後も毎フレーム描画を維持する
+                //(静止中でもモニターだけは throttle しない)。それ以外の静止車両は従来どおりキャッシュへ戻す。
+                jp.ngt.rtm.render.EntityPartsRenderer.clearTimeAccessed();
+                boolean drewNC = renderReal(entity, partialTick, poseStack, buffer, packedLight, packedOverlay, bodyModel, null);
+                if (jp.ngt.rtm.render.EntityPartsRenderer.wasTimeAccessed()) {
+                    EntityCache tec = this.entityCaches.computeIfAbsent(entity, k -> new EntityCache());
+                    tec.timeDependent = true;
+                    tec.valid = false;
+                } else if (ecExisting != null && !ecExisting.timeDependent) {
+                    this.entityCaches.remove(entity);
+                }
+                return drewNC;
             }
 
             EntityCache ec = this.entityCaches.computeIfAbsent(entity, k -> new EntityCache());
@@ -312,7 +332,12 @@ public final class VehicleScriptRenderers {
             boolean pureRefresh = !animating && ec.valid && ec.sig == sig;
             com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(false);
             List<CachedPass> sink = new ArrayList<>();
+            //この描画中にスクリプトが getTick を読んだら「時間依存」と判定し、以後は毎 tick 再記録に切り替える。
+            jp.ngt.rtm.render.EntityPartsRenderer.clearTimeAccessed();
             boolean drew = renderReal(entity, partialTick, poseStack, buffer, packedLight, packedOverlay, bodyModel, sink);
+            if (jp.ngt.rtm.render.EntityPartsRenderer.wasTimeAccessed()) {
+                ec.timeDependent = true;
+            }
             if (pureRefresh && drew == ec.drew && passesIdentical(ec.passes, sink)) {
                 ec.identicalRefreshes = Math.min(ec.identicalRefreshes + 1, 3);
             } else {

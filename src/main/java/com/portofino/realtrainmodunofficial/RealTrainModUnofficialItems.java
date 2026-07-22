@@ -100,6 +100,9 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> TRAIN_DETECTOR_ITEM = ITEMS.register(
         "train_detector", () -> new InstalledObjectItem(InstalledObjectCategory.TRAIN_DETECTOR)
     );
+    public static final DeferredItem<InstalledObjectItem> ATC_ITEM = ITEMS.register(
+        "atc", () -> new InstalledObjectItem(InstalledObjectCategory.ATC)
+    );
     public static final DeferredItem<InstalledObjectItem> OVERHEAD_LINE_POLE_ITEM = ITEMS.register(
         "overhead_line_pole", () -> new InstalledObjectItem(InstalledObjectCategory.OVERHEAD_LINE_POLE)
     );
@@ -159,6 +162,7 @@ public class RealTrainModUnofficialItems {
             case INSULATOR -> INSULATOR_ITEM.get();
             case SIGNAL -> SIGNAL_ITEM.get();
             case TRAIN_DETECTOR -> TRAIN_DETECTOR_ITEM.get();
+            case ATC -> ATC_ITEM.get();
             case OVERHEAD_LINE_POLE -> OVERHEAD_LINE_POLE_ITEM.get();
             case TICKET_GATE -> TICKET_GATE_ITEM.get();
             case SPEAKER -> SPEAKER_ITEM.get();

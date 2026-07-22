@@ -400,8 +400,28 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         } else {
             //DataMap を書き換えるサーバースクリプトを先に回してから同期する。
             this.tickServerScript();
+            //ATS 基礎: 車両の下にあるレールの signal を State_Signal に拾う (本家 updateBlockCollisionState 相当)。
+            this.updateRailSignalPickup();
             this.syncFormationData();
             this.syncDataMap();
+        }
+    }
+
+    /**
+     * ATS 基礎 (Phase 1): 車両直下のレール ({@link jp.ngt.rtm.rail.TileEntityLargeRailCore}) の
+     * signal を読み、{@link #setSignal} で自車 (=編成) の State_Signal に反映する。
+     * これで ATC 地上子がレールに書いた信号を、通過した列車が拾えるようになる。
+     * 本家 EntityTrainBase.updateBlockCollisionState の signal 拾い部分の移植。
+     */
+    private void updateRailSignalPickup() {
+        jp.ngt.rtm.rail.TileEntityLargeRailBase rail =
+                jp.ngt.rtm.rail.TileEntityLargeRailBase.getRailFromCoordinates(
+                        this.level(), this.getX(), this.getY() + 1.0D, this.getZ());
+        if (rail != null) {
+            jp.ngt.rtm.rail.TileEntityLargeRailCore core = rail.getRailCore();
+            if (core != null) {
+                this.setSignal(core.getSignal());
+            }
         }
     }
 

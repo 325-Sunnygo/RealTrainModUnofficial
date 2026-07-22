@@ -32,6 +32,19 @@ public final class PlayerCompat {
         this.refresh();
     }
 
+    /** 空プレイヤー (player=null)。field_71439_g を絶対 null にしないための null-object。 */
+    private PlayerCompat() {
+        this.player = null;
+        //refresh() は呼ばない。field_71071_by は空のまま = func_70448_g() が null を返す。
+    }
+
+    /**
+     * mc.player が null の瞬間 (ワールド遷移・特定の描画パス等) 用の共有インスタンス。
+     * スクリプトが {@code getMinecraft().field_71439_g.field_71071_by.func_70448_g()} を
+     * ノーガードで呼んでも (hi03 ATS 地上子 / Baru's Roof 等)、null 手ぶら扱いで落ちない。
+     */
+    public static final PlayerCompat EMPTY = new PlayerCompat();
+
     public static synchronized PlayerCompat of(Player player) {
         if (player == null) {
             return null;
@@ -58,6 +71,9 @@ public final class PlayerCompat {
     }
 
     public void refresh() {
+        if (this.player == null) {
+            return; //EMPTY (空プレイヤー) は更新しない
+        }
         this.field_70165_t = player.getX();
         this.field_70163_u = player.getY();
         this.field_70161_v = player.getZ();

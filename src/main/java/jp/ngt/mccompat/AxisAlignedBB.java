@@ -48,6 +48,17 @@ public final class AxisAlignedBB {
         this(new AABB(minX, minY, minZ, maxX, maxY, maxZ));
     }
 
+    /**
+     * func_72330_a = 1.7.10 {@code AxisAlignedBB.getBoundingBox(minX,minY,minZ,maxX,maxY,maxZ)} の静的ファクトリ。
+     * <p>ATS 地上子の server_ATS_Beacon.js が列車検知の当たり判定を作るのに
+     * {@code AxisAlignedBB.func_72330_a(...)} を呼ぶ。これが無いと検知 AABB を作れず列車検知が丸ごと失敗し、
+     * ATS-P が一切起動しなかった。
+     */
+    public static AxisAlignedBB func_72330_a(double minX, double minY, double minZ,
+                                             double maxX, double maxY, double maxZ) {
+        return new AxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
     /** ラッパー / 実体どちらからでも 1.21 の AABB を取り出す。 */
     public static AABB unwrap(Object obj) {
         if (obj instanceof AxisAlignedBB w) {

@@ -94,6 +94,7 @@ public class WorldCompat {
         return this.level.getEntities(EntityCompatUtil.unwrapEntity(exclude), box);
     }
 
+
     /**
      * getEntityByID。プレイヤーは PlayerCompat ラッパーで返す
      * (SRB3 等が MCWrapperClient.getPlayer() の戻り値と === 比較するため)。

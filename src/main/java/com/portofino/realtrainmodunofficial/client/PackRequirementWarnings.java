@@ -5,8 +5,6 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import net.neoforged.fml.loading.FMLPaths;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -20,11 +18,6 @@ import java.util.zip.ZipFile;
 
 public final class PackRequirementWarnings {
     private static final List<String> WARNINGS = new ArrayList<>();
-    private static final List<Charset> README_CHARSETS = List.of(
-        StandardCharsets.UTF_8,
-        Charset.forName("MS932"),
-        Charset.forName("Shift_JIS")
-    );
 
     private PackRequirementWarnings() {
     }
@@ -124,18 +117,15 @@ public final class PackRequirementWarnings {
                 continue;
             }
             byte[] bytes = zipFile.getInputStream(entry).readAllBytes();
-            String fallback = "";
-            for (Charset charset : README_CHARSETS) {
-                String text = new String(bytes, charset);
-                if (text.contains("前提パック")) {
-                    return text;
-                }
-                if (fallback.isBlank() && !looksCorrupted(text)) {
-                    fallback = text;
-                }
+            // UTF-8 → MS932 → Shift_JIS を厳格に試す共通デコーダに一本化。
+            // 旧実装の new String(bytes, charset) は例外を投げないため、CP932 専用文字を含む
+            // Shift_JIS README を UTF-8 のまま文字化けさせ、前提パック名の抽出を取りこぼしていた。
+            String text = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
+            if (text.contains("前提パック")) {
+                return text;
             }
-            if (!fallback.isBlank()) {
-                return fallback;
+            if (!looksCorrupted(text)) {
+                return text;
             }
         }
         return "";

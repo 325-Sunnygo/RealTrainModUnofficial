@@ -125,6 +125,7 @@ public final class ExternalSoundPackBridge {
         Path gameDir = FMLPaths.GAMEDIR.get();
         List<Path> roots = List.of(
             gameDir.resolve("mods"),
+            gameDir.resolve("mods").resolve("modelpacks"),
             gameDir.resolve("content"),
             gameDir.resolve("vehicle_packs"),
             com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get(),

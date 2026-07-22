@@ -260,6 +260,7 @@ public final class ClientItemHelper {
             case TICKET_GATE -> "screen.realtrainmodunofficial.select_ticket_gate";
             case SPEAKER -> "screen.realtrainmodunofficial.select_speaker";
             case TRAIN_DETECTOR -> "screen.realtrainmodunofficial.select_train_detector";
+            case ATC -> "screen.realtrainmodunofficial.select_atc";
             case CONNECTOR_INPUT, CONNECTOR_OUTPUT -> "screen.realtrainmodunofficial.select_connector";
             case FLUORESCENT -> "screen.realtrainmodunofficial.select_fluorescent";
             case RAILROAD_SIGN -> "screen.realtrainmodunofficial.select_railroad_sign";

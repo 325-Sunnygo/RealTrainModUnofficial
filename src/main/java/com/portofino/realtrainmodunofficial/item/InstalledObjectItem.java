@@ -245,10 +245,12 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         //パイプも RenderConnectablePipe.js が隣接パイプをワールド軸で見て腕を出すので、回さずグリッドに揃える。
         boolean gridAligned = category == InstalledObjectCategory.OVERHEAD_LINE_POLE
                 || category == InstalledObjectCategory.PIPE;
-        //列車検知器と車止め: 本家 ItemInstalledObject.setEntityOnRail 準拠で、クリックしたレールの
-        //曲線上に載せる (位置・向き・勾配・カント)。汎用の壁挿し/逆さ設置には乗せない。
+        //列車検知器・車止め・ATC 地上子: 本家 ItemInstalledObject.setEntityOnRail 準拠で、クリックした
+        //レールの曲線上に載せる (位置・向き・勾配・カント)。汎用の壁挿し/逆さ設置には乗せない。
+        //ATC 地上子は真下のレールに信号を書くので、検知器と同じくレールに吸着させる。
         boolean railMounted = category == InstalledObjectCategory.TRAIN_DETECTOR
-                || category == InstalledObjectCategory.BUMPING_POST;
+                || category == InstalledObjectCategory.BUMPING_POST
+                || category == InstalledObjectCategory.ATC;
         RailSnap railSnap = railMounted
                 ? computeRailSnap(level, context.getClickedPos(), placePos, player)
                 : null;

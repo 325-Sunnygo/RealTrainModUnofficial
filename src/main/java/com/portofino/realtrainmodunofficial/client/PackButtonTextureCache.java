@@ -305,14 +305,28 @@ public final class PackButtonTextureCache {
     private static ZipEntry findEntry(ZipFile zipFile, String texturePath) {
         String normalized = normalize(texturePath).toLowerCase(Locale.ROOT);
         String leaf = normalized.substring(normalized.lastIndexOf('/') + 1);
-        return zipFile.stream()
+        //1) フルパス一致を最優先。button_*.png が normal/ と new/ のように<b>別フォルダに同名で</b>
+        //   同居していると、リーフ名一致だけでは zip 内の先着を拾って取り違える (E259 と E259N で
+        //   同じボタンが出る不具合)。まず要求パスそのものに一致するエントリを探す。
+        ZipEntry byFullPath = zipFile.stream()
             .filter(entry -> !entry.isDirectory())
             .filter(entry -> {
                 String name = normalize(entry.getName()).toLowerCase(Locale.ROOT);
                 return name.equals(normalized)
                     || name.endsWith("/" + normalized)
-                    || name.endsWith("/" + leaf)
                     || name.contains("/textures/" + normalized);
+            })
+            .findFirst()
+            .orElse(null);
+        if (byFullPath != null) {
+            return byFullPath;
+        }
+        //2) フルパスで見つからないときだけ、最後の手段としてリーフ名一致にフォールバック。
+        return zipFile.stream()
+            .filter(entry -> !entry.isDirectory())
+            .filter(entry -> {
+                String name = normalize(entry.getName()).toLowerCase(Locale.ROOT);
+                return name.equals(leaf) || name.endsWith("/" + leaf);
             })
             .findFirst()
             .orElse(null);
@@ -336,6 +350,8 @@ public final class PackButtonTextureCache {
         addArchiveChildren(gameDir, seen, result);
         addDirectoryChildren(gameDir.resolve("mods"), seen, result);
         addArchiveChildren(gameDir.resolve("mods"), seen, result);
+        addDirectoryChildren(gameDir.resolve("mods").resolve("modelpacks"), seen, result);
+        addArchiveChildren(gameDir.resolve("mods").resolve("modelpacks"), seen, result);
         addDirectoryChildren(gameDir.resolve("content"), seen, result);
         addArchiveChildren(gameDir.resolve("content"), seen, result);
         addDirectoryChildren(gameDir.resolve("vehicle_packs"), seen, result);

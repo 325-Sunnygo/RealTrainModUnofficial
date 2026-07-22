@@ -42,6 +42,11 @@ public final class InstalledObjectServerScripts {
             "var __t = function(n){ try { return Java.type(n); } catch (e) { return null; } };",
             "var TileEntityCommandBlock = __t('jp.ngt.mccompat.tileentity.TileEntityCommandBlock');",
             "var CommandBlockLogic     = __t('jp.ngt.mccompat.tileentity.CommandBlockLogic');",
+            //ATS-Ps 地上子ビーコンが連動信号機を `tile instanceof TileEntitySignal` で判定し
+            //`NGTUtil.getField(TileEntitySignal.class, tile, ["signalLevel"])` で現示を読む。
+            //RTMU の信号機タイルは InstalledObjectBlockEntity なので、それを TileEntitySignal として束縛する
+            //(signalLevel フィールドは tick() で getLegacySignalState() を反映済み)。
+            "var TileEntitySignal      = __t('com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity');",
             "var AxisAlignedBB         = __t('jp.ngt.mccompat.AxisAlignedBB');",
             "var Blocks                = __t('jp.ngt.mccompat.init.Blocks');",
             "var NGTUtil               = __t('jp.ngt.ngtlib.util.NGTUtil');",

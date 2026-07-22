@@ -51,6 +51,11 @@ public final class InstalledObjectPackLoader {
                 loadDirectoryPacks(modsDir);
                 loadArchiveDirectory(modsDir);
             }
+            Path modelPacksDir = modsDir.resolve("modelpacks");
+            if (Files.isDirectory(modelPacksDir)) {
+                loadDirectoryPacks(modelPacksDir);
+                loadArchiveDirectory(modelPacksDir);
+            }
             Path contentDir = FMLPaths.GAMEDIR.get().resolve("content");
             if (Files.isDirectory(contentDir)) {
                 loadDirectoryPacks(contentDir);
@@ -637,8 +642,13 @@ public final class InstalledObjectPackLoader {
         if (containsAny(hay, "signboard", "sign_board", "billboard", "看板")) {
             return InstalledObjectCategory.SIGNBOARD;
         }
+        //本家 ATC 地上子: ModelMachine_ATC_01/02.json の machineType は "Antenna_Send" (検知器の送信側)。
+        //レールに signal を書き込む。検知器 (Antenna_Receive) と紛れないよう先に判定する。
+        if (machineType.equals("antenna_send") || lowerFile.startsWith("modelmachine_atc")
+                || containsAny(hay, "antenna_send", "地上子")) {
+            return InstalledObjectCategory.ATC;
+        }
         //本家 列車検知器: ModelMachine_TrainDetector_01.json の machineType は "Antenna_Receive"。
-        //(送信側 "Antenna_Send" = ATC 地上子は未移植なので、従来どおり汎用 ModelMachine 扱いのまま)
         //照明の受け皿より先に判定しないと、検知器が照明カテゴリに落ちて選択に出てこない。
         if (containsAny(hay, "antenna_receive", "traindetector", "train_detector", "列車検知", "電車検知")) {
             return InstalledObjectCategory.TRAIN_DETECTOR;

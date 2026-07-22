@@ -2,6 +2,7 @@ package com.portofino.realtrainmodunofficial;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.portofino.realtrainmodunofficial.entity.TrainBogieEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
@@ -94,6 +95,185 @@ public final class TrainCommands {
                     )
                 )
         );
+
+        registerMctrl(dispatcher);
+    }
+
+    /**
+     * KaizPatchX {@code CommandMCtrl} / {@code ModelCtrl} の移植。
+     * <pre>/mctrl &lt;target&gt; notch &lt;-8~5&gt;
+     * /mctrl &lt;target&gt; dir &lt;0|1&gt;
+     * /mctrl &lt;target&gt; dm &lt;dataName&gt; &lt;value&gt;
+     * /mctrl &lt;target&gt; state &lt;TrainStateType&gt; &lt;TrainState&gt;</pre>
+     * target = {@code @a}(全列車) / {@code @n}(最寄り) / {@code @r:NN}(半径NN) / {@code @s}(搭乗中) / 列車名。
+     */
+    private static void registerMctrl(CommandDispatcher<CommandSourceStack> dispatcher) {
+        dispatcher.register(
+            Commands.literal("mctrl")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.argument("target", StringArgumentType.string())
+                    .then(Commands.literal("notch")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(-8, 5))
+                            .executes(ctx -> mctrlNotch(ctx.getSource(),
+                                StringArgumentType.getString(ctx, "target"),
+                                IntegerArgumentType.getInteger(ctx, "value")))))
+                    .then(Commands.literal("dir")
+                        .then(Commands.argument("value", IntegerArgumentType.integer(0, 1))
+                            .executes(ctx -> mctrlDir(ctx.getSource(),
+                                StringArgumentType.getString(ctx, "target"),
+                                IntegerArgumentType.getInteger(ctx, "value")))))
+                    .then(Commands.literal("dm")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                            .then(Commands.argument("value", StringArgumentType.greedyString())
+                                .executes(ctx -> mctrlDataMap(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "target"),
+                                    StringArgumentType.getString(ctx, "name"),
+                                    StringArgumentType.getString(ctx, "value"))))))
+                    .then(Commands.literal("state")
+                        .then(Commands.argument("type", StringArgumentType.word())
+                            .then(Commands.argument("value", StringArgumentType.word())
+                                .executes(ctx -> mctrlState(ctx.getSource(),
+                                    StringArgumentType.getString(ctx, "target"),
+                                    StringArgumentType.getString(ctx, "type"),
+                                    StringArgumentType.getString(ctx, "value"))))))
+                )
+        );
+    }
+
+    /** target 文字列 (@a/@n/@r:NN/@s/名前) を解決して対象の本家列車を返す。 */
+    private static List<jp.ngt.rtm.entity.train.EntityTrainBase> resolveTrainTargets(
+            CommandSourceStack src, String target) {
+        ServerLevel level = src.getLevel();
+        List<jp.ngt.rtm.entity.train.EntityTrainBase> all = new ArrayList<>();
+        for (Entity e : level.getAllEntities()) {
+            if (e instanceof jp.ngt.rtm.entity.train.EntityTrainBase t && t.isAlive()) {
+                all.add(t);
+            }
+        }
+        String t = target.trim();
+        net.minecraft.world.phys.Vec3 pos = src.getPosition();
+        if (t.equals("@a")) {
+            return all;
+        }
+        if (t.equals("@s")) {
+            Entity sender = src.getEntity();
+            if (sender != null && sender.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase ride) {
+                return List.of(ride);
+            }
+            return List.of();
+        }
+        if (t.equals("@n")) {
+            jp.ngt.rtm.entity.train.EntityTrainBase nearest = null;
+            double best = Double.MAX_VALUE;
+            for (var tr : all) {
+                double d = tr.distanceToSqr(pos);
+                if (d < best) {
+                    best = d;
+                    nearest = tr;
+                }
+            }
+            return nearest == null ? List.of() : List.of(nearest);
+        }
+        if (t.startsWith("@r:")) {
+            double r;
+            try {
+                r = Double.parseDouble(t.substring(3));
+            } catch (NumberFormatException e) {
+                return List.of();
+            }
+            double rr = r * r;
+            List<jp.ngt.rtm.entity.train.EntityTrainBase> out = new ArrayList<>();
+            for (var tr : all) {
+                if (tr.distanceToSqr(pos) <= rr) {
+                    out.add(tr);
+                }
+            }
+            return out;
+        }
+        //名前一致 (表示名 or カスタム名)
+        List<jp.ngt.rtm.entity.train.EntityTrainBase> out = new ArrayList<>();
+        for (var tr : all) {
+            if (tr.getName().getString().equals(t)
+                || (tr.hasCustomName() && tr.getCustomName() != null
+                    && tr.getCustomName().getString().equals(t))) {
+                out.add(tr);
+            }
+        }
+        return out;
+    }
+
+    private static int mctrlNotch(CommandSourceStack src, String target, int value) {
+        List<jp.ngt.rtm.entity.train.EntityTrainBase> list = resolveTrainTargets(src, target);
+        if (list.isEmpty()) {
+            src.sendFailure(Component.literal("対象の列車が見つかりません: " + target));
+            return 0;
+        }
+        list.forEach(tr -> tr.setNotch(value));
+        src.sendSuccess(() -> Component.literal(list.size() + " 両のノッチを " + value + " に設定しました。"), true);
+        return list.size();
+    }
+
+    private static int mctrlDir(CommandSourceStack src, String target, int value) {
+        List<jp.ngt.rtm.entity.train.EntityTrainBase> list = resolveTrainTargets(src, target);
+        if (list.isEmpty()) {
+            src.sendFailure(Component.literal("対象の列車が見つかりません: " + target));
+            return 0;
+        }
+        list.forEach(tr -> tr.setTrainDirection(value));
+        src.sendSuccess(() -> Component.literal(list.size() + " 両の進行方向を " + value + " に設定しました。"), true);
+        return list.size();
+    }
+
+    private static int mctrlDataMap(CommandSourceStack src, String target, String name, String value) {
+        List<jp.ngt.rtm.entity.train.EntityTrainBase> list = resolveTrainTargets(src, target);
+        if (list.isEmpty()) {
+            src.sendFailure(Component.literal("対象の列車が見つかりません: " + target));
+            return 0;
+        }
+        list.forEach(tr -> applyDataMap(tr, name, value));
+        src.sendSuccess(() -> Component.literal(list.size() + " 両の DataMap[" + name + "] を " + value + " にしました。"), true);
+        return list.size();
+    }
+
+    private static int mctrlState(CommandSourceStack src, String target, String typeName, String value) {
+        jp.ngt.rtm.entity.train.util.TrainState state;
+        jp.ngt.rtm.entity.train.util.TrainState.TrainStateType type;
+        try {
+            state = jp.ngt.rtm.entity.train.util.TrainState.valueOf(value);
+            type = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.valueOf(typeName);
+        } catch (IllegalArgumentException e) {
+            src.sendFailure(Component.literal(
+                "state/type が不正です。例: type=State_Door value=Door_OpenAll"));
+            return 0;
+        }
+        List<jp.ngt.rtm.entity.train.EntityTrainBase> list = resolveTrainTargets(src, target);
+        if (list.isEmpty()) {
+            src.sendFailure(Component.literal("対象の列車が見つかりません: " + target));
+            return 0;
+        }
+        list.forEach(tr -> tr.setTrainStateData(type.id, state.data));
+        src.sendSuccess(() -> Component.literal(list.size() + " 両の " + typeName + " を " + value + " にしました。"), true);
+        return list.size();
+    }
+
+    /** DataMap の値を型推定して書き込む (本家 ModelCtrl の set(name,value,3) 相当)。 */
+    private static void applyDataMap(jp.ngt.rtm.entity.train.EntityTrainBase tr, String name, String value) {
+        jp.ngt.rtm.modelpack.state.DataMap dm = tr.getResourceState().getDataMap();
+        if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
+            dm.setBoolean(name, Boolean.parseBoolean(value), 3);
+            return;
+        }
+        try {
+            dm.setInt(name, Integer.parseInt(value), 3);
+            return;
+        } catch (NumberFormatException ignored) {
+        }
+        try {
+            dm.setDouble(name, Double.parseDouble(value), 3);
+            return;
+        } catch (NumberFormatException ignored) {
+        }
+        dm.setString(name, value, 3);
     }
 
     private static int executeDeleteTrain(CommandSourceStack source) {

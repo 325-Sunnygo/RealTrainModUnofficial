@@ -161,11 +161,23 @@ public class EntityBogie extends Entity {
     /**
      * 分岐で台車が追従すべきレールマップを選ぶ。
      *
-     * <p>本家は {@code getNearestPoint(台車).getActiveRailMap()} = <b>根元点が最も近い分岐点</b>の
-     * マップを掴むだけで、台車が実際に走っている線とも開通方向とも無関係だった。枝の端点が近いと
-     * <b>反対側の線路</b>のマップを掴み、台車だけがそちらへ TP して分岐通過後に合流し直す、という
-     * 不具合になっていた。ここでは「①開通(アクティブ)中 ②現レールと連続 (canConnect) ③台車に最も近い」
-     * の 3 条件で選ぶ。開通側に該当が無い場合 (背向進入など) は全分岐から連続するものを選ぶ。
+     * <p><b>本家と同じライブ参照方式</b>。本家 EntityBogie は
+     * {@code getSwitch().getNearestPoint(台車).getActiveRailMap(world)} で、台車に最も近い
+     * 分岐点の<b>開通(アクティブ)側</b>を掴む。{@code Point.getActiveRailMap} は根元で
+     * {@code RailPosition.checkRSInput} を<b>毎回ライブで参照</b>するため、レバー/レッドストーンの
+     * 現在状態を必ず反映する。根元から進入すれば開通方向、枝から背向で合流すれば其の枝、を
+     * 「最も近い点」の位置で自然に選び分ける (根元点なら RS で分岐/直進、枝端点なら其の枝)。
+     *
+     * <p>かつてここを {@code SwitchType.getActiveRailMap()} が返す<b>キャッシュ済み activeRails</b> を
+     * 距離で選ぶ方式に作り替えていたが、そのキャッシュはレール<b>コア</b>への {@code neighborChanged}
+     * 由来の {@code onBlockChanged} でしか更新されない。レバーがコアに隣接していない等で更新が
+     * 届かないと、見た目の分岐 (クライアントはライブ RS でアニメする) は切り替わっているのに台車だけ
+     * 直進側に固定される、という不具合になっていた。本家どおりライブ参照へ戻す。
+     *
+     * <p>本家に無い保険は 2 つだけ残す:
+     * ①同じ列車のもう一方の台車が既に或る枝に乗っていれば<b>同じ枝</b>を使う (車体が別々の枝へ
+     *   引き裂かれて台車分離するのを防ぐ) 。②開通側が進入元レールと連続しない (=非開通の枝から
+     *   背向合流) 場合は、実際に連続する枝へ乗せる (開通側へ TP させない) 。
      */
     private RailMap selectSwitchRailMap(jp.ngt.rtm.rail.util.SwitchType sw, double px, double pz) {
         //★最優先: 同じ列車のもう一方の台車が既にこの分岐の枝に乗っているなら、必ず<b>同じ枝</b>を使う。
@@ -175,30 +187,28 @@ public class EntityBogie extends Entity {
         if (sibling != null) {
             return sibling;
         }
-        //開通(アクティブ)側の最寄り枝と、全枝の最寄り枝をそれぞれ求める。
-        double[] activeSq = new double[]{Double.MAX_VALUE};
-        RailMap active = this.pickNearestConnectable(sw.getActiveRailMap(), px, pz, activeSq);
-        jp.ngt.rtm.rail.util.RailMapSwitch[] allArr = sw.getAllRailMap();
-        double[] nearestSq = new double[]{Double.MAX_VALUE};
-        RailMap nearest = this.pickNearestConnectable(
-                allArr == null ? null : java.util.Arrays.asList(allArr), px, pz, nearestSq);
-
-        //★台車が開通枝の上(近く)にいる = 根元から進路を選ぶ通常の進入 → 開通方向に従う。
-        if (active != null && activeSq[0] <= ON_RAIL_DIST_SQ) {
-            return active;
-        }
-        //★開通枝が遠い = 台車はすでに別の枝の上を走っている。ここで開通枝へ乗せ替えると
-        //  台車だけが数ブロック離れた別線へ TP する (走行中に分岐が切り替わった場合など)。
-        //  実際に乗っている枝をそのまま継続させる。
-        if (nearest != null) {
-            return nearest;
-        }
-        if (active != null) {
-            return active;
-        }
-        //フォールバック: 本家どおりの最近点ベース
+        //★本家と同じ: 台車に最も近い分岐点の「開通(アクティブ)側」をライブ参照で掴む。
+        //  Point.getActiveRailMap は根元で checkRSInput (getBestNeighborSignal) を毎回読むため、
+        //  レバー/RS の現在状態を必ず反映する。activeRails キャッシュには一切依存しない。
         jp.ngt.rtm.rail.util.Point np = sw.getNearestPoint(this);
-        return np != null ? np.getActiveRailMap(this.level()) : null;
+        RailMap active = np != null ? np.getActiveRailMap(this.level()) : null;
+
+        //進入元レールと連続していれば其れに従う (通常の進入。根元では両枝が根元端点を共有するので
+        //開通側が直進でも分岐でも canConnect が成立し、RS の選択どおりに進む)。
+        if (active != null && (this.currentRailMap == null || this.currentRailMap.canConnect(active))) {
+            return active;
+        }
+        //★開通側が進入元と繋がらない = 非開通の枝から背向で合流している。実際に連続する枝へ乗せ、
+        //  開通側へ台車だけを TP させない。
+        jp.ngt.rtm.rail.util.RailMapSwitch[] allArr = sw.getAllRailMap();
+        if (allArr != null && this.currentRailMap != null) {
+            for (jp.ngt.rtm.rail.util.RailMapSwitch rm : allArr) {
+                if (rm != null && this.currentRailMap.canConnect(rm)) {
+                    return rm;
+                }
+            }
+        }
+        return active;
     }
 
     /**
@@ -232,47 +242,11 @@ public class EntityBogie extends Entity {
         return null;
     }
 
-    /** 台車が「その枝の上に乗っている」とみなす距離の2乗 (1 ブロック)。 */
-    private static final double ON_RAIL_DIST_SQ = 1.0D;
-
-    /** 候補のうち「現レールと連続」かつ「台車に最も近い」ものを返す。距離の2乗を outSq[0] へ返す。 */
-    private RailMap pickNearestConnectable(java.util.List<jp.ngt.rtm.rail.util.RailMapSwitch> maps,
-                                           double px, double pz, double[] outSq) {
-        if (maps == null || maps.isEmpty()) {
-            return null;
-        }
-        RailMap best = null;
-        double bestSq = Double.MAX_VALUE;
-        for (jp.ngt.rtm.rail.util.RailMapSwitch rm : maps) {
-            if (rm == null) {
-                continue;
-            }
-            if (this.currentRailMap != null && !this.currentRailMap.canConnect(rm)) {
-                continue;
-            }
-            double d = distToRailMapSq(rm, px, pz);
-            if (d < bestSq) {
-                bestSq = d;
-                best = rm;
-            }
-        }
-        outSq[0] = bestSq;
-        return best;
-    }
-
     /**
-     * レール曲線と点 (px,pz) の最短距離の2乗 (サンプリング近似)。
-     *
-     * <p><b>サンプル密度はレール長に比例させること</b>。固定 16 分割にしていたときは、長さ 40m の
-     * 分岐でサンプル間隔が 2.6m になり、曲線上に乗っている台車でも「2.6 離れている」と誤測定した。
-     * この距離で<b>どの枝に乗るかを選んでいる</b>ため、数ブロックしか離れていない枝を区別できず、
-     * 反対側の線路の枝を選んで台車が TP する原因になっていた。
+     * レール曲線と点 (px,pz) の最短距離の2乗 (サンプリング近似)。描画で「どちらの枝に描くか」を
+     * 選ぶのに使う。<b>サンプル密度はレール長に比例させること</b> (固定分割だと長い分岐で曲線上の
+     * 台車を「離れている」と誤測定する)。
      */
-    private static double distToRailMapSq(RailMap rm, double px, double pz) {
-        //32 サンプル/m = 約 0.03 ブロック分解能。枝の判別には十分で、分岐進入時のみの呼び出しなので軽い。
-        return distToRailMapSq(rm, px, pz, 32.0D, 64.0D);
-    }
-
     private static double distToRailMapSq(RailMap rm, double px, double pz,
                                           double samplesPerMeter, double minSplit) {
         int split = (int) Math.max(minSplit, rm.getLength() * samplesPerMeter);

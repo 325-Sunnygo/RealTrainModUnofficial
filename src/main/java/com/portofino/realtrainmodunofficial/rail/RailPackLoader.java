@@ -105,7 +105,11 @@ public class RailPackLoader {
             if (Files.isDirectory(gameDir)) {
                 loadArchiveDirectory(gameDir);
                 Path modsDir = gameDir.resolve("mods");
-                if (Files.isDirectory(modsDir)) loadArchiveDirectory(modsDir);
+                if (Files.isDirectory(modsDir)) {
+                    loadArchiveDirectory(modsDir);
+                    Path modelPacksDir = modsDir.resolve("modelpacks");
+                    if (Files.isDirectory(modelPacksDir)) loadArchiveDirectory(modelPacksDir);
+                }
             }
             Path contentDir = gameDir.resolve("content");
             if (Files.isDirectory(contentDir)) loadArchiveDirectory(contentDir);
@@ -447,6 +451,8 @@ public class RailPackLoader {
         if (Files.exists(candidate)) return candidate;
         Path modsDir = gameDir.resolve("mods").resolve(packName);
         if (Files.exists(modsDir)) return modsDir;
+        Path modelPacksDir = gameDir.resolve("mods").resolve("modelpacks").resolve(packName);
+        if (Files.exists(modelPacksDir)) return modelPacksDir;
         Path defaultAssetsPack = com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get().resolve(packName);
         if (Files.exists(defaultAssetsPack)) return defaultAssetsPack;
         Path contentDir = gameDir.resolve("content").resolve(packName);

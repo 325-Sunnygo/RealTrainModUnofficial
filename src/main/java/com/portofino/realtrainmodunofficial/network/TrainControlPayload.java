@@ -131,6 +131,21 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 case "toggle_pantograph" -> controlTrain.setPantographUpForFormation(!controlTrain.isPantographUp());
                 case "toggle_reverse" -> controlTrain.setReverse(!controlTrain.isReverse());
                 case "set_reverser" -> controlTrain.setReverser(payload.value());
+                //↑↓ キーのレバーサ操作。↑=前(+1)/↓=後(-1) に 1 段ずつ。中立(0)を挟む 3 段。
+                //マスコンが 0 (力行/制動なし) のときだけ動かせる = 走行中の逆転を防ぐ。
+                case "reverser_up", "reverser_down" -> {
+                    if (!driverPassenger) {
+                        return;
+                    }
+                    if (controlTrain.getNotch() == 0) {
+                        int delta = payload.action().equals("reverser_up") ? 1 : -1;
+                        int next = Math.max(-1, Math.min(1, controlTrain.getReverser() + delta));
+                        if (next != controlTrain.getReverser()) {
+                            controlTrain.setReverser(next);
+                            TrainSoundPayload.broadcast(controlTrain, "rtm:sounds/train/lever.ogg", 1.0F, 1.0F);
+                        }
+                    }
+                }
                 case "next_destination" -> {
                     int count = Math.max(1, controlTrain.getResourceState().getResourceSet().getConfig().rollsignNames.length);
                     controlTrain.setDestinationIndexForFormation((controlTrain.getDestinationIndex() + 1) % count);
@@ -188,6 +203,28 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             case "toggle_reverse" -> {
                 if (train.getNotch() == 0) {
                     train.setTrainDirection(1 - train.getTrainDirection());
+                }
+            }
+            //↑↓ キーのレバーサ操作。<b>物理の前後判定は getTrainState(10)=State_Direction (Front/Back)</b>
+            //を読む (updateMotion)。以前は State_TrainDir を変えていたため列車が逆転せず
+            //「レバーサが切り替わらない」不具合になっていた。ここは State_Direction を書く。
+            //運転台が編成の向きと逆なら Front/Back を入れ替えて、↑ が常に「運転士の前方」になるようにする。
+            //マスコン 0 のときだけ動かせる = 走行中の逆転防止。
+            case "reverser_up", "reverser_down" -> {
+                if (train.getNotch() == 0) {
+                    var dirType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction;
+                    boolean flip = (train.getCabDirection() & 1) != (train.getTrainDirection() & 1);
+                    byte front = flip
+                            ? jp.ngt.rtm.entity.train.util.TrainState.Direction_Back.data
+                            : jp.ngt.rtm.entity.train.util.TrainState.Direction_Front.data;
+                    byte back = flip
+                            ? jp.ngt.rtm.entity.train.util.TrainState.Direction_Front.data
+                            : jp.ngt.rtm.entity.train.util.TrainState.Direction_Back.data;
+                    byte target = action.equals("reverser_up") ? front : back;
+                    if (train.getTrainStateData(dirType.id) != target) {
+                        train.setTrainStateData(dirType.id, target);
+                        TrainSoundPayload.broadcast(train, "rtm:sounds/train/lever.ogg", 1.0F, 1.0F);
+                    }
                 }
             }
             case "toggle_door" -> {

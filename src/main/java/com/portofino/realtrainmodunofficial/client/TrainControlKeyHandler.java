@@ -106,6 +106,15 @@ public final class TrainControlKeyHandler {
         if (event.getKey() == GLFW.GLFW_KEY_RIGHT) {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "toggle_door_right", 0));
             doorRightChordDown = true;
+            return;
+        }
+        //↑↓ でレバーサ (前後切り替え)。↑=前進側, ↓=後進側。
+        if (event.getKey() == GLFW.GLFW_KEY_UP) {
+            PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "reverser_up", 0));
+            return;
+        }
+        if (event.getKey() == GLFW.GLFW_KEY_DOWN) {
+            PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "reverser_down", 0));
         }
     }
 
@@ -190,6 +199,15 @@ public final class TrainControlKeyHandler {
         }
         if (event.getKey() == GLFW.GLFW_KEY_RIGHT) {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "toggle_door_right", 0));
+            return;
+        }
+        //↑↓ でレバーサ (前後切り替え)。↑=前進側, ↓=後進側。
+        if (event.getKey() == GLFW.GLFW_KEY_UP) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "reverser_up", 0));
+            return;
+        }
+        if (event.getKey() == GLFW.GLFW_KEY_DOWN) {
+            PacketDistributor.sendToServer(new TrainControlPayload(id, "reverser_down", 0));
         }
     }
 

@@ -191,5 +191,7 @@
   "entity.realtrainmodunofficial.passenger": "乗客",
   "gui.realtrainmodunofficial.station.title": "駅の設定",
   "gui.realtrainmodunofficial.station.tags": "この駅のタグ (需要)",
-  "gui.realtrainmodunofficial.station.hint": "タグをクリックで ON/OFF。時間帯で乗客の湧き方が変わります"
+  "gui.realtrainmodunofficial.station.hint": "タグをクリックで ON/OFF。時間帯で乗客の湧き方が変わります",
+  "item.realtrainmodunofficial.atc": "ATC地上子",
+  "screen.realtrainmodunofficial.select_atc": "ATC地上子モデル選択"
 }

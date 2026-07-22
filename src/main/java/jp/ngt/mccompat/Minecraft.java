@@ -67,9 +67,15 @@ public final class Minecraft {
         try {
             net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
             INSTANCE.field_71462_r = mc.screen;
-            INSTANCE.field_71439_g = mc.player != null ? PlayerCompat.of(mc.player) : null;
-            if (INSTANCE.field_71439_g != null) {
+            //field_71439_g (thePlayer) は<b>絶対に null にしない</b>。mc.player が null の瞬間でも
+            //空プレイヤー (PlayerCompat.EMPTY) を入れる。パックの描画スクリプトは
+            //getMinecraft().field_71439_g.field_71071_by.func_70448_g() をノーガードで呼ぶため、
+            //null だと TypeError で毎フレーム落ちてスクリプトごと無効化されていた (hi03 ATS 地上子等)。
+            if (mc.player != null) {
+                INSTANCE.field_71439_g = PlayerCompat.of(mc.player);
                 INSTANCE.field_71439_g.refresh();
+            } else {
+                INSTANCE.field_71439_g = PlayerCompat.EMPTY;
             }
             if (mc.level != null && (INSTANCE.field_71441_e == null || INSTANCE.field_71441_e.getLevel() != mc.level)) {
                 INSTANCE.field_71441_e = new WorldCompat(mc.level);

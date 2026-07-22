@@ -3,10 +3,7 @@ package com.portofino.realtrainmodunofficial.pack;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import net.neoforged.fml.loading.FMLPaths;
 
-import java.io.BufferedReader;
 import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -274,38 +271,13 @@ public final class PackConsent {
         return sb.toString();
     }
 
-    /** UTF-8 で読めなければ Shift_JIS で読む (日本語パックの README は Shift_JIS が多い)。 */
+    /**
+     * README を UTF-8 → MS932(CP932) → Shift_JIS の順に厳格デコードする共通デコーダに委譲する。
+     * 旧実装は Shift_JIS しか試さず、① / ㈱ / 号 のような「JDK の Shift_JIS には無く CP932 にだけある」
+     * 文字を含む README (ATS 系パックに多い) だと 1 文字でも失敗した瞬間に全文が UTF-8 素通し = 文字化け
+     * していた。MS932 を挟む {@link com.portofino.realtrainmodunofficial.util.PackTextDecoder} に一本化して解消。
+     */
     private static String decodeText(byte[] bytes) {
-        String utf8 = tryDecode(bytes, StandardCharsets.UTF_8);
-        if (utf8 != null) {
-            return utf8;
-        }
-        try {
-            String sjis = tryDecode(bytes, Charset.forName("Shift_JIS"));
-            if (sjis != null) {
-                return sjis;
-            }
-        } catch (Exception ignored) {
-            //Shift_JIS が無い環境は UTF-8 置換で妥協
-        }
-        return new String(bytes, StandardCharsets.UTF_8);
-    }
-
-    /** 置換文字 (U+FFFD) が出たら「その文字コードではない」とみなして null。 */
-    private static String tryDecode(byte[] bytes, Charset cs) {
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(
-                new java.io.ByteArrayInputStream(bytes), cs))) {
-            StringBuilder sb = new StringBuilder();
-            int c;
-            while ((c = r.read()) != -1) {
-                if (c == 0xFFFD) {
-                    return null;
-                }
-                sb.append((char) c);
-            }
-            return sb.toString();
-        } catch (Exception e) {
-            return null;
-        }
+        return com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
     }
 }

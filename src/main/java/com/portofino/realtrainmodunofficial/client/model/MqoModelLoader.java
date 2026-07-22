@@ -773,6 +773,7 @@ public final class MqoModelLoader {
                 Path gameDir = Minecraft.getInstance().gameDirectory.toPath();
                 addPackCandidates(candidates, gameDir);
                 addPackCandidates(candidates, gameDir.resolve("mods"));
+                addPackCandidates(candidates, gameDir.resolve("mods").resolve("modelpacks"));
                 addPackCandidates(candidates, gameDir.resolve("content"));
                 addPackCandidates(candidates, gameDir.resolve("vehicle_packs"));
                 addPackCandidates(candidates, com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get());

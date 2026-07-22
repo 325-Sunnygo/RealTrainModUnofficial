@@ -64,6 +64,7 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.PIPE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TRAIN_DETECTOR_ITEM.get());
+                output.accept(RealTrainModUnofficialItems.ATC_ITEM.get());
                 //架線柱: 本家モデル (LinePole01/02/Frame01/SignalPole01) を同梱したので再追加。
                 //以前は選択できるモデルが1つも無かったためタブから外していた。
                 output.accept(RealTrainModUnofficialItems.OVERHEAD_LINE_POLE_ITEM.get());

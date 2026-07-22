@@ -33,6 +33,12 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
     private static final int TICKET_GATE_MOVE_TICKS = 12;
     private String definitionId = "";
     private String category = InstalledObjectCategory.LIGHT.name();
+    //ATS 地上子ビーコン (server_ATS_Beacon.js) が、連動信号機の現示を
+    //  NGTUtil.getField(TileEntitySignal.class, tile, ["signalLevel"])
+    //で読むためのフィールド。本家 TileEntitySignal.signalLevel 相当 (STOP=1, PROCEED=5 ... の legacy 値)。
+    //SIGNAL カテゴリのとき tick() で毎回 getLegacySignalState() を書き込む。
+    @SuppressWarnings("unused")
+    private int signalLevel;
     //--- 派生値キャッシュ (definitionId から一意に決まる不変値を毎tick/毎frame 再計算しない) ---
     //軽量化: shouldHandleCrossingLogic()=toLowerCase×4+contains×9、isBrokenFluorescent()=substring
     //+toLowerCase+contains を、設置物 1 個ずつ毎servertick/毎frame 走らせると駅 (設置物多数) で
@@ -214,7 +220,15 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
     public void refreshScriptFields() {
         this.field_70170_p = this.func_145831_w();
         this.field_70165_t = this.worldPosition.getX() + 0.5D;
-        this.field_70163_u = this.worldPosition.getY();
+        //ATC 地上子はレール吸着で<b>レールの 1 つ上のブロック</b>に置かれる。ところが本家の
+        //server_ATS_Beacon.js は「自分の真下 (y-1) のコマンドブロックを設定として読む」「自分の高さの
+        //AABB で列車を検知する」— これは<b>地上子がレール高さのエンティティだった前提</b>。
+        //ブロック化した RTMU では 1 ブロック高いので、y-1 がレール自身になりコマブロを置けず、
+        //検知もレールの 1 つ上にズレていた (ユーザー指摘)。スクリプトから見た自分の Y を 1 下げ、
+        //本家エンティティと同じ「レール高さ」に合わせる → コマブロ=レールの下 / 検知=レール高さ。
+        this.field_70163_u = getCategory() == InstalledObjectCategory.ATC
+                ? this.worldPosition.getY() - 1.0D
+                : this.worldPosition.getY();
         this.field_70161_v = this.worldPosition.getZ() + 0.5D;
         this.field_70177_z = this.yaw;
         if (this.field_70121_D == null) {
@@ -1176,7 +1190,35 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         super.setRemoved();
     }
 
+    /**
+     * ATS 基礎 (Phase 1): ATC 地上子。真下のレール ({@link jp.ngt.rtm.rail.TileEntityLargeRailCore})
+     * の signal に、隣接レッドストーンの最大強度 (0-15) を書き込む。通過した列車が
+     * {@code EntityTrainBase.updateRailSignalPickup} で拾い、パックの ATS/ATS-P スクリプトが利用する。
+     * 無給電 (強度 0) のときは書き込まない = 意図しない「信号 0=停止」の散布を避ける。
+     */
+    private void emitAtcSignal(Level level, BlockPos pos) {
+        int redstone = level.getBestNeighborSignal(pos);
+        if (redstone <= 0) {
+            return;
+        }
+        jp.ngt.rtm.rail.TileEntityLargeRailBase rail =
+                jp.ngt.rtm.rail.TileEntityLargeRailBase.getRailFromCoordinates(
+                        level, pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D);
+        if (rail != null) {
+            jp.ngt.rtm.rail.TileEntityLargeRailCore core = rail.getRailCore();
+            if (core != null) {
+                core.setSignal(redstone);
+            }
+        }
+    }
+
     public static void tick(Level level, BlockPos pos, BlockState state, InstalledObjectBlockEntity be) {
+        //ATS 連動: 信号機は現示 (legacy 値) を signalLevel フィールドに毎 tick 反映しておく。
+        //ATS-Ps 地上子ビーコンが NGTUtil.getField(..., "signalLevel") でこれを読む (GAP C)。
+        //hasServerScript の早期 return より前に置くこと (ブロック検知式信号機は script を持つため)。
+        if (be.getCategory() == InstalledObjectCategory.SIGNAL) {
+            be.signalLevel = be.getLegacySignalState();
+        }
         //蛍光灯は明滅以外にやることが無い。明るさはクライアント/サーバー両方で使うので
         //サイド分岐より前に処理する (壊れていない蛍光灯なら何もせず抜ける)。
         if (be.getCategory() == InstalledObjectCategory.FLUORESCENT) {
@@ -1209,6 +1251,16 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         //列車検知器パック (hi03TrainDetector 等) は全処理をこのスクリプトに書くので、
         //スクリプトを持つ設置物は<b>パック側の実装に任せて</b> RTMU 内蔵の検知器処理は動かさない
         //(両方が出力を書くと奪い合いになる)。
+        //ATS 基礎 (Phase 1): 内蔵の簡易 ATC 地上子は真下のレールに signal を送出する。
+        //送出レベル = 隣接レッドストーンの最大強度 (0-15)。0 (無給電) のときは何も上書きしない。
+        //※ ただし hi03 ATS-Ps 地上子のように<b>独自の serverScriptPath (server_ATS_Beacon.js) を持つ</b>
+        //   ATC は、その script が列車検知〜ATSDataReceive 送信まで全部やるので、ここでは手を出さず
+        //   下の hasServerScript 分岐に任せる (両方が動くと信号の奪い合いになる)。
+        if (be.getCategory() == InstalledObjectCategory.ATC
+                && (be.getDefinition() == null || !be.getDefinition().hasServerScript())) {
+            be.emitAtcSignal(level, pos);
+            return;
+        }
         if (be.getDefinition() != null && be.getDefinition().hasServerScript()) {
             if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
                 com.portofino.realtrainmodunofficial.script.InstalledObjectServerScripts.tick(serverLevel, be);

@@ -189,5 +189,7 @@
   "entity.realtrainmodunofficial.passenger": "Passenger",
   "gui.realtrainmodunofficial.station.title": "Station Settings",
   "gui.realtrainmodunofficial.station.tags": "Station Tags (demand)",
-  "gui.realtrainmodunofficial.station.hint": "Click a tag to toggle. Time of day changes how passengers spawn."
+  "gui.realtrainmodunofficial.station.hint": "Click a tag to toggle. Time of day changes how passengers spawn.",
+  "item.realtrainmodunofficial.atc": "ATC Transponder",
+  "screen.realtrainmodunofficial.select_atc": "Select ATC Transponder Model"
 }

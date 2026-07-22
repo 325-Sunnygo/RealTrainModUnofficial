@@ -119,7 +119,12 @@ public class VehiclePackLoader {
             if (Files.exists(gameDir)) {
                 scanPackRoot(gameDir);
                 Path modsDir = gameDir.resolve("mods");
-                if (Files.exists(modsDir)) scanPackRoot(modsDir);
+                if (Files.exists(modsDir)) {
+                    scanPackRoot(modsDir);
+                    // 整理用に mods/modelpacks/ へ置いたモデルパックも読み込む。
+                    Path modelPacksDir = modsDir.resolve("modelpacks");
+                    if (Files.exists(modelPacksDir)) scanPackRoot(modelPacksDir);
+                }
             }
             Path contentDir = gameDir.resolve("content");
             if (Files.exists(contentDir)) scanPackRoot(contentDir);
