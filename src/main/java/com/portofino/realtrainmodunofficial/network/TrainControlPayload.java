@@ -255,6 +255,11 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 jp.ngt.rtm.entity.npc.macro.MacroRecorder.recDoor(player,
                         jp.ngt.rtm.entity.train.util.TrainState.getState(doorType.id, next));
             }
+            //運転席GUI (ドアタブ) の速度設定。JSON から読まなくなったぶんをここで決める。
+            //value = 最高速度 (km/h)。0 で既定へ戻す。
+            case "set_max_speed" -> train.setConfiguredMaxSpeedKmh(value);
+            //value = 加速度 (km/h/s ×100)。0 で既定へ戻す。
+            case "set_acceleration" -> train.setConfiguredAccelCentiKmhS(value);
             //ドアカット: この運転車両の開扉をカットする (物理でドアを開けない)。
             case "toggle_door_cut" -> {
                 var cutType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_DoorCut;

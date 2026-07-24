@@ -124,6 +124,8 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     public TrainConfig getConfig() {
         if (this.configCache == null) {
             this.configCache = jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.get(this.getModelName());
+            //運転席GUI で設定した速度性能を被せる (未設定なら既定のまま)
+            this.applyConfiguredPerformance(this.configCache);
         }
         return this.configCache;
     }
@@ -379,6 +381,74 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     protected void moveTrain() {
         if (this.formation != null && this.formation.isFrontCar(this)) {
             this.formation.updateTrainMovement();
+        }
+    }
+
+    //---- 運転席GUI (ドアタブ) で設定する速度性能 ----
+    //
+    //JSON からは読まなくなったので、車両ごとの設定はここに持つ。DataMap 経由なので
+    //server→client 同期とワールド保存に既存の仕組みがそのまま乗る。
+    //0 (未設定) なら TrainConfig.init() の既定値を使う。
+
+    /** DataMap キー: 最高速度 (km/h)。0 = 既定。 */
+    private static final String KEY_MAX_SPEED = "RTMU_MaxSpeed";
+    /** DataMap キー: 加速度 (km/h/s)。0 = 既定。 */
+    private static final String KEY_ACCEL = "RTMU_Accel";
+
+    /** ブロック/tick → km/h。 */
+    private static final float TO_KMH = 72.0F;
+
+    /** 設定された最高速度 (km/h)。0 なら未設定 (= 設定の既定値を使う)。 */
+    public int getConfiguredMaxSpeedKmh() {
+        return this.getResourceState().getDataMap().getInt(KEY_MAX_SPEED);
+    }
+
+    /** 設定された加速度 (km/h/s ×100 で保持)。0 なら未設定。 */
+    public int getConfiguredAccelCentiKmhS() {
+        return this.getResourceState().getDataMap().getInt(KEY_ACCEL);
+    }
+
+    /** サーバー側: 最高速度を設定する (0 で既定へ戻す)。編成全体へ配る。 */
+    public void setConfiguredMaxSpeedKmh(int kmh) {
+        int v = Math.max(0, Math.min(1000, kmh));
+        this.getResourceState().getDataMap().setInt(KEY_MAX_SPEED, v,
+                jp.ngt.rtm.modelpack.state.DataMap.SYNC_FLAG | jp.ngt.rtm.modelpack.state.DataMap.SAVE_FLAG);
+        this.configCache = null;
+    }
+
+    /** サーバー側: 加速度を設定する (km/h/s ×100、0 で既定へ戻す)。 */
+    public void setConfiguredAccelCentiKmhS(int centi) {
+        int v = Math.max(0, Math.min(10000, centi));
+        this.getResourceState().getDataMap().setInt(KEY_ACCEL, v,
+                jp.ngt.rtm.modelpack.state.DataMap.SYNC_FLAG | jp.ngt.rtm.modelpack.state.DataMap.SAVE_FLAG);
+        this.configCache = null;
+    }
+
+    /**
+     * 設定値を TrainConfig へ反映する。getConfig() から毎回呼ばれる。
+     * <p>
+     * 最高速度はノッチ段数ぶんを等間隔で割り振る (本家の既定 0.36/0.72/…/1.80 と同じ作り方)。
+     */
+    private void applyConfiguredPerformance(TrainConfig cfg) {
+        if (cfg == null) {
+            return;
+        }
+        int maxKmh = this.getConfiguredMaxSpeedKmh();
+        if (maxKmh > 0 && cfg.maxSpeed != null && cfg.maxSpeed.length > 0) {
+            float top = maxKmh / TO_KMH;
+            int n = cfg.maxSpeed.length;
+            for (int i = 0; i < n; ++i) {
+                cfg.maxSpeed[i] = top * (i + 1) / n;
+            }
+        }
+        int accelCenti = this.getConfiguredAccelCentiKmhS();
+        if (accelCenti > 0) {
+            //km/h/s → ブロック/tick^2
+            float a = (accelCenti / 100.0F) / TO_KMH / 20.0F;
+            cfg.accelerateion = a;
+            if (cfg.accelerateions != null) {
+                java.util.Arrays.fill(cfg.accelerateions, a);
+            }
         }
     }
 
@@ -1123,6 +1193,23 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     /**
      * EntityBogieで呼ばれる (乗車・連結棒)
      */
+    /**
+     * 本家 interactFirst: シフト右クリックでモデル選択画面を開く。
+     * <p>
+     * 台車 ({@link EntityBogie#interact}) がシフト時にここへ回す。画面はクライアント側でだけ
+     * 開き、決定は ChangeEntityModelPayload でサーバーへ返る (本家 openGui と同じ流れ)。
+     */
+    @Override
+    public InteractionResult interact(Player player, net.minecraft.world.InteractionHand hand) {
+        if (player.isShiftKeyDown()) {
+            if (this.level().isClientSide()) {
+                com.portofino.realtrainmodunofficial.ClientHooks.openEntityModelSelectScreen(this);
+            }
+            return InteractionResult.SUCCESS;
+        }
+        return super.interact(player, hand);
+    }
+
     protected InteractionResult interactTrain(EntityBogie bogie, Player player) {
         if (!this.level().isClientSide) {
             int id1 = bogie.getBogieId();

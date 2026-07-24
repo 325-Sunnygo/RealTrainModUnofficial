@@ -341,7 +341,8 @@ public class VehiclePackLoader {
             JsonObject obj = el.getAsJsonObject();
             String id = firstNonBlank(getString(obj, "trainName"), getString(obj, "name"));
             if (id == null || id.isBlank()) id = fallbackTrainId(sourcePath);
-            String displayName = firstNonBlank(getString(obj, "displayName"), getString(obj, "name"), id);
+            //本家に displayName は無い。表示名は name / trainName から取る。
+            String displayName = firstNonBlank(getString(obj, "name"), id);
             JsonObject trainModel = getObject(obj, "trainModel2");
             if (trainModel == null) trainModel = getObject(obj, "trainModel");
             // SuperRailBuilder3 などは "model" キーを使う。互換のため fallback。
@@ -355,24 +356,20 @@ public class VehiclePackLoader {
             float scale = parseFloat(trainModel, "scale", 1.0F);
             String scriptPath = getString(trainModel, "rendererPath");
             if (scriptPath == null || scriptPath.isBlank()) {
-                scriptPath = getString(trainModel, "renderScriptPath");
+                scriptPath = null;
             }
             if (scriptPath == null || scriptPath.isBlank()) {
                 scriptPath = getString(obj, "rendererPath");
             }
             if (scriptPath == null || scriptPath.isBlank()) {
-                scriptPath = getString(obj, "renderScriptPath");
+                scriptPath = null;
             }
             if (scriptPath == null || scriptPath.isBlank()) {
-                scriptPath = getString(obj, "scriptPath");
+                scriptPath = null;
             }
             String soundScriptPath = firstNonBlank(
                 getString(trainModel, "soundScriptPath"),
-                getString(trainModel, "soundScript"),
-                getString(trainModel, "soundScriptName"),
-                getString(obj, "soundScriptPath"),
-                getString(obj, "soundScript"),
-                getString(obj, "soundScriptName")
+                getString(obj, "soundScriptPath")
             );
             boolean sourceLooksLikeVehicle = isVehicleJsonPath(sourcePath);
             String vehicleType = firstNonBlank(
@@ -383,9 +380,10 @@ public class VehiclePackLoader {
                 sourceLooksLikeVehicle ? "Car" : "Train"
             );
 
-            String doorType = getString(trainModel, "doorType");
+            //本家に doorType は無い
+            String doorType = null;
             if (doorType == null || doorType.isBlank()) {
-                doorType = getString(obj, "doorType");
+                doorType = null;
             }
 
             List<Vec3> bogiePositions = new ArrayList<>();
@@ -453,12 +451,15 @@ public class VehiclePackLoader {
 
             Vec3 seatOffset = !playerPositions.isEmpty() ? playerPositions.get(0) : (!seats.isEmpty() ? seats.get(0) : null);
             float trainDistance = parseFloat(trainModel, "trainDistance", parseFloat(obj, "trainDistance", 4.5F));
-            int driverSeatIndex = parseInt(trainModel, "driverSeatIndex", parseInt(obj, "driverSeatIndex", 0));
+            //本家に driverSeatIndex は無い (運転席は playerPos から決まる)
+            int driverSeatIndex = 0;
             int frontDriverSeatIndex = resolveFrontDriverSeatIndex(obj, trainModel, rideableSeatMarkers, driverSeatIndex);
             int rearDriverSeatIndex = resolveRearDriverSeatIndex(obj, trainModel, rideableSeatMarkers, frontDriverSeatIndex);
             List<VehicleDefinition.DoorAnimationDefinition> leftDoors = parseDoorAnimations(obj, trainModel, "door_left");
             List<VehicleDefinition.DoorAnimationDefinition> rightDoors = parseDoorAnimations(obj, trainModel, "door_right");
-            List<Float> notchMaxSpeeds = parseFloatList(obj, trainModel, "maxSpeed");
+            //★速度性能は JSON から読まない。運転席GUI (ドアタブ) で車両ごとに設定する。
+            //空リスト = 既定値 (EntityTrainBase / TrainConfig.init の 0.36〜1.80) を使う。
+            List<Float> notchMaxSpeeds = List.of();
             List<String> rollsignNames = parseStringList(obj, trainModel, "rollsignNames");
             List<String> customButtonNames = parseCustomButtonNames(obj, trainModel);
             List<List<String>> customButtonOptions = parseCustomButtonOptions(obj, trainModel);
@@ -466,7 +467,8 @@ public class VehiclePackLoader {
             List<VehicleDefinition.RollsignDefinition> rollsigns = parseRollsigns(obj, trainModel);
             //RTMU 追加: 種別幕 (方向幕と同じ書式・別項目)。typeSignNames / typeSignTexture / typeSigns。
             List<String> typeSignNames = parseStringList(obj, trainModel, "typeSignNames");
-            String typeSignTexture = firstNonBlank(getString(trainModel, "typeSignTexture"), getString(obj, "typeSignTexture"));
+            //本家に typeSignTexture は無い
+            String typeSignTexture = null;
             List<VehicleDefinition.RollsignDefinition> typeSigns = parseSignPanels(obj, trainModel, "typeSigns");
             List<VehicleDefinition.LightDefinition> headLights = parseLights(obj, trainModel, "headLights");
             List<VehicleDefinition.LightDefinition> tailLights = parseLights(obj, trainModel, "tailLights");
@@ -482,8 +484,8 @@ public class VehiclePackLoader {
             String soundDoorOpen = firstNonBlank(getString(trainModel, "sound_DoorOpen"), getString(obj, "sound_DoorOpen"));
             String soundDoorClose = firstNonBlank(getString(trainModel, "sound_DoorClose"), getString(obj, "sound_DoorClose"));
             List<String> announcementSounds = parseAnnouncementSounds(obj, trainModel);
-            float acceleration = parseFloat(trainModel, "acceleration",
-                parseFloat(trainModel, "accelerateion", parseFloat(obj, "acceleration", parseFloat(obj, "accelerateion", 0.00243F))));
+            //★加速度も JSON から読まない (上に同じ)。0 = 既定値を使う。
+            float acceleration = 0.0F;
             boolean smoothing = parseBoolean(trainModel, "smoothing", parseBoolean(obj, "smoothing", false));
             boolean doCulling = parseBoolean(trainModel, "doCulling", parseBoolean(obj, "doCulling", false));
             boolean hasConfiguredLights = !headLights.isEmpty() || !tailLights.isEmpty() || !interiorLights.isEmpty();
@@ -594,12 +596,12 @@ public class VehiclePackLoader {
     }
 
     private static int resolveFrontDriverSeatIndex(JsonObject root, JsonObject trainModel, List<VehicleDefinition.SeatMarker> seats, int fallback) {
-        int configured = parseInt(trainModel, "frontDriverSeatIndex", parseInt(root, "frontDriverSeatIndex", Integer.MIN_VALUE));
+        int configured = Integer.MIN_VALUE;
         if (configured != Integer.MIN_VALUE) {
             return configured;
         }
 
-        int configuredDriverSeat = parseInt(trainModel, "driverSeatIndex", parseInt(root, "driverSeatIndex", Integer.MIN_VALUE));
+        int configuredDriverSeat = Integer.MIN_VALUE;
         if (configuredDriverSeat != Integer.MIN_VALUE) {
             return configuredDriverSeat;
         }
@@ -617,7 +619,7 @@ public class VehiclePackLoader {
     }
 
     private static int resolveRearDriverSeatIndex(JsonObject root, JsonObject trainModel, List<VehicleDefinition.SeatMarker> seats, int fallbackFrontIndex) {
-        int configured = parseInt(trainModel, "rearDriverSeatIndex", parseInt(root, "rearDriverSeatIndex", Integer.MIN_VALUE));
+        int configured = Integer.MIN_VALUE;
         if (configured != Integer.MIN_VALUE) {
             return configured;
         }
@@ -868,12 +870,8 @@ public class VehiclePackLoader {
             }
             if (element.isJsonObject()) {
                 JsonObject button = element.getAsJsonObject();
-                String value = firstNonBlank(
-                    getString(button, "name"),
-                    getString(button, "label"),
-                    getString(button, "displayName"),
-                    getString(button, "text")
-                );
+                //本家のボタン定義は name のみ
+                String value = getString(button, "name");
                 if (value != null && !value.isBlank()) {
                     values.add(value);
                 }
@@ -1114,7 +1112,7 @@ public class VehiclePackLoader {
         }
         if (entry != null && entry.isJsonObject()) {
             JsonObject object = entry.getAsJsonObject();
-            return firstNonBlank(getString(object, "name"), getString(object, "displayName"));
+            return getString(object, "name");
         }
         return "";
     }
@@ -1156,9 +1154,7 @@ public class VehiclePackLoader {
             JsonObject object = entry.getAsJsonObject();
             return firstNonBlank(
                 getString(object, "sound"),
-                getString(object, "soundName"),
-                getString(object, "id"),
-                getString(object, "path")
+                getString(object, "soundName")
             );
         }
         return null;

@@ -39,6 +39,14 @@ public final class ClientHooks {
         invokeClient("openInstalledObjectSelectScreen", new Class<?>[]{Player.class, ItemStack.class, InstalledObjectCategory.class}, player, stack, category);
     }
 
+    /**
+     * 本家 guiIdSelectEntityModel: 設置済み列車をシフト右クリックしたときのモデル選択画面。
+     * 決定するとそのエンティティのモデルが差し替わる (アイテムではなく実体が対象)。
+     */
+    public static void openEntityModelSelectScreen(Object vehicle) {
+        invokeClient("openEntityModelSelectScreen", new Class<?>[]{Object.class}, vehicle);
+    }
+
     /** SignalControllerMod (masa300) 移植: 設定 GUI */
     public static void openSignalControllerScreen(Object controller) {
         invokeClient("openSignalControllerScreen", new Class<?>[]{Object.class}, controller);

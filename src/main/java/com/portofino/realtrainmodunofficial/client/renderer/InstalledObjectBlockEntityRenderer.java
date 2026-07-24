@@ -214,8 +214,11 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             // 現示と無関係に複数レンズが点灯してしまう (ユーザー報告)。踏切と通常信号は従来どおり。
                             boolean scriptDrivenSignal = blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
                                     && machineScripted.isBlockDetection();
-                            if ((blockEntity.getCategory() == InstalledObjectCategory.CROSSING
-                                    || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL)
+                            //★踏切には overlay を掛けない。本家の踏切ランプはスクリプトの pass 2 が
+                            //Light テクスチャで光らせる (MachineScriptRenderers が本家どおり再生する)。
+                            //RTMU の overlay は灯具の筐体・警報器ごと赤く塗っていた (ユーザー報告)。
+                            //信号 (非ブロック検知) は現示を RTMU 側が持つため従来どおり overlay。
+                            if (blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
                                     && !scriptDrivenSignal) {
                                 renderActiveLights(blockEntity, definition, poseStack, buffer, packedOverlay);
                             }
@@ -228,20 +231,27 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         shouldRenderDefinedObjectGroup(groupName, definition)
                             && (!(far || compatibilityHeavy || customCrossingGateRendering)
                                 || shouldRenderInstalledObjectGroup(groupName, blockEntity, definition, cameraDistanceSq, compatibilityHeavy));
-                    boolean ticketGateRendering = blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE;
-                    final MqoModelLoader.MqoModel transformModel = model;
                     MqoModelLoader.GroupTransform transform = customCrossingGateRendering
                         ? (stack, groupName) -> applyCrossingGateTransform(stack, blockEntity, groupName)
-                        : (ticketGateRendering
-                            ? (stack, groupName) -> applyTicketGateTransform(stack, blockEntity, transformModel, groupName)
-                            : null);
-                    if (!customCrossingGateRendering && !ticketGateRendering && !veryFar && !compatibilityHeavy && definition.getScriptPath() != null && !definition.getScriptPath().isBlank()) {
-                        // 改札(TICKET_GATE)はスクリプト経路を使わない。スクリプト経路は扉の開閉 transform を
-                        // 渡さないため、扉が静止位置(=開)のまま「ずっと開いてる」状態になる。transform 付きの
-                        // renderModelWithoutScript を通して barMoveCount に応じ扉を閉じる(本家RTM挙動)。
-                        //標識/看板 (汎用スクリプト) は状態が変わらない間 Nashorn を再実行せず記録を
-                        //再生する (多数設置時の毎フレーム Nashorn が主コストだった)。信号/踏切は
-                        //MachineScriptRenderers で既にキャッシュ済み。見た目は不変。
+                        : null;
+                    //★改札もスクリプト経路を通す。
+                    //以前は「スクリプト経路だと扉の開閉 transform が渡らず開きっぱなしになる」として
+                    //改札だけ除外していたが、本家の RenderTurnstile01.js は扉を<b>自分で</b>開閉する
+                    //(getMovingCount>0 で doorL/doorR を ±90 度回す)。RTMU の
+                    //MachinePartsRenderer.getMovingCount も本家どおり isTicketGateOpen()?0:1 を返す。
+                    //除外していたせいでスクリプトが一度も走らず、通行可の矢印 (sign_F/sign_B を
+                    //pass 2 で描く) が出ていなかった。
+                    //★スクリプトを実行するかどうかを RTMU の都合で決めない (本家準拠)。
+                    //本家 RenderMachine は頂点数やバッチ数に関係なく必ず
+                    //  modelObj.render(tile, cfg, pass, partialTick)
+                    //を呼び、ModelObject.render は Light テクスチャがあれば発光パスも必ず描く。
+                    //RTMU はここで「重いモデル (頂点12000以上/バッチ64以上) はスクリプトを切る」
+                    //compatibilityHeavy と、遠距離の veryFar でスクリプトごと落としていた。
+                    //改札はパーツが多いため常に切られ、扉の開閉も通行可の矢印 (sign_F/sign_B を
+                    //pass 2 で描く) も一度も実行されていなかった。
+                    boolean takeScriptPath = !customCrossingGateRendering
+                        && definition.getScriptPath() != null && !definition.getScriptPath().isBlank();
+                    if (takeScriptPath) {
                         com.portofino.realtrainmodunofficial.client.render.InstalledObjectScriptCache.render(
                             blockEntity, model, poseStack, buffer, packedLight, packedOverlay);
                     } else {
@@ -762,36 +772,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
      * 本家RTM: モデル静止位置=開、閉(canThrough=false)で扉を回転。RTMUは barMoveCount を
      * 開度(0=閉, 90=開)として使い、closedness=1-(barMoveCount/90) で扉を閉じる。
      */
-    private static void applyTicketGateTransform(PoseStack poseStack, InstalledObjectBlockEntity blockEntity,
-                                                 MqoModelLoader.MqoModel model, String groupName) {
-        if (blockEntity == null || model == null || groupName == null) {
-            return;
-        }
-        String n = groupName.toLowerCase(java.util.Locale.ROOT);
-        if (!n.contains("door")) {
-            return;
-        }
-        // モデルの静止位置=閉(扉が通路を塞ぐ)。ICカード等で powered になり barMoveCount が増えると
-        // 扉が開く。openness=bar/90 (0=閉=静止, 1=全開=回転)。以前は closedness で駆動していたため
-        // 開閉が反転し「既定で開きっぱなし」「通れる時に閉じる」状態だった(ユーザー報告)。
-        float openness = Mth.clamp(blockEntity.getBarMoveCount() / 90.0F, 0.0F, 1.0F);
-        if (openness <= 0.001F) {
-            return; // 閉=モデル静止位置のまま(扉が通路を塞ぐ)
-        }
-        float[] b = groupBounds(model, groupName);
-        if (b == null) {
-            return;
-        }
-        // doorL を +90°・doorR を -90° 回して通路脇へ退避(開)。ヒンジは扉の外側X端・前側Z端。
-        // (回転方向はユーザー指摘により反転)
-        boolean left = n.endsWith("l") || n.contains("doorl") || n.contains("door_l");
-        double hingeX = left ? b[0] : b[3];   // 外側X端
-        double hingeZ = b[2];                 // 前側Z端
-        float angle = openness * (left ? 90.0F : -90.0F);
-        poseStack.translate(hingeX, 0.0D, hingeZ);
-        poseStack.mulPose(Axis.YP.rotationDegrees(angle));
-        poseStack.translate(-hingeX, 0.0D, -hingeZ);
-    }
 
     /** group(s) のモデル座標 AABB {minX,minY,minZ,maxX,maxY,maxZ}。取得できなければ null。 */
     // 碍子モデルの実描画上端Y(ベイク座標=×0.01適用済み)。電線をモデル先端から出すために使う。

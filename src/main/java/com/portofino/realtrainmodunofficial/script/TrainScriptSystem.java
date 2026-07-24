@@ -3970,12 +3970,20 @@ public class TrainScriptSystem {
             if (isInteriorEmissionGroup(lower)) {
                 return interiorOn;
             }
+            //自動改札の通行可/不可の表示 (sign_F / sign_B)。本家は pass 2 で描く。
+            if (lower.startsWith("sign_") || lower.equals("sign")) {
+                return true;
+            }
             if (lower.matches("lamp_\\d+")) {
                 return false;
             }
             if (lower.contains("doorlamp")) {
                 return false;
             }
+            //★名前で絞るのは本家に無い仕組みだが、RTMU はグループ単位で描くため必要。
+            //本家はマテリアル単位で「Light テクスチャを持つものだけ」を発光パスに出すので、
+            //スクリプトが同じ Parts にまとめた非発光パーツ (踏切の dirL/dirR = 矢印の板) は
+            //光らない。ここを撤廃すると板まで赤く光る (ユーザー報告)。
             if (lower.contains("light") || lower.contains("lamp") || lower.contains("marker")) {
                 return shouldRenderLightGroup(train, lower) && !isLightOffGroup(lower);
             }

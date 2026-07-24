@@ -36,12 +36,24 @@ public final class PackButtonTextureCache {
     private PackButtonTextureCache() {
     }
 
+    /**
+     * 「このパスにボタンテクスチャは無い」ことを表す番兵。
+     * <p>
+     * null を返すと {@link Map#computeIfAbsent} がキャッシュに乗せないため、欠落テクスチャを
+     * 参照するたびに全パック走査が走って FPS が激減する。<b>欠落という結果自体をキャッシュ</b>
+     * するためにこれを入れ、外に出すときだけ null へ戻す。
+     */
+    private static final ButtonTextureInfo MISSING =
+        new ButtonTextureInfo(null, 0, 0, 0, 0, 0, 0);
+
     public static ButtonTextureInfo get(String packName, String texturePath) {
         if (packName == null || packName.isBlank() || texturePath == null || texturePath.isBlank()) {
             return null;
         }
         String key = packName + "|" + texturePath;
-        return CACHE.computeIfAbsent(key, ignored -> load(packName, texturePath));
+        ButtonTextureInfo info = CACHE.computeIfAbsent(key, ignored -> load(packName, texturePath));
+        //呼び出し側には「無い = null」で見せる (描画側は車両名の文字にフォールバックする)
+        return info == MISSING ? null : info;
     }
 
     private static ButtonTextureInfo load(String packName, String texturePath) {
@@ -73,38 +85,12 @@ public final class PackButtonTextureCache {
         }
     }
 
-    private static volatile ButtonTextureInfo missingInfo;
-
     /**
-     * テクスチャ欠落ボタン用の紫黒チェッカー(本家missingno風)。
-     * null返しはcomputeIfAbsentにキャッシュされず、毎フレーム全パック走査が走ってFPSが激減するため、
-     * 必ずこれを返してキャッシュに乗せる。
+     * テクスチャ欠落。紫黒チェッカーは描かず、欠落であることだけをキャッシュに残す。
+     * 呼び出し側 (ModelSelectScreen) は null を受けて<b>車両名の文字</b>を描く。
      */
     private static ButtonTextureInfo missingButtonInfo() {
-        ButtonTextureInfo cached = missingInfo;
-        if (cached != null) {
-            return cached;
-        }
-        synchronized (PackButtonTextureCache.class) {
-            if (missingInfo != null) {
-                return missingInfo;
-            }
-            NativeImage img = new NativeImage(NativeImage.Format.RGBA, 16, 16, false);
-            int magenta = 0xFFF800F8; //ABGR
-            int black = 0xFF000000;
-            for (int y = 0; y < 16; y++) {
-                for (int x = 0; x < 16; x++) {
-                    img.setPixelRGBA(x, y, ((x / 8 + y / 8) % 2 == 0) ? magenta : black);
-                }
-            }
-            ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
-                RealTrainModUnofficial.MODID, "dynamic/button/_missing");
-            DynamicTexture tex = new DynamicTexture(img);
-            Minecraft.getInstance().getTextureManager().register(loc, tex);
-            tex.setFilter(false, false);
-            missingInfo = new ButtonTextureInfo(loc, 16, 16, 0, 0, 16, 16);
-            return missingInfo;
-        }
+        return MISSING;
     }
 
     /**

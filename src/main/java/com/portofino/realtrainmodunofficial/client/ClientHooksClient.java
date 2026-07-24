@@ -31,6 +31,11 @@ public final class ClientHooksClient {
         ClientItemHelper.openTrainSelectScreen(player, stack, category);
     }
 
+    /** 設置済み列車のモデル差し替え (本家 guiIdSelectEntityModel)。 */
+    public static void openEntityModelSelectScreen(Object vehicle) {
+        ClientItemHelper.openEntityModelSelectScreen(vehicle);
+    }
+
     public static void openTrainSelectScreen(Player player, ItemStack stack) {
         ClientItemHelper.openTrainSelectScreen(player, stack);
     }

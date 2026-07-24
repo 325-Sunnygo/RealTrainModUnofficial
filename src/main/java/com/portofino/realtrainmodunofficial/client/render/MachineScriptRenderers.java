@@ -175,14 +175,29 @@ public final class MachineScriptRenderers {
             //キャッシュヒット: 記録を再生するだけ (Nashorn 実行なし)。
             //★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
 
-            //ミス: 実際にスクリプトを実行して記録し、キャッシュへ保存。
-            GLRecorder rec = new GLRecorder();
-            GLRecorder.activate(rec);
+            //本家 ModelObject.render の 2 段構成をそのまま再現する:
+            //  pass 0 = 通常テクスチャで本体
+            //  pass 2 = Light テクスチャ (***_light0.png) で発光部のみ・フルブライト
+            //
+            //★pass ごとに別レコーダーに録る。以前は 1 本のレコーダーに両パスを混ぜて
+            //legacyPass=0 (通常) で再生していたため、pass 2 のパーツが<b>素のテクスチャの
+            //まま全光量</b>で描かれていた。踏切は灯具の筐体・矢印板・警報器まで赤黒く光り、
+            //自動改札の通行可矢印は「素テクスチャでは透明な UV 領域」なので何も出なかった。
+            //legacyPass=2 で再生すれば replay が renderNamedGroupsEmissive へ回し、
+            //本家どおり「Light テクスチャを持つマテリアルの面だけ」を _light0 で描く。
+            GLRecorder rec0 = new GLRecorder();
+            GLRecorder.activate(rec0);
             try {
                 this.renderer.currentMatId = 0;
-                //本家: pass 0 (通常) → pass 2 (発光)。発光はフルブライトで描く。
                 this.renderer.render(be, 0, partialTick);
-                rec.brightness(0xF000F0);
+            } finally {
+                GLRecorder.deactivate();
+            }
+            GLRecorder rec2 = new GLRecorder();
+            GLRecorder.activate(rec2);
+            try {
+                //本家 GLHelper.setLightmapMaxBrightness 相当 (発光はフルブライト)
+                rec2.brightness(0xF000F0);
                 this.renderer.render(be, 2, partialTick);
             } finally {
                 GLRecorder.deactivate();
@@ -191,15 +206,19 @@ public final class MachineScriptRenderers {
             //★ isEmpty ではなく hasGeometry。スクリプトが何も描かずに落ちると行列操作だけが
             //  残って isEmpty()==false になり、「描画済み」と誤判定して素のモデル描画が
             //  スキップされ、設置物が透明になる。
-            boolean drew = rec.hasGeometry();
+            boolean drew = rec0.hasGeometry();
             c.valid = true;
             c.sig = sig;
             c.drew = drew;
-            c.rec = drew ? rec : null;
+            c.rec = drew ? rec0 : null;
             if (!drew) {
                 return false;
             }
-            VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model, graph);
+            VehicleScriptRenderers.replay(rec0, poseStack, buffer, packedLight, packedOverlay, model, graph);
+            if (rec2.hasGeometry()) {
+                VehicleScriptRenderers.replay(rec2, poseStack, buffer, packedLight, packedOverlay, model,
+                        graph, jp.ngt.rtm.render.RenderPass.LIGHT.id, null);
+            }
             return true;
         }
     }

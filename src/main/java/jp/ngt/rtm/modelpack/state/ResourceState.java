@@ -87,8 +87,23 @@ public class ResourceState {
         return this.nameSupplier.get();
     }
 
+    /** 本家 ResourceState.name (モデル選択画面で付けるカスタム名)。未設定なら null。 */
+    private String customName;
+
+    /**
+     * 本家 getName: カスタム名が付いていればそれ、無ければモデル名。
+     * 本家は未設定を "no_name" にするので、その挙動も合わせる。
+     */
     public String getName() {
+        if (this.customName != null && !this.customName.isEmpty()) {
+            return this.customName;
+        }
         return this.getResourceName();
+    }
+
+    /** 本家 setName: 空なら "no_name" に丸める。 */
+    public void setName(String name) {
+        this.customName = (name == null || name.isEmpty()) ? "no_name" : name;
     }
 
     /** 本家 ResourceState.addExclusionParts */

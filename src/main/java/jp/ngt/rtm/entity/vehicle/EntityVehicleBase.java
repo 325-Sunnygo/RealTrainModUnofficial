@@ -373,6 +373,24 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         return other == null ? null : other.getBoundingBox();
     }
 
+    /**
+     * 本家 onModelChanged: モデルが差し替わった時の後始末。
+     * <p>
+     * サーバー側は座席 (slotPos) がモデル依存なので床を作り直させる
+     * ({@code floorLoaded=false} で次 tick に setupFloors が走る)。
+     * クライアント側は鳴っている走行音を止める (モデルが変われば音源も変わる)。
+     */
+    public void onModelChanged() {
+        if (!this.level().isClientSide()) {
+            //古い座席を消してから作り直す (新モデルの slotPos で並べ直すため)
+            this.vehicleFloors.stream().filter(java.util.Objects::nonNull).forEach(Entity::discard);
+            this.vehicleFloors.clear();
+            this.floorLoaded = false;
+        } else {
+            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAll(this);
+        }
+    }
+
     /** 本家 setFloor: EntityFloor から自分を登録してもらう。 */
     public void setFloor(jp.ngt.rtm.entity.train.parts.EntityFloor floor) {
         if (floor != null && !this.vehicleFloors.contains(floor)) {

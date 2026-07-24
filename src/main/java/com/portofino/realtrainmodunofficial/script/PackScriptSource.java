@@ -29,7 +29,12 @@ public final class PackScriptSource {
      */
     public static final String PRELUDE_GL =
             "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n" +
-            "var GL12 = GL11;\n";
+            "var GL12 = GL11;\n"
+            //Parts も描画機構に依存する。実 jp.ngt.rtm.render.Parts は GLRecorder へ描くので、
+            //OpList 経路 (ScriptModelRenderer) が自前で用意した renderer 対応の Parts を
+            //上書きしてはいけない (上書きすると parts.render() が全て空振りする)。
+            + bindOpt("Parts", "jp.ngt.rtm.render.Parts")
+            + bindOpt("ActionParts", "jp.ngt.rtm.render.ActionParts");
 
     public static final String PRELUDE_NO_GL =
             //rtm-ts の Multi-target 構成対策。base スクリプトは
@@ -103,8 +108,6 @@ public final class PackScriptSource {
             bindOpt("MCTE", "jp.ngt.mcte.MCTE") +
             bindOpt("ItemMiniature", "jp.ngt.mcte.item.ItemMiniature") +
             //車両/レール描画スクリプトが直接 new する描画クラス
-            bindOpt("Parts", "jp.ngt.rtm.render.Parts") +
-            bindOpt("ActionParts", "jp.ngt.rtm.render.ActionParts") +
             bindOpt("ActionType", "jp.ngt.rtm.render.ActionType") +
             bindOpt("ModelObject", "jp.ngt.rtm.render.ModelObject") +
             bindOpt("PartsRenderer", "jp.ngt.rtm.render.PartsRenderer") +

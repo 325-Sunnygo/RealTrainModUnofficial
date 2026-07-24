@@ -89,6 +89,42 @@ public final class ClientItemHelper {
         ));
     }
 
+    /**
+     * 本家 guiIdSelectEntityModel: 設置済み車両をシフト右クリックしたときのモデル選択画面。
+     * <p>
+     * アイテム用の {@link #openTrainSelectScreen} と違い、決定したら
+     * {@link com.portofino.realtrainmodunofficial.network.ChangeEntityModelPayload} を送って
+     * <b>ワールドに居るその車両</b>のモデルを差し替える。初期選択には現在のモデルを入れる。
+     */
+    public static void openEntityModelSelectScreen(Object vehicleObj) {
+        if (!(vehicleObj instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> vehicle)) {
+            return;
+        }
+        int entityId = vehicle.getId();
+        jp.ngt.rtm.modelpack.state.ResourceState state = vehicle.getResourceState();
+        String currentArg = state != null ? state.getArg() : "";
+        int currentColor = state != null ? state.color : 0xFFFFFF;
+        //カスタム名が未設定のときは名前欄を空にする (getName はモデル名を返すため)
+        String currentName = "";
+
+        List<ModelSelectScreen.ModelInfo> infos = getVisibleTrainModels();
+        Minecraft.getInstance().setScreen(new ModelSelectScreen(
+            Component.translatable("screen.realtrainmodunofficial.select_train"),
+            infos,
+            selection -> net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new com.portofino.realtrainmodunofficial.network.ChangeEntityModelPayload(
+                    entityId,
+                    selection.modelId(),
+                    selection.dataMapValue() == null ? "" : selection.dataMapValue(),
+                    selection.customName() == null ? "" : selection.customName(),
+                    selection.color())),
+            vehicle.getModelName(),
+            currentArg,
+            currentName,
+            currentColor
+        ));
+    }
+
     public static void openTrainSelectScreen(Player player, ItemStack stack) {
         openTrainSelectScreen(player, stack, TrainItem.Category.ELECTRIC);
     }

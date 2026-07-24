@@ -3999,23 +3999,6 @@ public final class MqoModelLoader {
             }
         }
 
-        private boolean shouldSkipObservedLegacyPass(int pass) {
-            if (pass < 0 || pass >= LEGACY_SCRIPT_PASS_COUNT) return false;
-            if (pass == 0) return false; // pass 0 は本体描画。絶対走らせる。
-            int bit = 1 << pass;
-            boolean observed = (legacyPassObservationMask & bit) != 0;
-            if (!observed) return false;
-            // 一度走らせて batch を 0 個しか出さなかった pass はスキップ。
-            // ただし PASS_RECHECK_INTERVAL 回ごとに再観測してライト ON 等の
-            // 状態変化を検出する。
-            if (observedLegacyPassActivity[pass]) return false;
-            if (++passSinceRecheck[pass] >= PASS_RECHECK_INTERVAL) {
-                passSinceRecheck[pass] = 0;
-                legacyPassObservationMask &= ~bit;  // 再観測
-                return false;
-            }
-            return true;
-        }
 
         private void renderInternal(PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
                                     boolean translucent, GroupPredicate groupFilter, GroupTransform groupTransform,
@@ -4423,8 +4406,16 @@ public final class MqoModelLoader {
                 if (hasScript) {
                     // scriptのrender()を全pass(0/1/2/3)で呼ぶ。重複は再描画チェックで防ぐ
                     for (int pass = 0; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
-                        if (!(entity instanceof TrainEntity) && shouldSkipObservedLegacyPass(pass)) continue;
-                        if (pass >= 2 && scriptRenderer != null && !scriptRenderer.hasEmissivePassContent()) continue;
+                        //★パスの取捨も RTMU では判断しない (スクリプト任せ)。
+                        //以前は「一度走らせて 1 バッチも出さなかったパスは以後スキップ」していたが、
+                        //スクリプトは状態でパスごとの出力を変える (改札は通行可のときだけ pass 2 で
+                        //矢印を描く)。出さなかった瞬間に見て切ると、その後どれだけ状態が変わっても
+                        //二度と描かれない。RTM 標準の自動改札の矢印が出なかったのはこれ。
+                        //★発光パスを RTMU の推測でスキップしない (スクリプト任せ)。
+                        //以前は「light/dest/type… という名前のグループを持つか」で判定していたが、
+                        //これは列車向けの名前の一覧でしかない。RTM 標準の自動改札は通行可の矢印を
+                        //sign_F/sign_B という名前で pass 2 に描くため、この一覧に当たらず
+                        //矢印が一切出なかった。何を pass 2 で描くかはスクリプトが決めること。
                         //室内灯/前照灯/尾灯は、点いているものだけ描く
                         if (pass >= 2 && !shouldRenderEmissivePass(entity, pass)) continue;
                         poseStack.pushPose();
@@ -4506,7 +4497,7 @@ public final class MqoModelLoader {
                 }
                 if (hasScript) {
                     for (int pass = 0; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
-                        if (pass >= 2 && scriptRenderer != null && !scriptRenderer.hasEmissivePassContent()) continue;
+                        //発光パスは RTMU の推測でスキップしない (何を描くかはスクリプトが決める)
                         //室内灯/前照灯/尾灯は、点いているものだけ描く
                         if (pass >= 2 && !shouldRenderEmissivePass(entity, pass)) continue;
                         // スクリプトが poseStack を破壊する事例 (rotate/translate を push/pop なしで多用、
