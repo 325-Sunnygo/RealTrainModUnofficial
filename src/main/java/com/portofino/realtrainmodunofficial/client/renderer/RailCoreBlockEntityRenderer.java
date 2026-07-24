@@ -94,6 +94,28 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     int above1 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above());
                     int above2 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above(2));
                     packedLight = maxPackedLight(packedLight, maxPackedLight(above1, above2));
+                    //コアの上まで埋まっている (掘割・道床埋込・高架下) と上2ブロックでも 0 のまま
+                    //レール全体が真っ黒に焼かれる。レール両端点の上でも取り直して max 合成する。
+                    jp.ngt.rtm.rail.util.RailPosition[] rps = be.getRailPositions();
+                    if (rps != null) {
+                        for (jp.ngt.rtm.rail.util.RailPosition rp : rps) {
+                            if (rp == null) {
+                                continue;
+                            }
+                            net.minecraft.core.BlockPos ep =
+                                net.minecraft.core.BlockPos.containing(rp.posX, rp.posY + 1.0D, rp.posZ);
+                            packedLight = maxPackedLight(packedLight,
+                                net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), ep));
+                        }
+                    }
+                    //どこを取っても真っ暗 = ライトエンジンがまだこの区画を照らしていない
+                    //(ワールド入場直後によく起きる)。この値で焼くと「読み込み済みなのに
+                    //レールだけ真っ黒」が固定化する。空が見えているなら日光を仮置きし、
+                    //次フレーム以降に正しい値へ焼き直させる。
+                    if (packedLight == 0 && be.getLevel().canSeeSky(be.getBlockPos().above())) {
+                        packedLight = net.minecraft.client.renderer.LightTexture.pack(
+                                0, be.getLevel().getMaxLocalRawBrightness(be.getBlockPos().above()));
+                    }
                 }
             }
             RailDefinition def = RailRegistry.getById(be.getRailDefinitionId());
@@ -269,7 +291,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     }
                     for (jp.ngt.rtm.rail.util.Point point : points) {
                         if (point != null) {
-                            renderSwitchPoint(be, point, poseStack, buffer, packedLight, ox, oy, oz, mo, scale,
+                            renderSwitchPoint(be, point, partialTick, poseStack, buffer, packedLight, ox, oy, oz, mo, scale,
                                 model, def, cameraDistanceSq, compatibilityHeavy);
                         }
                     }
@@ -531,6 +553,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     /** 本家 LibRenderRail.renderPoint 移植。Point ごとにレール本体+トングを描く。 */
     private void renderSwitchPoint(TileEntityLargeRailCore be, jp.ngt.rtm.rail.util.Point point,
+                                   float partialTick,
                                    PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                                    double ox, double oy, double oz, net.minecraft.world.phys.Vec3 mo, float scale,
                                    MqoModelLoader.MqoModel model, RailDefinition def, double cameraDistanceSq, boolean compatibilityHeavy) {
@@ -540,7 +563,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 point.mainDirIsPositive, 0.0F, 0, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, cameraDistanceSq, compatibilityHeavy, 0.0F);
             return;
         }
-        float movement = point.getMovement();
+        //partialTick 補間版を使い、トングの動きを frame 間で滑らかにする (素の getMovement() は 20Hz でカクつく)。
+        float movement = point.getMovement(partialTick);
         int tongIndex = (int) Math.floor(point.rmMain.getLength() * 2.0 * TONG_POS);
         float move = movement * TONG_MOVE;
         // rmMain は基準(bias 0)、rmBranch は分岐点付近で同位置に重なるため微小に持ち上げて z-fight 回避。

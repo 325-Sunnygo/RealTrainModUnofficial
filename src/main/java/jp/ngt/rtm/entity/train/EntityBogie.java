@@ -67,6 +67,10 @@ public class EntityBogie extends Entity {
     private int split = -1;
     private int prevPosIndex;
     private float jointDelay;
+    /** 何本目の継ぎ目か (jointDelay 配列のインデックス)。レール変更で 0 に戻る。 */
+    private int jointIndex;
+    /** 今いるレールが反響音指定か (トンネル/高架下)。 */
+    private boolean reverbSound;
 
     public float rotationRoll;
     public float prevRotationRoll;
@@ -417,6 +421,13 @@ public class EntityBogie extends Entity {
                     return true;
                 }
 
+                //乗り移りログ (隣線への飛び移り診断用)
+                if (this.currentRailMap != null) {
+                    jp.ngt.ngtlib.io.NGTLog.debug("[Bogie] rail change -> core(%d,%d,%d) gap=%.4f switch=%s",
+                            coreObj.getBlockPos().getX(), coreObj.getBlockPos().getY(), coreObj.getBlockPos().getZ(),
+                            this.currentRailMap.minEndpointGap(railMap),
+                            String.valueOf(coreObj instanceof TileEntityLargeRailSwitchCore));
+                }
                 this.currentRailObj = coreObj;
                 this.currentRailMap = railMap;
                 this.split = (int) (this.currentRailMap.getLength() * (double) SPLITS_PER_METER);
@@ -432,6 +443,9 @@ public class EntityBogie extends Entity {
      * 別レールに移動した際呼び出し
      */
     protected void onChangeRail(TileEntityLargeRailCore newRail) {
+        //新しいレールの反響音指定を引き継ぎ、継ぎ目カウントを最初から数え直す
+        this.reverbSound = newRail != null && newRail.isReberbSound();
+        this.jointIndex = 0;
         this.playJointSound();
         //レール継ぎ目のガタン — 車体サスペンションへ入力 (RTMU オリジナル)
         EntityTrainBase train = this.getTrain();
@@ -440,18 +454,90 @@ public class EntityBogie extends Entity {
         }
     }
 
+    /** 既定のジョイント音 (パックが sound_Joint を指定しない場合)。 */
+    private static final String JOINT_SOUND = "rtm:train/joint";
+    private static final String JOINT_SOUND_REVERB = "rtm:train/joint_reverb";
+
+    /**
+     * 本家 playJointSound: レール継ぎ目の「ガタン」を鳴らし、次の継ぎ目までの距離を決める。
+     * <p>
+     * jointDelay は台車ごとの配列で、車体の何本目の継ぎ目かによって間隔が変わる
+     * (先頭台車と後方台車で「ガタン…ゴトン」がずれるのはこれ)。
+     */
     protected void playJointSound() {
-        //TODO: 本家 jointDelay/サウンド再生 (TrainConfig.sound_Joint) の完全移植
         EntityTrainBase train = this.getTrain();
-        if (train != null) {
-            TrainConfig cfg = train.getConfig();
-            if (cfg != null && !cfg.muteJointSound) {
-                int size = cfg.jointDelay[this.getBogieId()].length;
-                if (size > 1) {
-                    this.jointDelay = Math.abs(cfg.jointDelay[this.getBogieId()][1] - cfg.jointDelay[this.getBogieId()][0]);
-                }
-            }
+        if (train == null) {
+            return;
         }
+        TrainConfig cfg = train.getConfig();
+        if (cfg == null || cfg.muteJointSound || cfg.jointDelay == null) {
+            return;
+        }
+        int bogieId = this.getBogieId();
+        if (bogieId < 0 || bogieId >= cfg.jointDelay.length || cfg.jointDelay[bogieId] == null) {
+            return;
+        }
+
+        if (this.level().isClientSide()) {
+            float maxSpeed = cfg.maxSpeed != null && cfg.maxSpeed.length > 0
+                    ? cfg.maxSpeed[cfg.maxSpeed.length - 1] : 1.8F;
+            //速いほど高いピッチ (1.0〜1.5)
+            float pitch = maxSpeed > 0.0F
+                    ? (Math.abs(train.getSpeed()) / maxSpeed) * 0.5F + 1.0F : 1.0F;
+            String sound;
+            if (cfg.sound_Joint != null && cfg.sound_JointReverb != null) {
+                sound = this.reverbSound ? cfg.sound_JointReverb : cfg.sound_Joint;
+            } else {
+                sound = this.reverbSound ? JOINT_SOUND_REVERB : JOINT_SOUND;
+            }
+            //継ぎ目音は離散イベント: 登録制ラッチを通さず毎回鳴らす
+            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
+                    .playLegacyId(this, sound, 1.0F, pitch, false, true);
+        }
+
+        int size = cfg.jointDelay[bogieId].length;
+        if (this.jointIndex < size - 1) {
+            int index0 = this.reverseJointArray() ? size - this.jointIndex - 1 : this.jointIndex;
+            ++this.jointIndex;
+            int index1 = this.reverseJointArray() ? size - this.jointIndex - 1 : this.jointIndex;
+            this.jointDelay = Math.abs(cfg.jointDelay[bogieId][index1] - cfg.jointDelay[bogieId][index0]);
+        }
+    }
+
+    /**
+     * 本家 reverseJointArray: 進行方向と台車位置の組み合わせで、
+     * jointDelay 配列を逆から読むか。後進時に継ぎ目の間隔が反転するのを合わせる。
+     */
+    protected boolean reverseJointArray() {
+        EntityTrainBase train = this.getTrain();
+        if (train == null) {
+            return false;
+        }
+        return (train.getTrainDirection() == 0) ^ (this.getBogieId() == 0);
+    }
+
+    /** 本家 setBogieSize: 台車の当たり判定サイズ。 */
+    public void setBogieSize(float width, float height) {
+        this.setBoundingBox(this.getBoundingBox().inflate(0.0D));
+        this.refreshDimensions();
+    }
+
+    /** 本家 Lockable: 施錠対象は親車両。 */
+    public Object getTarget(Object world, int x, int y, int z) {
+        return this.getTrain();
+    }
+
+    public boolean lock(Object player, String code) {
+        return true;
+    }
+
+    public boolean unlock(Object player, String code) {
+        return true;
+    }
+
+    /** 本家 getProhibitedAction: 1 = 破壊禁止。 */
+    public int getProhibitedAction() {
+        return 1;
     }
 
     private TileEntityLargeRailCore getRail(double px, double py, double pz) {

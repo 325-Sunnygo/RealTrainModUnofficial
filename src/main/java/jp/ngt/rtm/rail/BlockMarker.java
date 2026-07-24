@@ -551,4 +551,15 @@ public class BlockMarker extends BaseEntityBlock {
 
         return null;
     }
+
+    /**
+     * 本家 getFacing: 設置者の向きからマーカーの向き (0〜7) を決める。
+     * 斜め設置は 45 度刻みで割り当てる。
+     */
+    public static int getFacing(net.minecraft.world.entity.LivingEntity placer, boolean isDiagonal) {
+        int facing = net.minecraft.util.Mth.floor(
+                jp.ngt.ngtlib.math.NGTMath.normalizeAngle(placer.getYRot() + 180.0F) / 45.0D + 0.5D) & 7;
+        return facing / 2 + (facing % 2 == 0 ? 0 : 4);
+    }
+
 }

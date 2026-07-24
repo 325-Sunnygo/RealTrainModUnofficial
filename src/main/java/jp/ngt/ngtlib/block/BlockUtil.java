@@ -76,4 +76,87 @@ public final class BlockUtil {
                 liquid ? ClipContext.Fluid.ANY : ClipContext.Fluid.NONE, p));
         return MovingObjectPosition.of(hit);
     }
+
+    /** 本家getConnectedBlock: 6方向の隣接ブロック(+x,-x,+y,-y,+z,-z)。 */
+    public static Block[] getConnectedBlock(Object world, int x, int y, int z) {
+        return new Block[]{
+            getBlock(world, x + 1, y, z), getBlock(world, x - 1, y, z),
+            getBlock(world, x, y + 1, z), getBlock(world, x, y - 1, z),
+            getBlock(world, x, y, z + 1), getBlock(world, x, y, z - 1)};
+    }
+
+    /** 本家getConnectedBlockAndMetadata。 */
+    public static Object[][] getConnectedBlockAndMetadata(Object world, int x, int y, int z) {
+        return new Object[][]{
+            {getBlock(world, x + 1, y, z), getMetadata(world, x + 1, y, z)},
+            {getBlock(world, x - 1, y, z), getMetadata(world, x - 1, y, z)},
+            {getBlock(world, x, y + 1, z), getMetadata(world, x, y + 1, z)},
+            {getBlock(world, x, y - 1, z), getMetadata(world, x, y - 1, z)},
+            {getBlock(world, x, y, z + 1), getMetadata(world, x, y, z + 1)},
+            {getBlock(world, x, y, z - 1), getMetadata(world, x, y, z - 1)}};
+    }
+
+    /** 本家isConnectedBlock: 各方向が指定ブロック群のどれかか。 */
+    public static boolean[] isConnectedBlock(Object world, Block[] blocks, int x, int y, int z) {
+        boolean[] b0 = new boolean[6];
+        Block[] connected = getConnectedBlock(world, x, y, z);
+        for (int i = 0; i < 6; i++) {
+            for (Block block : blocks) {
+                if (connected[i] == block) {
+                    b0[i] = true;
+                    break;
+                }
+            }
+        }
+        return b0;
+    }
+
+    /** 本家isConnectedSolid: 各方向の面がソリッドか。 */
+    public static boolean[] isConnectedSolid(Object world, int x, int y, int z) {
+        Level level = toLevel(world);
+        if (level == null) {
+            return new boolean[6];
+        }
+        int[][] d = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+        net.minecraft.core.Direction[] f = {
+            net.minecraft.core.Direction.WEST, net.minecraft.core.Direction.EAST,
+            net.minecraft.core.Direction.DOWN, net.minecraft.core.Direction.UP,
+            net.minecraft.core.Direction.NORTH, net.minecraft.core.Direction.SOUTH};
+        boolean[] out = new boolean[6];
+        for (int i = 0; i < 6; i++) {
+            net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(x + d[i][0], y + d[i][1], z + d[i][2]);
+            out[i] = level.getBlockState(pos).isFaceSturdy(level, pos, f[i]);
+        }
+        return out;
+    }
+
+    /** 本家rotateBlockPos: 90度単位のXZ回転。 */
+    public static int[] rotateBlockPos(byte rotation, int x, int y, int z) {
+        if (rotation == 1) {
+            return new int[]{-z, y, x};
+        } else if (rotation == 2) {
+            return new int[]{-x, y, -z};
+        } else if (rotation == 3) {
+            return new int[]{z, y, -x};
+        }
+        return new int[]{x, y, z};
+    }
+
+    /** 本家getBlockList: 範囲内の指定ブロック座標一覧。 */
+    public static java.util.List<int[]> getBlockList(Object world, int x, int y, int z, Object block, int range) {
+        java.util.List<int[]> array = new java.util.ArrayList<>();
+        int r2 = range * 2;
+        for (int i0 = 0; i0 < r2; ++i0) {
+            for (int i1 = 0; i1 < r2; ++i1) {
+                for (int i2 = 0; i2 < r2; ++i2) {
+                    int bx = x - range + i0, by = y - range + i1, bz = z - range + i2;
+                    if (getBlock(world, bx, by, bz) == block && !(i0 == range && i1 == range && i2 == range)) {
+                        array.add(new int[]{bx, by, bz});
+                    }
+                }
+            }
+        }
+        return array;
+    }
+
 }

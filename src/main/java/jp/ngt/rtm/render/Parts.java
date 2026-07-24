@@ -18,6 +18,13 @@ public class Parts {
     //毎フレーム同一インスタンスでヒットさせるため、生成時に確定して使い回す。
     private final Set<String> normalizedNames;
     private jp.ngt.ngtlib.renderer.model.GroupObject[] objs;
+    /** 本家 ActionParts.id: registerParts で 1 始まりで振られるピッキング ID。 */
+    public int id;
+
+    /** 操作パーツ (ActionParts) か。本家は instanceof で判定する。 */
+    public boolean isActionParts() {
+        return false;
+    }
 
     public Parts(String... names) {
         this.names = names != null ? names : new String[0];
@@ -83,4 +90,10 @@ public class Parts {
             this.render(pr);
         }
     }
+
+    /** 本家ignoreMatId: マテリアルIDを無視して描くか。既定false。 */
+    public boolean ignoreMatId(PartsRenderer renderer) {
+        return false;
+    }
+
 }

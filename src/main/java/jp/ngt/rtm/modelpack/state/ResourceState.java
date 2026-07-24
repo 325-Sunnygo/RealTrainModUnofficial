@@ -20,7 +20,8 @@ public class ResourceState {
      */
     public int color = 16777215;
 
-    private final DataMap dataMap = new DataMap();
+    /** 本家は public フィールド。スクリプトが {@code state.dataMap} と直接読む。 */
+    public final DataMap dataMap = new DataMap();
     private final Supplier<String> nameSupplier;
 
     /**
@@ -58,6 +59,16 @@ public class ResourceState {
 
     public DataMap getDataMap() {
         return this.dataMap;
+    }
+
+    /** 本家 getArg: DataMap の全エントリを {@code key=(Type)value,...} で返す。 */
+    public String getArg() {
+        return this.dataMap.getArg();
+    }
+
+    /** 本家 setArg: 同形式の文字列を DataMap へ取り込む。 */
+    public void setArg(String arg, boolean overwrite) {
+        this.dataMap.setArg(arg, overwrite);
     }
 
     /**

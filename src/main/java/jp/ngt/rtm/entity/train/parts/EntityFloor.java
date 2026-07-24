@@ -73,6 +73,13 @@ public class EntityFloor extends EntityVehiclePart {
     @Override
     public void tick() {
         super.tick();
+        //車体側の一覧へ自分を登録しておく (車体が移動後に位置を押し出すため)。
+        //クライアントでは床はトラッカー経由で個別に湧くので setupFloors を通らず、
+        //ここで登録しないと車体からは追従させられない。
+        EntityVehicleBase<?> parent = this.getVehicle();
+        if (parent != null) {
+            parent.setFloor(this);
+        }
         if (!this.level().isClientSide) {
             //親車両が消えたら追従して消える
             if (this.tickCount > 100 && this.getVehicle() == null) {

@@ -51,6 +51,8 @@ public final class CarEntity extends Entity {
     public double field_70159_w;
     public double field_70181_x;
     public double field_70179_y;
+    /** サーバスクリプトが motion を書いた = 移動はスクリプト任せ。RTMU独自の車物理を止める。 */
+    private boolean scriptDrivesMotion;
     /** 1.7.10 riddenByEntity (この車に乗っているプレイヤーのラッパー) */
     public jp.ngt.mccompat.PlayerCompat field_70153_n;
     /** 1.7.10 ridingEntity (この車が乗っている対象=ホストプレイヤーのラッパー) */
@@ -323,12 +325,31 @@ public final class CarEntity extends Entity {
      */
     private Player pendingScriptRider;
 
+    /**
+     * プレイヤーに追従する「道具車」か (SRB3 / NGTO Builder)。
+     * これらは車=プレイヤー+2 追従とプレイヤー=座席位置が相互参照して毎tick上昇するため乗車させない。
+     * 判定は hostPlayerEntityId で追従する作りかどうか。普通の自動車 (MFCP 等) は該当しない。
+     */
+    private boolean isFollowToolCar() {
+        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
+        if (def == null || !def.hasServerScript()) {
+            return false;
+        }
+        String path = def.getServerScriptPath();
+        if (path == null) {
+            return false;
+        }
+        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("superrailbuilder") || lower.contains("srb") || lower.contains("ngto");
+    }
+
     /// @return 処理の完了状態
     @Override
     public @NotNull InteractionResult interact(@NotNull Player player, @NotNull InteractionHand hand) {
-        //サーバースクリプト持ち (SRB3/NGTO Builder 等) は実乗車させない
-        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
-        if (def != null && def.hasServerScript()) {
+        //追従する道具車 (SRB3/NGTO Builder) だけ実乗車させない。
+        //以前は「サーバースクリプトを持つ車」を全部弾いていたため、
+        //運転用スクリプトを持つ普通の自動車 (MFCP 等) に乗れなかった。
+        if (isFollowToolCar()) {
             if (!this.level().isClientSide) {
                 this.pendingScriptRider = player;
             }
@@ -486,7 +507,15 @@ public final class CarEntity extends Entity {
         if (!this.level().isClientSide()) {
             ensureServerScriptLoaded();
             if (serverScript != null) {
+                //スクリプトが読む1.7.10シムを実値で埋めてから走らせる。
+                //埋めないと motion が前回値のまま累積し、車が滑って暴れる。
+                net.minecraft.world.phys.Vec3 before = this.getDeltaMovement();
+                this.field_70159_w = before.x;
+                this.field_70181_x = before.y;
+                this.field_70179_y = before.z;
+
                 serverScript.onUpdate(this);
+
                 // サーバスクリプトが entity.field_70177_z=0 等で向きを制御する(SRB3はyawを0固定
                 // してマーカーをワールド座標で描く)。シムのフィールドを実際の向きへ反映する。
                 // 反映しないと車の実yawが残り、render が回転してマーカーが散らばる。
@@ -494,6 +523,17 @@ public final class CarEntity extends Entity {
                 this.setXRot(this.field_70125_A);
                 this.yRotO = this.field_70177_z;
                 this.xRotO = this.field_70125_A;
+
+                //スクリプトが書いた motion (field_70159_w/x/y) を実際の移動へ反映する。
+                //MFCP の車はここで前進/操舵を表現するので、反映しないと 1mm も動かない。
+                double mx = this.field_70159_w;
+                double my = this.field_70181_x;
+                double mz = this.field_70179_y;
+                if (Double.isFinite(mx) && Double.isFinite(my) && Double.isFinite(mz)
+                        && (mx != before.x || my != before.y || mz != before.z)) {
+                    this.setDeltaMovement(mx, my, mz);
+                    this.scriptDrivesMotion = true;
+                }
             }
             // ホストプレイヤー追従 (1.12 doFollowing 相当)。騎乗方式はスニークで
             // 振り落とされるため使わず、サーバー側で位置を直接ミラーする。
@@ -558,242 +598,26 @@ public final class CarEntity extends Entity {
         // 降りた後に惰性で動かないので、とりあえずコメントアウトして無効化 要研究
 //        if (!this.isControlledByLocalInstance()) return;
 
-        final var driver = this.getControllingPassenger();
-        if (driver instanceof Player drivingPlayer) {
-            this.handlePlayerInput(drivingPlayer);
-        } else {
-            // 操縦手がいない
-            this.updatePedals(); // ペダルのストロークを更新
-            this.updateSteeringAngle(); // ステアリング角度を更新
-        }
-
-        this.updateSpeed(); // 速度を更新
-        this.applyMovement(); // 移動量を計算
-
+        //移動はサーバスクリプト任せ (本家 RTM と同じ)。RTMU 独自の車物理は持たない。
+        //スクリプトが書いた motion をそのまま適用する。
         if (level.isClientSide) {
-            updateWheelRotationInClient(); // 車輪の回転を反映
+            updateWheelRotationInClient();
         }
-
-        // 移動を実行
         this.move(MoverType.SELF, this.getDeltaMovement());
     }
 
-    /// 運転しているプレイヤーの操作を反映する
-    ///
-    /// ### 動作
-    /// - 進行方向のキーでアクセル（`acceleratorStroke`を増加）
-    /// - 進行方向反対のキーでブレーキ（`brakeStroke`を増加）
-    /// - ブレーキで停止したのち、一度離してもう一度押し始めると反対側に進行方向を転換（`isReversing`を逆転）し、
-    ///   そのままその方向に加速を始める
-    private void handlePlayerInput(Player player) {
-
-        // プレイヤーの操作
-        final float wS = player.zza; // W: 0.98, S: -0.98
-        final float aD = player.xxa; // A: 0.98, D: -0.98
-
-        if (wS > 0.0f) { // 前キー（W）
-            final var justStartedW = this.prevWs <= 0.0f;
-            if (!this.isReversing) { // 前進（アクセル）
-                this.brakeStroke = 0.0f;
-                this.isBraking = false;
-
-                final var stroke = this.acceleratorStroke + ACCELERATOR_STROKE_CHANGE_RATE; // 踏む量を増やす
-                this.acceleratorStroke = Math.clamp(stroke, 0.0f, 1.0f);
-            } else { // 後進（ブレーキ）
-                this.acceleratorStroke = 0.0f;
-
-                if (this.isStopping() && justStartedW && !this.isReversalLocked) { // 新たに押され、ロックされていない
-                    this.isReversing = false; // 前進を開始
-                    this.brakeStroke = 0.0f;
-
-                    final var stroke = this.acceleratorStroke + ACCELERATOR_STROKE_CHANGE_RATE;
-                    this.acceleratorStroke = Math.clamp(stroke, 0.0f, 1.0f);
-                } else {
-                    // 通常のブレーキ処理
-                    if (this.speed >= -SPEED_STOP_THRESHOLD) { // 転換しない場合ロックをセット
-                        this.isReversalLocked = true;
-                    }
-                    final var stroke = this.brakeStroke + BRAKE_STROKE_CHANGE_RATE;
-                    this.brakeStroke = Math.clamp(stroke, 0.0f, 1.0f);
-                }
-            }
-        } else if (wS < 0.0f) { // 後ろキー（S）
-            final var justStartedS = this.prevWs >= 0.0f;
-            if (this.isReversing) { // 後進（アクセル）
-                this.brakeStroke = 0.0f;
-                this.isBraking = false;
-
-                final var stroke = this.acceleratorStroke + ACCELERATOR_STROKE_CHANGE_RATE;
-                this.acceleratorStroke = Math.clamp(stroke, 0.0f, 1.0f);
-            } else { // 前進（ブレーキ）
-                this.acceleratorStroke = 0.0f;
-
-                if (this.isStopping() && justStartedS && !this.isReversalLocked) { // 新たに押され、ロックされていない
-                    this.isReversing = true;
-                    this.brakeStroke = 0.0f;
-
-                    final var stroke = this.acceleratorStroke + ACCELERATOR_STROKE_CHANGE_RATE;
-                    this.acceleratorStroke = Math.clamp(stroke, 0.0f, 1.0f);
-                } else {
-                    // 通常のブレーキ処理
-                    if (this.speed <= SPEED_STOP_THRESHOLD) {
-                        this.isReversalLocked = true;
-                    }
-                    final var stroke = this.brakeStroke + BRAKE_STROKE_CHANGE_RATE;
-                    this.brakeStroke = Math.clamp(stroke, 0.0f, 1.0f);
-                }
-            }
-        } else { // 操作されていない
-            this.isReversalLocked = false; // 方向転換停止を解除
-
-            // 無人の時と同様に処理
-            this.updatePedals();
-        }
-
-        this.prevWs = wS; // wSを保存
-
-        if (aD != 0) {
-            final var angle = this.currentSteeringWheelAngle + Math.signum(aD) * -STEERING_WHEEL_ANGULAR_VELOCITY_MANIPULATED; // Aが正、Dが負だが、ヨーは逆
-            this.currentSteeringWheelAngle = Math.clamp(angle, -STEERING_WHEEL_MAX_ANGLE, STEERING_WHEEL_MAX_ANGLE);
-        } else { // 操作されていない
-            // 無人の時と同様に処理
-            this.updateSteeringAngle();
-        }
-    }
-//         実際の移動
-//        this.setYRot(this.getYRot() + turn);
-//        this.setDeltaMovement(this.getDeltaMovement().x, this.getDeltaMovement().y, this.getDeltaMovement().z + forward);
-
-//        if (forward != 0) {
-//            acceleration += forward * 0.02f;
-//            acceleration = Math.clamp(acceleration, -maxSpeed, maxSpeed);
-//            // 移動方向
-//            // Entity#yRotはたぶん度数法
-//            float yaw = this.getYRot() * (float) Math.PI / 180.0f;
-//            Vec3 forwardVec = new Vec3(-Math.sin(yaw), 0, Math.cos(yaw));
-//            Vec3 motion = forwardVec.scale(acceleration);
-//
-//            // 問答無用でX+へ移動
-//            this.setDeltaMovement(1.0f, this.getDeltaMovement().y, this.getDeltaMovement().z);
-//            // 回転処理（移動中のみ）
-//            if (Math.abs(acceleration) > 0.01f) {
-//                this.setYRot(this.getYRot() + turn * turnSpeed * Math.signum(acceleration));
-//            }
-//        }
-//        this.getEntityData().set(DATA_SPEED, Math.abs(acceleration));
-
-    /// 操作されていないときに自然にペダルを処理する
-    private void updatePedals() {
-        // 踏んだ時と同じ割合で減らす
-        // あるいは即時0？ どちらが実際の運転の感覚と似ているだろうか
-        final var accelStroke = this.acceleratorStroke - ACCELERATOR_STROKE_CHANGE_RATE;
-        this.acceleratorStroke = Math.clamp(accelStroke, 0.0f, 1.0f);
-        final var brakeStroke = this.brakeStroke - BRAKE_STROKE_CHANGE_RATE;
-        this.brakeStroke = Math.clamp(brakeStroke, 0.0f, 1.0f);
-    }
-
-    /// 操作されていないときに自然にステアリングを処理する
-    private void updateSteeringAngle() {
-        // 速度に応じてセルフセンタリングさせる処理
-        // 前進では切れ角を減らし、後進では増える
-
-        final var angle = this.currentSteeringWheelAngle;
-        // 移動距離が大きいほど変化量も大きくなる 0に近づくほど変わりづらくなる
-        this.currentSteeringWheelAngle = angle * (1 - STEERING_WHEEL_SELF_CENTERING_PARAMETER * this.speed * SECONDS_IN_TICK);
-    }
-
-    /// 速度を更新する
-    private void updateSpeed() {
-        var newSpeed = this.speed;
-
-        if (this.acceleratorStroke > 0.0f) {
-            newSpeed += (isReversing ? -1 : +1) * this.acceleratorStroke * ACCELERATION;
-        } else if (this.brakeStroke > 0.0f) {
-            newSpeed += (isReversing ? +1 : -1) * this.brakeStroke * DECELERATION;
-        } else {
-            newSpeed *= 1 - SLOWDOWN_DECELERATION;
-        }
-
-        if (isReversing) {
-            newSpeed = Math.clamp(newSpeed, -MAX_SPEED * 0.2f, 0.0f);
-        } else {
-            newSpeed = Math.clamp(newSpeed, 0.0f, MAX_SPEED);
-        }
-
-        this.speed = Math.clamp(newSpeed, -MAX_SPEED * 0.2f, MAX_SPEED);
-    }
-
-
-    /// アッカーマンジオメトリを遵守した四輪自動車の移動と回転の結果でdeltaMovementとyawを更新
-    private void applyMovement() {
-        // 正接で面倒が起きないようにステアリング角度が0度に近い場合は直接前進
-        if (Math.abs(this.currentSteeringWheelAngle) < 1.0f) {
-            final var movement = Vec3.directionFromRotation(0, this.getYRot()).scale(this.speed);
-            this.setDeltaMovement(movement);
-            return;
-        }
-
-        // 実舵角（ラジアン）
-        final double steerAngle = Math.toRadians(this.currentSteeringWheelAngle * STEERING_RATIO);
-
-        // 後輪軸基準の旋回半径
-        final double R = WHEELBASE / Math.tan(steerAngle);
-
-        // 1tick あたりのヨー変化量（後輪軸速度 = this.speed と仮定）
-        final double dYawRad = this.speed / R;
-        final float dYawDeg = (float) Math.toDegrees(dYawRad);
-        this.deltaYaw = dYawDeg;
-
-        final float currentYaw = this.getYRot();
-        final Vec3 forward = Vec3.directionFromRotation(0.0f, currentYaw);
-
-        // ① エンティティ原点 → 後輪軸のワールド座標
-        //    WHEEL_R_COORD < 0 なので forward.scale(WHEEL_R_COORD) は後方向
-        final Vec3 rearAxlePos = this.position().add(forward.scale(WHEEL_R_COORD));
-
-        // ② ICR = 後輪軸の右方向に距離 R
-        //    Minecraft の YRot は時計回りが正なので +90 で右方向になる
-        final Vec3 rightVec = Vec3.directionFromRotation(0.0f, currentYaw + 90.0f);
-        final Vec3 icrPos = rearAxlePos.add(rightVec.scale(R));
-
-        // ③ 後輪軸を ICR 周りに dYawRad だけ回転
-        //    Minecraft XZ 平面（上から見て時計回りが正）の回転行列:
-        //      x' = cx + cos(θ)·dx - sin(θ)·dz
-        //      z' = cz + sin(θ)·dx + cos(θ)·dz
-        final double dx = rearAxlePos.x - icrPos.x;
-        final double dz = rearAxlePos.z - icrPos.z;
-        final double cos = Math.cos(dYawRad);
-        final double sin = Math.sin(dYawRad);
-        final Vec3 newRearAxlePos = new Vec3(
-            icrPos.x + cos * dx - sin * dz,
-            rearAxlePos.y,
-            icrPos.z + sin * dx + cos * dz
-        );
-
-        // ④ 新しいヨーと前方向を確定
-        final float newYaw = currentYaw + dYawDeg;
-        final Vec3 newForward = Vec3.directionFromRotation(0, newYaw);
-
-        // ⑤ 後輪軸からエンティティ原点を逆算
-        //    entityPos = rearAxlePos - forward * WHEEL_R_COORD
-        //              = rearAxlePos + forward * |WHEEL_R_COORD|  （WHEEL_R_COORD < 0）
-        final Vec3 newEntityPos = newRearAxlePos.subtract(newForward.scale(WHEEL_R_COORD));
-
-        // ⑥ deltaMovement と yaw を設定
-        this.setDeltaMovement(newEntityPos.subtract(this.position()));
-        this.setYRot(newYaw);
-
-    }
-
-    /// 車輪の回転角度を更新する クライアントのみ
+    /// 車輪の回転角度を更新する クライアントのみ。
+    /// 速度はスクリプトが動かす実移動量から取る (独自物理の speed は持たない)。
     private void updateWheelRotationInClient() {
         this.prevWheelRotation = this.wheelRotation;
-
-        final var deltaRotation = this.speed / WHEEL_RADIUS;
-        this.wheelRotation += deltaRotation; // 直接加算 340潤ラジアン回ることは多分ないと信じる
-    }
-
-    private boolean isStopping() {
-        return Math.abs(this.speed) < SPEED_STOP_THRESHOLD;
+        Vec3 m = this.getDeltaMovement();
+        double horizontal = Math.sqrt(m.x * m.x + m.z * m.z);
+        //進行方向 (車体前方) との内積で前進/後退の符号を決める
+        Vec3 forward = Vec3.directionFromRotation(0.0F, this.getYRot());
+        double signed = (m.x * forward.x + m.z * forward.z) < 0 ? -horizontal : horizontal;
+        this.speed = (float) signed;
+        if (WHEEL_RADIUS > 1.0E-5F) {
+            this.wheelRotation += (float) (signed / WHEEL_RADIUS);
+        }
     }
 }

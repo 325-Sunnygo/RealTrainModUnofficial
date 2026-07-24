@@ -152,11 +152,18 @@ public final class RailMeshCache {
         //必ず焼く要因: 強制再焼き (パック再読込)・未焼き・モデル差替。
         boolean mustBake = forceRebuild || mesh == null || mesh.model() != model;
         //任意で焼く要因: ライト or 見た目 (variant=トング位置) が変わった。
-        boolean optionalBake = !mustBake && (mesh.light() != packedLight || mesh.variant() != variant);
+        boolean lightChanged = !mustBake && mesh.light() != packedLight;
+        boolean variantChanged = !mustBake && mesh.variant() != variant;
+        boolean optionalBake = lightChanged || variantChanged;
         //churn 対策: 任意再焼きは、直近に焼いてから REBAKE_MIN_FRAMES 経つまで見送り、古いメッシュを
         //描く。量子化の境界でトングが揺れて variant が毎tick変わっても、再焼きは間隔内に制限される
         //(静止して見えるクロスポイントが再焼きされ続けて重い、を解消)。見た目は最大数フレーム古いだけ。
-        if (optionalBake && (frameCounter - mesh.bakeFrame()) < REBAKE_MIN_FRAMES) {
+        //
+        //★ただしライト変化はこの遅延の対象外にする。ワールド入場直後はライトエンジンがまだ
+        //伝播しておらず、真っ暗な状態で焼かれることがある。そこに variant 用の遅延が重なると
+        //「読み込み済みのチャンクなのにレールだけ真っ黒のまま」になる (ユーザー報告)。
+        //ライトは連続的に変わるものではないので、churn の心配も無い。
+        if (optionalBake && !lightChanged && (frameCounter - mesh.bakeFrame()) < REBAKE_MIN_FRAMES) {
             optionalBake = false;
         }
         boolean needsBake = mustBake || optionalBake;

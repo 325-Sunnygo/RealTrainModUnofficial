@@ -261,4 +261,118 @@ public final class NGTUtil {
     public static <T> void addArray(java.util.List<T> list, T[] array) {
         java.util.Collections.addAll(list, array);
     }
+
+    /** 本家getLightValue: 空light(昼夜補正済み)とblock lightの大きい方。 */
+    public static int getLightValue(Object world, int x, int y, int z) {
+        net.minecraft.world.level.Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
+        if (level == null) {
+            return 15;
+        }
+        net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(x, y, z);
+        int sky = level.getBrightness(net.minecraft.world.level.LightLayer.SKY, pos) - level.getSkyDarken();
+        int block = level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, pos);
+        return Math.max(sky, block);
+    }
+
+    /** 本家contains: 配列に要素が含まれるか。 */
+    public static <E> boolean contains(E[] array, E obj) {
+        if (array == null) {
+            return false;
+        }
+        for (E e : array) {
+            if (java.util.Objects.equals(e, obj)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** 本家getChunkLoadDistance: 描画距離(チャンク)×16。 */
+    public static int getChunkLoadDistance() {
+        try {
+            return net.minecraft.client.Minecraft.getInstance().options.renderDistance().get() * 16;
+        } catch (Throwable t) {
+            return 128;
+        }
+    }
+
+    public static double getChunkLoadDistanceSq() {
+        int i = getChunkLoadDistance();
+        return (double) i * (double) i;
+    }
+
+    /** 本家getServer。 */
+    public static net.minecraft.server.MinecraftServer getServer() {
+        return net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+    }
+
+    /** 本家isSMP: マルチプレイか。 */
+    public static boolean isSMP() {
+        net.minecraft.server.MinecraftServer server = getServer();
+        return server == null || !server.isSingleplayer();
+    }
+
+    /** 本家openedLANWorld。 */
+    public static boolean openedLANWorld() {
+        net.minecraft.server.MinecraftServer server = getServer();
+        return server != null && server.isSingleplayer() && server.isPublished();
+    }
+
+    /** 本家isEquippedItem: プレイヤーが指定アイテムを手に持っているか。 */
+    public static boolean isEquippedItem(Object player, Object item) {
+        if (player instanceof net.minecraft.world.entity.player.Player p) {
+            net.minecraft.world.item.ItemStack stack = p.getMainHandItem();
+            return !stack.isEmpty() && stack.getItem() == item;
+        }
+        return false;
+    }
+
+    public static int byteArrayToInteger(byte[] par1) {
+        return java.nio.ByteBuffer.wrap(par1).asIntBuffer().get();
+    }
+
+    public static byte[] integerToByteArray(int par1) {
+        return new byte[]{(byte) (par1 >>> 24), (byte) (par1 >>> 16), (byte) (par1 >>> 8), (byte) par1};
+    }
+
+    /** 本家getNewRenderType: 1.21では未使用。 */
+    public static int getNewRenderType() {
+        return -1;
+    }
+
+    /** 本家sendPacketToServer: RTMUでは各機能が個別に同期するため何もしない。 */
+    public static void sendPacketToServer(Object packet) {
+    }
+
+    /** 本家sendPacketToClient: 同上。 */
+    public static void sendPacketToClient(Object packet, Object player) {
+    }
+
+    /**
+     * 旧 RTMU の JS スタブが持っていた補助 API。
+     * 実クラスへ一本化するにあたり、同名で使うスクリプトが落ちないよう本体側にも用意する。
+     */
+    public static long getCurrentTime() {
+        return System.currentTimeMillis();
+    }
+
+    /** 現在のワールド (クライアント側)。サーバーでは null。 */
+    public static Object getCurrentWorld() {
+        return getClientWorld();
+    }
+
+    /** 現在のプレイヤー (クライアント側)。サーバーでは null。 */
+    public static Object getCurrentPlayer() {
+        return getClientPlayer();
+    }
+
+    public static String getMCVersion() {
+        return "1.21.1";
+    }
+
+    /** 本家には無いが旧スタブが持っていた。言語判定は行わないので常に false。 */
+    public static boolean isLanguage(String lang) {
+        return false;
+    }
+
 }

@@ -94,18 +94,12 @@ public abstract class RailMap {
         if (railMap instanceof RailMapTurntable) {
             return railMap.canConnect(this);
         }
-        //★端点同士が「十分近い」なら接続とみなす。
-        //  本家は NGTMath.compare(..., 5) = <b>小数第5位までの完全一致</b> (許容 1e-5) だったが、
-        //  移植後は通常レール (RailMapBasic) と分岐レール (RailMapSwitch) で曲線サンプリングの
-        //  計算経路が異なり、端点が 1e-5 を超えて僅かにずれる。その結果「接続なし」と誤判定され、
-        //  台車が分岐へ乗り換えられず<b>進入元レールの端で詰まる</b> (=「分岐で進めない」)、
-        //  前後の台車で判定が食い違って分離する、という不具合になっていた。
-        //  レール端点は接続時ほぼ同一点なので、物理的に妥当な距離で判定する。
+        //端点間距離で接続判定 (本家は 1e-5 完全一致。分岐の計算誤差ぶんだけ緩和)
         return minEndpointGap(railMap) <= CONNECT_TOLERANCE;
     }
 
     /**
-     * 端点同士の最短距離 (診断用にも使う)。連結しているレールなら本来ほぼ 0。
+     * 端点同士の最短距離。
      */
     public double minEndpointGap(RailMap railMap) {
         double best = Double.MAX_VALUE;
@@ -125,13 +119,9 @@ public abstract class RailMap {
     }
 
     /**
-     * 接続とみなす端点間距離 (ブロック)。
-     * <p>本家は {@code NGTMath.compare(..., 5)} = 小数第5位の完全一致 (1e-5) で、移植後のレールは
-     * 曲線サンプリングの計算経路差でこれを僅かに超え、分岐へ乗り換えられず詰まっていた。一方で
-     * 緩めすぎると<b>近くに敷いた別のレール同士を「接続」と誤判定して列車が隣線へ飛ぶ</b>。
-     * 連結レールの端点は本来同一点なので、計算差を吸収できる最小限に留める。
+     * 接続とみなす端点間距離。緩めると近接する別レールへ列車が飛ぶ。
      */
-    private static final double CONNECT_TOLERANCE = 0.01D;
+    private static final double CONNECT_TOLERANCE = 0.001D;
 
     /**
      * 道床ブロックのリストを作成<br>

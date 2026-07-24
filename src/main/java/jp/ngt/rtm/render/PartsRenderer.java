@@ -19,11 +19,51 @@ import javax.script.ScriptEngine;
 public class PartsRenderer {
     public static java.util.Calendar CALENDAR = java.util.Calendar.getInstance();
 
+    //スクリプトが時刻系API (getTick/getSystemTime/getMCTime等) を読んだ = 描画結果が時間依存の合図。
+    //VehicleScriptRenderers はこれを見て、その車両を「静止でも毎フレーム再実行」に切り替える。
+    //getTickだけ検出していた頃は getSystemTime 系のモニター/方向幕が検出されず、
+    //キャッシュ再生で固まって定期再記録のときだけ更新される (=更新間隔が不安定) 不具合があった。
+    private static boolean timeAccessed;
+
+    /** 時刻系APIが呼ばれたら立てる。 */
+    protected static void markTimeAccessed() {
+        timeAccessed = true;
+    }
+
+    /** 1回ぶんの描画前に呼んで検知フラグを倒す。 */
+    public static void clearTimeAccessed() {
+        timeAccessed = false;
+    }
+
+    /** 直前の描画中に時刻系APIが読まれたか。 */
+    public static boolean wasTimeAccessed() {
+        return timeAccessed;
+    }
+
+    /** 本家 PACKAGE_NAME: スクリプトの renderClass 解決に使う既定パッケージ。 */
+    public static final String PACKAGE_NAME = "jp.ngt.rtm.render";
+    /** 本家 rendererMap: renderClass 名 → クラス。 */
+    public static java.util.Map<String, Class<?>> rendererMap = new java.util.HashMap<>();
+    /** 本家 BRIGHTNESS_RATE: 輝度値の正規化係数。 */
+    protected static final double BRIGHTNESS_RATE = 1.0D / 256.0D;
+    protected static final boolean DEBUG = false;
+    /** 本家 DIV_NUM: ライトエフェクトの円周分割数。 */
+    protected static final byte DIV_NUM = 32;
+    /** 本家 ANGLE: DIV_NUM 分割 1 つ分の角度 (ラジアン)。 */
+    protected static final float ANGLE = (float) (Math.PI * 2.0D / (double) DIV_NUM);
+
     protected ScriptEngine script;
     protected ModelObject modelObject = new ModelObject(null);
     protected Object modelSet;
     protected final java.util.List<Parts> partsList = new java.util.ArrayList<>();
     protected final java.util.Map<Integer, Object> dataMap = new java.util.HashMap<>();
+
+    /** 本家 targetsList: クリック可能パーツ (ActionParts) の一覧。 */
+    protected final java.util.List<Parts> targetsList = new java.util.ArrayList<>();
+    /** 本家 hittedEntity: 今カーソルが当たっている車両。 */
+    public Object hittedEntity;
+    /** 本家 hittedParts: 車両ごとの当たっているパーツ。 */
+    protected final java.util.Map<Object, Parts> hittedParts = new java.util.HashMap<>();
 
     /**
      * 本家: マテリアルごとの描画パスで現在のマテリアル ID (スクリプトが直接参照)
@@ -108,9 +148,47 @@ public class PartsRenderer {
         return this.modelObject;
     }
 
+    /**
+     * 本家のフィールド名は {@code modelObj}。Nashorn はプロパティ参照を getter へ
+     * 解決するので、この名前で {@code renderer.modelObj} と書ける。
+     */
+    public ModelObject getModelObj() {
+        return this.modelObject;
+    }
+
     public Parts registerParts(Parts par1) {
         this.partsList.add(par1);
+        //本家はクリック可能パーツ (ActionParts) を targetsList にも積み、id を 1 始まりで振る
+        if (par1 != null && par1.isActionParts()) {
+            par1.id = this.targetsList.size() + 1;
+            this.targetsList.add(par1);
+        }
         return par1;
+    }
+
+    /**
+     * 本家 getRendererWithScript: スクリプトの {@code renderClass} で指定された
+     * PartsRenderer サブクラスを生成し、スクリプトを結びつける。
+     */
+    public static PartsRenderer getRendererWithScript(ScriptEngine se, String... args)
+            throws ReflectiveOperationException {
+        String className = se == null ? null : String.valueOf(se.get("renderClass"));
+        Class<?> clazz = className == null || className.isEmpty() || "null".equals(className)
+                ? PartsRenderer.class
+                : rendererMap.computeIfAbsent(className, n -> {
+                    try {
+                        return Class.forName(n.contains(".") ? n : PACKAGE_NAME + "." + n);
+                    } catch (ClassNotFoundException e) {
+                        return PartsRenderer.class;
+                    }
+                });
+        PartsRenderer renderer = (PartsRenderer) clazz
+                .getConstructor(String[].class).newInstance((Object) args);
+        renderer.setScript(se);
+        if (se != null) {
+            se.put("renderer", renderer);
+        }
+        return renderer;
     }
 
     /**
@@ -187,6 +265,7 @@ public class PartsRenderer {
     }
 
     public int getMCTime() {
+        markTimeAccessed();
         Level level = Minecraft.getInstance().level;
         return level == null ? 0 : (int) (level.getDayTime() % 24000L);
     }
@@ -200,26 +279,32 @@ public class PartsRenderer {
     }
 
     public int getSystemTime() {
+        markTimeAccessed();
         return (int) ((System.currentTimeMillis() / 1000L) % 86400L);
     }
 
     public long getSystemTimeMillis() {
+        markTimeAccessed();
         return System.currentTimeMillis();
     }
 
     public int getSystemHour() {
+        markTimeAccessed();
         return CALENDAR.get(java.util.Calendar.HOUR_OF_DAY);
     }
 
     public int getSystemMinute() {
+        markTimeAccessed();
         return CALENDAR.get(java.util.Calendar.MINUTE);
     }
 
     public int getSystemSecond() {
+        markTimeAccessed();
         return CALENDAR.get(java.util.Calendar.SECOND);
     }
 
     public int getSystemMillisecond() {
+        markTimeAccessed();
         CALENDAR.setTimeInMillis(System.currentTimeMillis());
         return CALENDAR.get(java.util.Calendar.MILLISECOND);
     }
@@ -339,4 +424,71 @@ public class PartsRenderer {
     public void debug(String msg) {
         jp.ngt.ngtlib.io.NGTLog.debug(msg);
     }
+
+    /** 本家preRender: 既定は何もしない。 */
+    public void preRender(Object t, boolean smoothing, boolean culling, float par3) {
+    }
+
+    /** 本家postRender: 既定は何もしない。 */
+    public void postRender(Object t, boolean smoothing, boolean culling, float par3) {
+    }
+
+    /** 本家render: サブクラスが実装。 */
+    public void render(Object t, int pass, float partialTick) {
+        this.currentPass = pass;
+        this.execRenderScript(t, pass, partialTick);
+    }
+
+    /** 本家getViewerVec: 対象座標→視点のベクトル。 */
+    public static jp.ngt.ngtlib.math.Vec3 getViewerVec(double x, double y, double z) {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        net.minecraft.world.entity.Entity viewer = mc.getCameraEntity() != null ? mc.getCameraEntity() : mc.player;
+        if (viewer == null) {
+            return new jp.ngt.ngtlib.math.Vec3(0.0D, 1.0D, 0.0D);
+        }
+        return new jp.ngt.ngtlib.math.Vec3(
+            viewer.getX() - x, viewer.getEyeY() - y, viewer.getZ() - z);
+    }
+
+    /** 本家validPath: アセットが存在するか。 */
+    public boolean validPath(String path) {
+        return path != null && !path.isBlank()
+            && jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path) != null;
+    }
+
+    /** 本家renderLightEffectS: ボリュームライトは未対応(安全に無視)。 */
+    public static void renderLightEffectS(Object normal, double x, double y, double z,
+                                          float rL, float rS, float length, int color, int type, boolean reverse) {
+    }
+
+    /** 本家TileEntityPartsRenderer.getMetadata互換。 */
+    public int getMetadata(Object tile) {
+        if (tile instanceof BlockEntity be && be.getLevel() != null) {
+            return jp.ngt.ngtlib.block.BlockUtil.getMetadata(be.getLevel(),
+                be.getBlockPos().getX(), be.getBlockPos().getY(), be.getBlockPos().getZ());
+        }
+        return 0;
+    }
+
+
+    /**
+     * 本家 rotateAndRender: 指定座標を中心に 3 軸回転してからパーツを描く。
+     * 角度はラジアン (本家は内部で度へ変換して glRotatef している)。
+     */
+    public void rotateAndRender(Parts parts, float x, float y, float z,
+                                float rotationX, float rotationY, float rotationZ) {
+        GLRecorder r = GLRecorder.active();
+        if (r == null || parts == null) {
+            return;
+        }
+        r.push();
+        r.translate(x, y, z);
+        r.rotate((float) Math.toDegrees(rotationZ), 0.0F, 0.0F, 1.0F);
+        r.rotate((float) Math.toDegrees(rotationY), 0.0F, 1.0F, 0.0F);
+        r.rotate((float) Math.toDegrees(rotationX), 1.0F, 0.0F, 0.0F);
+        r.translate(-x, -y, -z);
+        parts.render(this);
+        r.pop();
+    }
+
 }

@@ -2,6 +2,7 @@ package jp.ngt.rtm.render;
 
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
+import net.minecraft.world.level.block.entity.BlockEntity;
 
 /**
  * 本家 jp.ngt.rtm.render.MachinePartsRenderer (KaizPatchX) の移植。
@@ -75,4 +76,56 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
     public float getYaw(Object tile) {
         return 0.0F;
     }
+
+    /** 本家getTick。 */
+    public int getTick(Object tile) {
+        markTimeAccessed();
+        if (tile instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity io
+                && io.getLevel() != null) {
+            return (int) (io.getLevel().getGameTime() & 0x7FFFFFFF);
+        }
+        return 0;
+    }
+
+    /** 本家rotateVec: 設置向きに応じてベクトルを回す。 */
+    public static void rotateVec(jp.ngt.ngtlib.math.Vec3 vec, int dir, float pitch, float yaw) {
+        switch (dir) {
+            case 0 -> {
+                vec.rotateAroundX(jp.ngt.ngtlib.math.NGTMath.toRadians(pitch));
+                vec.rotateAroundY(jp.ngt.ngtlib.math.NGTMath.toRadians(yaw));
+            }
+            case 1 -> {
+                vec.rotateAroundX(jp.ngt.ngtlib.math.NGTMath.toRadians(-pitch));
+                vec.rotateAroundY(jp.ngt.ngtlib.math.NGTMath.toRadians(yaw));
+            }
+            case 2 -> vec.rotateAroundX(jp.ngt.ngtlib.math.NGTMath.toRadians(pitch));
+            case 3 -> vec.rotateAroundX(jp.ngt.ngtlib.math.NGTMath.toRadians(-pitch));
+            case 4 -> vec.rotateAroundZ(jp.ngt.ngtlib.math.NGTMath.toRadians(pitch));
+            case 5 -> vec.rotateAroundZ(jp.ngt.ngtlib.math.NGTMath.toRadians(-pitch));
+            default -> {
+            }
+        }
+    }
+
+    /** 本家getNormal: 機器の向きベクトル。 */
+    public jp.ngt.ngtlib.math.Vec3 getNormal(Object tile, float x, float y, float z, float pitch, float yaw) {
+        jp.ngt.ngtlib.math.Vec3 vec = new jp.ngt.ngtlib.math.Vec3(x, y, z);
+        vec.rotateAroundX(jp.ngt.ngtlib.math.NGTMath.toRadians(pitch));
+        vec.rotateAroundY(jp.ngt.ngtlib.math.NGTMath.toRadians(yaw));
+        return vec;
+    }
+
+    /** 本家getLightPos: 機器のライト位置(ワールド座標)。 */
+    public double[] getLightPos(Object tile, float x, float y, float z, float pitch, float yaw) {
+        if (!(tile instanceof BlockEntity be)) {
+            return new double[3];
+        }
+        jp.ngt.ngtlib.math.Vec3 vec = new jp.ngt.ngtlib.math.Vec3(x, y, z);
+        rotateVec(vec, 0, pitch, yaw);
+        return new double[]{
+            be.getBlockPos().getX() + 0.5D + vec.getX(),
+            be.getBlockPos().getY() + 0.5D + vec.getY(),
+            be.getBlockPos().getZ() + 0.5D + vec.getZ()};
+    }
+
 }

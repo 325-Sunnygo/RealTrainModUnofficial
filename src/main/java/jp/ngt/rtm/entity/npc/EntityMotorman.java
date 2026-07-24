@@ -211,4 +211,10 @@ public class EntityMotorman extends PathfinderMob {
     }
 
     //経験値は落とさない (本家 getExperiencePoints=0。Mob の既定 xpReward も 0)
+
+    /** 本家 isMotorman: 運転士 NPC か。 */
+    public boolean isMotorman() {
+        return true;
+    }
+
 }

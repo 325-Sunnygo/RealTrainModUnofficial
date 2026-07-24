@@ -57,4 +57,65 @@ public final class NGTText {
     public static String applyTextStyles(Object... args) {
         return args != null && args.length > 0 ? String.valueOf(args[0]) : "";
     }
+
+    /** 本家append: 行リストを連結。 */
+    public static String append(java.util.List<String> list, boolean indention) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : list) {
+            sb.append(s);
+            if (indention) {
+                sb.append('\n');
+            }
+        }
+        return sb.toString();
+    }
+
+    /** 本家getText: リソースのテキスト全文。 */
+    public static String getText(Object resource, boolean indention) {
+        return append(readText(resource), indention);
+    }
+
+    /** 本家readTextL: InputStreamから行リスト。 */
+    public static java.util.List<String> readTextL(java.io.InputStream is, String encoding) {
+        java.util.List<String> list = new java.util.ArrayList<>();
+        try {
+            java.nio.charset.Charset cs = (encoding == null || encoding.isEmpty())
+                ? java.nio.charset.StandardCharsets.UTF_8 : java.nio.charset.Charset.forName(encoding);
+            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(is, cs));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                list.add(line);
+            }
+        } catch (Exception ignored) {
+        }
+        return list;
+    }
+
+    /** 本家readCSV。 */
+    public static String[][] readCSV(java.io.File file, String encoding) {
+        try (java.io.InputStream in = new java.io.FileInputStream(file)) {
+            java.util.List<String> texts = readTextL(in, encoding);
+            String[][] out = new String[texts.size()][];
+            for (int i = 0; i < texts.size(); i++) {
+                out[i] = texts.get(i).split(",");
+            }
+            return out;
+        } catch (Exception e) {
+            return new String[0][];
+        }
+    }
+
+    /** 本家writeToText: ファイルへ行を書き出す。 */
+    public static boolean writeToText(java.io.File file, String... texts) {
+        try (java.io.PrintWriter pw = new java.io.PrintWriter(
+                new java.io.OutputStreamWriter(new java.io.FileOutputStream(file), java.nio.charset.StandardCharsets.UTF_8))) {
+            for (String t : texts) {
+                pw.println(t);
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
 }

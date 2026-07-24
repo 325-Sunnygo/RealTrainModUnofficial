@@ -98,14 +98,11 @@ dependencies {
     // And its provides the option to then use net.minecraft as the group, and one of; client, server or joined as the module name, plus the game version as version.
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
-    implementation "org.graalvm.js:js-scriptengine:24.2.2"
-    implementation "org.graalvm.polyglot:js:24.2.2"
-    jsRuntime "org.graalvm.js:js-scriptengine:24.2.2"
-    jsRuntime "org.graalvm.polyglot:js:24.2.2"
-    // 本家 RTM/NGTLib と同一のスクリプトエンジン (jp.ngt.ngtlib.io.ScriptUtil が使用)。
+    // スクリプトエンジンは本家 RTM/NGTLib と同一の標準 Nashorn (org.openjdk.nashorn) 一本。
+    // GraalJS (org.graalvm.js / org.graalvm.polyglot) は本家 (JDK8 Nashorn/es6) と挙動が
+    // 食い違うため撤去した (全スクリプト経路 = ScriptUtil + TrainScriptSystem が Nashorn のみを使う)。
     // NeoForge 21.1 が nashorn-core 15.4 をプラットフォームライブラリとして同梱しているため
-    // jar への同梱 (jsRuntime) は不可 (org.openjdk.nashorn モジュールと二重エクスポート衝突)。
-    // コンパイル参照のみ。GraalJS は Phase 3 完了時に撤去予定。
+    // jar への同梱 (jsRuntime) は不可 (org.openjdk.nashorn モジュールと二重エクスポート衝突)。コンパイル参照のみ。
     implementation "org.openjdk.nashorn:nashorn-core:15.4"
     // Bundled add-on ATSAssistMod+ uses Jackson for IFTTT rule serialization.
     implementation "com.fasterxml.jackson.core:jackson-databind:2.15.2"

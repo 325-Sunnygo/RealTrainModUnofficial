@@ -540,6 +540,10 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         if (level != null && !level.isClientSide && start != null && end != null) {
             jp.ngt.rtm.electric.WireManager.register(level, start, end);
         }
+        //架線ジオメトリはパンタの上昇停止位置に使う。描画はクライアント側なので両サイドで登録する
+        if (level != null && start != null && end != null) {
+            jp.ngt.rtm.electric.WireManager.INSTANCE.addWire(level, start, end);
+        }
     }
 
     /**
@@ -1175,17 +1179,23 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
             SignalNetworkSavedData.get(serverLevel).syncLoadedSignal(serverLevel, this);
         }
         //ワイヤーは配線網 (本家 WireManager) へ登録
-        if (level != null && !level.isClientSide && getCategory() == InstalledObjectCategory.WIRE
+        if (level != null && getCategory() == InstalledObjectCategory.WIRE
                 && wireStart != null && wireEnd != null) {
-            jp.ngt.rtm.electric.WireManager.register(level, wireStart, wireEnd);
+            if (!level.isClientSide) {
+                jp.ngt.rtm.electric.WireManager.register(level, wireStart, wireEnd);
+            }
+            jp.ngt.rtm.electric.WireManager.INSTANCE.addWire(level, wireStart, wireEnd);
         }
     }
 
     @Override
     public void setRemoved() {
-        if (level != null && !level.isClientSide && getCategory() == InstalledObjectCategory.WIRE
+        if (level != null && getCategory() == InstalledObjectCategory.WIRE
                 && wireStart != null && wireEnd != null) {
-            jp.ngt.rtm.electric.WireManager.unregister(level, wireStart, wireEnd);
+            if (!level.isClientSide) {
+                jp.ngt.rtm.electric.WireManager.unregister(level, wireStart, wireEnd);
+            }
+            jp.ngt.rtm.electric.WireManager.INSTANCE.removeWire(level, wireStart, wireEnd);
         }
         super.setRemoved();
     }

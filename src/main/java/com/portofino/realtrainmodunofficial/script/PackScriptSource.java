@@ -21,10 +21,30 @@ public final class PackScriptSource {
      * Nashorn 実行前に評価される共通プリリュード。
      * importPackage は未定義名しか束縛しないため、ここで束縛した var が常に勝つ。
      */
-    public static final String PRELUDE =
+    /**
+     * GL 束縛だけを分離したもの。
+     * <p>モデル添付の描画スクリプト経路 ({@code TrainScriptSystem.loadScript}) は GL 呼び出しを
+     * {@code ScriptModelRenderer} の OpList に記録するため、GL11 は専用のシムを put 済みで、
+     * ここで上書きしてはいけない。そのため GL 以外の束縛を {@link #PRELUDE_NO_GL} として切り出す。
+     */
+    public static final String PRELUDE_GL =
             "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n" +
-            "var GL12 = GL11;\n" +
+            "var GL12 = GL11;\n";
+
+    public static final String PRELUDE_NO_GL =
+            //rtm-ts の Multi-target 構成対策。base スクリプトは
+            //  var RTMX_COMPAT_TARGETS = RTMX_COMPAT_TARGETS || {};
+            //を先頭に置き、その後の loader 内で各ターゲット (kaizpatch/mc1710/mc1122) の
+            //IIFE が RTMX_COMPAT_TARGETS.<target> = ... を代入する設計。ところが resolveIncludes は
+            ////include 展開結果を「includes + source」で<b>先頭に prepend</b> するため、ターゲット IIFE が
+            //base の var 宣言より前で走り、RTMX_COMPAT_TARGETS が (巻き上げで) undefined のまま
+            //"Cannot read property \"kaizpatch\" from undefined" で全スクリプトが init 失敗していた。
+            //ここで最初に {} を確定させておけば、prepend された IIFE も安全に代入できる。
+            "var RTMX_COMPAT_TARGETS = (typeof RTMX_COMPAT_TARGETS !== 'undefined' && RTMX_COMPAT_TARGETS) ? RTMX_COMPAT_TARGETS : {};\n" +
             "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n" +
+            //importPackage(net.minecraft.util) 経由の裸 ResourceLocation を互換クラスへ束縛
+            //(net.minecraft.util に実クラスを置くとバニラと split package でモジュール解決が落ちる)
+            "var ResourceLocation = Java.type('jp.ngt.mccompat.ResourceLocation');\n" +
             //LWJGL2 入力 (SRB3/NGTO Builder)
             "var Keyboard = Java.type('jp.ngt.mccompat.input.Keyboard');\n" +
             "var Mouse = Java.type('jp.ngt.mccompat.input.Mouse');\n" +
@@ -84,7 +104,80 @@ public final class PackScriptSource {
             bindOpt("ItemMiniature", "jp.ngt.mcte.item.ItemMiniature") +
             //車両/レール描画スクリプトが直接 new する描画クラス
             bindOpt("Parts", "jp.ngt.rtm.render.Parts") +
-            bindOpt("ModelObject", "jp.ngt.rtm.render.ModelObject");
+            bindOpt("ActionParts", "jp.ngt.rtm.render.ActionParts") +
+            bindOpt("ActionType", "jp.ngt.rtm.render.ActionType") +
+            bindOpt("ModelObject", "jp.ngt.rtm.render.ModelObject") +
+            bindOpt("PartsRenderer", "jp.ngt.rtm.render.PartsRenderer") +
+            bindOpt("VehiclePartsRenderer", "jp.ngt.rtm.render.VehiclePartsRenderer") +
+            bindOpt("RailPartsRenderer", "jp.ngt.rtm.render.RailPartsRenderer") +
+            bindOpt("MachinePartsRenderer", "jp.ngt.rtm.render.MachinePartsRenderer") +
+            bindOpt("SignalPartsRenderer", "jp.ngt.rtm.render.SignalPartsRenderer") +
+            bindOpt("WirePartsRenderer", "jp.ngt.rtm.render.WirePartsRenderer") +
+            bindOpt("OrnamentPartsRenderer", "jp.ngt.rtm.render.OrnamentPartsRenderer") +
+            bindOpt("TileEntityPartsRenderer", "jp.ngt.rtm.render.TileEntityPartsRenderer") +
+            bindOpt("EntityPartsRenderer", "jp.ngt.rtm.render.EntityPartsRenderer") +
+            bindOpt("RenderPass", "jp.ngt.rtm.render.RenderPass") +
+            //状態・設定 (スクリプトが最も多く触る)
+            bindOpt("ResourceState", "jp.ngt.rtm.modelpack.state.ResourceState") +
+            bindOpt("DataMap", "jp.ngt.rtm.modelpack.state.DataMap") +
+            bindOpt("TrainState", "jp.ngt.rtm.entity.train.util.TrainState") +
+            bindOpt("TrainConfig", "jp.ngt.rtm.modelpack.cfg.TrainConfig") +
+            bindOpt("ModelPackManager", "jp.ngt.rtm.modelpack.ModelPackManager") +
+            bindOpt("Formation", "jp.ngt.rtm.entity.train.util.Formation") +
+            bindOpt("EnumNotch", "jp.ngt.rtm.entity.train.util.EnumNotch") +
+            //レール
+            bindOpt("Point", "jp.ngt.rtm.rail.util.Point") +
+            bindOpt("RailMap", "jp.ngt.rtm.rail.util.RailMap") +
+            bindOpt("RailProperty", "jp.ngt.rtm.rail.util.RailProperty") +
+            bindOpt("SwitchType", "jp.ngt.rtm.rail.util.SwitchType") +
+            bindOpt("MarkerState", "jp.ngt.rtm.rail.util.MarkerState") +
+            bindOpt("TileEntityLargeRailSwitchCore", "jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore") +
+            bindOpt("TileEntityMarker", "jp.ngt.rtm.rail.TileEntityMarker") +
+            //モデル (頂点操作をするスクリプト用)
+            bindOpt("NGTTessellator", "jp.ngt.ngtlib.renderer.NGTTessellator") +
+            bindOpt("ModelLoader", "jp.ngt.ngtlib.renderer.model.ModelLoader") +
+            bindOpt("VecAccuracy", "jp.ngt.ngtlib.renderer.model.VecAccuracy") +
+            bindOpt("GroupObject", "jp.ngt.ngtlib.renderer.model.GroupObject") +
+            bindOpt("Face", "jp.ngt.ngtlib.renderer.model.Face") +
+            bindOpt("Vertex", "jp.ngt.ngtlib.renderer.model.Vertex") +
+            bindOpt("TextureCoordinate", "jp.ngt.ngtlib.renderer.model.TextureCoordinate") +
+            bindOpt("TextureSet", "jp.ngt.ngtlib.renderer.model.TextureSet") +
+            bindOpt("Material", "jp.ngt.ngtlib.renderer.model.Material") +
+            bindOpt("PolygonModel", "jp.ngt.ngtlib.renderer.model.PolygonModel") +
+            //IO・ワールド
+            bindOpt("NGTText", "jp.ngt.ngtlib.io.NGTText") +
+            bindOpt("NGTFileLoader", "jp.ngt.ngtlib.io.NGTFileLoader") +
+            bindOpt("ScriptUtil", "jp.ngt.ngtlib.io.ScriptUtil") +
+            bindOpt("NGTWorld", "jp.ngt.ngtlib.world.NGTWorld") +
+            bindOpt("TileEntityPlaceable", "jp.ngt.ngtlib.block.TileEntityPlaceable") +
+            //電気
+            bindOpt("Connection", "jp.ngt.rtm.electric.Connection") +
+            bindOpt("WireManager", "jp.ngt.rtm.electric.WireManager") +
+            bindOpt("SignalLevel", "jp.ngt.rtm.electric.SignalLevel") +
+            bindOpt("BlockInsulator", "jp.ngt.rtm.electric.BlockInsulator") +
+            bindOpt("TileEntityInsulator", "jp.ngt.rtm.electric.TileEntityInsulator") +
+            bindOpt("TileEntityConnectorBase", "jp.ngt.rtm.electric.TileEntityConnectorBase") +
+            //エンティティ・アイテム
+            bindOpt("EntityVehicleBase", "jp.ngt.rtm.entity.vehicle.EntityVehicleBase") +
+            bindOpt("EntityTrainBase", "jp.ngt.rtm.entity.train.EntityTrainBase") +
+            bindOpt("EntityBogie", "jp.ngt.rtm.entity.train.EntityBogie") +
+            bindOpt("SoundUpdaterTrain", "jp.ngt.rtm.sound.SoundUpdaterTrain") +
+            bindOpt("ItemInstalledObject", "jp.ngt.rtm.item.ItemInstalledObject") +
+            bindOpt("RTMResource", "jp.ngt.rtm.RTMResource") +
+            bindOpt("EntityVehiclePart", "jp.ngt.rtm.entity.train.parts.EntityVehiclePart") +
+            //1.7.10 のバニラクラス名 (スクリプトが instanceof で使う)
+            bindOpt("Entity", "net.minecraft.world.entity.Entity") +
+            bindOpt("EntityPlayer", "net.minecraft.world.entity.player.Player") +
+            bindOpt("EntityLivingBase", "net.minecraft.world.entity.LivingEntity") +
+            bindOpt("World", "net.minecraft.world.level.Level") +
+            bindOpt("ItemStack", "net.minecraft.world.item.ItemStack") +
+            bindOpt("Item", "net.minecraft.world.item.Item") +
+            bindOpt("TileEntity", "net.minecraft.world.level.block.entity.BlockEntity") +
+            //1.12 Forge の mod 存在チェック (rtm-ts の mc1122 ターゲットが class body で呼ぶ)
+            bindOpt("Loader", "net.minecraftforge.fml.common.Loader");
+
+    /** GL 束縛込みの完全版 (描画を GLRecorder に記録する通常経路用)。 */
+    public static final String PRELUDE = PRELUDE_GL + PRELUDE_NO_GL;
 
     private static String bindOpt(String name, String fqn) {
         //失敗したクラス名は __bindFails に集約 (ScriptUtil.doScript がログに出す)
@@ -96,6 +189,13 @@ public final class PackScriptSource {
     private static final Pattern INCLUDE_PATTERN = Pattern.compile("^\\s*//include\\s*<([^>]+)>", Pattern.MULTILINE);
 
     private static final String[][] FQN_REMAP = {
+            //LWJGL直束縛 (var GL11 = Packages.org.lwjgl.opengl.GL11 等) を互換クラスへ。
+            //LWJGL3の実GL11に解決されると、固定機能関数(glPushMatrix等)は関数ポインタNULLで
+            //jni_FatalError→プロセスabort (SR1-200が設置直後に落ちていた原因)。
+            {"Packages.org.lwjgl.opengl.GL11", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
+            {"Packages.org.lwjgl.opengl.GL12", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
+            {"Packages.org.lwjgl.input.Keyboard", "Packages.jp.ngt.mccompat.input.Keyboard"},
+            {"Packages.org.lwjgl.input.Mouse", "Packages.jp.ngt.mccompat.input.Mouse"},
             {"Packages.net.minecraft.util.ResourceLocation", "Packages.jp.ngt.mccompat.ResourceLocation"},
             {"Packages.net.minecraft.client.renderer.texture.TextureUtil", "Packages.jp.ngt.mccompat.TextureUtil"},
             {"Packages.net.minecraft.client.renderer.texture.DynamicTexture", "Packages.jp.ngt.mccompat.DynamicTexture"},
@@ -137,9 +237,18 @@ public final class PackScriptSource {
      */
     private static final Pattern SEAT_ROTATION_FIELD = Pattern.compile("\\.seatRotation\\b(?!\\s*\\()");
 
+    /**
+     * {@code var X = X;} (FQN リマップの結果生じる自己代入宣言)。
+     * <p>var は巻き上げられるので、宣言の時点でグローバル X が undefined に潰れ、
+     * PRELUDE で束縛したクラスが見えなくなる。宣言ごと消すのが正しい。
+     */
+    private static final Pattern SELF_ASSIGN_DECL =
+            Pattern.compile("\\bvar\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*=\\s*\\1\\s*;");
+
     public static String prepare(String source) {
         String out = resolveIncludes(source, new HashSet<>());
         out = remapLegacyClasses(out);
+        out = SELF_ASSIGN_DECL.matcher(out).replaceAll("");
         return remapFieldAccess(out);
     }
 

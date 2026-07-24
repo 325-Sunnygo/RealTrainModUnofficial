@@ -748,9 +748,12 @@ public class VehiclePackLoader {
         List<String> values = new ArrayList<>();
         for (JsonElement element : array) {
             try {
-                String value = element.getAsString();
-                if (!value.isBlank()) {
-                    values.add(value);
+                //★空文字コマも保持する。方向幕/種別幕は本家 RenderVehicleBase が rollsignNames.length
+                //  (=生の JSON 配列長。末尾やコマ間の "" も1コマとして数える) でテクスチャを縦分割する。
+                //  空を落とすと分割数が本来より減り、幕全体がコマ番号に比例して少しずつズレる
+                //  (N042 等、末尾に "" を持つパックで方向幕がズレる原因)。null 等の非文字列のみ捨てる。
+                if (element != null && element.isJsonPrimitive()) {
+                    values.add(element.getAsString());
                 }
             } catch (Exception ignored) {
             }
@@ -1277,7 +1280,8 @@ public class VehiclePackLoader {
                         }
                     }
                 }
-                return null;
+                //自パックに無い: 前提/ベーススクリプトパックを横断して探す。
+                return readScriptFromGlobalIndex(scriptPath);
             }
             try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(packPath))) {
                 java.util.zip.ZipEntry entry;
@@ -1291,6 +1295,29 @@ public class VehiclePackLoader {
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to read vehicle script {} from pack {}", definition.getScriptPath(), definition.getPackName(), e);
+        }
+        //自パックに無い / パック解決失敗: 前提・ベーススクリプトパックを横断して探す。
+        //(例: JRCT_Keiyo が車両を定義し、実体スクリプト scripts/Render_script_jre233_mi.js は
+        // 前提の JR-CommuterTrainPack 側にある、という分割構成。自パックのみ探すと "not readable" で
+        // スクリプト無し描画になり、前面ガラス等が崩れる。)
+        return readScriptFromGlobalIndex(scriptPath);
+    }
+
+    /**
+     * 車両スクリプトを<b>全ロード済みパック横断</b>の資産索引 (NGTFileLoader) から読む。
+     * rendererPath が前提/ベーススクリプトパックのファイルを指す分割構成のフォールバック。
+     * {@code //include} が既にこの索引で解決されるのと同じ仕組みで、入口スクリプトも同様に解決する。
+     */
+    private static String readScriptFromGlobalIndex(String scriptPath) {
+        if (scriptPath == null || scriptPath.isBlank()) {
+            return null;
+        }
+        try {
+            byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(scriptPath);
+            if (bytes != null) {
+                return PackTextDecoder.readText(new java.io.ByteArrayInputStream(bytes));
+            }
+        } catch (Exception ignored) {
         }
         return null;
     }

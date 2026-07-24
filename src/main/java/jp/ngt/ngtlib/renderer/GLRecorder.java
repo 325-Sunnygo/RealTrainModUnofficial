@@ -138,11 +138,23 @@ public final class GLRecorder {
         this.cmds.add(new Cmd(Op.POP, 0, 0, 0, 0, null));
     }
 
+    /**
+     * NaN/Inf を弾く。スクリプトが未実装フィールドを読むと undefined→NaN が入り、
+     * そのまま行列に載るとモデルが丸ごと消える。壊れた値は 0 に潰して描画を守る。
+     */
+    private static float finite(float v) {
+        return Float.isFinite(v) ? v : 0.0F;
+    }
+
     public void translate(float x, float y, float z) {
-        this.cmds.add(new Cmd(Op.TRANSLATE, x, y, z, 0, null));
+        this.cmds.add(new Cmd(Op.TRANSLATE, finite(x), finite(y), finite(z), 0, null));
     }
 
     public void rotate(float deg, float x, float y, float z) {
+        deg = finite(deg);
+        x = finite(x);
+        y = finite(y);
+        z = finite(z);
         //再生毎の Quaternion 生成を避けるため記録時に確定させる (payload)
         org.joml.Quaternionf quat = null;
         org.joml.Vector3f axis = new org.joml.Vector3f(x, y, z);
@@ -154,7 +166,11 @@ public final class GLRecorder {
     }
 
     public void scale(float x, float y, float z) {
-        this.cmds.add(new Cmd(Op.SCALE, x, y, z, 0, null));
+        //NaN/Inf に加えて 0 倍も潰す (0 スケールは面が消える)
+        float sx = Float.isFinite(x) ? x : 1.0F;
+        float sy = Float.isFinite(y) ? y : 1.0F;
+        float sz = Float.isFinite(z) ? z : 1.0F;
+        this.cmds.add(new Cmd(Op.SCALE, sx, sy, sz, 0, null));
     }
 
     public void color(float r, float g, float b, float a) {
@@ -185,6 +201,13 @@ public final class GLRecorder {
      */
     public void bindTexture(net.minecraft.resources.ResourceLocation texture) {
         this.cmds.add(new Cmd(Op.BIND_TEXTURE, 0, 0, 0, 0, null, texture));
+    }
+
+    /** bindTexture の元パス付き版。再生側が「素テクスチャへの復帰」を判定できる。 */
+    public record TexBind(net.minecraft.resources.ResourceLocation location, String rawPath) {}
+
+    public void bindTexture(net.minecraft.resources.ResourceLocation texture, String rawPath) {
+        this.cmds.add(new Cmd(Op.BIND_TEXTURE, 0, 0, 0, 0, null, new TexBind(texture, rawPath)));
     }
 
     public void drawTess(TessDraw draw) {

@@ -38,15 +38,24 @@ public final class TrainHudOverlay {
      * HUD が旧 TrainEntity / 新 jp.ngt EntityTrainBase の両方を描けるようにする共通ビュー。
      * {@code doorsClosed} = 編成の全車両のドアが閉まっている (戸閉め灯用)。
      */
-    private record HudData(int notch, float speed, int maxBrakeNotch, String modelId, boolean doorsClosed) {
+    /**
+     * @param brakeCount    ブレーキ圧計 (黒針) の生値。本家 GuiIngameCustom は brakeCount*3 を 432 で割る
+     * @param brakeAirCount 空気残量計 (赤針) の生値。本家は MAX_AIR_COUNT で割る
+     */
+    private record HudData(int notch, float speed, int maxBrakeNotch, String modelId, boolean doorsClosed,
+                           int brakeCount, int brakeAirCount) {
     }
 
     private static HudData getHudData(Minecraft mc) {
         TrainEntity train = getControlledTrain(mc);
         if (train != null && train.isDriverPassenger(mc.player)) {
             //旧 TrainEntity はドア状態を持たないため戸閉め灯は常時点灯 (閉扱い)。
+            //旧実装は圧力を持たないのでノッチから概算する。
+            int maxBrake = Math.max(1, train.getMaxBrakeNotch());
+            int approxBrake = Math.round(144.0F * Math.max(0, -train.getNotch()) / maxBrake);
             return new HudData(train.getNotch(), train.getSpeed(), train.getMaxBrakeNotch(),
-                train.getVehicleId(), true);
+                train.getVehicleId(), true, approxBrake,
+                jp.ngt.rtm.entity.train.EntityTrainBase.MAX_AIR_COUNT);
         }
         // Phase 2: 本家忠実列車 — 運転士のみ表示 (客席 = 座席オフセット搭乗は非表示)
         if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain
@@ -56,7 +65,9 @@ public final class TrainHudOverlay {
                 rtmTrain.getSpeed(),
                 rtmTrain.getConfig().deccelerations.length - 1,
                 rtmTrain.getModelName(),
-                computeDoorsClosed(rtmTrain));
+                computeDoorsClosed(rtmTrain),
+                rtmTrain.brakeCount,
+                rtmTrain.brakeAirCount);
         }
         return null;
     }
@@ -131,8 +142,11 @@ public final class TrainHudOverlay {
         pose.translate(x, y, 0.0F);
         pose.scale(scale, scale, 1.0F);
         graphics.blit(CAB_TEXTURE, 0, 0, 0.0F, 0.0F, CAB_W, CAB_H, TEX_SIZE, TEX_SIZE);
-        drawMeter(graphics, 32, 19, 32, 32, 48, 240.0F * getBrakeRatio(train));
-        drawMeter(graphics, 32, 19, 32, 0, 48, 240.0F * getBrakeCommandRatio(train));
+        //圧力計は本家 GuiIngameCustom と同じ 2 針。ノッチ段数ではなく実際の圧力を出す。
+        //  赤 (UV 32) = 空気残量  240 * brakeAirCount / MAX_AIR_COUNT
+        //  黒 (UV  0) = ブレーキ圧 240 * (brakeCount*3) / 432
+        drawMeter(graphics, 32, 19, 32, 32, 48, 240.0F * getAirRatio(train));
+        drawMeter(graphics, 32, 19, 32, 0, 48, 240.0F * getBrakePressureRatio(train));
         drawMeter(graphics, 72, 19, 32, 64, 48, getSpeedNeedleRotation(train, def));
         drawLever(graphics, 104, 29, train);
         drawWatch(graphics);
@@ -233,13 +247,15 @@ public final class TrainHudOverlay {
         return Math.min(270.0F, 270.0F * getSpeedKmh(train) / Math.max(1.0F, max));
     }
 
-    private static float getBrakeRatio(HudData train) {
-        // 実際の最大ブレーキ段数で割る(段数とメーターのズレを防ぐ)。
-        return Math.min(1.0F, Math.max(0.0F, -train.notch()) / (float) Math.max(1, train.maxBrakeNotch()));
+    /** 空気残量計 (赤針)。本家: brakeAirCount / MAX_AIR_COUNT。 */
+    private static float getAirRatio(HudData train) {
+        float max = jp.ngt.rtm.entity.train.EntityTrainBase.MAX_AIR_COUNT;
+        return Math.min(1.0F, Math.max(0.0F, train.brakeAirCount() / max));
     }
 
-    private static float getBrakeCommandRatio(HudData train) {
-        return Math.min(1.0F, Math.max(0.0F, -train.notch()) / (float) Math.max(1, train.maxBrakeNotch()));
+    /** ブレーキ圧計 (黒針)。本家: (brakeCount * 3) / 432。 */
+    private static float getBrakePressureRatio(HudData train) {
+        return Math.min(1.0F, Math.max(0.0F, train.brakeCount() * 3.0F / 432.0F));
     }
 
     private static int getWorldTime() {

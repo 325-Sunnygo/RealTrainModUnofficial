@@ -195,4 +195,27 @@ public final class SoundScriptExecutor {
         }
         LegacyScriptSoundManager.stopAll(this.train);
     }
+
+    /** 本家 getMaxSpeed: 最高速度 (km/h)。走行音の段階判定に使う。 */
+    public float getMaxSpeed() {
+        if (this.train instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
+            jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = t.getConfig();
+            if (cfg != null && cfg.maxSpeed != null && cfg.maxSpeed.length > 0) {
+                return cfg.maxSpeed[cfg.maxSpeed.length - 1] * SPEED_TO_KMH;
+            }
+        }
+        return 0.0F;
+    }
+
+    /** 本家 changePitch: 最高速域では速度でピッチを変える。 */
+    public boolean changePitch() {
+        float max = this.getMaxSpeed();
+        return max > 0.0F && this.getSpeed() >= max;
+    }
+
+    /** 本家 onModelChanged: モデルが変わったら鳴っている音を全部止める。 */
+    public void onModelChanged() {
+        this.stopAllSounds();
+    }
+
 }

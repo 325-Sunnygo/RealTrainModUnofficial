@@ -73,4 +73,51 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
         super.loadAdditional(nbt, provider);
         this.electricity = nbt.getInt("electricity");
     }
+
+    /** 本家 signalOnTrue/signalOnFalse: 入力が有/無のときに出す信号レベル。 */
+    public int signalOnTrue = 15;
+    public int signalOnFalse;
+    /** 本家 signal: 変換器の種類ごとのフラグ用 (RS 出力の可否など)。 */
+    public int signal;
+    /** 本家 operator/comparator: 比較器モードの演算子と閾値。 */
+    public int operator;
+    public int comparator;
+    /** 本家 id: 変換器のチャンネル番号。 */
+    public int id;
+
+    /** 本家 getSignalLevel: {入力有りのとき, 入力無しのとき}。 */
+    public int[] getSignalLevel() {
+        return new int[]{this.signalOnTrue, this.signalOnFalse};
+    }
+
+    public void setSignalLevel(int onTrue, int onFalse) {
+        this.signalOnTrue = onTrue;
+        this.signalOnFalse = onFalse;
+        this.setChanged();
+    }
+
+    /** 本家 getChannel: 同じチャンネル同士だけが繋がる。 */
+    public int getChannel() {
+        return this.id;
+    }
+
+    public void setChannel(int channel) {
+        this.id = channel;
+        this.setChanged();
+    }
+
+    /** 本家 getRSOutput: この変換器がレッドストーンへ出す強度。 */
+    public int getRSOutput() {
+        return this.signal == 1 ? 15 : 0;
+    }
+
+    /** 本家 getChunkLoadRange: チャンクローダーとして保持する範囲。 */
+    public int getChunkLoadRange() {
+        return 0;
+    }
+
+    public boolean isChunkLoaderEnable() {
+        return false;
+    }
+
 }

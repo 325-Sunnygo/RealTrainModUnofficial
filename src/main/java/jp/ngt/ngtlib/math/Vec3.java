@@ -154,4 +154,36 @@ public class Vec3 {
     }
 
     // NOTE: 本家には toNGTVec() があるが、NGTVec (MC Vec3 依存) は必要になった時点で移植する
+
+    //以下は本家に無い別名。旧 RTMU の JS スタブが提供していた名前で、
+    //それ向けに書かれたスクリプトが落ちないよう実クラス側にも用意する。
+
+    /** {@link #multi(double)} の別名。 */
+    public Vec3 scale(double s) {
+        return this.multi(s);
+    }
+
+    public Vec3 multiply(double s) {
+        return this.multi(s);
+    }
+
+    /** {@link #sub(Vec3)} の別名。 */
+    public Vec3 subtract(Vec3 other) {
+        return this.sub(other);
+    }
+
+    /** {@link #dotProduct(Vec3)} の別名。 */
+    public double dot(Vec3 other) {
+        return this.dotProduct(other);
+    }
+
+    /** 長さの 2 乗 (本家 lengthSq は始点指定版しか無いのでここで計算する)。 */
+    public double lengthSquared() {
+        return this.getX() * this.getX() + this.getY() * this.getY() + this.getZ() * this.getZ();
+    }
+
+    public double distanceTo(Vec3 other) {
+        return this.sub(other).length();
+    }
+
 }

@@ -40,23 +40,6 @@ public final class RtmuSettings {
      * Nashorn/GraalJS 実行」なので、遠方車両を間引くのが最も効く。既定 0。
      */
     public static int vehicleRenderDistance = 0;
-    /**
-     * 静止車両の再計算頻度。停車してドア/パンタも動いていない車両は描画結果をキャッシュして
-     * 毎フレームの Nashorn 実行を省くが、点滅灯・スクロール表示等の時間依存アニメのために一定間隔で
-     * 描き直す。その間隔を選ぶ:
-     * <ul>
-     *   <li>0 = 標準 (約6Hz。点滅も滑らか。既定)</li>
-     *   <li>1 = 省エネ (約2Hz)</li>
-     *   <li>2 = 積極 (約1Hz。停車中の点滅がカクつくが最も軽い)</li>
-     * </ul>
-     */
-    public static int staticVehicleThrottle = 0;
-    /**
-     * 遠方車両のライト・方向幕を省略する。ON のとき、車両描画距離の半分より遠い車両は
-     * 前照灯/尾灯/室内灯の発光パスと方向幕/種別幕オーバーレイ (どちらも追加の Nashorn 実行) を
-     * 省く。車体は出る。車両描画距離が無制限のときは 64m を基準にする。既定 OFF。
-     */
-    public static boolean skipDistantVehicleExtras = false;
 
     // ---- カメラ (撮り鉄カメラの装着レンズ。クライアントのみ・所持アイテムで切替) ----
     /** 現在マウントしているレンズの id (CameraLens.id)。空 = 既定 (標準ズーム)。 */
@@ -134,26 +117,7 @@ public final class RtmuSettings {
         return dx * dx + dy * dy + dz * dz > (double) limit * (double) limit;
     }
 
-    /** 静止車両の再計算間隔 (フレーム数)。throttle 0/1/2 → 10/30/60。 */
-    public static int staticVehicleRefreshFrames() {
-        return switch (staticVehicleThrottle) {
-            case 1 -> 30;
-            case 2 -> 60;
-            default -> 10;
-        };
-    }
 
-    /**
-     * 遠方車両の追加描画 (ライト/方向幕) を省くしきい値の二乗 (m^2)。0 = 省かない。
-     * 車両描画距離が有効ならその半分、無制限なら 64m を基準にする。
-     */
-    public static double distantExtrasCutoffSq() {
-        if (!skipDistantVehicleExtras) {
-            return 0.0D;
-        }
-        double d = vehicleRenderDistance > 0 ? vehicleRenderDistance * 0.5D : 64.0D;
-        return d * d;
-    }
 
     // ===== クライアント: 永続化 =====
 
@@ -170,8 +134,6 @@ public final class RtmuSettings {
             autoHeightLevel = clampLevel(parseInt(p.getProperty("autoHeightLevel", "1"), 1));
             railRenderDistance = clampRailRenderDistance(parseInt(p.getProperty("railRenderDistance", "128"), 128));
             vehicleRenderDistance = clampVehicleRenderDistance(parseInt(p.getProperty("vehicleRenderDistance", "0"), 0));
-            staticVehicleThrottle = Math.max(0, Math.min(2, parseInt(p.getProperty("staticVehicleThrottle", "0"), 0)));
-            skipDistantVehicleExtras = Boolean.parseBoolean(p.getProperty("skipDistantVehicleExtras", "false"));
             cameraLensId = p.getProperty("cameraLensId", "");
             cameraTeleconverterId = p.getProperty("cameraTeleconverterId", "");
             maxPassengers = clampMaxPassengers(parseInt(p.getProperty("maxPassengers", "30"), 30));
@@ -188,8 +150,6 @@ public final class RtmuSettings {
             p.setProperty("autoHeightLevel", Integer.toString(autoHeightLevel));
             p.setProperty("railRenderDistance", Integer.toString(railRenderDistance));
             p.setProperty("vehicleRenderDistance", Integer.toString(vehicleRenderDistance));
-            p.setProperty("staticVehicleThrottle", Integer.toString(staticVehicleThrottle));
-            p.setProperty("skipDistantVehicleExtras", Boolean.toString(skipDistantVehicleExtras));
             p.setProperty("cameraLensId", cameraLensId == null ? "" : cameraLensId);
             p.setProperty("cameraTeleconverterId", cameraTeleconverterId == null ? "" : cameraTeleconverterId);
             p.setProperty("maxPassengers", Integer.toString(maxPassengers));

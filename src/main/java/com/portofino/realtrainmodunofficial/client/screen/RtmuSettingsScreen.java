@@ -71,26 +71,6 @@ public class RtmuSettingsScreen extends Screen {
         //車両描画距離: 0=無制限、32〜256。遠方車両を丸ごと省略して毎フレームのスクリプト実行を削る。
         addRenderableWidget(new VehicleDistanceSlider(cx - w / 2, y, w, 20));
 
-        y += 24;
-        //静止車両の再計算頻度: 標準/省エネ/積極。
-        addRenderableWidget(CycleButton.<Integer>builder(RtmuSettingsScreen::throttleLabel)
-            .withValues(0, 1, 2)
-            .withInitialValue(clampThrottle(RtmuSettings.staticVehicleThrottle))
-            .create(cx - w / 2, y, w, 20, Component.literal("静止車両の再計算"),
-                (btn, value) -> {
-                    RtmuSettings.staticVehicleThrottle = value;
-                    RtmuSettings.save();
-                }));
-
-        y += 24;
-        //遠方車両のライト・方向幕を省略。
-        addRenderableWidget(CycleButton.onOffBuilder(RtmuSettings.skipDistantVehicleExtras)
-            .create(cx - w / 2, y, w, 20,
-                Component.literal("遠方車両のライト/幕を省略"),
-                (btn, value) -> {
-                    RtmuSettings.skipDistantVehicleExtras = value;
-                    RtmuSettings.save();
-                }));
 
         // ===== 乗客 =====
         y += 30;
@@ -262,7 +242,7 @@ public class RtmuSettingsScreen extends Screen {
             left + 44, this.perfHeaderY, 0xFF808080, false);
         graphics.drawString(this.font, Component.literal("§l乗客"), left, this.passengerHeaderY, 0xFF80E080, false);
         graphics.drawString(this.font,
-            Component.literal("§7駅に湧く乗客 NPC の総数の上限 (ワールド全体)"),
+            Component.literal("§7駅に湧く乗客 NPC の上限 (自分から見える数)"),
             left + 44, this.passengerHeaderY, 0xFF808080, false);
     }
 

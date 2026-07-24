@@ -8,6 +8,9 @@ import java.util.Arrays;
  * TODO(Phase 4): NGTJson による ModelTrain_*.json 直読。現状は VehicleDefinition アダプタが充填する。
  */
 public class TrainConfig {
+    /** 本家 IConfigWithType の型名。スクリプトが cfg.TYPE で判定する。 */
+    public static final String TYPE = "ModelTrain";
+
     public String trainName = "";
     public String trainType = "EC";
     /** 本家 ModelConfig.smoothing (NGTO Builder の renderStatic が getConfig().smoothing を読む)。 */
@@ -50,6 +53,13 @@ public class TrainConfig {
     public String sound_BrakeRelease;
     public String sound_BrakeRelease2;
     public String sound_CpFin;
+    /** レバーサ操作音。 */
+    public String sound_Reversal;
+
+    /** 車体モデル (本家 VehicleConfig.model / getModel())。 */
+    public Object model;
+    /** 台車モデル (本家 bogieModel3 / getBogieModel(i))。 */
+    public Object[] bogieModel;
 
     /**
      * 本家 init() の既定値適用。
@@ -110,5 +120,32 @@ public class TrainConfig {
 
     public String getSubType() {
         return this.trainType;
+    }
+
+    /** 本家 getModelType: 設定の型名。 */
+    public String getModelType() {
+        return TYPE;
+    }
+
+    /** 本家 getModel: 車体モデル。 */
+    public Object getModel() {
+        return this.model;
+    }
+
+    /** 本家 getBogieModel(i): i 番目の台車モデル。未設定なら null。 */
+    public Object getBogieModel(int index) {
+        if (this.bogieModel == null || index < 0 || index >= this.bogieModel.length) {
+            return null;
+        }
+        return this.bogieModel[index];
+    }
+
+    /** 本家 getDummyConfig: モデル未解決時に使う空設定。 */
+    public static TrainConfig getDummyConfig() {
+        TrainConfig config = new TrainConfig();
+        config.trainName = "Dummy";
+        config.trainType = "N";
+        config.init();
+        return config;
     }
 }

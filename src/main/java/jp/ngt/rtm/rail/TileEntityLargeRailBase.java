@@ -332,4 +332,23 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         }
         return false;
     }
+
+    /** 本家 Lockable: 施錠対象はレールコア。 */
+    public Object getTarget(Object world, int x, int y, int z) {
+        return this.getRailCore();
+    }
+
+    public boolean lock(Object player, String code) {
+        return true;
+    }
+
+    public boolean unlock(Object player, String code) {
+        return true;
+    }
+
+    /** 本家 getProhibitedAction: 1 = 破壊禁止。 */
+    public int getProhibitedAction() {
+        return 1;
+    }
+
 }

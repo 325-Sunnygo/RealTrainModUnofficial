@@ -78,7 +78,66 @@ public class ScriptExecuter {
         return new jp.ngt.mccompat.WorldCompat(this.level);
     }
 
+    public jp.ngt.mccompat.WorldCompat getEntityWorld() {
+        return this.func_130014_f_();
+    }
+
     public long getCount() {
         return this.count;
+    }
+
+    /** 本家 getCommandSenderName。 */
+    public String getCommandSenderName() {
+        return this.name;
+    }
+
+    /** 本家 func_145748_c_: 表示名。 */
+    public Component func_145748_c_() {
+        return Component.literal(this.name);
+    }
+
+    /** 本家 addChatMessage: スクリプト実行者への出力は捨てる。 */
+    public void addChatMessage(Object message) {
+    }
+
+    /** 本家 canCommandSenderUseCommand: コマンドブロック相当 (レベル 2 まで)。 */
+    public boolean canCommandSenderUseCommand(int permLevel, String commandName) {
+        return permLevel <= 2;
+    }
+
+    /** 本家 getPlayerCoordinates: {チャンクX, Y, チャンクZ}。 */
+    public int[] getPlayerCoordinates() {
+        if (this.pos == null) {
+            return new int[]{0, 0, 0};
+        }
+        return new int[]{
+                net.minecraft.util.Mth.floor(this.pos.x) >> 4,
+                net.minecraft.util.Mth.floor(this.pos.y),
+                net.minecraft.util.Mth.floor(this.pos.z) >> 4};
+    }
+
+    /**
+     * 本家 callMethod: 対象のサーバースクリプト側の関数を名前で呼ぶ。
+     * 対象が {@code getServerScriptEngine()} を持てばそれを使う。
+     */
+    public Object callMethod(Object selector, String name, Object... args) {
+        if (selector == null || name == null) {
+            return null;
+        }
+        try {
+            Object engine = selector.getClass().getMethod("getServerScriptEngine").invoke(selector);
+            if (engine instanceof javax.script.ScriptEngine se) {
+                return jp.ngt.ngtlib.io.ScriptUtil.doScriptIgnoreError(se, name, args);
+            }
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            //サーバースクリプトを持たない対象なら何もしない (本家も null を返す)
+        }
+        return null;
+    }
+
+    /** 本家 execScript: 対象の onUpdate を 1 回呼び、count を進める。 */
+    public void execScript(Object selector) {
+        this.callMethod(selector, "onUpdate", selector, this);
+        ++this.count;
     }
 }

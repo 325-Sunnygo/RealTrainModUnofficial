@@ -189,6 +189,15 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             ++this.seatRotation;
         }
 
+        //幕回し (方向幕スクロール): 目標フレーム = 行先 index、そこへ rollsignAnimation を毎 tick ±1 で寄せる。
+        //本家 EntityTrainBase.onUpdate 準拠。描画側 (doAnimation=true のパネル) が getRollsignAnimation() を読む。
+        this.setRollsignAnimation(this.getTrainStateData(TrainStateType.State_Destination.id));
+        if (this.rollsignAnimation > this.rollsignV) {
+            --this.rollsignAnimation;
+        } else if (this.rollsignAnimation < this.rollsignV) {
+            ++this.rollsignAnimation;
+        }
+
         int doorState = this.getTrainStateData(TrainStateType.State_Door.id);
         //ドアカット: この車両がカット指定なら開扉指令を無視 (閉じたまま/閉じる方向へ)。
         if (this.getTrainStateData(TrainStateType.State_DoorCut.id) != 0) {
@@ -247,13 +256,129 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 ++this.pantograph_B;
             }
         } else {
-            //TODO 本家は架線高さで停止位置を決める (getPantographMaxHeight)
-            if (this.pantograph_F > 0) {
+            //上昇は架線の高さで止める。架線が無ければ 0 (＝完全上昇) まで戻す
+            int[] ia = this.getPantographMaxHeight();
+            if (this.pantograph_F > ia[0]) {
                 --this.pantograph_F;
+            } else if (this.pantograph_F < ia[0]) {
+                this.pantograph_F = ia[0] == 0 ? this.pantograph_F + 1 : ia[0];
             }
-            if (this.pantograph_B > 0) {
+            if (this.pantograph_B > ia[1]) {
                 --this.pantograph_B;
+            } else if (this.pantograph_B < ia[1]) {
+                this.pantograph_B = ia[1] == 0 ? this.pantograph_B + 1 : ia[1];
             }
+        }
+    }
+
+    private static final int[] PANTO_POS_ZERO = new int[]{0, 0};
+
+    /**
+     * 本家 getPantographMaxHeight: 各パンタが上がれる高さ (0=全上昇)。
+     * <p>
+     * pantoPos は {x, z, 上限y, 下限y}。架線 (WireManager) が張ってあれば、
+     * その高さで止める。架線が無い区間ではパンタが伸びきったままになる。
+     */
+    protected int[] getPantographMaxHeight() {
+        TrainConfig config = this.getConfig();
+        if (config == null || config.pantoPos == null) {
+            return PANTO_POS_ZERO;
+        }
+        int[] ia = new int[Math.max(2, config.pantoPos.length)];
+        for (int i = 0; i < config.pantoPos.length; ++i) {
+            float[] fa = config.pantoPos[i];
+            if (fa == null || fa.length < 4 || fa[3] <= 0.0F || fa[2] == fa[3]) {
+                continue;
+            }
+            double trainY = this.getY() + TRAIN_HEIGHT;
+            jp.ngt.ngtlib.math.Vec3 vec = new jp.ngt.ngtlib.math.Vec3(fa[0], fa[3], fa[1])
+                    .rotateAroundX(this.getXRot())
+                    .rotateAroundY(this.getYRot());
+            double y = jp.ngt.rtm.electric.WireManager.INSTANCE.getWireY(this.level(),
+                    this.getYRot(), this.getX() + vec.getX(), trainY + vec.getY(), this.getZ() + vec.getZ());
+            ia[i] = (int) ((y - (trainY + fa[3])) / (fa[2] - fa[3]) * MAX_PANTOGRAPH_MOVE);
+        }
+        return ia;
+    }
+
+    /**
+     * 本家 updateATS: ATS 確認をしないまま 100tick 経つと非常停止する。
+     * atsCount は信号現示で 1 から立ち上がり、確認操作で 0 に戻る。
+     */
+    protected void updateATS() {
+        if (this.atsCount > 0) {
+            ++this.atsCount;
+            if (this.atsCount >= 100) {
+                this.stopTrain(false);
+                this.atsCount = 0;
+            }
+        }
+    }
+
+    /**
+     * 本家 spawnSmoke: SL 等の煙を出す (クライアント側のみ)。
+     * config.smoke は 1 個あたり {x, y, z, 粒子名, 停車時の量, 走行時の量, [初速]}。
+     */
+    protected void spawnSmoke() {
+        TrainConfig config = this.getConfig();
+        if (config == null || config.smoke == null || !this.level().isClientSide()) {
+            return;
+        }
+        float speed = Math.abs(this.getSpeed());
+        int notch = this.getNotch();
+        net.minecraft.util.RandomSource random = this.level().getRandom();
+
+        for (Object[] entry : config.smoke) {
+            if (entry == null || entry.length < 6) {
+                continue;
+            }
+            jp.ngt.ngtlib.math.Vec3 vec = new jp.ngt.ngtlib.math.Vec3(
+                    toDouble(entry[0]), toDouble(entry[1]), toDouble(entry[2]))
+                    .rotateAroundX(this.getXRot())
+                    .rotateAroundY(this.getYRot());
+            double min = toDouble(entry[4]);
+            double max = toDouble(entry[5]);
+            //走行中は max、停車中でも力行していれば少し多め
+            int amount = speed > 0.05F ? (int) max : (notch > 0 ? (int) min + 3 : (int) min);
+            net.minecraft.core.particles.ParticleOptions particle = resolveParticle(entry[3]);
+            if (particle == null) {
+                continue;
+            }
+            double smokeSpeed = entry.length >= 7 ? toDouble(entry[6]) : 0.0625D;
+            for (int j = 0; j < amount; ++j) {
+                double px = this.getX() + vec.getX() + random.nextFloat() * 0.5D - 0.25D;
+                double py = this.getY() + vec.getY();
+                double pz = this.getZ() + vec.getZ() + random.nextFloat() * 0.5D - 0.25D;
+                double vx = (random.nextDouble() * 2.0D - 1.0D) * smokeSpeed;
+                double vz = (random.nextDouble() * 2.0D - 1.0D) * smokeSpeed;
+                this.level().addParticle(particle, px, py, pz, vx, 0.25D, vz);
+            }
+        }
+    }
+
+    private static double toDouble(Object o) {
+        return o instanceof Number n ? n.doubleValue() : 0.0D;
+    }
+
+    /** 1.7.10 の粒子名 ("largesmoke" 等) を 1.21 の ParticleOptions へ。 */
+    private static net.minecraft.core.particles.ParticleOptions resolveParticle(Object name) {
+        String s = name == null ? "" : String.valueOf(name).toLowerCase(java.util.Locale.ROOT);
+        return switch (s) {
+            case "largesmoke", "large_smoke" -> net.minecraft.core.particles.ParticleTypes.LARGE_SMOKE;
+            case "smoke", "normal_smoke" -> net.minecraft.core.particles.ParticleTypes.SMOKE;
+            case "cloud" -> net.minecraft.core.particles.ParticleTypes.CLOUD;
+            case "flame" -> net.minecraft.core.particles.ParticleTypes.FLAME;
+            case "lava" -> net.minecraft.core.particles.ParticleTypes.LAVA;
+            case "splash" -> net.minecraft.core.particles.ParticleTypes.SPLASH;
+            case "" -> null;
+            default -> net.minecraft.core.particles.ParticleTypes.LARGE_SMOKE;
+        };
+    }
+
+    /** 本家 moveTrain: 先頭車だけが編成全体の移動を進める。 */
+    protected void moveTrain() {
+        if (this.formation != null && this.formation.isFrontCar(this)) {
+            this.formation.updateTrainMovement();
         }
     }
 
@@ -440,13 +565,10 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         if (this.serverScriptEngine == null) {
             return;
         }
-        //軽量化: 停車中の列車はサーバースクリプト (毎tick Nashorn invokeFunction = 重い) を
-        //4tick に 1 回へ間引く。ATS/制御・方向幕/種別の DataMap 更新は「動いている時」か
-        //「停車中でも 0.2 秒おき」で十分で、動き出した瞬間 (speed!=0) に毎tick へ戻る。
-        //留置線に大量の列車を置いた時のサーバー tick 負荷を大きく減らす (見た目・挙動は不変)。
-        if (this.getSpeed() == 0.0F && (this.tickCount & 3) != 0) {
-            return;
-        }
+        //★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
+        //以前は「停車中は 4tick に 1 回」に間引いていたが、停車中こそスクリプトが
+        //パンタ・ドア・方向幕を動かす。間引くとその進行が 4 倍遅くなり、カクついて見える
+        //(SR1 のパンタ上げ下げ)。本家も毎 tick 呼んでいる。
         com.portofino.realtrainmodunofficial.script.TrainScriptSystem
                 .invokeServerScriptOnUpdate(this.serverScriptEngine, this);
     }
@@ -473,12 +595,15 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
     /**
      * サーバー: DataMap の flag=1 書き込み (ATSA の HUD 情報等) をクライアントへ配信する。
-     * 変更があった時だけ・10 tick おきにまとめて送る (軽量)。
+     * <p>
+     * ★間隔を空けてはいけない。以前は 10 tick おきにまとめ送りしていたが、パックによっては
+     * サーバースクリプトが DataMap 経由でアニメーションを進める (SR1 のパンタ等)。まとめ送りだと
+     * クライアントには 0.5 秒に 1 コマしか届かず、カクカクに見える。
+     * <p>
+     * 送信量は {@code drainPendingSync} が空のとき何も送らないことで抑えられている
+     * (=スクリプトが書いた時だけ流れる)。本家も set のたびに即送っている。
      */
     private void syncDataMap() {
-        if ((this.tickCount % 10) != 0) {
-            return;
-        }
         java.util.Map<String, Object> pending = this.getResourceState().getDataMap().drainPendingSync();
         if (pending.isEmpty()) {
             return;
@@ -604,6 +729,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             } else if (this.brakeAirCount < MIN_AIR_COUNT) {
                 this.complessorActive = true;
             }
+            this.spawnSmoke();
+        } else {
+            this.updateATS();
         }
     }
 
@@ -1417,4 +1545,36 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             this.applyClientFormationData(this.entityData.get(DATA_FORMATION));
         }
     }
+
+    /** 本家syncTrainStateData: クライアントからの状態同期要求。setTrainStateDataに委譲。 */
+    public void syncTrainStateData(int id, byte data) {
+        this.setTrainStateData(id, data);
+    }
+
+    /** 本家setSignal2: State_Signalへ直接書き込む。 */
+    public void setSignal2(int par1) {
+        this.setTrainStateData(TrainStateType.State_Signal.id, (byte) par1);
+    }
+
+    /** 本家getMountedYOffset。 */
+    public double getMountedYOffset() {
+        return this.getBbHeight() - 0.93F;
+    }
+
+    /** 本家isChunkLoaderEnable。 */
+    public boolean isChunkLoaderEnable() {
+        return this.getTrainStateData(TrainStateType.State_ChunkLoader.id) > 0;
+    }
+
+    /** 本家getModelType。 */
+    public String getModelType() {
+        return "ModelTrain";
+    }
+
+    /** 本家getSubType。 */
+    public String getSubType() {
+        TrainConfig cfg = this.getConfig();
+        return cfg != null ? cfg.getSubType() : "";
+    }
+
 }

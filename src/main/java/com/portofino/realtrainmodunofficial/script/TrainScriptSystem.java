@@ -36,20 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class TrainScriptSystem {
 
-    /** {@code var X = X;} (リマップで生じる自己代入宣言)。巻き上げでグローバルを潰すので消す。 */
-    private static final java.util.regex.Pattern SELF_ASSIGN_DECL =
-            java.util.regex.Pattern.compile("\\bvar\\s+([A-Za-z_$][A-Za-z0-9_$]*)\\s*=\\s*\\1\\s*;");
-
-    private static final String[] PREFERRED_ECMA_VERSIONS = {"2024", "2023", "2022"};
     private static final String SCRIPT_PATH_KEY = "__ptScriptPath";
 
-    /**
-     * ユーザースクリプトの先頭に prepend する JS。
-     * Nashorn の Java overloaded method 解決が不安定で `NGTText.readText is not a function`
-     * になる事例が頻発するため、純 JS で NGTText 等をオブジェクトとして定義する。
-     * readText は List<String> を期待されるので空 ArrayList を返す（no-op として）。
-     * importPackage も併せて no-op に上書きしておく（ユーザースクリプトが書き換える前に確立）。
-     */
+    /** ユーザースクリプト先頭にprependするJS。NGTText等を純JSで定義する。 */
     private static final String LEGACY_API_PREPEND =
         "importPackage = function(p) {};\n" +
         "importClass = function(c) {};\n" +
@@ -138,34 +127,7 @@ public class TrainScriptSystem {
         "  V.prototype.rotateAroundZ = function(deg) { var r = deg*Math.PI/180, c = Math.cos(r), s = Math.sin(r); return new V(c*this.x - s*this.y, s*this.x + c*this.y, this.z); };\n" +
         "  return V;\n" +
         "})();\n" +
-        "var Vec3 = __Vec3Impl;\n" +
-        "NGTText = {\n" +
-        // 空 ArrayList を返すと sound_includeSoundLib の eval が no-op になり、
-        // onUpdate が再定義されないまま onUpdate(su) を再帰呼出して StackOverflow する。
-        // dummy の onUpdate/onUpdate2 定義を1要素入れて、eval で no-op 化させる。
-        // include されるパックスクリプト (render_function.js 等) を実際に読む。
-        // r は getResource(...) の戻り値: 実 RL / {path,func_110623_a} / 文字列。
-        // 読めなければ空 onUpdate 等のダミーを返す (sound lib の StackOverflow 対策)。
-        "  __path: function(r) { try { if (r == null) return null; if (typeof r === 'string') return r; if (typeof r.func_110623_a === 'function') return r.func_110623_a(); if (r.path != null) return '' + r.path; if (r.domain != null) return '' + r.domain; } catch (e) {} return null; },\n" +
-        "  readText: function(r) { try { var p = this.__path(r); if (p) { var ls = Packages.jp.ngt.ngtlib.io.NGTFileLoader.readAssetLines(p); if (ls && ls.size() > 0) return ls; } } catch (e) {} var l = new java.util.ArrayList(); l.add('function onUpdate(su) {} function onUpdate2(su) {} function tick(e) {} function update(e,pt) {}'); return l; },\n" +
-        "  readTextLines: function(r) { try { var p = this.__path(r); if (p) return Packages.jp.ngt.ngtlib.io.NGTFileLoader.readAssetLines(p); } catch (e) {} return []; },\n" +
-        "  writeText: function() {},\n" +
-        "  loadText: function() { return ''; },\n" +
-        "  createText: function() { return ''; },\n" +
-        "  getText: function() { return ''; },\n" +
-        "  getFormattedText: function() { return ''; },\n" +
-        "  getString: function() { return ''; },\n" +
-        "  appendSibling: function() {},\n" +
-        "  appendText: function() {},\n" +
-        "  applyTextStyles: function() {}\n" +
-        "};\n" +
-        "NGTLog = { debug: function() {}, info: function() {}, warn: function() {}, error: function() {}, sendChatMessage: function(player, msg){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) __SRB__.chat(player, ''+msg); }catch(e){} }, sendChatMessageToAll: function(msg){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) __SRB__.chat((typeof __RTMU_MC__!=='undefined'&&__RTMU_MC__)?__RTMU_MC__.getPlayer():null, ''+msg); }catch(e){} } };\n" +
-        "NGTUtil = { getCurrentTime: function() { return java.lang.System.currentTimeMillis(); }, getUniqueId: function() { return java.lang.System.nanoTime(); }, isClient: function() { return true; }, getCurrentWorld: function() { return null; }, getCurrentPlayer: function() { return null; }, getMCVersion: function() { return '1.21.1'; }, isLanguage: function() { return false; } };\n" +
-        "NGTMath = { toRadians: function(d) { return d * Math.PI / 180.0; }, toDegrees: function(r) { return r * 180.0 / Math.PI; }, sin: Math.sin, cos: Math.cos, tan: Math.tan, atan2: Math.atan2, sqrt: Math.sqrt, floor: Math.floor, ceil: Math.ceil, clamp: function(v,a,b) { return Math.max(a, Math.min(b, v)); }, normalizeAngle: function(a) { while(a>=180)a-=360; while(a<-180)a+=360; return a; } };\n" +
-        // ★ ここまでの JS シムは「Java 実装が無いときのフォールバック」。
-        // Java 側 (NGTUtilCompat 等) を put してあるなら、そちらを使う。
-        // シムで無条件に上書きしていたため、Java に実装した getMethod / getField 等が
-        // <b>スクリプトから見えなくなっていた</b> (西武 2000 系の運転台が丸ごと死んでいた原因)。
+        // JSシムはJava実装が無いときのフォールバック。Java側があればそちらを使う
         "if (typeof __RTMU_NGTUtil__ !== 'undefined' && __RTMU_NGTUtil__) NGTUtil = __RTMU_NGTUtil__;\n" +
         "if (typeof __RTMU_NGTLog__  !== 'undefined' && __RTMU_NGTLog__)  NGTLog  = __RTMU_NGTLog__;\n" +
         "if (typeof __RTMU_NGTMath__ !== 'undefined' && __RTMU_NGTMath__) NGTMath = __RTMU_NGTMath__;\n" +
@@ -187,11 +149,7 @@ public class TrainScriptSystem {
         "var __ptCtl = function() { return { isActive: false, stopDistance: 0, targetSpeed: 0, mode: 0, value: 0, isEnable: function() { return false; }, isEnabled: function() { return false; }, isWorking: function() { return false; }, isValid: function() { return false; }, getMode: function() { return 0; }, getState: function() { return 0; }, getTargetSpeed: function() { return 0; }, getTargetDistance: function() { return 0; }, getDistance: function() { return 0; }, getStopDistance: function() { return 0; }, getSpeed: function() { return 0; }, getValue: function() { return 0; }, setTarget: function() {}, setEnable: function() {}, setEnabled: function() {}, enable: function() {}, disable: function() {}, update: function() {}, reset: function() {} }; };\n" +
         "var __ptPatchController = function(c) { c = c || {}; if (!c.tascController || typeof c.tascController.isEnable !== 'function') c.tascController = __ptCtl(); if (!c.atoController || typeof c.atoController.isEnable !== 'function') c.atoController = __ptCtl(); if (!c.atsController || typeof c.atsController.isEnable !== 'function') c.atsController = __ptCtl(); if (!c.atcController || typeof c.atcController.isEnable !== 'function') c.atcController = __ptCtl(); if (typeof c.isEnable !== 'function') c.isEnable = function() { return false; }; if (typeof c.isEnabled !== 'function') c.isEnabled = function() { return false; }; if (typeof c.getSpeedLimit !== 'function') c.getSpeedLimit = function() { return 0; }; if (!c.speedOrderList) c.speedOrderList = []; return c; };\n" +
         "if (typeof TrainControllerManager === 'undefined' || !TrainControllerManager) {\n" +
-        // 空ではなくダミーオブジェクトを返す。getTrainController(entity).tascController などへの
-        // 連鎖アクセスが頻出するため、null 返しだと「Cannot get property X of null」で死ぬ。
-        // 各サブコントローラ共通のダミーメソッド群。スクリプト(SD8200 等)は isEnable() など
-        // 多様なメソッドを呼ぶため、未定義だと「X is not a function」で server script が毎tick死ぬ。
-        // 真偽系は false、数値系は 0、設定/更新系は no-op を返す広めの stub にして根本的に潰す。
+        // 連鎖アクセスに耐える広めのダミーを返す(真偽=false/数値=0/更新=no-op)
         "  var __ptDummyController = {\n" +
         "    tascController: __ptCtl(),\n" +
         "    atoController: __ptCtl(),\n" +
@@ -220,30 +178,6 @@ public class TrainScriptSystem {
         "}\n" +
         "try { var __ptOldGetTC = TrainControllerManager.getTrainController; TrainControllerManager.getTrainController = function(e) { try { return __ptPatchController(__ptOldGetTC ? __ptOldGetTC(e) : null); } catch (ex) { return __ptPatchController(null); } }; } catch (e) { TrainControllerManager.getTrainController = function() { return __ptPatchController(null); }; }\n" +
         "try { var __ptOldGetC = TrainControllerManager.getController; TrainControllerManager.getController = function(e) { try { return __ptPatchController(__ptOldGetC ? __ptOldGetC(e) : null); } catch (ex) { return __ptPatchController(null); } }; } catch (e) { TrainControllerManager.getController = function() { return __ptPatchController(null); }; }\n" +
-        // 重要: LEGACY_API_PREPEND は user script と同じ eval 内で先頭に prepend される。
-        // injectScriptCompatibility() の別 eval で定義した var NGTMath は別 binding に
-        // 閉じてしまうことがあり、user script 実行時に「NGTMath.getSin is not a function」
-        // になる事例 (C12 render_rod) があるため、ここで pure JS の NGTMath を定義し直す。
-        // user script の importPackage(Packages.jp.ngt.ngtlib.math) を no-op 化済みなので
-        // この再代入が user script より前に確実に効く。\n
-        "var NGTMath = {\n" +
-        "  toRadians: function(deg) { return deg * Math.PI / 180; },\n" +
-        "  toDegrees: function(rad) { return rad * 180 / Math.PI; },\n" +
-        "  getSin: function(rad) { return Math.sin(rad); },\n" +
-        "  getCos: function(rad) { return Math.cos(rad); },\n" +
-        "  getTan: function(rad) { return Math.tan(rad); },\n" +
-        "  getAtan2: function(y, x) { return Math.atan2(y, x); },\n" +
-        "  getSqrt: function(x) { return Math.sqrt(x); },\n" +
-        "  sin: function(rad) { return Math.sin(rad); },\n" +
-        "  cos: function(rad) { return Math.cos(rad); },\n" +
-        "  tan: function(rad) { return Math.tan(rad); },\n" +
-        "  atan2: function(y, x) { return Math.atan2(y, x); },\n" +
-        "  sqrt: function(x) { return Math.sqrt(x); },\n" +
-        "  floor: function(x) { return Math.floor(x); },\n" +
-        "  ceil: function(x) { return Math.ceil(x); },\n" +
-        "  clamp: function(v, a, b) { return Math.max(a, Math.min(b, v)); },\n" +
-        "  normalizeAngle: function(a) { while(a>=180)a-=360; while(a<-180)a+=360; return a; }\n" +
-        "};\n" +
         // NGTUtilClient / MCWrapperClient も user script と同じ eval で確実に定義する(別 eval の
         // 定義は見えないため)。getMinecraft は __RTMU_MC__(クライアント実体)へ橋渡し。
         "function __rtmuMcShim() { return { field_71462_r: ((typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getCurrentScreen() : null), func_135016_M: function() { return { func_135041_c: function() { return { func_135034_a: function() { return ((typeof __RTMU_MC__ !== 'undefined' && __RTMU_MC__) ? __RTMU_MC__.getLanguageCode() : 'en_us'); } }; } }; } }; }\n" +
@@ -282,37 +216,10 @@ public class TrainScriptSystem {
         // RailPosition.REVISION: 8方向の[dx,dz]オフセット(RTMU RailPosition.REVISION と同値)。render の getNearestEdgePos 等が参照。
         "RailPosition.REVISION = [[0.0,-0.5],[-0.5,-0.5],[-0.5,0.0],[-0.5,0.499999],[0.0,0.499999],[0.499999,0.499999],[0.499999,0.0],[0.499999,-0.5]];\n";
     private static final String SCRIPT_MODEL_KEY = "__ptScriptModel";
-    private static volatile boolean graalPolyglotUnavailable = false;
-
-    // ===== AppleExtended 方式: 共有 polyglot Engine + 車両ごと Context =====
-    // GraalJS の Engine (コンパイル済みコードのキャッシュ) を<b>1 個だけ</b>作って全スクリプトで共有し、
-    // Context (変数空間) だけを毎回新規にする。これで「同じスクリプトを N 両ぶんコンパイル/常駐」する
-    // 無駄が消える (コンパイル 1 回・メモリ大幅削減)。車両別のグローバル状態 (isBrake 等) は Context
-    // 分離で壊れない。polyglot API が module-path から直接使えない (RTMU 既存の問題) ため、AppleExtended と
-    // 同じく<b>リフレクション</b>で正しい ClassLoader から掴む。失敗したら従来経路へ (退行なし)。
-    private static volatile boolean graalReflectionUnavailable = false;
-    private static final Object GRAAL_ENGINE_LOCK = new Object();
-    private static volatile Object SHARED_GRAAL_POLYGLOT_ENGINE;
-    private static volatile ClassLoader SHARED_GRAAL_POLYGLOT_ENGINE_LOADER;
     private static TrainScriptSystem instance;
     private ScriptEngine engine;
     private final Map<UUID, EntityScriptContext> entityContexts = new HashMap<>();
-    /**
-     * スクリプトに見せる RTMCore.VERSION。
-     *
-     * <p>パックはこれを見て 1.7.10 系 / 1.12 系の API を出し分ける:
-     * <pre>var isOldVer = RTMCore.VERSION.indexOf("1.7.10") !== -1;</pre>
-     *
-     * <p>RTMU が用意している互換 API は<b>1.7.10 の形</b> (TileEntity.field_145851_c,
-     * World.func_147438_o(x,y,z), EntityTrainBase.getTrainStateData(int) …) であって、
-     * 1.12 の形 (func_174877_v() → BlockPos, func_175625_s(BlockPos) …) ではない。
-     *
-     * <p>ここは以前 "2.4.24" (= RTM 1.12.2 のバージョン) を返しており、実クラス
-     * {@link jp.ngt.rtm.RTMCore#VERSION} ("1.7.10.41 KaizPatchX/…") と食い違っていた。
-     * そのためこのエンジンで動くパックだけが 1.12 側の分岐に入り、存在しない
-     * {@code tileEntity.func_174877_v()} を呼んで毎フレーム TypeError で死んでいた
-     * (架線柱がフォールバック描画の変な塔になっていた原因)。実クラスを唯一の出所にする。
-     */
+    /** スクリプトに見せるRTMCore.VERSION。実クラスを唯一の出所にする。 */
     private static final String SCRIPT_CORE_VERSION = jp.ngt.rtm.RTMCore.VERSION;
     private static final Set<Integer> DISABLED_SCRIPT_ENGINES = ConcurrentHashMap.newKeySet();
     private static final Set<String> REPORTED_SCRIPT_ERRORS = ConcurrentHashMap.newKeySet();
@@ -373,7 +280,7 @@ public class TrainScriptSystem {
                 engine = getAvailableScriptEngine(manager);
             }
             if (engine == null) {
-                RealTrainModUnofficial.LOGGER.warn("JavaScript engine not available. Java 21 requires an external JS engine dependency such as Graal.js.");
+                RealTrainModUnofficial.LOGGER.warn("Nashorn script engine not available (org.openjdk.nashorn). NeoForge should provide nashorn-core on the platform library path.");
             } else {
             }
         } catch (Exception e) {
@@ -392,7 +299,8 @@ public class TrainScriptSystem {
         }
         try {
             injectScriptCompatibility(scriptEngine, new ScriptModelRenderer(null, null));
-            scriptEngine.eval(LEGACY_API_PREPEND + normalizeLegacyScriptReferences(script == null ? "" : script));
+            scriptEngine.eval(PackScriptSource.PRELUDE_NO_GL + LEGACY_API_PREPEND
+                    + legacyRenderFixups(PackScriptSource.prepare(script == null ? "" : script)));
             return scriptEngine;
         } catch (Exception e) {
             throw new RuntimeException("Script exec error", e);
@@ -507,194 +415,23 @@ public class TrainScriptSystem {
         }
     }
 
-    /**
-     * AppleExtended 方式: 共有 polyglot Engine + 車両ごと Context の GraalJS エンジンを
-     * リフレクションで生成する。Engine (コンパイル済みコード) は 1 個共有、Context (変数空間) は毎回新規。
-     * 失敗したら null (呼び出し側は従来経路へ)。
-     */
-    private static ScriptEngine createReflectedGraalEngine(String ecmaVersion) {
-        try {
-            ClassLoader host = resolveScriptHostClassLoader();
-            Class<?> engineClass = loadClassForScriptRuntime("org.graalvm.polyglot.Engine", host);
-            Object polyglotEngine = getOrCreateSharedGraalPolyglotEngine(engineClass, host);
-
-            Class<?> contextClass = loadClassForScriptRuntime("org.graalvm.polyglot.Context", host);
-            Object cb = contextClass.getMethod("newBuilder", String[].class).invoke(null, (Object) new String[]{"js"});
-            Class<?> cbClass = cb.getClass();
-            cbClass.getMethod("allowAllAccess", boolean.class).invoke(cb, true);
-            cbClass.getMethod("allowExperimentalOptions", boolean.class).invoke(cb, true);
-            try {
-                cbClass.getMethod("hostClassLoader", ClassLoader.class).invoke(cb, host);
-            } catch (NoSuchMethodException ignored) {
-            }
-            try {
-                Object allowAll = java.lang.reflect.Proxy.newProxyInstance(
-                    TrainScriptSystem.class.getClassLoader(),
-                    new Class<?>[]{java.util.function.Predicate.class},
-                    (proxy, method, args) -> {
-                        String n = method.getName();
-                        if ("test".equals(n)) return Boolean.TRUE;
-                        if ("toString".equals(n)) return "AllowAll";
-                        if ("hashCode".equals(n)) return System.identityHashCode(proxy);
-                        if ("equals".equals(n)) return proxy == args[0];
-                        return null;
-                    });
-                cbClass.getMethod("allowHostClassLookup", java.util.function.Predicate.class).invoke(cb, allowAll);
-            } catch (NoSuchMethodException ignored) {
-            }
-            //Context オプションは RTMU 従来と同一 (nashorn 互換・構文拡張・ECMA 版) にして挙動を変えない。
-            cbClass.getMethod("option", String.class, String.class).invoke(cb, "js.nashorn-compat", "true");
-            cbClass.getMethod("option", String.class, String.class).invoke(cb, "js.syntax-extensions", "true");
-            cbClass.getMethod("option", String.class, String.class).invoke(cb, "js.ecmascript-version", ecmaVersion);
-
-            Class<?> graalEngineClass =
-                loadClassForScriptRuntime("com.oracle.truffle.js.scriptengine.GraalJSScriptEngine", host);
-            Object se = graalEngineClass.getMethod("create", engineClass, cbClass).invoke(null, polyglotEngine, cb);
-            return se instanceof ScriptEngine ? (ScriptEngine) se : null;
-        } catch (Throwable t) {
-            return null;
-        }
-    }
-
-    private static Object getOrCreateSharedGraalPolyglotEngine(Class<?> engineClass, ClassLoader host) throws Exception {
-        Object existing = SHARED_GRAAL_POLYGLOT_ENGINE;
-        if (existing != null && SHARED_GRAAL_POLYGLOT_ENGINE_LOADER == host) {
-            return existing;
-        }
-        synchronized (GRAAL_ENGINE_LOCK) {
-            existing = SHARED_GRAAL_POLYGLOT_ENGINE;
-            if (existing != null && SHARED_GRAAL_POLYGLOT_ENGINE_LOADER == host) {
-                return existing;
-            }
-            Object builder = engineClass.getMethod("newBuilder").invoke(null);
-            Class<?> bClass = builder.getClass();
-            bClass.getMethod("allowExperimentalOptions", boolean.class).invoke(builder, true);
-            try {
-                bClass.getMethod("option", String.class, String.class)
-                    .invoke(builder, "engine.WarnInterpreterOnly", "false");
-            } catch (Throwable ignored) {
-            }
-            Object engine = bClass.getMethod("build").invoke(builder);
-            SHARED_GRAAL_POLYGLOT_ENGINE = engine;
-            SHARED_GRAAL_POLYGLOT_ENGINE_LOADER = host;
-            return engine;
-        }
-    }
-
-    private static ClassLoader resolveScriptHostClassLoader() {
-        ClassLoader ctx = Thread.currentThread().getContextClassLoader();
-        if (ctx != null) {
-            return ctx;
-        }
-        return TrainScriptSystem.class.getClassLoader();
-    }
-
-    private static java.util.List<ClassLoader> getCandidateClassLoaders() {
-        java.util.Set<ClassLoader> ordered = new java.util.LinkedHashSet<>();
-        ClassLoader ctx = Thread.currentThread().getContextClassLoader();
-        if (ctx != null) {
-            ordered.add(ctx);
-        }
-        ClassLoader self = TrainScriptSystem.class.getClassLoader();
-        if (self != null) {
-            ordered.add(self);
-        }
-        ClassLoader sys = ClassLoader.getSystemClassLoader();
-        if (sys != null) {
-            ordered.add(sys);
-        }
-        return new java.util.ArrayList<>(ordered);
-    }
-
-    private static Class<?> loadClassForScriptRuntime(String className, ClassLoader preferred)
-            throws ClassNotFoundException {
-        java.util.Set<ClassLoader> loaders = new java.util.LinkedHashSet<>();
-        if (preferred != null) {
-            loaders.add(preferred);
-        }
-        loaders.addAll(getCandidateClassLoaders());
-        for (ClassLoader loader : loaders) {
-            if (loader == null) {
-                continue;
-            }
-            try {
-                return Class.forName(className, true, loader);
-            } catch (ClassNotFoundException ignored) {
-            }
-        }
-        return Class.forName(className);
-    }
-
+    /** モデルスクリプト用エンジン。全経路と同一の標準Nashornを返す。 */
     private static ScriptEngine getAvailableScriptEngine(ScriptEngineManager manager) {
-        if (manager == null) {
+        return createNashornEngine();
+    }
+
+    private static ScriptEngine createNashornEngine() {
+        try {
+            org.openjdk.nashorn.api.scripting.NashornScriptEngineFactory factory =
+                new org.openjdk.nashorn.api.scripting.NashornScriptEngineFactory();
+            //ScriptUtil / 本家と同一フラグ。MOD クラスローダを渡して Packages.jp.ngt.* を解決させる。
+            return factory.getScriptEngine(
+                new String[]{"-doe", "--language=es6"},
+                TrainScriptSystem.class.getClassLoader());
+        } catch (Throwable t) {
+            RealTrainModUnofficial.LOGGER.error("Failed to create Nashorn script engine for model scripts", t);
             return null;
         }
-
-        //最優先: AppleExtended 方式の共有 Engine (コンパイル済みコードを全車両で共有)。
-        if (!graalReflectionUnavailable) {
-            for (String ecmaVersion : PREFERRED_ECMA_VERSIONS) {
-                ScriptEngine shared = createReflectedGraalEngine(ecmaVersion);
-                if (shared != null) {
-                    return shared;
-                }
-            }
-            graalReflectionUnavailable = true;
-        }
-
-        if (!graalPolyglotUnavailable) {
-            for (String ecmaVersion : PREFERRED_ECMA_VERSIONS) {
-                try {
-                    org.graalvm.polyglot.Engine polyglotEngine = org.graalvm.polyglot.Engine.newBuilder()
-                        .allowExperimentalOptions(true)
-                        .build();
-                    org.graalvm.polyglot.Context.Builder contextBuilder = org.graalvm.polyglot.Context.newBuilder("js")
-                        .allowAllAccess(true)
-                        .allowExperimentalOptions(true)
-                        .option("js.nashorn-compat", "true")
-                        .option("js.syntax-extensions", "true")
-                        .option("js.ecmascript-version", ecmaVersion);
-                    ScriptEngine scriptEngine = com.oracle.truffle.js.scriptengine.GraalJSScriptEngine.create(polyglotEngine, contextBuilder);
-                    if (scriptEngine != null) {
-                        return scriptEngine;
-                    }
-                } catch (Throwable e) {
-                }
-            }
-            graalPolyglotUnavailable = true;
-        }
-
-        String[] engineNames = {"javascript", "js", "Graal.js", "graal.js", "nashorn"};
-        for (String name : engineNames) {
-            ScriptEngine scriptEngine = manager.getEngineByName(name);
-            if (scriptEngine != null) {
-                return scriptEngine;
-            }
-        }
-
-        if (!manager.getEngineFactories().isEmpty()) {
-            RealTrainModUnofficial.LOGGER.warn(
-                "Available script engines: {}",
-                manager.getEngineFactories().stream()
-                    .map(ScriptEngineFactory::getEngineName)
-                    .collect(Collectors.joining(", "))
-            );
-        } else {
-            RealTrainModUnofficial.LOGGER.warn("No script engine providers found on the classpath.");
-        }
-
-        try {
-            Class<?> factoryClass = Class.forName("org.graalvm.polyglot.js.jsr223.GraalJSScriptEngineFactory");
-            ScriptEngineFactory factory = (ScriptEngineFactory) factoryClass.getDeclaredConstructor().newInstance();
-            ScriptEngine scriptEngine = factory.getScriptEngine();
-            if (scriptEngine != null) {
-                return scriptEngine;
-            }
-        } catch (ClassNotFoundException ignored) {
-            // Graal.js is not available on the classpath.
-        } catch (Exception e) {
-        }
-
-        return null;
     }
 
     private static void loadScript(String scriptPath, String script, Object model, String modelName, ScriptEngine scriptEngine) {
@@ -703,12 +440,15 @@ public class TrainScriptSystem {
             injectScriptCompatibility(scriptEngine, renderer);
             scriptEngine.put(SCRIPT_PATH_KEY, scriptPath == null ? "" : scriptPath);
             scriptEngine.put(SCRIPT_MODEL_KEY, modelName == null ? "" : modelName);
-            script = normalizeLegacyScriptReferences(script);
-            //Nashorn はプロパティ解決で getter をフィールドより優先するので、
-            //.seatRotation を生値のゲッターへ振り替える (VehicleScriptRenderers 側の
-            //PackScriptSource.prepare と同じ扱いにしないと、経路によって値の意味が食い違う)。
-            script = PackScriptSource.remapFieldAccess(script);
-            script = LEGACY_API_PREPEND + (script == null ? "" : script);
+            //前処理は車両描画側と同じ PackScriptSource に一本化する。
+            //ただしこの経路は GL 呼び出しを ScriptModelRenderer の OpList に記録するため、
+            //GL11 は injectScriptCompatibility が put した専用シムのままにする (PRELUDE_NO_GL)。
+            //順序が重要: 実 jp.ngt クラス (PRELUDE) を土台に置き、その上から
+            //LEGACY_API_PREPEND が「描画器に依存するものだけ」を上書きする。
+            //MCWrapper.getPosX は補間位置を返す必要があり (実クラスは tick 位置なので固定
+            //マーカーがドリフトする)、NGTUtilClient.bindTexture は OpList へ流す必要がある。
+            script = PackScriptSource.PRELUDE_NO_GL + LEGACY_API_PREPEND
+                    + legacyRenderFixups(PackScriptSource.prepare(script));
             scriptEngine.eval(script);
             prepareScriptRuntimeBeforeInit(scriptEngine);
 
@@ -738,11 +478,16 @@ public class TrainScriptSystem {
             injectScriptCompatibility(scriptEngine, renderer);
             scriptEngine.put(SCRIPT_PATH_KEY, scriptPath == null ? "" : scriptPath);
             scriptEngine.put(SCRIPT_MODEL_KEY, modelName == null ? "" : modelName);
-            script = normalizeLegacyScriptReferences(script);
-            // ユーザースクリプトの先頭に Java 注入オブジェクトのリバインドを prepend する。
-            // injectScriptCompatibility 内の eval で var 宣言しても、別の eval をまたぐと
-            // Nashorn でグローバルが期待通りに見えないケースがあるため、確実性を最大化。
-            script = LEGACY_API_PREPEND + script;
+            //サーバー/サウンドスクリプトは描画しない (GL を触らない) ので、車両描画側と
+            //同じ PackScriptSource の前処理・束縛に一本化する。
+            //
+            //従来はここだけ独自方言だった: LEGACY_API_PREPEND が NGTUtil / NGTLog / NGTText /
+            //Vec3 を<b>JS スタブで上書き</b>しており (NGTUtil.isClient() が常に true を返す等)、
+            //同じ API でも経路によって別実装に当たっていた。PRELUDE は実 jp.ngt クラスを束縛する。
+            //
+            //SRB3 のネイティブ敷設ブリッジだけはこの経路固有なので個別に付ける。
+            script = PackScriptSource.PRELUDE
+                    + appendSuperRailBuilderOverrides(PackScriptSource.prepare(script));
             scriptEngine.eval(script);
             prepareScriptRuntimeBeforeInit(scriptEngine);
             invokeScriptInit(scriptEngine, renderer);
@@ -758,65 +503,26 @@ public class TrainScriptSystem {
         return null;
     }
 
-    private static String normalizeLegacyScriptReferences(String script) {
-        if (script == null || script.isEmpty()) {
-            return script;
+    /**
+     * OpList 経路の描画スクリプトだけに要る機能的な回避策。
+     * <p>クラス名の置換 (旧方言) ではなく、1.21 で挙動が変わる 2 点への対処:
+     * <ul>
+     *   <li>{@code Java.from} は配列変換で例外を投げる型があるので、安全版へ回す</li>
+     *   <li>テクスチャ読み込みが null を返すとスクリプトが早期 return して以降を描かなくなるので、
+     *       ダミーのテクスチャデータを返して描画を続行させる</li>
+     * </ul>
+     */
+    private static String legacyRenderFixups(String script) {
+        if (script == null) {
+            return "";
         }
-        String oldRoot = "n" + "gt";
-        String oldLibRoot = oldRoot + "lib";
-        String oldVehicleRoot = "r" + "tm";
-        String oldCoreName = "R" + "T" + "MCore";
-        String oldClientUtilName = "N" + "G" + "TUtilClient";
-        String oldUtilName = "N" + "G" + "TUtil";
-        String oldLogName = "N" + "G" + "TLog";
-        String oldFileLoaderName = "N" + "G" + "TFileLoader";
-        String oldTessellatorName = "N" + "G" + "TTessellator";
-        String packages = "Packages.jp." + oldRoot + ".";
-        String result = script;
-        result = result.replace("var GLHelper = " + packages + oldLibRoot + ".renderer.GLHelper;", "");
-        result = result.replace("var " + oldClientUtilName + " = " + packages + oldLibRoot + ".util." + oldClientUtilName + ";", "");
-        result = result.replace("var " + oldUtilName + " = " + packages + oldLibRoot + ".util." + oldUtilName + ";", "");
-        result = result.replace(packages + oldVehicleRoot + "." + oldCoreName, oldCoreName);
-        result = result.replace(packages + oldVehicleRoot + ".modelpack.ModelPackManager", "ModelPackManager");
-        result = result.replace(packages + oldLibRoot + ".util." + oldClientUtilName, oldClientUtilName);
-        result = result.replace(packages + oldLibRoot + ".util." + oldUtilName, oldUtilName);
-        result = result.replace(packages + oldLibRoot + ".io." + oldLogName, oldLogName);
-        result = result.replace(packages + oldLibRoot + ".io." + oldFileLoaderName + ".getInputStream", oldFileLoaderName + "_getInputStream");
-        result = result.replace(packages + oldLibRoot + ".renderer.GLHelper", "GLHelper");
-        // Packages.jp.ngt.ngtlib.math.Vec3 → グローバル Vec3 (LEGACY_API_PREPEND で JS 実装)
-        // Nashorn の Packages は JavaPackage で、JS から property を上書きできないため、
-        // ソース側で直接置換するのが確実。
-        result = result.replace(packages + oldLibRoot + ".math.Vec3", "Vec3");
-        result = result.replace(packages + oldLibRoot + ".math.NGTMath", "NGTMath");
-        result = result.replace(packages + oldLibRoot + ".io.ScriptUtil", "ScriptUtil");
-        result = result.replace(packages + oldLibRoot + ".renderer." + oldTessellatorName, "TessellatorCompat");
-        result = result.replace(packages + oldLibRoot + ".renderer.model.ModelLoader", "ModelLoader");
-        result = result.replace(packages + oldLibRoot + ".renderer.model.VecAccuracy", "VecAccuracy");
-        result = result.replace(packages + oldLibRoot + ".math.Vec3", "Vec3");
-        result = result.replace("Packages.net.minecraft.util.ResourceLocation", "ResourceLocationCompat");
-        // 1.12.2 Forge の Loader (mod 存在チェック) は 1.21.1(NeoForge)に無いのでスタブへ。
-        result = result.replace("Packages.net.minecraftforge.fml.common.Loader", "LoaderCompat");
-        result = result.replace("if (!stream) return null;", "if (!stream) return __ptDummyTextureData();");
-        result = result.replace("Java.from(", "__ptJavaFrom(");
-        //★ 自己代入の宣言を消す。
-        //
-        //上のリマップで  var NGTLog = Packages.jp.ngt.ngtlib.io.NGTLog;
-        //            →  var NGTLog = NGTLog;
-        //になる。これが関数の中にあると JS の巻き上げでローカル NGTLog が先に宣言され、
-        //右辺はグローバルではなく<b>まだ undefined のローカル自身</b>を読む。結果
-        //NGTLog が undefined になり、NGTLog.debug(...) で TypeError → スクリプトごと停止する
-        //(E259 のサウンドスクリプトが丸ごと死んでいた原因)。
-        //宣言ごと消せば、以降の参照はプリリュードで用意したグローバルに解決される。
-        result = SELF_ASSIGN_DECL.matcher(result).replaceAll("");
-        result = appendSuperRailBuilderOverrides(result);
-        return result;
+        return script
+                .replace("if (!stream) return null;", "if (!stream) return __ptDummyTextureData();")
+                .replace("Java.from(", "__ptJavaFrom(");
     }
 
-    /**
-     * SuperRailBuilder3 のサーバスクリプトを検出したら、レール生成/削除/レール所持判定の各関数を
-     * RTMU ネイティブ敷設(__SRB__ ブリッジ)へ差し替える上書き定義を末尾に追加する。
-     * GUI・制御フロー(onUpdate/dataMap)・render はそのまま活かし、低レベル RTM/MCP API の不一致を回避する。
-     */
+
+    /** SRB3のサーバスクリプトにネイティブ敷設ブリッジの上書き定義を追加する。 */
     private static String appendSuperRailBuilderOverrides(String script) {
         if (script == null || !script.contains("SuperRailBuilderVersion")) {
             return script;
@@ -830,10 +536,7 @@ public class TrainScriptSystem {
         sb.append("  getSelectedSlotItem = function(player){ return null; };\n");
         sb.append("  hasPlayerMarker = function(player){ return false; };\n");
         sb.append("  getPlayerRail = function(player) { try { var p = (player && player.__srbReal)?player.__srbReal:player; var id = __SRB__.heldRailModelId(p); return (id && (''+id).length>0)?(''+id):null; } catch(e){ return null; } };\n");
-        // doFollowing: ホストプレイヤーの上へ車体をテレポート(MCP field を避け getX/Y/Z を使う)。
-        // doFollowing はサーバ側のみで車をプレイヤー上へ移動させ、クライアントはサーバ同期＋補間で
-        // 滑らかに追従する。マーカーは MCWrapper.getPosX(=レンダー補間位置)基準で描くので一致して荒ぶらない。
-        // クライアントで毎フレーム動かすと描画とズレるため、ここでは動かさない。
+        // doFollowingはサーバ側のみで移動し、クライアントは同期+補間で追従
         sb.append("  doFollowing = function(entity, hostPlayer){ try{ if(!entity||!hostPlayer) return; var w=entity.field_70170_p; if(w && w.isClientSide && w.isClientSide()) return; var p=hostPlayer.__srbReal?hostPlayer.__srbReal:hostPlayer; if(!p||!p.getX) return; entity.func_70107_b(p.getX(), p.getY()+2, p.getZ()); try{entity.field_70159_w=0; entity.field_70181_x=0; entity.field_70179_y=0;}catch(e2){} }catch(e){} };\n");
         // getTileEntity: 1.12.2 の net.minecraft.util.math.BlockPos を new せず、座標直接版 func_175625_s を使う。
         // 当たり判定/道床ブロックはコアに解決して返す(__SRB__.railCoreAt)。レール沿いどこでも接続検出が効き、
@@ -847,8 +550,9 @@ public class TrainScriptSystem {
             sb.append("  getRider = function(entity){ try{ var ps=entity.func_184188_bt(); var r=(ps&&ps.size()>0)?ps.get(0):null; return __srbWrap(r); }catch(e){ return null; } };\n");
             sb.append("  getRidingEntity = function(entity){ try{ return __srbWrap(entity.func_184187_bx()); }catch(e){ return null; } };\n");
             sb.append("  createRailPosition = function(data) { return __SRB__.createRailPosition(data.blockX|0, data.blockY|0, data.blockZ|0, data.markerDir|0, (data.switchType!=null?Number(data.switchType):0), (data.anchorLength!=null?Number(data.anchorLength):-1), (data.anchorPitch!=null?Number(data.anchorPitch):0), (data.anchorYaw!=null?Number(data.anchorYaw):0), (data.cantCenter!=null?Number(data.cantCenter):0), (data.cantEdge!=null?Number(data.cantEdge):0), (data.height!=null?Number(data.height):0)); };\n");
-            sb.append("  buildNormalRail = function(world, startRP, endRP, railItem) { try { __SRB__.buildNormalRail(world, startRP, endRP, railItem); } catch(e){ try{NGTLog.error('SRB buildNormalRail err: '+e);}catch(e2){} } };\n");
-            sb.append("  buildBranchRail = function(world, rps, railItem) { try { var l=new java.util.ArrayList(); for(var i=0;i<rps.length;i++) l.add(rps[i]); __SRB__.buildBranchRail(world, l, railItem); } catch(e){} };\n");
+            //戻り値をそのまま返す (SRB 側は真偽で成否を見る)。失敗理由は Java 側がログに出す。
+            sb.append("  buildNormalRail = function(world, startRP, endRP, railItem) { try { return __SRB__.buildNormalRail(world, startRP, endRP, railItem); } catch(e){ try{__SRB__.logError('buildNormalRail: '+e);}catch(e2){} return false; } };\n");
+            sb.append("  buildBranchRail = function(world, rps, railItem) { try { var l=new java.util.ArrayList(); for(var i=0;i<rps.length;i++) l.add(rps[i]); return __SRB__.buildBranchRail(world, l, railItem); } catch(e){ try{__SRB__.logError('buildBranchRail: '+e);}catch(e2){} return false; } };\n");
             sb.append("  deleteRail = function(world, x, y, z) { try { return __SRB__.deleteRail(world, x|0, y|0, z|0); } catch(e){ return false; } };\n");
             sb.append("  deleteRailRP = function(world, rp) { return deleteRail(world, rp.blockX, rp.blockY, rp.blockZ); };\n");
         }
@@ -873,14 +577,7 @@ public class TrainScriptSystem {
             // GL11 シム
             scriptEngine.put("GL11", new GL11Compat(renderer));
             scriptEngine.put("Parts", PartsBuilder.class);
-            // NGTText / NGTLog 等の頻出ユーティリティは Java オブジェクトで直接注入する。
-            // ただし scriptEngine.put("NGTText", ...) だけだと、ユーザースクリプトの
-            //   importPackage(Packages.jp.ngt.ngtlib.io)
-            // で global の NGTText が JavaPackage に上書きされる事例がある。
-            // 対策: 衝突しないアンダースコア名で put し、後段の eval ブロックで
-            //   var NGTText = __RTMU_NGTText__;
-            // を実行することで、ユーザースクリプトの importPackage より先に
-            // global var として確立しておく (var 宣言は importPackage よりも優先)。
+            // ユーティリティはアンダースコア名でputし、evalでvar宣言に束縛する(importPackageより優先)
             NGTTextCompat ngtText = new NGTTextCompat();
             NGTLogCompat ngtLog = new NGTLogCompat();
             NGTUtilCompat ngtUtil = new NGTUtilCompat();
@@ -1020,13 +717,7 @@ public class TrainScriptSystem {
                 "if (typeof NGTLog === 'undefined') NGTLog = { debug: function() {}, info: function() {}, warn: function() {}, error: function() {} };\n" +
                 "if (typeof GuiChat === 'undefined') GuiChat = function() {};\n" +
                 "if (typeof Minecraft === 'undefined') Minecraft = { func_71410_x: function() { return null; }, getMinecraft: function() { return null; } };\n" +
-                // --- SuperRailBuilder3 等の 1.12.2 RTM スクリプト互換グローバル ---
-                // 本家 RTM の Java クラスは 1.21.1 に存在しないため、スクリプトが eval 時に
-                // 参照するトップレベルのグローバルを最小限スタブする。
-                //
-                //RTMCore は injectScriptCompatibility が必ず代入するのでここは保険。
-                //VERSION は SCRIPT_CORE_VERSION (= 実クラスの値) を唯一の出所にする
-                //(別の文字列を書くとパックの 1.7.10/1.12 分岐が食い違って壊れる)。
+                // スクリプトがeval時に参照するトップレベルのグローバルを最小限スタブする
                 "if (typeof RTMCore === 'undefined') RTMCore = { VERSION: " + quoteJs(SCRIPT_CORE_VERSION) + ", MODID: 'rtm' };\n" +
                 "if (typeof Blocks === 'undefined') Blocks = {};\n" +
                 "if (Blocks.field_150325_L === undefined) Blocks.field_150325_L = { __rtmuBlock: 'minecraft:white_wool' };\n" +
@@ -1135,9 +826,7 @@ public class TrainScriptSystem {
                 "}\n"
             );
 
-            // model.body_f など任意グループ名アクセスをサポートするProxyラッパー
-            // RTMスクリプトは model.body_f を直接アクセスするが、ScriptModelはJavaフィールドを持たないため
-            // GraalJS Proxyでインターセプトし、グループ名文字列を持つアクセサオブジェクトを返す
+            // model.任意グループ名アクセスのラッパー。Proxyが無ければ__noSuchProperty__で再現
             scriptEngine.eval(
                 "if (typeof Proxy !== 'undefined' && typeof model !== 'undefined' && model !== null) {\n" +
                 "  var __ptGA = function(n) {\n" +
@@ -1164,6 +853,22 @@ public class TrainScriptSystem {
                 "    },\n" +
                 "    has: function(t, n) { return true; }\n" +
                 "  });\n" +
+                "} else if (typeof model !== 'undefined' && model !== null) {\n" +
+                //標準 Nashorn 経路 (完全互換): ES6 Proxy が無いので __noSuchProperty__ で任意グループ名アクセスを代替。
+                "  var __ptOM2 = model;\n" +
+                "  var __ptGA2 = function(n) {\n" +
+                "    var o = { groupsStr: n, toString: function() { return n; }, valueOf: function() { return n; },\n" +
+                "              render: function(r) { if (r && typeof r.renderParts === 'function') { try { r.renderParts(n); } catch(e) {} } } };\n" +
+                "    o.__noSuchProperty__ = function(p) { return (typeof p === 'string' && p.indexOf('__') !== 0 && p !== 'constructor') ? __ptGA2(p) : undefined; };\n" +
+                "    return o;\n" +
+                "  };\n" +
+                "  var __ptModel = {};\n" +
+                "  __ptModel.__noSuchProperty__ = function(n) {\n" +
+                "    if (typeof n !== 'string' || n === 'then') return undefined;\n" +
+                "    try { var v = __ptOM2[n]; if (v !== null && v !== undefined) return v; } catch(e) {}\n" +
+                "    return __ptGA2(n);\n" +
+                "  };\n" +
+                "  model = __ptModel;\n" +
                 "}\n"
             );
 
@@ -1330,9 +1035,12 @@ public class TrainScriptSystem {
 
     private static void invokeScriptInit(ScriptEngine scriptEngine, ScriptModelRenderer renderer) {
         Object initModel = renderer.getModel();
+        //無音終了 (ネイティブ/メモリ由来) の切り分け用。モデル1つにつき1回だけ出る。
+        RealTrainModUnofficial.LOGGER.info("[RTMU] model script init: {}", renderer.getModelName());
         if (scriptEngine instanceof Invocable invocable) {
             try {
                 invocable.invokeFunction("init", renderer, initModel);
+                RealTrainModUnofficial.LOGGER.info("[RTMU] model script init done: {}", renderer.getModelName());
                 return;
             } catch (NoSuchMethodException ignored) {
                 try {
@@ -1397,11 +1105,7 @@ public class TrainScriptSystem {
         }
     }
 
-    /**
-     * SRB3 等のサーバスクリプトを毎tick実行する用。
-     * entity を `onUpdate(entity, scriptExecuter)` の形式で呼び出す。
-     * scriptExecuter はスクリプト側で任意に使われる helper。現状は null を渡す。
-     */
+    /** サーバスクリプトを毎tick実行する。onUpdate(entity, executer)形式。 */
     public static void invokeServerScriptOnUpdate(ScriptEngine scriptEngine, Object entity) {
         if (scriptEngine == null || isScriptDisabled(scriptEngine)) return;
         try {
@@ -1527,14 +1231,7 @@ public class TrainScriptSystem {
         }
     }
 
-    /**
-     * サウンドスクリプト (sound_*.js) を 1tick 分回す。
-     *
-     * <p>本家のサウンドスクリプトは {@code onUpdate(su)} 一本で、su には音用の executor が
-     * 渡る。描画用の {@code invokeScriptTick} は executor を旧 TrainEntity 限定で作るため、
-     * 本家系の列車では su が null になり音が鳴らなかった。ここでは両系統の列車で使える
-     * {@link SoundScriptExecutor} を必ず渡す。
-     */
+    /** サウンドスクリプトを1tick回す。SoundScriptExecutorを必ず渡す。 */
     public static void invokeSoundScript(ScriptEngine scriptEngine, net.minecraft.world.entity.Entity train) {
         if (scriptEngine == null || train == null || isScriptDisabled(scriptEngine)) {
             return;
@@ -2013,10 +1710,7 @@ public class TrainScriptSystem {
             return train == null ? 0.0F : train.getSeatRotation();
         }
 
-        /**
-         * 転換クロスシートの向き。0 = 前向き / 1 = 後ろ向き。
-         * プレイヤーが乗り込んだ向きで決まる (本家は進行方向で切り替えていた)。
-         */
+        /** 転換クロスシートの向き。0=前向き/1=後ろ向き。 */
         public float getSeatDirection() {
             return train == null ? 0.0F : train.getSeatDirection();
         }
@@ -2465,10 +2159,7 @@ public class TrainScriptSystem {
         // emissive pass (pass>=2) の発光描画はライトON状態のときに行う別系統。
         // translucent pass (pass=1) の半透明描画とは独立に 1 フレーム 1 回制限する。
         private final Set<String> scriptedEmissiveGroups = new LinkedHashSet<>();
-        // 通常 translucent (AlphaBlend) を「最初に描画したパス」だけに限定するための記録。
-        // -1 = まだ未描画。 これにより mat1 等の半透明面が複数 pass で重ね描きされて
-        // z-fighting する (外装チラつき) のを防ぎつつ、 同一 pass 内の複数 renderParts
-        // (椅子を複数脚など) は全て描画できる。
+        // translucentを最初に描画したパスだけに限定するための記録(-1=未描画)
         private int firstTranslucentPass = -1;
         // Groups registered via registerParts() during init() — script "owns" these, baked render skips them
         private final Set<String> scriptRegisteredGroups = new LinkedHashSet<>();
@@ -2502,12 +2193,7 @@ public class TrainScriptSystem {
             }
         }
 
-        // ==== 半透明遅延描画 (Deferred Translucent) ====
-        // スクリプトは body_o(窓含む)→body_i(椅子) の順に「不透明→半透明」を即描画するため、
-        // 窓(半透明)が椅子(不透明)より先に描かれ、窓越しに内装が見えない等の順序問題が出る。
-        // deferTranslucent=true の間は半透明描画を即時せずキューに溜め、スクリプト全体(全 parts)が
-        // 終わってから flushDeferredTranslucent() で一括描画する。これで「全不透明 → 全半透明」の
-        // 正しい順序になり、窓越しに内装が見え、ライト等の半透明も最後に正しく重なる。
+        // 半透明遅延描画: 半透明をキューに溜め、全parts終了後に一括描画して順序を正す
         private boolean deferTranslucent = false;
         private final List<DeferredTranslucent> deferredTranslucents = new ArrayList<>();
 
@@ -2597,10 +2283,7 @@ public class TrainScriptSystem {
             return true;
         }
 
-        // ==== Script Replay Cache (停車中など状態が変わらないフレームで JS engine を完全に bypass) ====
-        // 1 度 render() を実行したときに renderer に対して行われた呼び出し列を記録し、
-        // 同じ entity 状態のフレームでは記録された Op 列を直接再生する (JS engine 起動なし)。
-        // GraalJS の関数実行 + JS↔Java 橋渡しコスト (1フレーム ~10-20ms) が消える。
+        // Script Replay Cache: 状態が同じフレームは記録したOp列を再生しJS実行を省く
         public static final int OP_TRANSLATE = 1;
         public static final int OP_ROTATE_AXIS = 2;   // rotate(angle, axis, x, y, z)
         public static final int OP_ROTATE_FREE = 3;   // rotate(angle, x, y, z)
@@ -2663,11 +2346,7 @@ public class TrainScriptSystem {
             }
         }
 
-        /**
-         * pass + entity 状態を long に圧縮。同じ signature の連続フレームでは
-         * 録画された Op 列を再生する。state には speed / door / light / notch
-         * 等 「branch に影響しうる」値を含める。yaw 等の連続変化値は含めない。
-         */
+        /** pass+entity状態をlongに圧縮。分岐に影響する値のみ含める。 */
         public long computeReplaySignature(int pass, Object entity) {
             if (!(entity instanceof TrainEntity t)) return 0L;
             if (Math.abs(t.getSpeed()) > 0.001F) {
@@ -2777,11 +2456,7 @@ public class TrainScriptSystem {
             bindScriptTexture(parts[0], parts[1], frameIndex);
         }
 
-        // renderParts() の入力文字列 → 解析済み結果のキャッシュ。
-        // SL の動軸スクリプトのように毎フレーム同じ groupsStr で renderParts を多数回
-        // 呼び出すケースで、extractGroupNames/strip/filter/normalize/hasGroupNamed の
-        // 重複処理を完全に省く。Parts.groupsStr は JS 側で 1 回しか生成されないため
-        // 同一 String インスタンスのまま渡され、HashMap ヒット率はほぼ 100%。
+        // renderParts()入力→解析結果のキャッシュ。同一String前提でヒット率ほぼ100%
         private final Map<String, ParsedGroupSet> renderPartsParseCache = new HashMap<>();
 
         // emissive pass で、lightMode ごとの presentGroupNames をキャッシュ。
@@ -2825,6 +2500,57 @@ public class TrainScriptSystem {
             this.model = model;
             this.mqoModel = model instanceof MqoModelLoader.MqoModel m ? m : null;
             this.defaultModelName = defaultModelName == null ? "" : defaultModelName;
+        }
+
+        //---- 実 PartsRenderer と同じ API (経路によって欠けないようにする) ----
+        //
+        // 車両描画は VehicleScriptRenderers (実 jp.ngt.rtm.render.PartsRenderer) を通るが、
+        // モデル添付スクリプトはこちらを通る。同じスクリプトが経路で TypeError になるのを防ぐため、
+        // 実 PartsRenderer 側にしか無かったものをここにも生やす。
+
+        /** 本家 preRender: 既定は何もしない。 */
+        public void preRender(Object t, boolean smoothing, boolean culling, float partialTick) {
+        }
+
+        /** 本家 postRender: 既定は何もしない。 */
+        public void postRender(Object t, boolean smoothing, boolean culling, float partialTick) {
+        }
+
+        /** 本家 getViewerVec: 対象座標から視点へのベクトル。 */
+        public static jp.ngt.ngtlib.math.Vec3 getViewerVec(double x, double y, double z) {
+            return jp.ngt.rtm.render.PartsRenderer.getViewerVec(x, y, z);
+        }
+
+        /** 本家 validPath: そのアセットが存在するか。 */
+        public boolean validPath(String path) {
+            return path != null && !path.isBlank()
+                    && jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path) != null;
+        }
+
+        /** 本家 renderLightEffectS: ボリュームライトは未対応 (安全に無視)。 */
+        public static void renderLightEffectS(Object normal, double x, double y, double z,
+                                              float rL, float rS, float length,
+                                              int color, int type, boolean reverse) {
+        }
+
+        /** 本家 spawnParticle。 */
+        public void spawnParticle(Object entity, String name, double posX, double posY, double posZ,
+                                  double speedX, double speedY, double speedZ) {
+            net.minecraft.world.entity.Entity e =
+                    jp.ngt.mccompat.EntityCompatUtil.unwrapEntity(entity);
+            if (e != null && e.level().isClientSide()) {
+                e.level().addParticle(jp.ngt.mccompat.EnumParticleTypes.particleByLegacyName(name),
+                        posX, posY, posZ, speedX, speedY, speedZ);
+            }
+        }
+
+        public void debug(String msg) {
+            jp.ngt.ngtlib.io.NGTLog.debug(msg);
+        }
+
+        /** 本家 getModelObj (フィールド名アクセス用の getter)。 */
+        public Object getModelObj() {
+            return this.getModelObject();
         }
 
         public Object getModel() {
@@ -2899,6 +2625,26 @@ public class TrainScriptSystem {
                     renderer.renderRegisteredGroups(groupNames);
                 }
             }
+
+            /** 本家Parts.getObjects互換。PolygonModelからグループ名一致のGroupObjectを返す。 */
+            public jp.ngt.ngtlib.renderer.model.GroupObject[] getObjects(Object model) {
+                if (!(model instanceof jp.ngt.ngtlib.renderer.model.PolygonModel pm)) {
+                    return new jp.ngt.ngtlib.renderer.model.GroupObject[0];
+                }
+                java.util.List<jp.ngt.ngtlib.renderer.model.GroupObject> found = new java.util.ArrayList<>();
+                for (String name : this.groupNames) {
+                    if (name == null) {
+                        continue;
+                    }
+                    for (jp.ngt.ngtlib.renderer.model.GroupObject obj : pm.groupObjects) {
+                        if (name.equals(obj.name) || name.equalsIgnoreCase(obj.name)) {
+                            found.add(obj);
+                            break;
+                        }
+                    }
+                }
+                return found.toArray(new jp.ngt.ngtlib.renderer.model.GroupObject[0]);
+            }
         }
 
         /** 指定グループ名のリストを現在の poseStack で描画する。 */
@@ -2919,10 +2665,7 @@ public class TrainScriptSystem {
             for (String n : rawNames) {
                 String x = normalizeLegacyGroupName(n);
                 if (x.isEmpty()) continue;
-                // pack 由来の擬似シャドウ (黒い平板を地面に貼るタイプ) は無効化する。
-                // entity renderer の shadowRadius は 0 にしてあるが、こちらはモデル内の
-                // group として描かれるためここでフィルタする。
-                // shadow 完全一致のみ。 shadowXX など別の group まで巻き込まないようにする。
+                // 擬似シャドウ(黒平板)を無効化。shadow完全一致のみ
                 if (x.equalsIgnoreCase("shadow")) continue;
                 if (currentPass >= 2 && isLightOffGroup(x)) continue;
                 if (shouldSuppressOerMseScriptHoodGroup(x)) continue;
@@ -2933,12 +2676,7 @@ public class TrainScriptSystem {
                 normalized = filterLegacyScriptEmissiveGroups(normalized);
                 if (normalized.isEmpty()) return;
             }
-            // 角度バリアント (body-30 / body-90 / body-180 / bogie1-90 等) のフィルタ。
-            // RTM の連結曲げ用に用意された「曲げ角ごとの代替メッシュ」で、本家は曲げ角に応じ
-            // 1 つだけ描画する。移植版は同じ Parts に登録された全部を重ねて描くため、
-            // 直線状態でも曲げボディが翼のように外へはみ出す (ポリゴン重なり)。
-            // 0°(サフィックス無し)の本体が同じ描画呼び出しに含まれる時だけ曲げ変種を除外し、
-            // 直線/単行の見た目を本家に合わせる。
+            // 連結曲げ用の角度変種フィルタ。0°本体があるときだけ曲げ変種を除外
             if (!shouldKeepNumberedVariantGroups(normalized)) {
                 normalized = filterAngleVariantGroups(normalized);
             }
@@ -2987,28 +2725,9 @@ public class TrainScriptSystem {
         // これ未満 (1〜9) は車体のセクション分割 (D51 の body-1/2/3 等) とみなす。
         private static final int ANGLE_SUFFIX_THRESHOLD = 10;
 
-        /**
-         * 連結曲げ用の角度/ミラー変種を除外する。
-         * RTM は同一 Parts に「素の名前(0°直線)」と曲げ角・ミラーの代替メッシュをまとめて登録し、
-         * 曲げ角に応じ 1 つだけ描く (例: C57 body = "body","body(mx)","body-30",...,"body-180(mx)" /
-         * bogie2 = "bogie2-60","bogie2-90" など素の名前が無いケースもある)。
-         * 移植版には曲げ処理が無いため全部描くと翼状に重なる。
-         *
-         * ★重要: RTM の "(mx)" は「鏡像コピー」。直線(0°)の車体は body と body(mx) の
-         *   左右 2 枚で 1 つになる。曲げ変種は body-30 / body-90(mx) のように**角度数字付き**だけ。
-         *   → 角度数字付き(-NN, NN≥THRESHOLD)だけを「曲げ変種」として落とす。角度の無い (mx) は
-         *     直線の鏡像半身なので残す (これを落とすと車体が半分になり断片化する)。
-         *
-         * 方針:
-         *   - 非曲げ変種(素 / 鏡像 (mx) / セクション -1〜-9) は保持。
-         *   - 曲げ変種(角度-数字≥THRESHOLD)は一切描かない (素の有無に関わらず)。
-         * D51 の body-1/2/3 はセクション扱いで全保持。
-         */
+        /** 連結曲げ用の角度/ミラー変種を除外する。角度数字付きだけを落とし、(mx)鏡像とセクションは残す。 */
         private java.util.Set<String> filterAngleVariantGroups(java.util.Set<String> names) {
-            // 曲げ変種(角度数字付き)は一切描かない。直線の単行列車に曲げメッシュは不要で、
-            // 原点姿勢で描くと翼状/斜めに飛び出す (C57 の body-30..180, bogie2-60 等)。
-            // 素 / 鏡像 (mx) / セクション(-1〜-9) のみ残す。素が無い部品 (例: 面を持たない
-            // placeholder bogie2 しか 0° が無い後台車) は 0° では非表示 = RTM 互換。
+            // 曲げ変種(角度数字付き)は描かない。素/(mx)鏡像/セクションのみ残す
             java.util.Set<String> out = new java.util.LinkedHashSet<>(names.size());
             for (String n : names) {
                 if (!isBendVariant(n)) {
@@ -3019,11 +2738,7 @@ public class TrainScriptSystem {
         }
 
         private static String stripMirrorSuffix(String n) {
-            // RTM の鏡像/向き変種サフィックスは多様: (mx)/(my)/(mz) 単軸, (mxz)/(mxy)/(mxyz) 複数軸,
-            // (r) 反転, さらにそれらが積み重なる場合もある(例 "body-35(mxz)", "body-100(r)")。
-            // 以前は (mx) や単軸しか剥がせず、(mxz)/(r) 付きの曲げ変種が角度判定をすり抜けて
-            // 原点姿勢で描画され、パーツの飛び散り/車番の重複を起こしていた。
-            // 末尾の括弧が「鏡像/向きトークン(m,x,y,z,r のみ)」なら、すべて(連続も)剥がす。
+            // 末尾括弧が鏡像/向きトークンなら全て剥がしてから角度判定する
             String s = n;
             while (s.length() >= 3 && s.endsWith(")")) {
                 int open = s.lastIndexOf('(');
@@ -3141,11 +2856,7 @@ public class TrainScriptSystem {
             restoreMatrixDepth(0);
             this.poseStack = poseStack;
             this.buffer = buffer;
-            // pass 2+ is the legacy emissive pass, but do not make the whole script pass
-            // fullbright. Some train scripts (Spacia etc.) call render_parts() again in pass
-            // 2, and a pass-wide fullbright makes exterior body meshes flash/glow in daylight.
-            // Only explicit GLHelper.setLightmapMaxBrightness() or filtered emissive batches
-            // should become fullbright.
+            // pass2+でもパス全体はフルブライトにしない(明示指定と発光バッチのみ)
             this.packedLight = packedLight;
             this.basePackedLight = packedLight;
             this.lightmapMaxForced = false;
@@ -3279,11 +2990,7 @@ public class TrainScriptSystem {
             recordOp(OP_CLEAR_UV_WINDOW, 0, 0, 0, 0, 0, null, ' ');
         }
 
-        /**
-         * UV ウィンドウまたは UV オフセットがアクティブかどうか。
-         * GPU VBO キャッシュは静的 UV を前提とするため、これらが有効なフレームでは
-         * CPU フォールバック経路を使う。
-         */
+        /** UVウィンドウ/オフセットが有効か。有効フレームはCPU経路を使う。 */
         public boolean hasUvWindow() {
             return uvWindowActive || uvOffsetActive;
         }
@@ -3563,12 +3270,7 @@ public class TrainScriptSystem {
             tessellatorVertices.clear();
         }
 
-        /**
-         * 指定グループ(LCD面)の各クワッド面の上に、gif/画像テクスチャをフルUV(0-1)で貼り付けて描画する。
-         * E259 等の CustomMonitor_LCD は別オーバーレイモデルを NGTLib 直接GLで重ねるが、その API は
-         * 1.21 に無いため、ここでは LCD 面の実頂点に直接 gif クワッドを描く(発光・面法線方向に微小オフセット)。
-         * @param groupsCsv 対象グループ名(カンマ/スペース区切り, 例 "lcd1")
-         */
+        /** 指定グループの面にgif/画像テクスチャを貼って描画する。 */
         public void renderGifOnGroup(String groupsCsv, String domain, String path, int frameIndex) {
             if (mqoModel == null || poseStack == null || buffer == null || groupsCsv == null) return;
             java.util.Set<String> groups = new java.util.HashSet<>();
@@ -4255,16 +3957,7 @@ public class TrainScriptSystem {
             }
             String lower = groupName.toLowerCase(Locale.ROOT);
             if (train != null) {
-                //pass 3 = 前照灯 (***_light1.png) / pass 4 = 尾灯 (***_light2.png)。
-                //
-                //本家 (ModelObject.renderWithTexture) はここでグループ名を一切見ない。
-                //発光パスの絞り込みは「マテリアルに Light フラグが付いているか」だけで行い、
-                //Light マテリアルの面を車体ごと light テクスチャで描き直す。何が光るかは
-                //light テクスチャのアルファが決める (ランプ以外は透明)。
-                //RTM のパックはこの前提で作られているので (EXE も E257 も pass > 1 で
-                //body.render() を呼ぶ)、名前でランプだけに絞ると何も描かれなくなる。
-                //どのパスを走らせるかは MqoModelLoader.shouldRenderEmissivePass が
-                //本家 renderBodyLight と同じ条件 (ライト状態 / 先頭車 / 最後尾車) で決める。
+                //発光パスはマテリアルのLightフラグだけで絞る(グループ名では絞らない)
                 if (currentPass >= 3) {
                     return true;
                 }
@@ -4353,11 +4046,7 @@ public class TrainScriptSystem {
                 || !scriptedTranslucentGroups.isEmpty();
         }
 
-        /**
-         * Called when the script is permanently disabled (render() threw an exception).
-         * Clears group ownership so baked render can render all groups normally instead
-         * of skipping everything that was registered via registerParts() during init.
-         */
+        /** スクリプトが恒久無効化されたときにグループ所有権をクリアする。 */
         public void clearScriptRegisteredGroups() {
             scriptRegisteredGroups.clear();
             scriptedOpaqueGroups.clear();
@@ -4377,17 +4066,11 @@ public class TrainScriptSystem {
             if (shouldSuppressOerMseScriptHoodGroup(normalized)) {
                 return false;
             }
-            // 角度曲げ変種 (body-30 / body-180(mx) / bogie1-90 / bogie2-60 等、角度数字付き) は
-            // RTM の連結曲げ用代替メッシュ。移植版には曲げ処理が無く、原点姿勢で描くと翼状/斜めに
-            // 散乱する。直線の単行列車では一切描かない (台車ルールより前に判定。bogie2-60 もここで除外)。
-            // 角度の無い (mx) 鏡像は直線の半身なので対象外。D51 の body-1/2/3 はセクション扱い。
+            // 角度曲げ変種は描かない(原点姿勢だと散乱する)
             if (isBendVariant(normalized)) {
                 return false;
             }
-            // 台車・車輪グループは常にベイクド描画する。スクリプトの render_bogie() が
-            // サイレント失敗・座標バグ・getWheelRotationR 未実装等で見えなくなる事例が
-            // 多発するため、スクリプト描画と併せて baked からも必ず描く。
-            // (二重描画になるが、車輪が消えるよりは重なって見える方を優先 — ユーザー要望)
+            // 台車・車輪グループは常にベイクド描画もする(消えるより重なる方を優先)
             boolean isBogieLike = isBogieLikeGroup(normalized);
             if (isBogieLike) {
                 return !scriptedOpaqueGroups.contains(normalized)
@@ -4399,19 +4082,11 @@ public class TrainScriptSystem {
             if (scriptRegisteredGroups.contains(normalized)) {
                 return false;
             }
-            // RTM script は on/off、号車別、表示種別の片方だけを render() で選ぶ。
-            // 直接 registerParts されていない兄弟 group を baked が描くと、
-            // MSE の幌、スペーシアの急行灯、床下板や表示器の別状態が復活する。
-            // そのため script が同じ「切替ファミリー」を 1 つでも登録している場合、
-            // 未登録の兄弟も script 管理として baked から落とす。
+            // 切替ファミリーを登録済みなら未登録の兄弟もbakedから落とす
             if (scriptRegisteredAnyInSelectorFamily(normalized)) {
                 return false;
             }
-            // "type" セレクタ変種 (type_1 / type_180 / type0 等) は RTM が車種設定で 1 つだけ
-            // 表示する front-end タイプ。同じ MQO に複数同梱され、スクリプトは使う 1 つだけ登録する。
-            // スクリプトが type* を登録済みなのに、この未登録 type* を baked が原点描画すると
-            // 空中に破片として出る (C57_001 の type_180 = ユーザー報告の散乱パネル)。
-            // → type* を 1 つでも登録していれば、未登録の type* は描かない。
+            // type*を1つでも登録済みなら未登録のtype*は描かない
             if (normalized.startsWith("type") && scriptRegisteredAnyWithPrefix("type")) {
                 return false;
             }
@@ -4522,10 +4197,7 @@ public class TrainScriptSystem {
             }
         }
 
-        /**
-         * Returns wheel rotation angle in degrees for legacy scripts.
-         * Called as renderer.getWheelRotationR(entity) in RTM 1.12.2 scripts.
-         */
+        /** レガシースクリプト用の車輪回転角(度)を返す。 */
         public float getWheelRotationR(Object entity) {
             if (entity instanceof TrainEntity train) {
                 // 走行距離ベースの累積回転角(TrainEntity.tick で毎tick加算)を使う。
@@ -4616,12 +4288,7 @@ public class TrainScriptSystem {
 
         public int getLightState(Object entity) {
             if (entity instanceof InstalledObjectBlockEntity blockEntity) {
-                // 本家 MachinePartsRenderer.getLightState 準拠:
-                //   照明(LIGHT) → レッドストーン電力で 1(点灯) / -1(消灯)。
-                //     ※ TileEntityLight.isGettingPower と同じ。スクリプトは pass==2 で
-                //       state==1 のとき発光(_lightN)テクスチャを描く。
-                //   踏切(CROSSING) → 点滅カウンタ(0/1)、信号(SIGNAL) → 現示状態。
-                //     (どちらも getLightCount() が従来通り返す。)
+                // 本家getLightState準拠: 照明=RS電力で±1、踏切=点滅カウンタ、信号=現示
                 if (blockEntity.getCategory()
                         == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.LIGHT) {
                     return blockEntity.isPowered() ? 1 : -1;
@@ -5226,11 +4893,7 @@ public class TrainScriptSystem {
         public int getColor(Object entity) { return 0xFFFFFF; }
     }
 
-    /**
-     * GL11 即時モード関数の最小シム。RTM 原作のレンダラスクリプトが直叩きする
-     * glPushMatrix/glPopMatrix/glTranslated/glRotated/glScalef 等を ScriptModelRenderer の
-     * poseStack 操作にブリッジする。
-     */
+    /** GL11即時モード関数の最小シム。poseStack操作へブリッジする。 */
     public static final class GL11Compat {
         private final ScriptModelRenderer renderer;
 
@@ -5238,10 +4901,7 @@ public class TrainScriptSystem {
             this.renderer = renderer;
         }
 
-        // GL11 行列操作を ScriptModelRenderer 経由で PoseStack に橋渡しする。
-        // ScriptModelRenderer 側で NaN/Infinite ガードと matrixDepth 管理を行うため、
-        // ここでは委譲するだけ。これで RTM スクリプトの GL11.glPushMatrix → glTranslated →
-        // glRotated → model.renderPart("doorL") → glPopMatrix パターンが機能する。
+        // GL11行列操作をScriptModelRenderer経由でPoseStackへ委譲する
         public void glPushMatrix() { if (renderer != null) renderer.pushMatrix(); }
         public void glPopMatrix() { if (renderer != null) renderer.popMatrix(); }
         public void glTranslatef(float x, float y, float z) { if (renderer != null) renderer.translate(x, y, z); }
@@ -5282,11 +4942,7 @@ public class TrainScriptSystem {
         public static final int GL_QUADS = 0x0007;
     }
 
-    /**
-     * スクリプトで {@code new Parts("bogieF", "wheelF1", ...)} と呼ばれる用のビルダー。
-     * 引数の文字列群を保持し、{@code ScriptModelRenderer.registerParts(parts)} に渡された時点で
-     * グループ名を抽出する。
-     */
+    /** new Parts(...)用ビルダー。registerParts時にグループ名を抽出する。 */
     public static final class PartsBuilder {
         private final java.util.List<String> groupNames = new java.util.ArrayList<>();
 
@@ -5331,20 +4987,9 @@ public class TrainScriptSystem {
         }
     }
 
-    /**
-     * RTM 原作の jp.ngt.ngtlib.io.NGTText スタブ。
-     * Nashorn のオーバーロード解決は不安定で、複数の readText() オーバーロードがあると
-     * "is not a function" エラーになることがある。各メソッドを 1 個の定義に統一する。
-     * readText は本来テキストファイル内容を List<String> で返す。
-     */
+    /** NGTTextスタブ。各メソッドを1個の定義に統一する。 */
     public static final class NGTTextCompat {
-        /**
-         * パックの自前 include (eval(append(NGTText.readText(getResource(path))))) が呼ぶ。
-         * 従来は無条件で空を返していたため、render_function.js 等を include する車両
-         * (500系など) で MCVersionChecker 等が未定義になり描画スクリプトが丸ごと死んでいた。
-         * resource から実パスを取り出し、パックアセットを実際に読む。
-         * 見つからないときだけ、sound lib include の StackOverflow 対策ダミーを返す。
-         */
+        /** パックの自前includeが呼ぶ。実パスを取り出してアセットを読む。 */
         public java.util.List<String> readText(Object resource) {
             String path = extractResourcePath(resource);
             if (path != null && !path.isBlank()) {
@@ -5366,10 +5011,7 @@ public class TrainScriptSystem {
             }
             return jp.ngt.ngtlib.io.NGTFileLoader.readAssetLines(path).toArray(new String[0]);
         }
-        /**
-         * getResource(...) の戻り値からアセットパスを取り出す。
-         * 実 ResourceLocation / JS オブジェクト ({path,func_110623_a}) / 文字列 に対応。
-         */
+        /** getResource戻り値からアセットパスを取り出す。 */
         private static String extractResourcePath(Object resource) {
             if (resource == null) {
                 return null;
@@ -5470,21 +5112,7 @@ public class TrainScriptSystem {
             } catch (Throwable t) { return false; }
         }
 
-        /**
-         * 本家 NGTUtil.getMethod: リフレクションでメソッドを呼び、戻り値を返す。
-         *
-         * <p>パックはこれで <b>private なメソッド</b> (Formation.getControlCar 等) を叩く。
-         * 未実装だったため、西武 2000 系のような運転台スクリプトが
-         * {@code TypeError: NGTUtil.getMethod is not a function} で落ち、スクリプトごと無効化されて
-         * <b>素のモデル (全ノッチぶんのマスコン) がまとめて描かれていた</b>。
-         *
-         * <p>引数の並びは NGTLib のバージョンで違う:
-         * <pre>
-         *   (clazz, instance, names[], types[], args...)        1.7.10 / KaizPatchX
-         *   (clazz, instance, ???, names[], types[], args...)   RTM 2.x
-         * </pre>
-         * どちらでも通るよう、2 番目を対象インスタンスとし、残りからメソッド名を拾う。
-         */
+        /** 本家NGTUtil.getMethod: リフレクションでメソッドを呼ぶ。引数並びの版差に両対応。 */
         public Object getMethod(Object... params) {
             if (params == null || params.length < 2 || params[1] == null) {
                 return null;

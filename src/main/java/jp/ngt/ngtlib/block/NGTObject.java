@@ -75,6 +75,79 @@ public class NGTObject {
         return BlockSet.AIR;
     }
 
+    /** 本家 setBlockSet: 指定位置のブロックを差し替える。変わったら true。 */
+    public boolean setBlockSet(int x, int y, int z, net.minecraft.world.level.block.Block block, int meta) {
+        if (x < 0 || y < 0 || z < 0 || x >= this.xSize || y >= this.ySize || z >= this.zSize) {
+            return false;
+        }
+        BlockSet old = this.getBlockSet(x, y, z);
+        if (old != null && old.block == block && old.metadata == (byte) meta) {
+            return false;
+        }
+        BlockSet set = new BlockSet(x, y, z, block, meta);
+        this.grid[x + z * this.xSize + y * this.xSize * this.zSize] = set;
+        this.blockList.removeIf(b -> b.x == x && b.y == y && b.z == z);
+        this.blockList.add(set);
+        this.lightValue = -1;
+        return true;
+    }
+
+    /** ミニチュア内のエンティティ。RTMU はブロックのみ保持する。 */
+    public java.util.List<Object> getEntityList() {
+        return java.util.List.of();
+    }
+
+    /** 本家 getLightValue: 含まれるブロックの最大発光量。 */
+    public int getLightValue() {
+        if (this.lightValue < 0) {
+            int brightness = 0;
+            for (BlockSet set : this.blockList) {
+                if (set == null) {
+                    continue;
+                }
+                brightness = Math.max(brightness, set.getState().getLightEmission());
+            }
+            this.lightValue = brightness;
+        }
+        return this.lightValue;
+    }
+
+    /** 発光量キャッシュ (-1 = 未計算)。 */
+    private int lightValue = -1;
+
+    /** 本家 exportToFile: gzip NBT でファイルへ書き出す。 */
+    public void exportToFile(java.io.File file) {
+        try {
+            net.minecraft.nbt.NbtIo.writeCompressed(this.writeToNBT(), file.toPath());
+        } catch (java.io.IOException e) {
+            jp.ngt.ngtlib.io.NGTLog.debug("[NGTObject] export failed: " + e);
+        }
+    }
+
+    /** 本家 importFromFile。読めなければ null。 */
+    public static NGTObject importFromFile(java.io.File file) {
+        try {
+            CompoundTag tag = net.minecraft.nbt.NbtIo.readCompressed(
+                    file.toPath(), net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+            return tag == null ? null : readFromNBT(tag);
+        } catch (java.io.IOException e) {
+            jp.ngt.ngtlib.io.NGTLog.debug("[NGTObject] import failed: " + e);
+            return null;
+        }
+    }
+
+    /** 本家 load: ストリームから読む (パック内のミニチュア用)。 */
+    public static NGTObject load(java.io.InputStream stream) {
+        try {
+            CompoundTag tag = net.minecraft.nbt.NbtIo.readCompressed(
+                    stream, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+            return tag == null ? null : readFromNBT(tag);
+        } catch (java.io.IOException e) {
+            jp.ngt.ngtlib.io.NGTLog.debug("[NGTObject] load failed: " + e);
+            return null;
+        }
+    }
+
     public CompoundTag writeToNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putLong("ObjId", this.objId);

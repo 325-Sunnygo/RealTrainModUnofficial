@@ -80,4 +80,55 @@ public final class ModelPackManager {
             return name;
         }
     }
+
+    /** 本家getType: 型キー(そのまま返す)。 */
+    public String getType(String type) {
+        return type;
+    }
+
+    /** 本家getModelList: モデル一覧(未対応=空)。 */
+    public java.util.List<Object> getModelList(Object type) {
+        return new java.util.ArrayList<>();
+    }
+
+    /** 本家getModelFile: モデルグラフを返す(無ければ空)。 */
+    public jp.ngt.ngtlib.renderer.model.PolygonModel getModelFile(String key) {
+        try {
+            byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(key);
+            if (bytes == null) {
+                bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset("models/" + key);
+            }
+            if (bytes != null) {
+                return jp.ngt.ngtlib.renderer.model.ModelLoader.parse(bytes, key);
+            }
+        } catch (Exception ignored) {
+        }
+        return new jp.ngt.ngtlib.renderer.model.PolygonModel();
+    }
+
+    /** 本家loadModel。 */
+    public jp.ngt.ngtlib.renderer.model.PolygonModel loadModel(String modelName, int drawMode, boolean addModelMap, Object cfg) {
+        return getModelFile(modelName);
+    }
+
+    /** 本家registerType: no-op。 */
+    public void registerType(String type, Object cfg, Object set) {
+    }
+
+    /** 本家addModelSetName: no-op。 */
+    public void addModelSetName(int count, String type, String name) {
+    }
+
+    /** 本家registerModelset: no-op。 */
+    public void registerModelset(Object... args) {
+    }
+
+    /** 本家sendModelSetsToClient: no-op。 */
+    public void sendModelSetsToClient(Object... args) {
+    }
+
+    /** 本家setModelFile: no-op。 */
+    public void setModelFile(Object... args) {
+    }
+
 }

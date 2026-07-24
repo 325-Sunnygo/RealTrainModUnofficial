@@ -384,7 +384,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
 
     private static void renderConfiguredRollsigns(TrainEntity entity, VehicleDefinition def, PoseStack poseStack,
                                                   MultiBufferSource buffer, int packedLight) {
-        renderConfiguredRollsigns(entity.getDestinationIndex(), def, poseStack, buffer, packedLight);
+        renderConfiguredRollsigns(entity.getDestinationIndex(), entity.getRollsignAnimation(), def, poseStack, buffer, packedLight);
     }
 
     /**
@@ -397,24 +397,26 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
      * <p>実際に列車を描くのは {@code RtmTrainRenderer} なので、そちらからも呼べるよう
      * エンティティに依存しない形 (行き先インデックスだけ受ける) にしてある。
      */
-    static void renderConfiguredRollsigns(int rawDestinationIndex, VehicleDefinition def, PoseStack poseStack,
+    static void renderConfiguredRollsigns(int rawDestinationIndex, float animation, VehicleDefinition def, PoseStack poseStack,
                                           MultiBufferSource buffer, int packedLight) {
         if (def == null) {
             return;
         }
-        renderSignPanels(rawDestinationIndex, def.getPackName(), def.getRollsignTexture(),
+        renderSignPanels(rawDestinationIndex, animation, def.getPackName(), def.getRollsignTexture(),
                 def.getRollsignNames(), def.getRollsigns(), poseStack, buffer, packedLight);
     }
 
     /**
      * RTMU 追加: 種別幕 (方向幕と同じ仕組みで別テクスチャ・別インデックス State_Type)。
+     * 種別幕は本家に無く幕回し用の連続値も持たないので、doAnimation でも index を静的表示する
+     * (animation に index をそのまま渡す = f1 が整数のままスナップ)。
      */
     static void renderConfiguredTypeSigns(int rawTypeIndex, VehicleDefinition def, PoseStack poseStack,
                                           MultiBufferSource buffer, int packedLight) {
         if (def == null) {
             return;
         }
-        renderSignPanels(rawTypeIndex, def.getPackName(), def.getTypeSignTexture(),
+        renderSignPanels(rawTypeIndex, (float) rawTypeIndex, def.getPackName(), def.getTypeSignTexture(),
                 def.getTypeSignNames(), def.getTypeSigns(), poseStack, buffer, packedLight);
     }
 
@@ -422,7 +424,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
      * uv+pos で定義された幕パネル群を、名前数で縦分割したテクスチャの index 番目の帯で描く。
      * 方向幕 (rollsigns) と種別幕 (typeSigns) の共通処理。
      */
-    private static void renderSignPanels(int rawIndex, String packName, String texturePath,
+    private static void renderSignPanels(int rawIndex, float animation, String packName, String texturePath,
                                          List<String> names, List<VehicleDefinition.RollsignDefinition> panels,
                                          PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
         if (panels == null || panels.isEmpty()) {
@@ -433,9 +435,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         }
         ResourceLocation texture = MqoModelLoader.resolvePackTexture(packName, texturePath);
         int count = Math.max(1, names == null || names.isEmpty() ? 1 : names.size());
-        int destinationIndex = Math.floorMod(rawIndex, count);
-        float segmentV0 = destinationIndex / (float) count;
-        float segmentV1 = (destinationIndex + 1.0F) / (float) count;
+        int discreteIndex = Math.floorMod(rawIndex, count);
         VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
         PoseStack.Pose pose = poseStack.last();
         Matrix4f mat = pose.pose();
@@ -450,8 +450,13 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             float uMax = uv[1];
             float baseVMin = uv[2];
             float baseVMax = uv[3];
-            float vMin = Mth.lerp(segmentV0, baseVMin, baseVMax);
-            float vMax = Mth.lerp(segmentV1, baseVMin, baseVMax);
+            //★本家 RenderVehicleBase.renderRollsign と同じ:
+            //  f1 = doAnimation ? getRollsignAnimation() (連続値で滑らかに幕回し) : 行先 index (段でスナップ)。
+            //  幕を names 数で縦分割し、その 1 コマ分 (segment) を f1 番目から f1+1 番目まで切り出す。
+            float f1 = rollsign.doAnimation() ? animation : (float) discreteIndex;
+            float segment = (baseVMax - baseVMin) / (float) count;
+            float vMin = baseVMin + segment * f1;
+            float vMax = baseVMin + segment * (f1 + 1.0F);
             //★本家は disableLighting が false のときに GL のライティングを切って
             //  ライトマップを最大にする = 幕が自己発光する。名前と逆なので注意
             //  (RTMU は条件が反転していて、光るべき幕が暗いままだった)。

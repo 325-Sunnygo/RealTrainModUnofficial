@@ -128,16 +128,13 @@ public final class MachineScriptRenderers {
 
         //設置オブジェクトごとのスクリプト描画キャッシュ。信号機/看板は状態が変わらない間
         //Nashorn を再実行せず記録を再生する (172 個の毎フレーム実行が主なコストだった)。
-        //シグネチャに含まれない時間依存要素の取りこぼしは REFRESH_FRAMES で救済する。
         private final java.util.Map<Object, Cache> caches =
                 java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
-        private static final int REFRESH_FRAMES = 8;
 
         private static final class Cache {
             boolean valid;
             boolean drew;
             long sig;
-            int framesSinceRun;
             GLRecorder rec;
         }
 
@@ -176,14 +173,7 @@ public final class MachineScriptRenderers {
             PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
 
             //キャッシュヒット: 記録を再生するだけ (Nashorn 実行なし)。
-            if (c.valid && c.sig == sig && c.framesSinceRun < REFRESH_FRAMES) {
-                c.framesSinceRun++;
-                if (!c.drew) {
-                    return false;
-                }
-                VehicleScriptRenderers.replay(c.rec, poseStack, buffer, packedLight, packedOverlay, model, graph);
-                return true;
-            }
+            //★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
 
             //ミス: 実際にスクリプトを実行して記録し、キャッシュへ保存。
             GLRecorder rec = new GLRecorder();
@@ -204,7 +194,6 @@ public final class MachineScriptRenderers {
             boolean drew = rec.hasGeometry();
             c.valid = true;
             c.sig = sig;
-            c.framesSinceRun = 0;
             c.drew = drew;
             c.rec = drew ? rec : null;
             if (!drew) {

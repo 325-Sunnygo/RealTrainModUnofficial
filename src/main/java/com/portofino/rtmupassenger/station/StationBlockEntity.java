@@ -164,9 +164,10 @@ public class StationBlockEntity extends BlockEntity {
         if (level.random.nextFloat() >= chance) {
             return;
         }
-        //ワールド全体の上限 (RTMU 設定「乗客の最大数」。0=湧かない, 無制限も可)。
-        //SavedData で厳密にカウント (チャンク外の乗客も含む)。
-        if (PassengerPopulation.get(level).size()
+        //上限は「プレイヤーから見える乗客の数」で判定する (RTMU 設定「乗客の最大数」)。
+        //ワールド全体の総数で見ると、遠くの駅に湧いた乗客のせいで目の前の駅が
+        //いつまでも無人になる。見えている範囲で数えれば、どこにいても同じ密度になる。
+        if (this.visiblePassengerCount(level)
                 >= com.portofino.realtrainmodunofficial.RtmuSettings.serverMaxPassengers()) {
             return;
         }
@@ -196,8 +197,36 @@ public class StationBlockEntity extends BlockEntity {
         p.initPassenger(this.worldPosition, dest, waitSpot);
         p.finalizeSpawn(level, level.getCurrentDifficultyAt(this.worldPosition), MobSpawnType.TRIGGERED, null);
         level.addFreshEntity(p);
-        //総数へ登録 (本当に消えた時に PassengerEntity.remove が解除する)
-        PassengerPopulation.get(level).add(p.getUUID());
+    }
+
+    /**
+     * この駅を見ているプレイヤーの視界内にいる乗客の数 (見ている人の中での最大値)。
+     * <p>
+     * 誰も見ていない駅では {@link Integer#MAX_VALUE} を返して湧かせない
+     * (チャンクローダーで回り続けている駅に、誰も見ないまま乗客が溜まるのを防ぐ)。
+     */
+    private int visiblePassengerCount(ServerLevel level) {
+        double r = level.getServer().getPlayerList().getViewDistance() * 16.0D;
+        double rSq = r * r;
+        int max = 0;
+        boolean anyViewer = false;
+        for (net.minecraft.server.level.ServerPlayer player : level.players()) {
+            //この駅がそのプレイヤーの視界外なら、その人にとっては関係ない
+            if (player.distanceToSqr(this.worldPosition.getX() + 0.5D,
+                    this.worldPosition.getY() + 0.5D,
+                    this.worldPosition.getZ() + 0.5D) > rSq) {
+                continue;
+            }
+            anyViewer = true;
+            double px = player.getX();
+            double py = player.getY();
+            double pz = player.getZ();
+            int count = level.getEntitiesOfClass(PassengerEntity.class,
+                    new net.minecraft.world.phys.AABB(px - r, py - r, pz - r, px + r, py + r, pz + r),
+                    p -> true).size();
+            max = Math.max(max, count);
+        }
+        return anyViewer ? max : Integer.MAX_VALUE;
     }
 
     /** ブロック破壊時: 駅登録を解除する。 */

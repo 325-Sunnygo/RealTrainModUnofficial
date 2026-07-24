@@ -45,6 +45,10 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public int seatRotation;
     public int doorMoveL;
     public int doorMoveR;
+    /** 方向幕スクロールアニメ (幕回し) の現在位置 (1/16 単位)。本家 EntityVehicleBase.rollsignAnimation。 */
+    public int rollsignAnimation;
+    /** 方向幕スクロールの目標位置 (= 行先 index * 16)。本家 EntityVehicleBase.rollsignV。 */
+    public int rollsignV;
 
     /**
      * RTMU 追加: 転換クロスシートの向き (E257 等の train スクリプトが読む)。
@@ -86,6 +90,12 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public int field_70173_aa;
     public float field_70177_z;
     public float field_70125_A;
+    //prevRotationYaw / prevRotationPitch。
+    //スクリプトは pitch = field_70127_C + (field_70125_A - field_70127_C) * partialTick で補間する。
+    //欠けていると undefined→NaN になり glRotatef(NaN) で行列が壊れ、車体が丸ごと消える
+    //(MultiFunctionCarsPack の車が透明になっていた原因)。
+    public float field_70126_B;
+    public float field_70127_C;
     public Entity field_70153_n;
     //posX / posY / posZ
     public double field_70165_t;
@@ -161,6 +171,14 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
         this.applyPhysicalEffect();
 
+        //床/座席パーツを「車体が動き終わったこの時点」の位置へ揃える。
+        //
+        //★これが無いと走行中に座れなくなる。パーツ側も自分の tick で追従するが、
+        //エンティティの tick 順は登録順で決まり、パーツが車体より先に回ると
+        //<b>1 tick 前の車体位置</b>を使ってしまう。最高速では 1 tick で 1.8 ブロック進むため、
+        //当たり判定だけが車両の後方に取り残され、クリックしても座席に届かない。
+        this.updateFloorPositions();
+
         //視点追従 (本家 KaizPatchX EntityTrainBase.updateRiderPosition)
         this.rotateRiders();
 
@@ -169,6 +187,9 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
             this.field_70170_p = new jp.ngt.mccompat.WorldCompat(this.level());
         }
         this.field_70173_aa = this.tickCount;
+        //前 tick の角度は「今の値で上書きする前」に退避する (スクリプトが partialTick 補間に使う)
+        this.field_70126_B = this.yRotO;
+        this.field_70127_C = this.xRotO;
         this.field_70177_z = this.getYRot();
         this.field_70125_A = this.getXRot();
         this.field_70153_n = this.getPassengers().isEmpty() ? null : this.getPassengers().get(0);
@@ -293,8 +314,157 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         return 0.0F;
     }
 
+    /**
+     * 本家 getSpeed: 車両速度 (ブロック/tick)。列車側がオーバーライドする。
+     * 本家は abstract だが、RTMU では車以外も同じ基底を使うため既定を返す。
+     */
+    public float getSpeed() {
+        return this.getVehicleSpeed();
+    }
+
+    /** 本家 getModelName: 選択中のモデル名。 */
+    public String getModelName() {
+        return this.getResourceName();
+    }
+
+    /** 本家 setModelName: 既定は何もしない (列車/車が実装)。 */
+    public void setModelName(String name) {
+    }
+
+    /** 本家 getDefaultName: モデル未指定時のフォールバック名。 */
+    public String getDefaultName() {
+        return "";
+    }
+
+    /** 本家 getModelSet: このモデル名に対応する ModelSet。 */
+    public jp.ngt.rtm.modelpack.modelset.ModelSetCompat getModelSet() {
+        return this.getResourceSetForScript();
+    }
+
+    /** 本家 getModelType: モデル種別 ("ModelTrain" 等)。 */
+    public String getModelType() {
+        return jp.ngt.rtm.modelpack.cfg.TrainConfig.TYPE;
+    }
+
+    /**
+     * 本家 useInteriorLight: 室内灯を点けるか (設定で常時オフに出来る)。
+     * shouldUseInteriorLight は「これ AND 周囲が暗い」で判定する。
+     */
+    public boolean useInteriorLight() {
+        return true;
+    }
+
+    /** 本家 getBoundingBox。 */
+    public net.minecraft.world.phys.AABB getBoundingBox2() {
+        return this.getBoundingBox();
+    }
+
+    /**
+     * 本家 getCollisionBox: 自分に属する台車/パーツとは当たり判定を持たない。
+     * 持たせると自車のパーツに押し返されて車両が跳ねる。
+     */
+    public net.minecraft.world.phys.AABB getCollisionBox(net.minecraft.world.entity.Entity other) {
+        if (other instanceof jp.ngt.rtm.entity.train.parts.EntityVehiclePart part && part.getVehicle() == this) {
+            return null;
+        }
+        if (other instanceof jp.ngt.rtm.entity.train.EntityBogie bogie && bogie.getTrain() == this) {
+            return null;
+        }
+        return other == null ? null : other.getBoundingBox();
+    }
+
+    /** 本家 setFloor: EntityFloor から自分を登録してもらう。 */
+    public void setFloor(jp.ngt.rtm.entity.train.parts.EntityFloor floor) {
+        if (floor != null && !this.vehicleFloors.contains(floor)) {
+            this.vehicleFloors.add(floor);
+        }
+    }
+
+    /**
+     * 床/座席パーツを今の車体位置へ揃える。
+     * <p>
+     * パーツ自身の tick でも追従しているが、tick 順によっては車体より先に回って
+     * 1 tick 前の位置を使う。ここで車体の移動後に押し出しておけば、順序に関係なく
+     * 当たり判定が車体と一致する。
+     */
+    protected void updateFloorPositions() {
+        if (this.vehicleFloors.isEmpty()) {
+            return;
+        }
+        //消えた床は取り除く (クライアントでは床が個別に消えるので溜まる)
+        this.vehicleFloors.removeIf(f -> f == null || f.isRemoved());
+        for (jp.ngt.rtm.entity.train.parts.EntityFloor floor : this.vehicleFloors) {
+            floor.updatePartPos(this);
+        }
+    }
+
+    /**
+     * 本家 fixRiderPos: 降車時に車体の内側へ埋まらないよう、
+     * 車体 AABB の外の足場へ押し出す。
+     */
+    public static void fixRiderPos(net.minecraft.world.entity.LivingEntity entity,
+                                   net.minecraft.world.entity.Entity vehicle) {
+        if (entity == null || vehicle == null) {
+            return;
+        }
+        net.minecraft.world.phys.AABB aabb = vehicle.getBoundingBox();
+        if (entity.getX() < aabb.minX || entity.getX() >= aabb.maxX
+                || entity.getZ() < aabb.minZ || entity.getZ() >= aabb.maxZ) {
+            return;
+        }
+        double range = 0.5D;
+        int y = net.minecraft.util.Mth.floor(aabb.minY);
+        //車体 AABB のすぐ外側 4 方向のうち、立てる所へ寄せる
+        double[][] candidates = {
+                {aabb.minX - range, entity.getZ()},
+                {aabb.maxX + range, entity.getZ()},
+                {entity.getX(), aabb.minZ - range},
+                {entity.getX(), aabb.maxZ + range}};
+        for (double[] c : candidates) {
+            net.minecraft.core.BlockPos pos = net.minecraft.core.BlockPos.containing(c[0], y, c[1]);
+            if (entity.level().getBlockState(pos).isAir()
+                    && !entity.level().getBlockState(pos.below()).isAir()) {
+                entity.teleportTo(c[0], y, c[1]);
+                return;
+            }
+        }
+    }
+
     public jp.ngt.rtm.modelpack.state.ResourceState getResourceState() {
         return this.resourceState;
+    }
+
+    /** 本家getRoll: 車体ロール角。 */
+    public float getRoll() {
+        return this.rotationRoll;
+    }
+
+    /** 本家setSpeed: 既定は何もしない(列車側がオーバーライド)。 */
+    public void setSpeed(float par1) {
+    }
+
+    /** 本家setRollAndSpeed。 */
+    public void setRollAndSpeed(float speed, float roll) {
+        this.setSpeed(speed);
+        this.vehicleRoll = roll;
+    }
+
+    /** 本家closeGui。 */
+    public boolean closeGui(String par1, Object par2) {
+        return true;
+    }
+
+    /** 本家getPos: {entityId, -1, 0}。 */
+    public int[] getPos() {
+        return new int[]{this.getId(), -1, 0};
+    }
+
+    /** 本家shouldUseInteriorLight: 周囲光が暗ければ室内灯を使う。 */
+    public boolean shouldUseInteriorLight() {
+        int x = net.minecraft.util.Mth.floor(this.getX());
+        int y = net.minecraft.util.Mth.floor(this.getY() + 0.5D);
+        int z = net.minecraft.util.Mth.floor(this.getZ());
+        return jp.ngt.ngtlib.util.NGTUtil.getLightValue(this.level(), x, y, z) < 7;
     }
 
     // ---- 本家スクリプト互換 API ----
@@ -321,11 +491,20 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     }
 
     /**
-     * 本家 EntityVehicleBase.getRollsignAnimation: 方向幕のスクロール量 (0.0〜1.0)。
-     * RTMU は方向幕をアニメーションさせないので常に 0 (= 表示が切り替わるだけ)。
+     * 本家 EntityTrainBase.getRollsignAnimation: 方向幕のスクロール位置 (連続値・行先index基準)。
+     * {@code rollsignAnimation} は毎 tick 目標 {@code rollsignV} (=行先*16) へ ±1 で寄るので、
+     * 16 で割ると「今どの行先フレームを表示中か」を小数で表す (幕回しアニメ)。列車以外は 0。
      */
     public float getRollsignAnimation() {
-        return 0.0F;
+        return (float) this.rollsignAnimation / 16.0F;
+    }
+
+    /**
+     * 本家 EntityTrainBase.setRollsignAnimation: 方向幕スクロールの目標フレームを設定する。
+     * 実際の {@code rollsignAnimation} はこの目標へ毎 tick 1 ずつ寄り、滑らかに幕が回る。
+     */
+    public void setRollsignAnimation(int destination) {
+        this.rollsignV = destination * 16;
     }
 
     /**

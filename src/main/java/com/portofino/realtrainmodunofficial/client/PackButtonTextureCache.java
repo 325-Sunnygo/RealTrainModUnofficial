@@ -50,11 +50,11 @@ public final class PackButtonTextureCache {
             try {
                 NativeImage fallbackImage = loadBySearchingAllPacks(texturePath);
                 if (fallbackImage == null) {
-                    return null;
+                    return missingButtonInfo();
                 }
                 return registerDynamicTexture(packName, texturePath, fallbackImage);
             } catch (Exception e) {
-                return null;
+                return missingButtonInfo();
             }
         }
         try {
@@ -65,11 +65,45 @@ public final class PackButtonTextureCache {
                 image = loadBySearchingAllPacks(texturePath);
             }
             if (image == null) {
-                return null;
+                return missingButtonInfo();
             }
             return registerDynamicTexture(packName, texturePath, image);
         } catch (Exception e) {
-            return null;
+            return missingButtonInfo();
+        }
+    }
+
+    private static volatile ButtonTextureInfo missingInfo;
+
+    /**
+     * テクスチャ欠落ボタン用の紫黒チェッカー(本家missingno風)。
+     * null返しはcomputeIfAbsentにキャッシュされず、毎フレーム全パック走査が走ってFPSが激減するため、
+     * 必ずこれを返してキャッシュに乗せる。
+     */
+    private static ButtonTextureInfo missingButtonInfo() {
+        ButtonTextureInfo cached = missingInfo;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (PackButtonTextureCache.class) {
+            if (missingInfo != null) {
+                return missingInfo;
+            }
+            NativeImage img = new NativeImage(NativeImage.Format.RGBA, 16, 16, false);
+            int magenta = 0xFFF800F8; //ABGR
+            int black = 0xFF000000;
+            for (int y = 0; y < 16; y++) {
+                for (int x = 0; x < 16; x++) {
+                    img.setPixelRGBA(x, y, ((x / 8 + y / 8) % 2 == 0) ? magenta : black);
+                }
+            }
+            ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
+                RealTrainModUnofficial.MODID, "dynamic/button/_missing");
+            DynamicTexture tex = new DynamicTexture(img);
+            Minecraft.getInstance().getTextureManager().register(loc, tex);
+            tex.setFilter(false, false);
+            missingInfo = new ButtonTextureInfo(loc, 16, 16, 0, 0, 16, 16);
+            return missingInfo;
         }
     }
 

@@ -21,7 +21,6 @@ import java.util.WeakHashMap;
  *
  * <p><b>対策</b>: 状態シグネチャ ({@link InstalledObjectBlockEntity#renderStateSignature()}) が
  * 変わらない間はスクリプトの描画結果 (GLRecorder 記録) を再生し、Nashorn 再実行を省く。
- * {@link #REFRESH_FRAMES} が時間依存要素の取りこぼしの安全網。見た目は不変。
  *
  * <p>baked (非スクリプトグループの VBO 直描画) は GLRecorder を通らないが、RTM の描画スクリプトは
  * 通常<b>全グループをスクリプトで描く</b> (baked は空) ため再生で不足しない。スクリプトが
@@ -29,7 +28,6 @@ import java.util.WeakHashMap;
  */
 public final class InstalledObjectScriptCache {
 
-    private static final int REFRESH_FRAMES = 8;
     private static final Map<InstalledObjectBlockEntity, Cache> CACHES =
             Collections.synchronizedMap(new WeakHashMap<>());
 
@@ -37,7 +35,6 @@ public final class InstalledObjectScriptCache {
         boolean valid;
         boolean noCache;
         long sig;
-        int framesSinceRun;
         GLRecorder rec;
     }
 
@@ -52,14 +49,9 @@ public final class InstalledObjectScriptCache {
             MqoModelLoader.renderModelPreferScript(model, poseStack, buffer, packedLight, be);
             return;
         }
-        long sig = be.renderStateSignature();
-        //ヒット: 記録を再生するだけ (Nashorn 実行なし)。
-        if (c.valid && c.sig == sig && c.framesSinceRun < REFRESH_FRAMES) {
-            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(true);
-            c.framesSinceRun++;
-            VehicleScriptRenderers.replay(c.rec, poseStack, buffer, packedLight, packedOverlay, model, null);
-            return;
-        }
+        //★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
+        //シグネチャは RTMU が知っている状態しか見られず、スクリプトが自前で進める
+        //アニメ (点滅・スクロール・可動部) を検出できないため、間引くと不定期にカクつく。
         com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(false);
         //ミス: GLRecorder を有効にして renderPreferScript を実行し、スクリプト部を記録。
         //(記録中はスクリプトの GL 命令は記録先へ流れ buffer には出ない。baked は buffer へ直接出る。)
@@ -71,11 +63,6 @@ public final class InstalledObjectScriptCache {
             GLRecorder.deactivate();
         }
         if (rec.hasGeometry()) {
-            c.valid = true;
-            c.sig = sig;
-            c.framesSinceRun = 0;
-            c.rec = rec;
-            //このフレーム分もここで再生 (ミス時も含め毎フレーム描く)。
             VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model, null);
         } else {
             //スクリプトはジオメトリを出さない = baked が本体。以降キャッシュせず素通し。

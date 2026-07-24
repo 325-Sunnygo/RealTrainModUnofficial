@@ -39,6 +39,9 @@ public final class InstalledObjectServerScripts {
      * <p>importPackage では解決できない (1.21 に該当パッケージが無い) ものだけ。
      */
     private static final String PRELUDE = String.join("\n",
+            //rtm-ts Multi-target 対策 (詳細は PackScriptSource.PRELUDE)。prepend されたターゲット IIFE が
+            //base の var 宣言前に走っても落ちないよう、最初に RTMX_COMPAT_TARGETS を確定させる。
+            "var RTMX_COMPAT_TARGETS = (typeof RTMX_COMPAT_TARGETS !== 'undefined' && RTMX_COMPAT_TARGETS) ? RTMX_COMPAT_TARGETS : {};",
             "var __t = function(n){ try { return Java.type(n); } catch (e) { return null; } };",
             "var TileEntityCommandBlock = __t('jp.ngt.mccompat.tileentity.TileEntityCommandBlock');",
             "var CommandBlockLogic     = __t('jp.ngt.mccompat.tileentity.CommandBlockLogic');",

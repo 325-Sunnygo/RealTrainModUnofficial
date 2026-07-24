@@ -137,4 +137,40 @@ public final class GLHelper {
 
     public static void postMoveTexUV() {
     }
+
+    /** 本家setColor: 0xRRGGBB + alpha(0-255) を現在色に設定 (GLRecorder経由)。 */
+    public static void setColor(int rgb, int alpha) {
+        float r = (rgb >> 16 & 0xFF) / 255.0F;
+        float g = (rgb >> 8 & 0xFF) / 255.0F;
+        float b = (rgb & 0xFF) / 255.0F;
+        float a = alpha / 255.0F;
+        jp.ngt.ngtlib.renderer.GLRecorder rec = jp.ngt.ngtlib.renderer.GLRecorder.active();
+        if (rec != null) {
+            rec.color(r, g, b, a);
+        }
+    }
+
+    /** 本家clearGLList: 1.21はGLリスト非使用のためno-op。 */
+    public static void clearGLList() {
+    }
+
+    /** 本家initGLList: no-op。 */
+    public static void initGLList() {
+    }
+
+    /** 本家isCompiling: GLリスト非使用のため常にfalse。 */
+    public static boolean isCompiling() {
+        return false;
+    }
+
+    /** 本家isValid(DisplayList)。 */
+    public static boolean isValid(Object par1) {
+        return false;
+    }
+
+    /** 本家getShaderProgram: 旧GLSL直叩きは非対応。 */
+    public static int getShaderProgram(String vsh, String fsh) {
+        return -1;
+    }
+
 }

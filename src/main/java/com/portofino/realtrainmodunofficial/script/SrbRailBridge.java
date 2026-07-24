@@ -74,10 +74,16 @@ public final class SrbRailBridge {
             level, first.blockX, first.blockY, first.blockZ, rps, prop, true, true);
     }
 
+    /** スクリプト側から呼ぶ診断ログ。 */
+    public void logError(String msg) {
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn("[SRB] {}", msg);
+    }
+
     /** SRB の buildBranchRail 相当(3点以上で分岐レール)。 */
     public boolean buildBranchRail(Object world, List<?> rpsRaw, Object modelId) {
         Level level = toLevel(world);
         if (level == null || rpsRaw == null || rpsRaw.size() < 2) {
+            logError("buildBranchRail: level=" + (level != null) + " rps=" + (rpsRaw == null ? -1 : rpsRaw.size()));
             return false;
         }
         List<RailPosition> rps = new ArrayList<>(rpsRaw.size());
@@ -86,7 +92,20 @@ public final class SrbRailBridge {
                 rps.add(rp);
             }
         }
-        return buildRailFaithful(level, rps, toModelId(modelId));
+        if (rps.size() != rpsRaw.size()) {
+            logError("buildBranchRail: RailPosition 変換に失敗 " + rps.size() + "/" + rpsRaw.size()
+                + " first=" + (rpsRaw.isEmpty() ? "-" : rpsRaw.get(0).getClass().getName()));
+        }
+        boolean ok = buildRailFaithful(level, rps, toModelId(modelId));
+        if (!ok) {
+            StringBuilder sb = new StringBuilder("buildBranchRail 失敗 model=").append(toModelId(modelId)).append(" rps=");
+            for (RailPosition rp : rps) {
+                sb.append('(').append(rp.blockX).append(',').append(rp.blockY).append(',').append(rp.blockZ)
+                  .append(" dir=").append(rp.direction).append(" sw=").append(rp.switchType).append(") ");
+            }
+            logError(sb.toString());
+        }
+        return ok;
     }
 
     /** SRB の deleteRail 相当。(x,y,z) にレール(コア or 当たり判定)があれば撤去し true。 */

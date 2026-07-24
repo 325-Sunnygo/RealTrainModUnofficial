@@ -539,6 +539,15 @@ public class RailPackLoader {
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to read script {} from pack {}", definition.getScriptPath(), definition.getPackName(), e);
         }
+        //自パックに無い: 前提/ベーススクリプトパックを横断する資産索引 (NGTFileLoader) から探す。
+        //車両スクリプトと同じく、レールの実体スクリプトが別の前提パックにある分割構成に対応する。
+        try {
+            byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(scriptPath);
+            if (bytes != null) {
+                return PackTextDecoder.readText(new java.io.ByteArrayInputStream(bytes));
+            }
+        } catch (Exception ignored) {
+        }
         return null;
     }
 

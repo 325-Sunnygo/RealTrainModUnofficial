@@ -70,9 +70,27 @@ public final class NGTUtilClient {
             jp.ngt.ngtlib.io.NGTLog.debug("[RTM] bindTexture: unresolved texture object "
                     + texture.getClass().getName() + " (" + texture + ")");
         }
-        //解決できてもできても記録する。null は「既定へ戻す」の意味になり、
-        //前のテクスチャを引きずったまま描くより安全。
-        r.bindTexture(rl);
+        //元パスも記録する。再生側は「モデルの素テクスチャへ戻す bind」を検出して
+        //上書きを解除する (残すと以降のパーツが全部そのテクスチャで描かれる)。
+        r.bindTexture(rl, rawPathOf(texture));
+    }
+
+    /** スクリプトが渡したテクスチャの元パス (正規化済み小文字)。取れなければ null。 */
+    private static String rawPathOf(Object texture) {
+        String path = null;
+        if (texture instanceof jp.ngt.mccompat.ResourceLocation compat) {
+            path = compat.func_110623_a();
+        } else if (texture instanceof net.minecraft.resources.ResourceLocation rl) {
+            path = rl.getPath();
+        } else if (texture instanceof CharSequence cs) {
+            path = cs.toString();
+        } else {
+            path = invokeString(texture, "func_110623_a");
+        }
+        if (path == null) {
+            return null;
+        }
+        return path.replace('\\', '/').replaceFirst("^/+", "").toLowerCase(java.util.Locale.ROOT);
     }
 
     /** スクリプトが渡す各種テクスチャ表現を実 ResourceLocation へ寄せる。解決不能なら null。 */
@@ -144,4 +162,32 @@ public final class NGTUtilClient {
         //Iris/Oculus のシェーダーパック使用中か (スクリプトが発光の描き方を切り替える)
         return com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse();
     }
+
+    /** 本家getLightValue。 */
+    public static int getLightValue(Object world, int x, int y, int z) {
+        return jp.ngt.ngtlib.util.NGTUtil.getLightValue(world, x, y, z);
+    }
+
+    /** 本家playSound: クライアントローカルで音を鳴らす。 */
+    public static void playSound(Object soundName, float volume, float pitch) {
+        try {
+            String name = String.valueOf(soundName);
+            net.minecraft.resources.ResourceLocation rl = net.minecraft.resources.ResourceLocation.tryParse(name);
+            if (rl == null) {
+                return;
+            }
+            net.minecraft.sounds.SoundEvent ev = net.minecraft.sounds.SoundEvent.createVariableRangeEvent(rl);
+            net.minecraft.client.Minecraft mc = getRealMinecraft();
+            if (mc.player != null) {
+                mc.level.playLocalSound(mc.player.getX(), mc.player.getY(), mc.player.getZ(), ev,
+                    net.minecraft.sounds.SoundSource.MASTER, volume, pitch, false);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 本家checkGLError: no-op。 */
+    public static void checkGLError(String msg) {
+    }
+
 }

@@ -70,10 +70,7 @@ public class TrainEntity extends Entity {
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> REVERSER =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.INT);
-    /**
-     * 転換クロスシートの向き。0 = 前向き / 1 = 後ろ向き / -1 = 未設定 (進行方向に従う)。
-     * プレイヤーが乗り込んだときの向きで決まる。
-     */
+    /** 転換クロスシートの向き。0=前向き/1=後ろ向き/-1=未設定。 */
     private static final EntityDataAccessor<Integer> SEAT_DIRECTION =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Integer> DESTINATION_INDEX =
@@ -436,15 +433,7 @@ public class TrainEntity extends Entity {
         entityData.set(REVERSER, clamped);
         entityData.set(REVERSE, clamped < 0);
     }
-    /**
-     * 転換クロスシートの向き。<b>0 = 前向き / 1 = 後ろ向き (180°転換)</b>。
-     * <p>
-     * 本家は進行方向 (レバーサー) で切り替えていたが、こちらは
-     * <b>プレイヤーが乗り込んだときの向き</b>に合わせて自動転換する。
-     * 乗った瞬間の向きで固定するので、着席後に振り向いても座席は回らない。
-     * <p>
-     * まだ誰も乗っていない編成は、従来どおり進行方向に従う。
-     */
+    /** 転換クロスシートの向き。乗り込んだ向きで自動転換。未乗車は進行方向に従う。 */
     public float getSeatDirection() {
         int dir = entityData.get(SEAT_DIRECTION);
         if (dir < 0) {
@@ -454,10 +443,7 @@ public class TrainEntity extends Entity {
         return dir;
     }
 
-    /**
-     * プレイヤーが乗り込んだ向きで、編成全体の座席を転換する。
-     * 車体の向きに対して 90°以上ずれていれば「後ろ向きに座った」とみなす。
-     */
+    /** 乗り込んだ向きで編成全体の座席を転換する。 */
     public void updateSeatDirectionFor(Player player) {
         if (player == null || level().isClientSide) {
             return;
@@ -669,10 +655,7 @@ public class TrainEntity extends Entity {
         prevRotationRoll = rotationRoll;
         rotationRoll = entityData.get(BODY_ROLL);
 
-        // 動輪/ロッドの回転角を「毎tickの移動距離」で累積する。
-        // 旧実装(tickCount × 現在速度)は速度が少しでも変わるたびに全履歴が再スケールされ、
-        // tickCount が大きいほど巨大な回転ジャンプ→「空転しまくり」になっていた。
-        // 正しくは各tickに進んだ距離分だけ回す(= 速度/円周 × 360)。
+        // 動輪/ロッド回転角は毎tickの移動距離で累積する
         {
             float distThisTick = Math.abs(getSpeed());
             final float wheelCircumference = (float) (2.0 * Math.PI * 0.43);
@@ -840,10 +823,7 @@ public class TrainEntity extends Entity {
         clientLerpZ = z;
         clientLerpYRot = yRot;
         clientLerpXRot = xRot;
-        // Trains send a position update every tick (hasImpulse=true while moving), so
-        // using steps=1 (snap to server position each tick) gives smooth rendering AND
-        // keeps the lerped body position aligned with the rail-anchor-based bogie positions.
-        // Multi-step lerp would lag the body behind the bogies by several ticks at speed.
+        // 位置更新は毎tick来るのでsteps=1で即スナップし台車位置と揃える
         clientLerpSteps = 1;
         setDeltaMovement(Vec3.ZERO);
     }
@@ -992,11 +972,7 @@ public class TrainEntity extends Entity {
         seatRotation = Mth.clamp(seatRotation, -45.0F, 45.0F);
     }
 
-    /**
-     * クライアント側: ドア開閉状態の変化を検出し、車両定義の sound_DoorOpen / sound_DoorClose を鳴らす。
-     * 多くのパック (209/125 系等) はサウンドスクリプトでドア音を鳴らさず、この JSON 設定に頼るため、
-     * 本家 RTM と同じくエンジン側で鳴らす。初回 tick は状態を記録するだけ (スポーン時に鳴らさない)。
-     */
+    /** ドア開閉変化を検出してsound_DoorOpen/Closeを鳴らす。初回tickは記録のみ。 */
     private void updateDoorSound() {
         boolean left = isDoorLeftOpen();
         boolean right = isDoorRightOpen();
@@ -1154,10 +1130,7 @@ public class TrainEntity extends Entity {
         int bodyDirection = activeRailBodyDirection == 0 ? 1 : activeRailBodyDirection;
         double gap = getCoupledGap(this, follower);
 
-        // Use anchor-based traversal instead of index arithmetic so rail joints are
-        // handled correctly without relying on resolveRailSample's single-crossing limit.
-        // offset = currentSide * gap: bodyDirection is already encoded in travelDirection,
-        // so negative offset flips direction toward the follower regardless of rail orientation.
+        // アンカー基準の走査で継ぎ目を正しく越える。offsetの符号で方向を反転
         RailAnchor leaderCenter = new RailAnchor(
             activeRailMap, activeRailSplit,
             Mth.clamp(activeRailPosition, 0.0D, activeRailSplit),
@@ -1206,11 +1179,7 @@ public class TrainEntity extends Entity {
         return true;
     }
 
-    /**
-     * 連結間隔に使う「中心→連結面(車体端)」距離。trainDistance が center-to-end。
-     * getTrainHalfLength は台車/座席位置で膨張した当たり判定用の長さで、短い車体だと
-     * 実車体より長くなり連結間隔が伸びすぎる。連結にはこの実車体端を使う。
-     */
+    /** 連結間隔に使う「中心→車体端」距離。 */
     private double getCouplingHalfLength() {
         return Math.max(1.0D, getTrainDistance());
     }
@@ -1366,17 +1335,10 @@ public class TrainEntity extends Entity {
     private record RailConnection(RailMap map, int split, double index, int travelDirection, double score) {}
     private record RailSample(double x, double y, double z) {}
 
-    /**
-     * 列車真下に支えとなるブロック / レールが存在するかをチェック。
-     * 体下方 3 ブロックがすべて air なら未支持 = 重力で落下対象とみなす。
-     */
+    /** 列車真下に支えのレールがあるか。無ければ落下対象。 */
     private boolean isUnsupportedInAir() {
         if (level() == null) return false;
-        // 列車を支えるのは「地面の任意ブロック」ではなく「レール」。レール系ブロック(当たり判定/コア/道床)が
-        // 近くに無ければ脱線=支え無しとみなし重力で落下させる。
-        // 車体中心だけ見ると、カーブでは車体中心がレール中心線から内側へずれて当たり判定ブロックを外し、
-        // 誤って「非支持」と判定→重力で地面に埋まる。前後台車はレール上にあるので、台車位置周辺も見る。
-        // (レールが折れた場合は台車位置の当たり判定ブロックも消えるため、落下判定は従来どおり機能する。)
+        // 支え判定はレール系ブロックのみ。車体中心に加え前後台車位置も見る
         if (hasRailSupportNear(blockPosition())) {
             return false;
         }
@@ -1471,11 +1433,7 @@ public class TrainEntity extends Entity {
                     front = sampleBogieRail(frontRailAnchor.map(), frontRailAnchor.split(), frontRailAnchor.index());
                     rear = sampleBogieRail(rearRailAnchor.map(), rearRailAnchor.split(), rearRailAnchor.index());
                 }
-                // ワープ・ガード: 逆向きに繋がったレール継ぎ目等で本体中心が1tickに
-                // 物理的にあり得ない距離(速度×tickを大きく超える)ジャンプする不具合がある
-                // (bodyDir が毎tick反転→前進方向が反転→2レール間を往復ワープ→速度0/1・めり込み)。
-                // この場合は更新を棄却し、直前のアンカー・方向・位置を維持して振動を止める。
-                // 通常走行・カーブは移動量が小さくしきい値に達しないため一切影響しない。
+                // ワープ・ガード: 物理的にあり得ない1tickジャンプは棄却して直前状態を維持
                 RailSample candidateCenter = resolveBodyCenterSample(front, rear);
                 double jumpDx = candidateCenter.x() - preX;
                 double jumpDz = candidateCenter.z() - preZ;
@@ -1575,16 +1533,8 @@ public class TrainEntity extends Entity {
         return true;
     }
 
-    /**
-     * 本家RTM EntityBogie.updateBogiePos 準拠: refSample からの直線距離が targetDist に最も近い
-     * レール点を baseAnchor の map 上で探して返す。2台車の弦長を台車間隔に保ち、カーブでも
-     * 台車が実レール点(±bogiePos)へ乗る(アーク配置による弦-弧オーバーシュートを解消)。
-     */
-    /**
-     * 本家RTM準拠の後続台車の決め方。先頭台車(leadingSample)から台車間隔(span)の弦距離になる点を、
-     * まず「前回の後続台車位置(prevTrailing)の近傍」で探す(連続性優先=レールの膨らみ等で遠点へ飛ばない)。
-     * 近傍に妥当な点が無い(レール端を越える等)場合だけ、先頭からアーク逆算した点に補正してフォールバックする。
-     */
+    /** refSampleから弦距離targetDistに最も近いレール点を探す。 */
+    /** 後続台車は前回位置近傍を優先して弦距離で決め、無理ならアーク逆算で補正。 */
     private RailAnchor deriveTrailingAnchor(RailAnchor prevTrailing, RailSample leadingSample, double span, RailAnchor leading) {
         RailAnchor cont = refineAnchorByStraightDistance(prevTrailing, leadingSample, span);
         if (chordWithinTolerance(cont, leadingSample, span)) {
@@ -1658,13 +1608,7 @@ public class TrainEntity extends Entity {
             return false;
         }
         int bodyDirection = activeRailBodyDirection == 0 ? 1 : activeRailBodyDirection;
-        // Each anchor stores the direction it travels on ITS OWN rail:
-        //   frontRailAnchor.travelDirection() = forward direction on front's rail
-        //   rearRailAnchor.travelDirection()  = backward direction on rear's rail
-        //                                       (placed by going backward from front)
-        // When bogies span a rail joint, the two rails may have opposite orientations,
-        // so a single global pathDirection from the front anchor is wrong for the rear.
-        // Use per-anchor directions to handle cross-rail cases correctly.
+        // アンカーごとの進行方向を使う(継ぎ目跨ぎでレール向きが逆でも正しく処理)
         int frontPathDirection = frontRailAnchor.travelDirection() != 0
             ? frontRailAnchor.travelDirection()
             : bodyDirection;
@@ -2254,10 +2198,7 @@ public class TrainEntity extends Entity {
 
         BlockPos center = BlockPos.containing(boundary.x, boundary.y, boundary.z);
         int radius = 24;
-        // 1st pass: アクティブ分岐のみ(トラフ側でスイッチ通り正しい分岐を選ぶ)。
-        // 2nd pass: 見つからなければ全分岐へフォールバック。これにより「非アクティブな分岐の
-        // 終端から突入」「走行中にスイッチが切替わって現在の分岐が非アクティブ化」した場合でも
-        // 物理的に存在するレールへ接続でき、弾かれて前に進めなくなるのを防ぐ。
+        // 1st passはアクティブ分岐のみ、無ければ全分岐へフォールバック
         RailConnection best = null;
         for (int pass = 0; pass < 2 && best == null; pass++) {
             railLookupIncludeAllSegments = pass == 1;
@@ -2308,10 +2249,7 @@ public class TrainEntity extends Entity {
             candidateYaw = Mth.wrapDegrees(candidateYaw + 180.0F);
         }
         float yawDiff = Math.abs(Mth.wrapDegrees(outgoingYaw - candidateYaw));
-        // 端点共有(sameEndpoint)でも「逆走(yaw差>90°)」の接続は拒否する。分岐器のトランクでは
-        // 兄弟分岐(直進↔カーブ)が同じトランク端点を共有するため、出ていく方向と約180°逆向きの
-        // 兄弟分岐へ前台車がU字に乗り移ってしまい、後台車が別分岐に残って車体が裂け弾かれていた。
-        // 正しい継続は進行方向が揃う(yaw差小)。逆走接続はスイッチ内への逆流なので常に不可とする。
+        // 端点共有でも逆走(yaw差>90°)の接続は拒否する
         boolean reversal = yawDiff > 90.0F;
         if ((!sameEndpoint && yawDiff > RAIL_CONNECTION_MAX_YAW_DIFF) || reversal) {
             return null;
@@ -2670,11 +2608,7 @@ public class TrainEntity extends Entity {
         if (railWorldY == null) {
             railWorldY = getBogieWorldPosition(bogieIndex);
         }
-        // 本家RTM準拠の台車高さ:
-        //   本家は車体・台車とも func_70033_W()=0 で、両者を「同じレール面基準」に置く。
-        //   台車の縦オフセットは JSON の bogiePos[i].y のみ(全実パックで 0.0 = 車体中心と同じ高さ)。
-        //   台車基準を車体と同一(RAIL_HEIGHT_OFFSET)へ揃え、bogiePos.y だけ足す。
-        // カーブ上では車体中心線とレール中心線が一致しないため、X/Z はレール位置へ追従。
+        // 台車高さは車体と同一基準+bogiePos.y。X/Zはレール位置へ追従
         RailAnchor anchor = getAnchorForRenderedBogie(bogieIndex);
         if (clientSynced || isRailAnchorUsable(anchor)) {
             double bodyRefY = railWorldY.y + (RAIL_HEIGHT_OFFSET - BOGIE_HITBOX_HEIGHT_OFFSET) + bogie.position().y + BOGIE_RENDER_LIFT;
@@ -2759,10 +2693,7 @@ public class TrainEntity extends Entity {
         return bogieYawMemory[side] == 0.0F ? getYRot() : bogieYawMemory[side];
     }
 
-    /**
-     * クライアントで台車のレール接線ワールドヨーを求める。サーバー同期された台車エンティティの
-     * 向きを最優先で使い、無ければ台車取付位置の近傍レールから接線を計算する。見つからなければ NaN。
-     */
+    /** 台車のレール接線ワールドヨーを求める。無ければNaN。 */
     private float computeClientBogieRailYaw(int bogieIndex) {
         // 注意: 同期された台車エンティティの向き(clientBogieEntityYaw)はラグがあり、
         // 走行中に台車が一瞬古い向きを指して横ずれして見える。そこでクライアントでは
@@ -2875,13 +2806,7 @@ public class TrainEntity extends Entity {
         }
     }
 
-    /**
-     * レール継ぎ目で同期台車位置が一瞬飛ぶグリッチを除去する。明らかな大ジャンプ(>6ブロック/tick、
-     * 遠レール誤取得や180°反転に伴う反対側への飛び等)だけを弾き前回値を維持する。
-     * 台車オフセットはカーブで回転するため急カーブ+高速では1tick変化が数ブロックになる。しきい値を
-     * 低くすると正当なカーブ変化を弾いて「追従が外れて一瞬戻る」原因になるため 6 と高めにする。
-     * 連続したら本物の変化として採用(固着回避)。
-     */
+    /** 継ぎ目での同期台車位置の大ジャンプ(>6ブロック/tick)だけ弾く。連続したら採用。 */
     private Vec3 filterOffsetJump(int side, Vec3 cur, Vec3 target) {
         if (cur == null || target == null) {
             return target;
@@ -2904,10 +2829,7 @@ public class TrainEntity extends Entity {
             clientBogieYawRejectCount[side] = 0;
             return;
         }
-        // グリッチ除去: 明らかな誤値(fixBogieYaw の約180°反転や別レール接線の拾い間違い)だけを弾く。
-        // 急カーブ＋高速の正当な1tick変化(最大~50°程度)を棄却しないよう、しきい値は 100° と高めにする。
-        // (45°など低くすると急カーブで正当変化を弾き「追従が外れて一瞬戻る」原因になる。)
-        // 大ジャンプが連続したら本物の向き変化(=固着回避)として採用する。
+        // 明らかな誤値(約180°反転等)だけ弾く。しきい値100°。連続したら採用
         if (Math.abs(Mth.wrapDegrees(target - clientBogieYawCurr[side])) > 100.0F
             && clientBogieYawRejectCount[side] < 2) {
             clientBogieYawRejectCount[side]++;
@@ -2918,11 +2840,7 @@ public class TrainEntity extends Entity {
         clientBogieYawCurr[side] = target;
     }
 
-    /**
-     * サーバーが同期した端台車ワールド位置から、指定台車のワールド位置を返す(中間は前後で補間)。
-     * 本家RTMの台車補間に倣い、エンティティ位置・台車オフセットとも partialTicks で前tick↔現tick
-     * 補間して滑らかに追従させる(tick段付き防止)。
-     */
+    /** 同期された端台車位置から指定台車のワールド位置を返す(partialTicks補間)。 */
     private Vec3 clientSyncedBogieWorld(int bogieIndex, float partialTicks) {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
         if (def == null || def.getBogies().isEmpty()) {
@@ -3002,11 +2920,7 @@ public class TrainEntity extends Entity {
         double py = modelOffset.y + local.y * scale;
         double pz = modelOffset.z + local.z * scale;
 
-        // スポーン直後はクライアント側エンティティの前tick位置(xo/yo/zo)が原点(0,0,0)の
-        // まま(最初のクライアントtickまで)。そのまま補間すると台車位置が原点側へ大きく
-        // ズレる(=「列車を置いた瞬間だけ台車がズレる/動かすと戻る」)。前tick位置が現在位置
-        // から物理的にあり得ない距離(列車は最大2/tick)離れていたら未初期化とみなし、補間
-        // せず現在値を使う。通常走行では xo は近接しているため一切影響しない。
+        // スポーン直後の未初期化な前tick位置は補間せず現在値を使う
         double dxo = this.getX() - this.xo;
         double dyo = this.getY() - this.yo;
         double dzo = this.getZ() - this.zo;
@@ -3671,12 +3585,7 @@ public class TrainEntity extends Entity {
             formationHead.markDriverControl(formationDriver.controller());
             formationHead.ensureDriverReadyForFormation(formationDriver.controller());
         }
-        // 本家RTM(Formation.connectTrain)準拠: 連結時に本体をテレポート・スナップさせない。
-        // 連結はトレインが接触している時にしか成立しない(canCompleteCouplingWith)ので、
-        // 既に隣接している。編成を結合してブレーキで止めるだけにし、位置は毎tickの追従で
-        // 自然に整える。以前の placeCoupledFollower* による即時スナップ+updateTrainMovement は
-        // 3両目連結時に中間車のレール状態が未確立のままフォールバック moveTo され、他車へ
-        // テレポート・重なりする不具合の原因だった。
+        // 連結時に本体をテレポートさせない。編成結合とブレーキのみ
         sourceTail.stopFormationMotionForResync(8L);
         targetHead.stopFormationMotionForResync(8L);
         // Rebuild Formation for the newly combined UUID chain
@@ -3685,10 +3594,7 @@ public class TrainEntity extends Entity {
         if (newHead != null) {
             newHead.setNotchForFormation(0);
         }
-        // 連結直後に「新しく連結した車両(targetHead)だけ」を連結位置へ静かに寄せる。
-        // 接触連結なので元々隣接しており移動量は小さい(数ブロック以内)＝隙間が即座に詰まる。
-        // 大ジャンプ(レール状態未確立で他車上へ飛ぶケース)は棄却して元位置を維持し、
-        // 他車には一切触らないので重なり・TPは起きない。
+        // 連結直後は新規連結車だけを静かに寄せる。大ジャンプは棄却
         if (sourceTail.coupledFollowerUuid != null && targetHead != null) {
             double pX = targetHead.getX();
             double pY = targetHead.getY();
@@ -4546,10 +4452,7 @@ public class TrainEntity extends Entity {
         COUPLING_MODE.clear();
     }
 
-    /**
-     * 連結が成立したら、その2両（および各編成の全車両）を選択中の連結モードを解除する。
-     * プレイヤー操作・接触連結など、どの経路で連結しても確実にモードが消えるようにする。
-     */
+    /** 連結成立時に両編成の連結モードを解除する。 */
     private static void clearCouplingModeInvolving(TrainEntity a, TrainEntity b) {
         if (COUPLING_MODE.isEmpty()) {
             return;
@@ -4658,35 +4561,18 @@ public class TrainEntity extends Entity {
         return isInteriorLightOn() ? 1.0F : 0.0F;
     }
 
-    /**
-     * 前照灯/尾灯の出し分け用。
-     * <p>
-     * <b>0 = この車両が進行方向の先頭 (前照灯/白) / 1 = それ以外 (尾灯/赤)</b>
-     * <p>
-     * 以前は {@code getReverser() >= 0 ? 0 : 1} を返していた。しかしレバーサーは編成全体で
-     * 共有される (setReverserForFormation) ため<b>全車が同じ値</b>になり、前進中は全車が
-     * 前照灯・後進中は全車が尾灯になっていた。結果、尾灯テクスチャ (***_light2.png) が
-     * 一度も使われず「light2 が出ない」状態だった。
-     * <p>
-     * 連結リストの先頭 (index 0) が前進時の先頭。後進時は末尾が先頭になる。
-     */
+    /** 前照灯/尾灯の出し分け。0=進行方向の先頭/1=それ以外。 */
     public float getTrainDirection() {
         return isLeadingCar() ? 0.0F : 1.0F;
     }
 
-    /**
-     * 本家 {@code RenderVehicleBase.renderBodyLight} の {@code isFrontEmpty} 相当。
-     * 進行方向側に連結相手がいない = この車両が編成の先頭。
-     */
+    /** 進行方向側に連結相手がいない=編成の先頭か。 */
     public boolean isLeadingCar() {
         updateFormationPositionCache();
         return leadingCarCache;
     }
 
-    /**
-     * 本家の {@code isBackEmpty} 相当。進行方向と逆側に連結相手がいない = 編成の最後尾。
-     * 単行の場合は先頭かつ最後尾になる。
-     */
+    /** 進行方向と逆側に連結相手がいない=編成の最後尾か。 */
     public boolean isTrailingCar() {
         updateFormationPositionCache();
         return trailingCarCache;
@@ -4728,12 +4614,7 @@ public class TrainEntity extends Entity {
         return getTrainDirection();
     }
 
-    /**
-     * 進行方向そのもの (0 = 前進 / 1 = 後進)。名前のとおり「動く向き」を返す。
-     * <p>
-     * {@link #getTrainDirection()} は「この車両が編成の先頭か」(前照灯/尾灯の判定) に
-     * 変わったので、こちらは従来どおりレバーサー基準のままにしてある。
-     */
+    /** 進行方向そのもの(0=前進/1=後進)。レバーサー基準。 */
     public float getMoveDir() {
         return getReverser() >= 0 ? 0.0F : 1.0F;
     }
@@ -4778,13 +4659,7 @@ public class TrainEntity extends Entity {
         return Mth.clamp(seatRotation / 45.0F, -1.0F, 1.0F);
     }
 
-    /**
-     * {@code seatRotation} の生値 (-45〜45)。PackScriptSource が {@code entity.seatRotation} を
-     * {@code entity.getSeatRotationRaw()} に書き換えるため、このメソッドが無いと SL 等
-     * (旧 TrainEntity で描画される車両) の render() が TypeError で落ち、素モデル全描画に
-     * フォールバックして「隠すはずの部品が出る/動くと二重に見える」不具合になっていた。
-     * EntityVehicleBase.getSeatRotationRaw() と同じ生値を返す。
-     */
+    /** seatRotationの生値(-45〜45)。 */
     public float getSeatRotationRaw() {
         return seatRotation;
     }
@@ -4844,11 +4719,7 @@ public class TrainEntity extends Entity {
         return new BogieCompat(this, scriptBogieIndexToDefinitionIndex(index));
     }
 
-    /**
-     * 台車モデルが .class(本家組込 ModelBogie 等、RTMU は標準台車へ差し替え)の車両か。
-     * この場合、台車を BogieRenderer でレール追従描画し、車体モデル/スクリプト側の
-     * 車体固定 bogie グループ描画は抑制する(でないとカーブで台車がレールからズレる)。
-     */
+    /** 台車モデルが.classの車両か。台車はレール追従描画し車体側のbogie描画を抑制。 */
     public boolean usesReplacementBogies() {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
         if (def == null) {
@@ -5156,12 +5027,7 @@ public class TrainEntity extends Entity {
             return new FormationEntryCompat(index, entryTrain, dir);
         }
 
-        /**
-         * Returns the entry for a train.
-         * ★引数は Object 受け: レガシー JS は entity(=LegacyScriptExecutor ラッパー)をそのまま渡すため。
-         *   TrainEntity 専用にすると Nashorn がラッパーを TrainEntity へキャストして ClassCastException
-         *   になる(isMiddleCar で発生していた)。中身は getTrain() で取り出すか、無ければ自分(train)。
-         */
+        /** 編成エントリを返す。引数はObject受け(JSラッパー対応)。 */
         public FormationEntryCompat getEntry(Object entity) {
             TrainEntity resolved = train;
             if (entity instanceof TrainEntity t) {
@@ -5175,13 +5041,7 @@ public class TrainEntity extends Entity {
                 } catch (Exception ignored) {
                 }
             }
-            // 号車位置(entryId)は「表示チェーン順(=先頭から数えた実際の連結位置)」を
-            // 唯一のソースにする。size() も同じ表示チェーンから数えるため、
-            // スクリプトの isMiddleCar (id==1||id==size の判定) が必ず整合する。
-            // ※ 旧実装は size を表示チェーン・entryId を formation.entries[] と別ソースから
-            //   取っており、編成方向によって不整合 → 連結器/幌が片側だけ消える原因だった。
-            //   また 06/07 だけ中間車に偽装するハックもあったが、本家スクリプトの
-            //   パーツ分けに任せる方針(ユーザー要望)で撤去した。
+            // 号車位置は表示チェーン順を唯一のソースにする(isMiddleCarと整合)
             List<TrainEntity> trains = train.getFormationTrainsForDisplay();
             int index = trains.indexOf(resolved);
             int dir = 0;
@@ -5325,10 +5185,7 @@ public class TrainEntity extends Entity {
         public final float[] deccelerations = {
             0.0F, 0.1F, 0.2F, 0.35F, 0.5F, 0.7F, 0.9F, 1.1F, 1.3F
         };
-        // Legacy cab/monitor scripts read maxSpeed as an array of per-notch top speeds
-        // (e.g. CustomMonitor_JRE1: config.maxSpeed[config.maxSpeed.length-1]*72). Must be
-        // non-null with at least one element or scripts crash on undefined.length.
-        // 値は blocks/tick 相当(末尾要素 1.1 ≈ 約79km/h)。実速度はエンジン側で決まるので表示用の上限。
+        // maxSpeedはノッチ別上限の配列として読まれる。非nullで1要素以上必須
         public final float[] maxSpeed = {
             0.0F, 0.22F, 0.44F, 0.66F, 0.88F, 1.1F
         };
@@ -5395,11 +5252,7 @@ public class TrainEntity extends Entity {
             return field_72995_K;
         }
 
-        /**
-         * RTM 1.7.10 互換: World.loadedEntityList (field_72996_f)。
-         * スクリプトが {@code world.field_72996_f.size()} / {@code .get(i)} で走査する。
-         * 毎呼び出し時に level の現在の全エンティティを ArrayList で返す。
-         */
+        /** 1.7.10互換: World.loadedEntityList。現在の全エンティティを返す。 */
         public java.util.List<net.minecraft.world.entity.Entity> field_72996_f() {
             java.util.ArrayList<net.minecraft.world.entity.Entity> out = new java.util.ArrayList<>();
             if (train == null) return out;
@@ -6056,12 +5909,7 @@ public class TrainEntity extends Entity {
         return new Vec3(localX / scale, dy / scale, localZ / scale);
     }
 
-    /**
-     * 台車描画用の world→body-local 変換。台車は TrainEntityRenderer の本体ポーズ
-     * (yaw → pitch → bank → modelOffset → scale)の中で translate されるため、その全段を厳密に
-     * 逆変換しないと、カーブのバンク(カント)や坂のpitchで台車がレールからズレて描画される。
-     * (従来の worldToLocalForRender は yaw しか逆回転しておらずバンク分ズレていた。)
-     */
+    /** 台車描画用のworld→body-local変換。本体ポーズ全段を厳密に逆変換する。 */
     private Vec3 worldToBogieLocalForRender(Vec3 world, float partialTicks) {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
         if (def == null) {
@@ -6633,10 +6481,7 @@ public class TrainEntity extends Entity {
         this.formation = f;
     }
 
-    /**
-     * Builds (or rebuilds) this train's Formation from the UUID-linked chain.
-     * Called lazily on first tick for head/solo cars, and after coupling/decoupling.
-     */
+    /** UUIDチェーンからFormationを構築する。 */
     private void rebuildFormationFromUuidChain() {
         if (level().isClientSide()) return;
         List<TrainEntity> chain = getFormationTrainsInOrder();

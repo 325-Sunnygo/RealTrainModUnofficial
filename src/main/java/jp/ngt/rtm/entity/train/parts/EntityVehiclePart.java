@@ -180,4 +180,8 @@ public abstract class EntityVehiclePart extends Entity {
     public Vec3 getPartVec() {
         return new Vec3(this.entityData.get(DATA_VEC_X), this.entityData.get(DATA_VEC_Y), this.entityData.get(DATA_VEC_Z));
     }
+
+    /** 本家 needsUpdatePos: 次 tick に位置を親車両へ追従させるか。 */
+    public boolean needsUpdatePos = true;
+
 }

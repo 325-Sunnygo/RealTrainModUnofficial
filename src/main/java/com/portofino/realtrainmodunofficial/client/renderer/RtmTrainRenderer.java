@@ -131,7 +131,9 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                 //スクリプト経路と同じフォールバックに載せる。
                 com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(entity);
                 try {
-                    MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, filter, doorTransform);
+                    //entity を渡す版を使う。渡さないとカリング (doCulling) も
+                    //発光パスの点灯判定 (前照灯/尾灯/室内灯) も引けない。
+                    MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, filter, doorTransform, entity);
                 } finally {
                     com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(null);
                 }
@@ -148,6 +150,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             TrainEntityRenderer.renderConfiguredRollsigns(
                     entity.getTrainStateData(
                             jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id),
+                    entity.getRollsignAnimation(),
                     def, poseStack, buffer, packedLight);
             //RTMU 追加: 種別幕 (方向幕とは別の State_Type インデックスで別テクスチャを表示)
             TrainEntityRenderer.renderConfiguredTypeSigns(

@@ -21,11 +21,16 @@ import java.util.zip.ZipFile;
  * (scripts/xxx.gif 等) を読む。全パック zip/フォルダを走査して解決する。
  */
 public final class NGTFileLoader {
+    /** 本家 NO_ZIP: 「zip の中ではなく素のファイル」を表す ScanResult のキー。 */
+    public static final String NO_ZIP = "no_zip";
+
     /**
      * 正規化パス (assets/minecraft/ 以降, 小文字) → コンテナ
      */
     private static Map<String, AssetRef> index;
     private static final Map<String, byte[]> CONTENT_CACHE = new ConcurrentHashMap<>();
+    /** 索引に無いと確定したキー。全走査の再実行を防ぐ。 */
+    private static final java.util.Set<String> MISSING_CACHE = ConcurrentHashMap.newKeySet();
     private static final Map<String, net.minecraft.resources.ResourceLocation> TEXTURE_CACHE = new ConcurrentHashMap<>();
 
     private record AssetRef(Path container, String entryName) {
@@ -55,18 +60,26 @@ public final class NGTFileLoader {
         if (cached != null) {
             return cached;
         }
-        AssetRef ref = getIndex().get(key);
+        if (MISSING_CACHE.contains(key)) {
+            return null;
+        }
+        Map<String, AssetRef> idx = getIndex();
+        AssetRef ref = idx.get(key);
         if (ref == null) {
-            //サフィックス一致 (パス表記ゆれ対策)
+            //サフィックス一致 (パス表記ゆれ対策)。索引全走査なので結果は必ずキャッシュする
+            //(見つからない要求を毎回走査すると、スクリプトが欠落アセットを繰り返し要求したとき
+            // 索引サイズ×要求回数の走査になり描画が止まる)。
             String leaf = key.contains("/") ? key.substring(key.lastIndexOf('/') + 1) : key;
-            for (Map.Entry<String, AssetRef> e : getIndex().entrySet()) {
-                if (e.getKey().endsWith("/" + key) || e.getKey().equals(leaf)) {
+            String suffix = "/" + key;
+            for (Map.Entry<String, AssetRef> e : idx.entrySet()) {
+                if (e.getKey().endsWith(suffix) || e.getKey().equals(leaf)) {
                     ref = e.getValue();
                     break;
                 }
             }
         }
         if (ref == null) {
+            MISSING_CACHE.add(key);
             return null;
         }
         try {
@@ -74,9 +87,10 @@ public final class NGTFileLoader {
             if (Files.isDirectory(ref.container)) {
                 bytes = Files.readAllBytes(ref.container.resolve(ref.entryName));
             } else {
-                try (ZipFile zip = new ZipFile(ref.container.toFile())) {
+                try (ZipFile zip = openZip(ref.container)) {
                     ZipEntry entry = zip.getEntry(ref.entryName);
                     if (entry == null) {
+                        MISSING_CACHE.add(key);
                         return null;
                     }
                     bytes = zip.getInputStream(entry).readAllBytes();
@@ -174,6 +188,22 @@ public final class NGTFileLoader {
         return p;
     }
 
+    /**
+     * zip を開く。UTF-8 で開けないエントリ名 (Windows 製の Shift_JIS パック) は SJIS で開き直す。
+     * これをしないと SJIS パックが 1 つあるだけで "invalid CEN header" を出して索引から丸ごと漏れる。
+     */
+    private static ZipFile openZip(Path container) throws IOException {
+        try {
+            return new ZipFile(container.toFile());
+        } catch (IOException first) {
+            try {
+                return new ZipFile(container.toFile(), java.nio.charset.Charset.forName("Shift_JIS"));
+            } catch (Exception ignored) {
+                throw first;
+            }
+        }
+    }
+
     private static synchronized Map<String, AssetRef> getIndex() {
         if (index == null) {
             Map<String, AssetRef> map = new ConcurrentHashMap<>();
@@ -189,7 +219,7 @@ public final class NGTFileLoader {
                             }
                         }
                     } else {
-                        try (ZipFile zip = new ZipFile(container.toFile())) {
+                        try (ZipFile zip = openZip(container)) {
                             var entries = zip.entries();
                             while (entries.hasMoreElements()) {
                                 ZipEntry e = entries.nextElement();
@@ -206,6 +236,146 @@ public final class NGTFileLoader {
             NGTLog.debug("[NGTFileLoader] indexed " + map.size() + " pack assets");
         }
         return index;
+    }
+
+    /**
+     * 本家 getModsDir: パックを探すディレクトリ一覧。
+     * RTMU は mods/ に加えて config/realtrainmodunofficial/ 以下も見る。
+     */
+    public static List<java.io.File> getModsDir() {
+        List<java.io.File> out = new ArrayList<>();
+        Path gameDir = FMLPaths.GAMEDIR.get();
+        out.add(gameDir.resolve("mods").toFile());
+        Path cfg = gameDir.resolve("config").resolve("realtrainmodunofficial");
+        for (String sub : new String[]{"vehicle_packs", "rail_packs", "packs", "nested_pack_cache"}) {
+            out.add(cfg.resolve(sub).toFile());
+        }
+        return out;
+    }
+
+    /** 本家 getArchiveSuffix: 絶対パスに含まれるアーカイブ拡張子 (".zip"/".jar")。無ければ空。 */
+    public static String getArchiveSuffix(String absPath) {
+        if (absPath == null) {
+            return "";
+        }
+        if (absPath.contains(".zip")) {
+            return ".zip";
+        }
+        if (absPath.contains(".jar")) {
+            return ".jar";
+        }
+        return "";
+    }
+
+    /** 本家 getArchivePath: "…/pack.zip/scripts/a.js" から "…/pack.zip" を切り出す。 */
+    public static String getArchivePath(String absPath, String suffix) {
+        int index = absPath.indexOf(suffix);
+        return index < 0 ? absPath : absPath.substring(0, index + suffix.length());
+    }
+
+    /** 本家 getArchive: zip/jar を開く。encoding が空なら UTF-8。 */
+    public static ZipFile getArchive(java.io.File file, String encoding) throws IOException {
+        if (file == null || !file.isFile()) {
+            return null;
+        }
+        String name = file.getName().toLowerCase(Locale.ROOT);
+        if (!name.endsWith(".zip") && !name.endsWith(".jar")) {
+            return null;
+        }
+        java.nio.charset.Charset cs = encoding == null || encoding.isEmpty()
+                ? java.nio.charset.StandardCharsets.UTF_8
+                : java.nio.charset.Charset.forName(encoding);
+        return new ZipFile(file, cs);
+    }
+
+    /** 本家 getStreamFromArchive: アーカイブ内の同名エントリを開く。 */
+    public static InputStream getStreamFromArchive(java.io.File file, String suffix) throws IOException {
+        String zipPath = getArchivePath(file.getAbsolutePath(), suffix);
+        ZipFile zip = getArchive(new java.io.File(zipPath), "");
+        if (zip == null) {
+            throw new java.io.FileNotFoundException("On get stream : " + file.getName());
+        }
+        var entries = zip.entries();
+        while (entries.hasMoreElements()) {
+            ZipEntry ze = entries.nextElement();
+            if (ze.isDirectory()) {
+                continue;
+            }
+            String entryName = ze.getName();
+            int slash = entryName.lastIndexOf('/');
+            String base = slash < 0 ? entryName : entryName.substring(slash + 1);
+            if (base.equals(file.getName())) {
+                //ZipFile は close するとストリームも閉じるので、内容を読み切って返す
+                byte[] bytes = zip.getInputStream(ze).readAllBytes();
+                zip.close();
+                return new ByteArrayInputStream(bytes);
+            }
+        }
+        zip.close();
+        throw new java.io.FileNotFoundException("On get stream : " + file.getName());
+    }
+
+    /** 本家 getInputStreamFromFile: 素のファイルでもアーカイブ内でも開ける。 */
+    public static InputStream getInputStreamFromFile(java.io.File file) throws IOException {
+        String suffix = getArchiveSuffix(file.getAbsolutePath());
+        if (!suffix.isEmpty() && !file.isFile()) {
+            return getStreamFromArchive(file, suffix);
+        }
+        return Files.newInputStream(file.toPath());
+    }
+
+    /** 本家 readBytes。 */
+    public static byte[] readBytes(java.io.File file) throws IOException {
+        return Files.readAllBytes(file.toPath());
+    }
+
+    /**
+     * 本家 findFile: 探索ディレクトリ以下から条件に合うファイルを集める。
+     * matcher は {@code match(File)} を持つオブジェクト (スクリプトの関数でも可)。
+     */
+    public static List<java.io.File> findFile(Object matcher) {
+        List<java.io.File> out = new ArrayList<>();
+        for (java.io.File dir : getModsDir()) {
+            findFileInDirectory(out, dir, matcher);
+        }
+        return out;
+    }
+
+    /** 本家 findFileInDirectory: 1 ディレクトリ以下を再帰的に探す。 */
+    public static List<java.io.File> findFileInDirectory(java.io.File dir, Object matcher) {
+        List<java.io.File> out = new ArrayList<>();
+        findFileInDirectory(out, dir, matcher);
+        return out;
+    }
+
+    private static void findFileInDirectory(List<java.io.File> out, java.io.File dir, Object matcher) {
+        if (dir == null || !dir.isDirectory()) {
+            return;
+        }
+        java.io.File[] files = dir.listFiles();
+        if (files == null) {
+            return;
+        }
+        for (java.io.File entry : files) {
+            if (entry.isDirectory()) {
+                findFileInDirectory(out, entry, matcher);
+            } else if (matches(matcher, entry)) {
+                out.add(entry);
+            }
+        }
+    }
+
+    /** matcher.match(file) を呼ぶ。呼べない matcher は「全て一致」とみなす。 */
+    private static boolean matches(Object matcher, java.io.File file) {
+        if (matcher == null) {
+            return true;
+        }
+        try {
+            Object r = matcher.getClass().getMethod("match", java.io.File.class).invoke(matcher, file);
+            return !(r instanceof Boolean b) || b;
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return true;
+        }
     }
 
     private static List<Path> collectContainers() {

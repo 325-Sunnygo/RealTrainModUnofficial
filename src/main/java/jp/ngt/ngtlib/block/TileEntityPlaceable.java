@@ -14,6 +14,9 @@ package jp.ngt.ngtlib.block;
  */
 public class TileEntityPlaceable extends TileEntityCustom {
     private float rotation;
+    private float offsetX, offsetY, offsetZ;
+    private float roll, pitch, yaw;
+    private float scale = 1.0F;
 
     public float getRotation() {
         return this.rotation;
@@ -21,5 +24,71 @@ public class TileEntityPlaceable extends TileEntityCustom {
 
     public void setRotation(float rotation, boolean sync) {
         this.rotation = rotation % 360.0F;
+    }
+
+    /** 本家 setRotation(yaw, pitch, roll): 3 軸まとめて設定。 */
+    public void setRotation(float yaw, float pitch, float roll) {
+        this.setRotationYaw(yaw, false);
+        this.setRotationPitch(pitch, false);
+        this.setRotationRoll(roll, false);
+    }
+
+    public float getOffsetX() {
+        return this.offsetX;
+    }
+
+    public float getOffsetY() {
+        return this.offsetY;
+    }
+
+    public float getOffsetZ() {
+        return this.offsetZ;
+    }
+
+    /** 本家 setOffset: 設置物のモデル位置オフセット。 */
+    public void setOffset(float offsetX, float offsetY, float offsetZ, boolean sync) {
+        this.offsetX = offsetX;
+        this.offsetY = offsetY;
+        this.offsetZ = offsetZ;
+    }
+
+    public void setOffset(float offsetX, float offsetY, float offsetZ) {
+        this.setOffset(offsetX, offsetY, offsetZ, false);
+    }
+
+    public float getRotationRoll() {
+        return this.roll;
+    }
+
+    public void setRotationRoll(float roll, boolean sync) {
+        this.roll = roll % 360.0F;
+    }
+
+    public float getRotationPitch() {
+        return this.pitch;
+    }
+
+    public void setRotationPitch(float pitch, boolean sync) {
+        this.pitch = pitch % 360.0F;
+    }
+
+    public float getRotationYaw() {
+        return this.yaw;
+    }
+
+    public void setRotationYaw(float yaw, boolean sync) {
+        this.yaw = yaw % 360.0F;
+    }
+
+    public float getScale() {
+        return this.scale;
+    }
+
+    public void setScale(float scale, boolean sync) {
+        this.scale = scale;
+    }
+
+    public void setScale(float scale) {
+        this.setScale(scale, false);
     }
 }

@@ -54,6 +54,20 @@ public class BlockSet {
         return this.state;
     }
 
+    /** 本家 asKey: 座標を落とした比較用インスタンス (y=-1 が「座標なし」の印)。 */
+    public BlockSet asKey() {
+        return new BlockSet(0, -1, 0, this.block, this.metadata, this.nbt, this.state);
+    }
+
+    public boolean hasNBT() {
+        return this.nbt != null;
+    }
+
+    /** 本家 setNBT: NBT を差し替えた新しい BlockSet を返す (自身は変えない)。 */
+    public BlockSet setNBT(CompoundTag nbt) {
+        return new BlockSet(this.x, this.y, this.z, this.block, this.metadata, nbt, this.state);
+    }
+
     public CompoundTag writeToNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putInt("X", this.x);

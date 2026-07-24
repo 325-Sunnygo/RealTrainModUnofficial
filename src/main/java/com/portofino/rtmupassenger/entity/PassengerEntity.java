@@ -1,6 +1,5 @@
 package com.portofino.rtmupassenger.entity;
 
-import com.portofino.rtmupassenger.station.PassengerPopulation;
 import com.portofino.rtmupassenger.station.StopTargetBlock;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
 import net.minecraft.core.BlockPos;
@@ -34,8 +33,8 @@ import javax.annotation.Nullable;
  * 目的駅の座標に近づき停車してドアが開けば、扉が開いてから 1 秒後に降りる。
  * これが「駅のチャンクがロードされていないと降りない」問題の根治。
  *
- * <p><b>列車が壊されたら乗客も消える</b>。総数はワールド全体で
- * {@link PassengerPopulation} により厳密に管理される (チャンク外も数える)。
+ * <p><b>列車が壊されたら乗客も消える</b>。湧かせる上限は
+ * 「プレイヤーの視界内にいる乗客の数」で判定する (StationBlockEntity)。
  */
 public class PassengerEntity extends PathfinderMob {
 
@@ -751,19 +750,6 @@ public class PassengerEntity extends PathfinderMob {
             this.restrictTo(pos, 24);
         });
         NbtUtils.readBlockPos(tag, "PsgWait").ifPresent(pos -> this.waitSpot = pos);
-    }
-
-    /**
-     * 本当に消えた時 (討伐・discard) だけ総数から引く。チャンクアンロード
-     * ({@code shouldDestroy()=false}) では引かない — チャンク外でも「存在している」数として
-     * 維持することで、ワールド全体の上限を厳密に守る。
-     */
-    @Override
-    public void remove(Entity.RemovalReason reason) {
-        if (!this.level().isClientSide && reason.shouldDestroy() && this.level() instanceof ServerLevel sl) {
-            PassengerPopulation.get(sl).remove(this.getUUID());
-        }
-        super.remove(reason);
     }
 
     //---- 振る舞いの細部 ----
