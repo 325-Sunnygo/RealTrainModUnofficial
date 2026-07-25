@@ -137,12 +137,29 @@ public class RailPartsRenderer extends PartsRenderer {
         if (rec == null) {
             return;
         }
-        jp.ngt.rtm.rail.util.RailMap map = this.renderMapOverride != null
-                ? this.renderMapOverride : tile.getRailMap(null);
-        if (map == null) {
-            return;
+        //★本家 createRailPos と同じく<b>全 RailMap を 1 回の呼び出しで回す</b>。
+        //分岐は RailMap を複数持つので、1 本しか見ないと分岐側のルートに土台 (道床/枕木) が
+        //付かない。逆に呼び出し側でマップごとに renderStaticParts を呼ぶと、スクリプトの
+        //描画全体がマップの本数ぶん重なり、マップが収束する分岐の端で潰れて見える。
+        //回すのはここ (本家と同じ場所) が正しい。
+        jp.ngt.rtm.rail.util.RailMap[] maps;
+        if (this.renderMapOverride != null) {
+            maps = new jp.ngt.rtm.rail.util.RailMap[]{this.renderMapOverride};
+        } else {
+            maps = tile.getAllRailMaps();
+            if (maps == null || maps.length == 0) {
+                jp.ngt.rtm.rail.util.RailMap single = tile.getRailMap(null);
+                if (single == null) {
+                    return;
+                }
+                maps = new jp.ngt.rtm.rail.util.RailMap[]{single};
+            }
         }
         net.minecraft.core.BlockPos origin = tile.getBlockPos();
+        for (jp.ngt.rtm.rail.util.RailMap map : maps) {
+        if (map == null) {
+            continue;
+        }
         double length = map.getLength();
         int max = (int) Math.floor(length * 2.0D);
         if (max < 1) {
@@ -182,6 +199,7 @@ public class RailPartsRenderer extends PartsRenderer {
             rec.rotate(roll, 0.0F, 0.0F, 1.0F);
             rec.renderGroups(allowed);
             rec.pop();
+        }
         }
     }
 }

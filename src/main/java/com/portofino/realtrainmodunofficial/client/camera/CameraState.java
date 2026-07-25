@@ -87,50 +87,6 @@ public final class CameraState {
     private AspectGuide aspectGuide = AspectGuide.OFF;
     private boolean level = true;
 
-    // ---- レンズ / テレコン (装着している機材で焦点距離範囲と開放 F 値が決まる) ----
-    private CameraLens lens = CameraLens.KIT;
-    private Teleconverter teleconverter = Teleconverter.NONE;
-
-    public CameraLens getLens() {
-        return lens;
-    }
-
-    public Teleconverter getTeleconverter() {
-        return teleconverter;
-    }
-
-    /**
-     * レンズ / テレコンを装着し、焦点距離と絞りを新しい機材の範囲へ収める。
-     * 装着直後は広角端 (一番引いた状態) から始める。
-     */
-    public void applyGear(CameraLens newLens, Teleconverter tc) {
-        this.lens = newLens != null ? newLens : CameraLens.KIT;
-        this.teleconverter = tc != null ? tc : Teleconverter.NONE;
-        this.focalMm = Mth.clamp(effectiveFocalMin(), effectiveFocalMin(), effectiveFocalMax());
-        //開放より明るい側にいたら開放へ寄せる (テレコンで暗くなったぶんも反映)
-        this.fStopIndex = Mth.clamp(this.fStopIndex, minFStopIndex(), F_STOPS.length - 1);
-    }
-
-    private float effectiveFocalMin() {
-        return Mth.clamp(lens.focalMin * teleconverter.factor, MIN_FOCAL_MM, MAX_FOCAL_MM);
-    }
-
-    private float effectiveFocalMax() {
-        return Mth.clamp(lens.focalMax * teleconverter.factor, MIN_FOCAL_MM, MAX_FOCAL_MM);
-    }
-
-    /** このレンズ+テレコンで選べる一番明るい絞りの F_STOPS インデックス。 */
-    private int minFStopIndex() {
-        int base = 0;
-        for (int i = 0; i < F_STOPS.length; i++) {
-            if (F_STOPS[i] >= lens.wideFStop - 0.001F) {
-                base = i;
-                break;
-            }
-        }
-        return Mth.clamp(base + teleconverter.stopLoss, 0, F_STOPS.length - 1);
-    }
-
     // ---- 焦点距離 ----
 
     public float getFocalMm() {
@@ -140,11 +96,10 @@ public final class CameraState {
     /**
      * ズーム操作。望遠側ほど 1 ステップの mm 変化を大きくする (対数的)。
      * そうしないと 28→50mm が一瞬で終わり、300→800mm が異常に遅くなる。
-     * 単焦点レンズ (min==max) ではズームしても動かない。
      */
     public void zoom(float steps) {
         float factor = (float) Math.pow(1.06D, steps);
-        focalMm = Mth.clamp(focalMm * factor, effectiveFocalMin(), effectiveFocalMax());
+        focalMm = Mth.clamp(focalMm * factor, MIN_FOCAL_MM, MAX_FOCAL_MM);
     }
 
     /** 画角倍率 (等倍 = 28mm)。FOV 計算に使う。 */
@@ -159,8 +114,7 @@ public final class CameraState {
     }
 
     public void stepAperture(int dir) {
-        //開放側 (小さい F) は装着レンズ+テレコンの限界まで。絞る側は f/22 まで。
-        fStopIndex = Mth.clamp(fStopIndex + dir, minFStopIndex(), F_STOPS.length - 1);
+        fStopIndex = Mth.clamp(fStopIndex + dir, 0, F_STOPS.length - 1);
     }
 
     /**

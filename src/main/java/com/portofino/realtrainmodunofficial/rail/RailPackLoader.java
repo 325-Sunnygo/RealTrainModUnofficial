@@ -512,12 +512,15 @@ public class RailPackLoader {
     /** スクリプトファイルの内容をパックZIPから読み込む。見つからない場合はnullを返す。 */
     public static String readScriptContent(RailDefinition definition) {
         if (definition == null || definition.getScriptPath() == null || definition.getScriptPath().isBlank()) return null;
+        //★同梱パック (mod jar) は resolvePackPath が null を返す。ここで打ち切ると
+        //同梱レールのスクリプトが永久に読めず、黙ってスクリプト無し描画に落ちていた。
+        //zip 走査は飛ばして、下の索引フォールバックへ進む。
         Path packPath = resolvePackPath(definition.getPackName());
-        if (packPath == null) return null;
         String scriptPath = normalize(definition.getScriptPath());
         String scriptFileName = scriptPath.contains("/")
             ? scriptPath.substring(scriptPath.lastIndexOf('/') + 1).toLowerCase()
             : scriptPath.toLowerCase();
+        if (packPath != null) {
         try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(packPath))) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
@@ -530,6 +533,7 @@ public class RailPackLoader {
             }
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to read script {} from pack {}", definition.getScriptPath(), definition.getPackName(), e);
+        }
         }
         //自パックに無い: 前提/ベーススクリプトパックを横断する資産索引 (NGTFileLoader) から探す。
         //車両スクリプトと同じく、レールの実体スクリプトが別の前提パックにある分割構成に対応する。

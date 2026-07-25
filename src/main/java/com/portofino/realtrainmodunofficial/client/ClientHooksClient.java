@@ -130,18 +130,6 @@ public final class ClientHooksClient {
         com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.toggle();
     }
 
-    /** レンズを持って右クリック → 装着。 */
-    public static void mountCameraLens(String lensId) {
-        com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.mountLens(
-            com.portofino.realtrainmodunofficial.client.camera.CameraLens.forId(lensId));
-    }
-
-    /** テレコンを持って右クリック → 装着。 */
-    public static void attachTeleconverter(String tcId) {
-        com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.attachTeleconverter(
-            com.portofino.realtrainmodunofficial.client.camera.Teleconverter.forId(tcId));
-    }
-
     /** 駅設定 GUI を開く (現在のタグビット付き)。 */
     public static void openStationScreen(net.minecraft.core.BlockPos pos, int bits) {
         Minecraft.getInstance().setScreen(

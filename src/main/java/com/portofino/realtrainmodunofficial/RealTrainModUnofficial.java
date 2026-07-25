@@ -14,7 +14,6 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -88,15 +87,6 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.TICKET_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_BOOK_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CAMERA_ITEM.get());
-                //交換レンズ (広角→標準→望遠→超望遠→サンニッパ→撒き餌) とテレコン
-                output.accept(RealTrainModUnofficialItems.LENS_WIDE.get());
-                output.accept(RealTrainModUnofficialItems.LENS_STANDARD.get());
-                output.accept(RealTrainModUnofficialItems.LENS_TELE.get());
-                output.accept(RealTrainModUnofficialItems.LENS_SUPER_TELE.get());
-                output.accept(RealTrainModUnofficialItems.LENS_SANNI.get());
-                output.accept(RealTrainModUnofficialItems.LENS_NIFTY.get());
-                output.accept(RealTrainModUnofficialItems.TELECONVERTER_14.get());
-                output.accept(RealTrainModUnofficialItems.TELECONVERTER_20.get());
                 //リモコン: ブロック2つを無線レッドストーンでペアリング
                 output.accept(RealTrainModUnofficialItems.REMOTE_ITEM.get());
                 //乗客シミュレーション (統合): 駅ブロック / 停止位置目標
@@ -139,7 +129,6 @@ public class RealTrainModUnofficial {
 
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerNetwork);
-        modEventBus.addListener(this::buildCreativeTabContents);
         //本家 RTM のチャンクローダー (列車の State_ChunkLoader) 用チケットコントローラ
         modEventBus.addListener((net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent event) ->
             event.register(com.portofino.realtrainmodunofficial.world.TrainChunkLoader.CONTROLLER));
@@ -186,6 +175,9 @@ public class RealTrainModUnofficial {
             com.portofino.realtrainmodunofficial.rail.RailPackLoader.load();
             com.portofino.realtrainmodunofficial.vehicle.VehiclePackLoader.load();
             com.portofino.realtrainmodunofficial.installedobject.InstalledObjectPackLoader.load();
+            //本家同様、前提パックが足りなければここで落とす (黙って崩れた見た目で動かさない)。
+            //全パックのロード後に検証する — スクリプトは全パック横断の索引まで見て解決するため。
+            com.portofino.realtrainmodunofficial.pack.PackPrerequisiteCheck.verify();
             com.portofino.realtrainmodunofficial.script.TrainScriptSystem.getInstance().initialize();
         });
     }
@@ -194,11 +186,4 @@ public class RealTrainModUnofficial {
         com.portofino.realtrainmodunofficial.network.RealTrainModUnofficialNetwork.registerPayloadHandlers(event);
     }
 
-    private void buildCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
-        if (CreativeModeTabs.REDSTONE_BLOCKS.equals(event.getTabKey())) {
-            event.accept(RealTrainModUnofficialItems.CROSSING_GATE_ITEM.get());
-            event.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
-            event.accept(RealTrainModUnofficialItems.SPEAKER_ITEM.get());
-        }
-    }
 }

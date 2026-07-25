@@ -46,7 +46,14 @@ public final class CarServerScripts {
             }
             String source = PackScriptSource.decode(bytes);
             source = PackScriptSource.prepare(source);
+            //★SuperRailBuilder3 のビルダーは車として登録されているので、その敷設処理は
+            //この経路で読まれる。ここに差し込まないとブリッジが一切効かず、SRB 本来の
+            //1.12.2 向けコードがそのまま走って分岐敷設で失敗する。
+            source = TrainScriptSystem.appendSuperRailBuilderOverrides(source);
             ScriptEngine engine = ScriptUtil.doScript(PackScriptSource.PRELUDE + source);
+            //差し込んだ差し替えが呼ぶブリッジ。この経路では束縛されていなかったため、
+            //差し替えても __SRB__ が未定義で必ず失敗していた。
+            engine.put("__SRB__", new SrbRailBridge());
             return new Entry(engine);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init server script for {}", def.getId(), t);

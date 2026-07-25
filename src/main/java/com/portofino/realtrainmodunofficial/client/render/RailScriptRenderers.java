@@ -242,6 +242,11 @@ public final class RailScriptRenderers {
             this.engine = engine;
         }
 
+        /** パックのレールスクリプト本体。グループの出し分け (shouldRenderObject) を聞くのに使う。 */
+        public RailPartsRenderer renderer() {
+            return this.renderer;
+        }
+
         /**
          * スクリプト描画 (renderRailStatic → 内部で renderStaticParts) を記録・再生する。
          *
@@ -251,11 +256,13 @@ public final class RailScriptRenderers {
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
             boolean isSwitch = be instanceof TileEntityLargeRailSwitchCore;
-            if (isSwitch && modelHasTongParts(model)) {
-                //トング可動パーツ持ちのモデル (RTM 公式レール等) は既存パイプラインへ
-                //(Point 単位の転てつアニメ; renderRailDynamic 未移植)
-                return false;
-            }
+            //★トング可動パーツ持ちのモデル (RTM 公式レール等) もここで描く。
+            //以前は「renderRailDynamic 未移植」として RTMU 独自パイプラインへ逃がしていたが、
+            //その独自パイプラインは道床/枕木/レールを RTMU が名前で勝手に振り分けており
+            //(RailGroup.BASE + renderSwitchPoint)、分岐で道床や枕木が抜ける原因になっていた。
+            //本家は分岐も通常レールも同じで、静的部分は renderRailStatic、可動部 (トング) は
+            //renderRailDynamic をスクリプトに描かせる (LibRenderRail.js の renderPoint)。
+            //その両方は下で既に呼んでいるので、素直にスクリプトへ任せる。
             BlockPos pos = be.getBlockPos();
             //スクリプトが分岐を描かないパック (AR 等は isSwitchRail で早期 return):
             //記録が空だったコアは旧パイプラインに任せる (端トリミング付き)
@@ -272,21 +279,16 @@ public final class RailScriptRenderers {
                 try {
                     this.renderer.modelGroupNames = model.getOriginalGroupNames();
                     if (isSwitch) {
-                        //分岐: 全 RailMap をスクリプト静的描画 (本家 createRailPos は
-                        //getAllRailMaps を全部回す)。これでスクリプトの shouldRenderObject
-                        //(端トリミング/ピース循環) が分岐でも効き、AR 系レールで
-                        //端のピースが飛び出さない。
-                        RailMap[] allMaps = be.getAllRailMaps();
-                        if (allMaps != null) {
-                            for (int i = 0; i < allMaps.length; i++) {
-                                if (allMaps[i] == null) {
-                                    continue;
-                                }
-                                this.renderer.currentRailIndex = i;
-                                this.renderer.renderMapOverride = allMaps[i];
-                                this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
-                            }
-                        }
+                        //★分岐でも静的描画は<b>1 回だけ</b>。本家 RenderRailStandard.js の
+                        //renderRailStatic は renderer.renderStaticParts(...) を 1 回呼ぶだけで、
+                        //RailMap ごとに回したりはしない。分岐のレール本体とトングは
+                        //renderRailDynamic (LibRenderRail.js の renderPoint) が Point 単位で描く。
+                        //
+                        //以前はここで getAllRailMaps を全部回していた。すると土台 (base) が
+                        //<b>マップの本数ぶん重ねて</b>描かれ、マップが収束する分岐の端で
+                        //わずかに向きの違う同じピースが重なり、潰れたような見た目になっていた。
+                        this.renderer.currentRailIndex = 0;
+                        this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
                     } else {
                         //この定義のレール 1 本だけ描く。重ねレール (サブレール) は
                         //RailCoreBlockEntityRenderer 側で各サブ定義のモデル+スクリプトを使い別途描く
@@ -383,28 +385,6 @@ public final class RailScriptRenderers {
             return key;
         }
 
-        /**
-         * トング可動パーツ (L0/L1/R0/R1 + railL/railR) を持つモデルか。
-         * 持つ場合は転てつアニメのため既存パイプラインで描く必要がある。
-         */
-        private static boolean modelHasTongParts(MqoModelLoader.MqoModel model) {
-            java.util.Set<String> groups = model.getAllNormalizedGroupNames();
-            if (groups == null) {
-                return false;
-            }
-            boolean hasTong = false;
-            boolean hasRail = false;
-            for (String g : groups) {
-                String n = g.toLowerCase(java.util.Locale.ROOT);
-                if (n.equals("l0") || n.equals("l1") || n.equals("r0") || n.equals("r1")) {
-                    hasTong = true;
-                }
-                if (n.equals("raill") || n.equals("railr")) {
-                    hasRail = true;
-                }
-            }
-            return hasTong && hasRail;
-        }
     }
 
     /**

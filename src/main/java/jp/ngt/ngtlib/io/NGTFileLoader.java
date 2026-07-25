@@ -79,6 +79,17 @@ public final class NGTFileLoader {
             }
         }
         if (ref == null) {
+            //mod 自身の同梱アセット (assets/minecraft/scripts/... 等)。
+            //索引はワールドの mods/ や config/ の<b>外部パックしか見ていない</b>ため、
+            //同梱のレール描画スクリプトなどはここまで来ないと見つからない
+            //(開発環境では jar が mods/ に無いので索引にすら載らない)。
+            byte[] bundled = findBundledAsset(key);
+            if (bundled != null) {
+                if (bundled.length < 4 * 1024 * 1024) {
+                    CONTENT_CACHE.put(key, bundled);
+                }
+                return bundled;
+            }
             MISSING_CACHE.add(key);
             return null;
         }
@@ -104,6 +115,24 @@ public final class NGTFileLoader {
             NGTLog.debug("[NGTFileLoader] failed to read " + path + ": " + e);
             return null;
         }
+    }
+
+    /** mod jar (= クラスパス) に同梱しているアセットを探す。 */
+    private static byte[] findBundledAsset(String key) {
+        String[] candidates = {
+            "/assets/minecraft/" + key,
+            "/assets/realtrainmodunofficial/" + key,
+            "/" + key,
+        };
+        for (String candidate : candidates) {
+            try (java.io.InputStream in = NGTFileLoader.class.getResourceAsStream(candidate)) {
+                if (in != null) {
+                    return in.readAllBytes();
+                }
+            } catch (IOException ignored) {
+            }
+        }
+        return null;
     }
 
     /**

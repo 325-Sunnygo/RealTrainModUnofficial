@@ -277,15 +277,27 @@ public class BlockMarker extends BaseEntityBlock {
     }
 
     public static boolean createRail(Level world, int x, int y, int z, List<RailPosition> rps, RailProperty prop, boolean makeRail, boolean isCreative) {
+        return createRail(world, x, y, z, rps, prop, makeRail, isCreative, RailMapBasic.fixRTMRailMapVersionCurrent);
+    }
+
+    /**
+     * @param railMapVersion レールマップの版。
+     *   <p>版 1 以上は「アンカーの向きが dir から導かれる値と違えば必ずベジェにする」という
+     *   条件が入る (fixRTM 由来)。マーカーで敷くときはこれでよいが、<b>SuperRailBuilder3 は
+     *   独自のアンカー規約を持ち、本来 版 0 で敷く</b> ({@code new RailMapBasic(start, end)})。
+     *   版を合わせないと直線区間までベジェで膨らみ、分岐のトング付近が潰れる。
+     */
+    public static boolean createRail(Level world, int x, int y, int z, List<RailPosition> rps, RailProperty prop,
+                                     boolean makeRail, boolean isCreative, int railMapVersion) {
         rps = rps.stream().sorted(Comparator.comparingInt(o -> o.blockY)).collect(Collectors.toList());
         if (rps.size() == 2) {
             if (rps.stream().allMatch(rp -> rp.switchType == 1)) {
                 return createTurntable(world, rps.get(0), rps.get(1), prop, makeRail, isCreative);
             } else {
-                return createRail0(world, rps.get(0), rps.get(1), prop, makeRail, isCreative);
+                return createRail0(world, rps.get(0), rps.get(1), prop, makeRail, isCreative, railMapVersion);
             }
         } else if (rps.size() > 2) {
-            return createRail1(world, x, y, z, null, rps, prop, makeRail, isCreative);
+            return createRail1(world, x, y, z, null, rps, prop, makeRail, isCreative, railMapVersion);
         }
         return false;
     }
@@ -325,7 +337,12 @@ public class BlockMarker extends BaseEntityBlock {
     }
 
     private static boolean createRail0(Level world, RailPosition start, RailPosition end, RailProperty prop, boolean makeRail, boolean isCreative) {
-        RailMapBasic railMap = new RailMapBasic(start, end, RailMapBasic.fixRTMRailMapVersionCurrent);
+        return createRail0(world, start, end, prop, makeRail, isCreative, RailMapBasic.fixRTMRailMapVersionCurrent);
+    }
+
+    private static boolean createRail0(Level world, RailPosition start, RailPosition end, RailProperty prop,
+                                       boolean makeRail, boolean isCreative, int railMapVersion) {
+        RailMapBasic railMap = new RailMapBasic(start, end, railMapVersion);
 
         //コアの位置に別レールのコアが居るなら、置いた瞬間にそのレールが消える。敷設を中止する。
         if (hasRailCore(world, start.blockX, start.blockY, start.blockZ)) {
@@ -370,11 +387,16 @@ public class BlockMarker extends BaseEntityBlock {
      * 分岐レール
      */
     private static boolean createRail1(Level world, int x, int y, int z, Player player, List<RailPosition> list, RailProperty prop, boolean makeRail, boolean isCreative) {
+        return createRail1(world, x, y, z, player, list, prop, makeRail, isCreative, RailMapBasic.fixRTMRailMapVersionCurrent);
+    }
+
+    private static boolean createRail1(Level world, int x, int y, int z, Player player, List<RailPosition> list,
+                                       RailProperty prop, boolean makeRail, boolean isCreative, int railMapVersion) {
         //コアの位置に別レールのコアが居るなら、置いた瞬間にそのレールが消える。敷設を中止する。
         if (hasRailCore(world, x, y, z)) {
             return false;
         }
-        RailMaker railMaker = new RailMaker(world, list, RailMapBasic.fixRTMRailMapVersionCurrent);
+        RailMaker railMaker = new RailMaker(world, list, railMapVersion);
         SwitchType st = railMaker.getSwitch();
         if (st == null) {
             if (player != null) {

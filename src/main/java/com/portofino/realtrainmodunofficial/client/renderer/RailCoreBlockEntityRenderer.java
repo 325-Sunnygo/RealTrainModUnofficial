@@ -151,6 +151,11 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 //焼き込み本数は上限付き ({@link RailMeshCache#MAX_BAKES_PER_FRAME}) で分散され、
                 //焼き直し待ちの間は直前のメッシュを描くので、静止分岐は焼いて使い回し (ほぼ0ms)、
                 //実際にトングが動いている一瞬もコストが跳ねない。見た目は変わらない。
+                //レールは統合メッシュへ焼く (軽量化)。焼いた VBO は AFTER_BLOCK_ENTITIES で
+                //まとめて描かれるため、車両より<b>先に</b>フレームバッファへ乗る。
+                //以前ここを疑って本家同様 MultiBufferSource 経由へ戻したが、症状は変わらなかった。
+                //真因は車両側の発光パスが深度を書いていなかったこと (MqoModelLoader の
+                //renderNamedGroupsEmissive)。深度さえ書かれていれば描画順は問題にならない。
                 long variant = switchVariantKey(be);
                 RailDefinition bakedDef = def;
                 //packedLight はこのメソッド内で再代入しているのでラムダに直接は渡せない
@@ -849,7 +854,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             packedLight,
             net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
             false,
-            groupName -> shouldRenderRailGroup(model, groupName, pos, max),
+            groupName -> shouldRenderObject(blockEntity, groupName, max, pos),
             null
         );
         //★半透明パスは距離で切らない。本家 BasicRailPartsRenderer.shouldRenderObject は
@@ -863,67 +868,46 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 packedLight,
                 net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
                 true,
-                groupName -> shouldRenderRailGroup(model, groupName, pos, max),
+                groupName -> shouldRenderObject(blockEntity, groupName, max, pos),
                 null
             );
         }
         poseStack.popPose();
     }
 
-    private static boolean shouldRenderRailGroup(MqoModelLoader.MqoModel model, String groupName, int pos, int max) {
-        String lower = groupName == null ? "" : groupName.toLowerCase(java.util.Locale.ROOT);
-        if (lower.matches("[lr][0-9]+")) {
-            return false;
+    /**
+     * この位置でこのグループを描くか。
+     * <p>
+     * 本家 {@code RailPartsRenderer.shouldRenderObject(tile, objName, len, pos)} に丸投げする。
+     * スクリプトを持つパックはそこで枕木の周期・バラストの敷き方・端部品の出し方を決めており、
+     * スクリプトを持たないパックは本家 {@code BasicRailPartsRenderer} と同じく<b>無条件 true</b>。
+     * <p>
+     * ★以前はここで RTMU が独自に出し分けていた (ballast を {@code pos % 16} で回す、
+     * {@code sleeper_point} を常に隠す、{@code end/cap} は端だけ… など)。パック側の意図と
+     * 噛み合わず、特に分岐で道床と枕木がおかしくなっていた
+     * (分岐用枕木 {@code sleeper_point} が常に消えていた)。判断はパックに返す。
+     */
+    private static boolean shouldRenderObject(TileEntityLargeRailCore be, String groupName, int max, int pos) {
+        if (groupName == null || groupName.isBlank()) {
+            return true;
         }
-        if (lower.startsWith("ballast")) {
-            int ballastIndex = parseTrailingNumber(lower);
-            if (ballastIndex <= 0) {
-                return true;
-            }
-            if (model != null && model.hasGroupNamed("ballast04")) {
-                return ballastIndex == (pos % 16) + 1;
-            }
-            if (model != null && model.hasGroupNamed("ballast03")) {
-                if (pos % 10 == 0) {
-                    return ballastIndex == 2;
+        try {
+            com.portofino.realtrainmodunofficial.rail.RailDefinition def =
+                com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(be.getRailDefinitionId());
+            if (def != null) {
+                com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
+                    com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
+                if (scripted != null && scripted.renderer() != null) {
+                    return scripted.renderer().shouldRenderObject(be, groupName, max, pos);
                 }
-                if ((pos + 1) % 10 == 0) {
-                    return ballastIndex == 3;
-                }
-                return ballastIndex == 1;
             }
-            return ballastIndex == 1;
-        }
-        if (lower.startsWith("sleeper_point")) {
-            return false;
-        }
-        if (lower.equals("ladder")) {
-            return (pos + 1) % 10 == 0 || (pos + 5) % 10 == 0 || (pos + 9) % 10 == 0;
-        }
-        boolean endpoint = pos == 0 || pos == max;
-        // 一部パックは end/cap 名で端面パーツを持つ。中間で出すと長い先端が飛び出す。
-        if (lower.contains("end") || lower.contains("cap") || lower.contains("terminal")) {
-            return endpoint;
+        } catch (Throwable ignored) {
+            //スクリプトが転んでもレールは描く (本家の既定と同じ true)
         }
         return true;
     }
 
 
-    private static int parseTrailingNumber(String value) {
-        int end = value.length();
-        int start = end;
-        while (start > 0 && Character.isDigit(value.charAt(start - 1))) {
-            start--;
-        }
-        if (start == end) {
-            return -1;
-        }
-        try {
-            return Integer.parseInt(value.substring(start, end));
-        } catch (NumberFormatException e) {
-            return -1;
-        }
-    }
 
     @Override
     public @NotNull AABB getRenderBoundingBox(TileEntityLargeRailCore be) {

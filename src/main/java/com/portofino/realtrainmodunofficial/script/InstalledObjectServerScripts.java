@@ -121,7 +121,11 @@ public final class InstalledObjectServerScripts {
             //パックのスクリプトは Shift-JIS のことがある。UTF-8 で読むと日本語コメント中の
             //バイトが化けて構文まで壊れるので、既存のパック用デコーダに任せる。
             String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
+            //SRB 系のスクリプトが設置物として来た場合もブリッジを効かせる
+            //(SuperRailBuilderVersion を含まないスクリプトには何も足さない)。
+            source = TrainScriptSystem.appendSuperRailBuilderOverrides(source);
             ScriptEngine se = ScriptUtil.doScript(PRELUDE + source);
+            se.put("__SRB__", new com.portofino.realtrainmodunofficial.script.SrbRailBridge());
             return se;
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("[serverScript] 読み込み失敗: {} ({})", def.getId(), path, t);

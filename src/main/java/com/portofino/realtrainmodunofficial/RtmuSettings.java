@@ -42,10 +42,6 @@ public final class RtmuSettings {
     public static int vehicleRenderDistance = 0;
 
     // ---- カメラ (撮り鉄カメラの装着レンズ。クライアントのみ・所持アイテムで切替) ----
-    /** 現在マウントしているレンズの id (CameraLens.id)。空 = 既定 (標準ズーム)。 */
-    public static String cameraLensId = "";
-    /** 現在装着しているテレコンバーターの id (Teleconverter.id)。空/none = 無し。 */
-    public static String cameraTeleconverterId = "";
 
     // ---- 乗客シミュレーション ----
     /**
@@ -134,8 +130,6 @@ public final class RtmuSettings {
             autoHeightLevel = clampLevel(parseInt(p.getProperty("autoHeightLevel", "1"), 1));
             railRenderDistance = clampRailRenderDistance(parseInt(p.getProperty("railRenderDistance", "128"), 128));
             vehicleRenderDistance = clampVehicleRenderDistance(parseInt(p.getProperty("vehicleRenderDistance", "0"), 0));
-            cameraLensId = p.getProperty("cameraLensId", "");
-            cameraTeleconverterId = p.getProperty("cameraTeleconverterId", "");
             maxPassengers = clampMaxPassengers(parseInt(p.getProperty("maxPassengers", "30"), 30));
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("RTMU: failed to load settings", e);
@@ -150,8 +144,6 @@ public final class RtmuSettings {
             p.setProperty("autoHeightLevel", Integer.toString(autoHeightLevel));
             p.setProperty("railRenderDistance", Integer.toString(railRenderDistance));
             p.setProperty("vehicleRenderDistance", Integer.toString(vehicleRenderDistance));
-            p.setProperty("cameraLensId", cameraLensId == null ? "" : cameraLensId);
-            p.setProperty("cameraTeleconverterId", cameraTeleconverterId == null ? "" : cameraTeleconverterId);
             p.setProperty("maxPassengers", Integer.toString(maxPassengers));
             try (OutputStream out = Files.newOutputStream(FILE)) {
                 p.store(out, "RTMU client settings");

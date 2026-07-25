@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "realtrainmodunofficial:item/lens_sanni"
+    "layer0": "realtrainmodunofficial:item/miniature"
   }
 }

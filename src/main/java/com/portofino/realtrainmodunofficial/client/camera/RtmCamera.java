@@ -88,47 +88,7 @@ public final class RtmCamera {
         } else {
             active = true;
             trackedTrain = null;
-            //装着中のレンズ / テレコン (設定に保存済み) を反映して構える。
-            reloadGear();
         }
-    }
-
-    /** 設定に保存されている装着レンズ / テレコンを状態へ反映する。 */
-    public void reloadGear() {
-        CameraLens lens = CameraLens.forId(
-            com.portofino.realtrainmodunofficial.RtmuSettings.cameraLensId);
-        Teleconverter tc = Teleconverter.forId(
-            com.portofino.realtrainmodunofficial.RtmuSettings.cameraTeleconverterId);
-        state.applyGear(lens, tc);
-    }
-
-    // ---- レンズ / テレコン装着 (レンズ・テレコンアイテムを持って右クリック) ----
-
-    /**
-     * レンズを装着する。新しいレンズに換えると<b>テレコンは外れる</b> (実機で丸ごと外して
-     * 素のレンズを付け直すのと同じ)。テレコンを外したいときはレンズを付け直せばよい。
-     */
-    public void mountLens(CameraLens lens) {
-        if (lens == null) {
-            lens = CameraLens.KIT;
-        }
-        boolean hadTc = state.getTeleconverter() != Teleconverter.NONE;
-        state.applyGear(lens, Teleconverter.NONE);
-        com.portofino.realtrainmodunofficial.RtmuSettings.cameraLensId = lens.id;
-        com.portofino.realtrainmodunofficial.RtmuSettings.cameraTeleconverterId = "";
-        com.portofino.realtrainmodunofficial.RtmuSettings.save();
-        message("§aレンズ装着: §f" + lens.displayName + (hadTc ? " §7(テレコン解除)" : ""));
-    }
-
-    /** テレコンバーターを装着する (現在のレンズはそのまま)。 */
-    public void attachTeleconverter(Teleconverter tc) {
-        if (tc == null) {
-            tc = Teleconverter.NONE;
-        }
-        state.applyGear(state.getLens(), tc);
-        com.portofino.realtrainmodunofficial.RtmuSettings.cameraTeleconverterId = tc.id;
-        com.portofino.realtrainmodunofficial.RtmuSettings.save();
-        message("§aテレコン装着: §f" + tc.displayName + " §7(" + state.getLens().shortLabel() + ")");
     }
 
     private void message(String msg) {

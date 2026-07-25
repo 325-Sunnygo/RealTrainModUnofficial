@@ -11,11 +11,13 @@ import java.util.function.Function;
 /**
  * RTMU 専用の {@link RenderType}。
  * <p>
- * {@code entityTranslucent} は深度を書き込む (COLOR_DEPTH_WRITE) ため、車両のガラス越しに
- * 後方のレール等が「先にガラスが深度を書く → 後で描くレールが深度テストで消える」現象を起こす。
- * ここではガラス専用に <b>深度を書き込まない (COLOR_WRITE)</b> 半透明 RenderType を用意する。
- * ガラスは他の不透明物 (地形/レール) を全て描いた後 (遅延バッファ) に描くので、深度を書かなくても
- * 正しく重なり、かつ後方を塞がない。両面表示 (NO_CULL) で車内側からもガラス色が見える。
+ * 用途は<b>「提出順で描く」ことだけ</b>。深度は本家どおり書き込む。
+ * <p>
+ * ★以前はガラスを深度非書き込み (COLOR_WRITE) にしていた。これは「ガラスを遅延バッファで
+ * 全ての不透明物より後に描く」独自処理とセットの設計だったが、その遅延処理は本家に無く、
+ * 車体越しにレールが透けるので撤去した。遅延が無いまま深度を書かないと、後から描かれる
+ * レールがガラスや車体を突き抜けて見える。本家 pass1 は depthMask を既定 (ON) のままなので、
+ * それに合わせる。
  * <p>
  * シャード ({@code RENDERTYPE_ENTITY_TRANSLUCENT_SHADER} 等) は {@code RenderType} の
  * protected static メンバなので、このクラスを {@code RenderType} のサブクラスにして参照する。
@@ -41,17 +43,15 @@ public final class RtmuRenderTypes extends RenderType {
                 .setLightmapState(LIGHTMAP)
                 .setOverlayState(OVERLAY)
                 .setCullState(NO_CULL)
-                .setWriteMaskState(COLOR_WRITE)
                 .createCompositeState(true)));
 
-    /** 深度を書き込まない半透明・両面・提出順 (ソート無し) のガラス用 RenderType。 */
+    /** 半透明・両面・提出順 (ソート無し)。深度は本家どおり書き込む。 */
     public static RenderType glassNoDepth(ResourceLocation texture) {
         return GLASS_NO_DEPTH.apply(texture);
     }
 
-    //glassNoDepth の片面カリング版。本家 doCulling=true のモデルは半透明も片面描画するため
+    //上の片面カリング版。本家 doCulling=true のモデルは半透明も片面描画するため
     //(RenderVehicleBase は glDisable(GL_CULL_FACE) を doCulling でしか外さない)、それに合わせる用。
-    //深度書き込み無し・提出順は据え置きで、カリングだけ有効にする。
     private static final Function<ResourceLocation, RenderType> GLASS_NO_DEPTH_CULL = Util.memoize(tex ->
         create("rtmu_glass_nodepth_cull",
             DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, false,
@@ -62,12 +62,37 @@ public final class RtmuRenderTypes extends RenderType {
                 .setLightmapState(LIGHTMAP)
                 .setOverlayState(OVERLAY)
                 .setCullState(CULL)
-                .setWriteMaskState(COLOR_WRITE)
                 .createCompositeState(true)));
 
     /** {@link #glassNoDepth} の片面カリング版 (本家 doCulling=true 用)。 */
     public static RenderType glassNoDepthCull(ResourceLocation texture) {
         return GLASS_NO_DEPTH_CULL.apply(texture);
+    }
+
+    //本家 RenderVehicleBase.renderBodyLight の i>0 (前照灯/尾灯) 相当。
+    //  GLHelper.disableLighting();        → ライティング無し = 発光シェーダ
+    //  GL11.glEnable(GL_BLEND);
+    //  GL11.glBlendFunc(SRC_ALPHA, ONE_MINUS_SRC_ALPHA);
+    //  GLHelper.setLightmapMaxBrightness();
+    //★本家は glDepthMask(false) を<b>呼んでいない</b>。GL ではブレンドと深度書き込みは独立なので、
+    //  前照灯/尾灯パスは深度を書く。バニラの entityTranslucentEmissive は COLOR_WRITE
+    //  (深度書き込み無し) なので、そのまま使うと基本テクスチャが透明で実体が
+    //  ***_light1/2.png 側にある面 (0系の鼻) がライト点灯中だけ深度を書かず、
+    //  後から描くレールに突き抜かれる。書き込みマスクだけ既定へ戻したものを使う。
+    private static final Function<ResourceLocation, RenderType> EMISSIVE_DEPTH_WRITE = Util.memoize(tex ->
+        create("rtmu_emissive_depth",
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, true,
+            CompositeState.builder()
+                .setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_EMISSIVE_SHADER)
+                .setTextureState(new TextureStateShard(tex, false, false))
+                .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                .setCullState(NO_CULL)
+                .setOverlayState(OVERLAY)
+                .createCompositeState(true)));
+
+    /** 発光 (ライティング無し) + ブレンド + <b>深度書き込みあり</b>。本家の前照灯/尾灯パス相当。 */
+    public static RenderType emissiveDepthWrite(ResourceLocation texture) {
+        return EMISSIVE_DEPTH_WRITE.apply(texture);
     }
 
     //entityTranslucent 相当 (深度書き込みあり・両面) だが提出順で描く。台車・座席など

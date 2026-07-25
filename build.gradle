@@ -175,17 +175,40 @@ tasks.named('jar', Jar).configure {
 }
 
 // Windows: ModrinthApp の rtmu プロファイル (APPDATA 配下)。他OSは従来パスにフォールバック。
-def modrinthModsDir = System.getenv('APPDATA') != null
-        ? file("${System.getenv('APPDATA')}/ModrinthApp/profiles/rtmu/mods")
-        : file("${System.properties['user.home']}/Library/Application Support/ModrinthApp/profiles/Server test/mods")
+// ビルドした jar を、この mod が既に入っている Modrinth プロファイル<b>すべて</b>へ配る。
+// 1 つ決め打ちだと、別プロファイルで遊んでいるときに古い jar のまま検証してしまう。
+// (プロファイル名は環境ごとに違うので、既に realtrainmodunofficial-*.jar がある mods/ を対象にする)
+def modrinthProfilesRoot = System.getenv('APPDATA') != null
+        ? file("${System.getenv('APPDATA')}/ModrinthApp/profiles")
+        : file("${System.properties['user.home']}/Library/Application Support/ModrinthApp/profiles")
 
-tasks.register('copyJarToModrinthMods', Copy) {
+def modrinthModsDirs = modrinthProfilesRoot.isDirectory()
+        ? modrinthProfilesRoot.listFiles()
+            .findAll { it.isDirectory() }
+            .collect { new File(it, 'mods') }
+            .findAll { it.isDirectory() && it.listFiles()?.any { f -> f.name.startsWith('realtrainmodunofficial') && f.name.endsWith('.jar') } }
+        : []
+
+tasks.register('copyJarToModrinthMods') {
     dependsOn tasks.named('jar')
-    onlyIf {
-        modrinthModsDir.isDirectory()
+    def jarFile = tasks.named('jar').flatMap { it.archiveFile }
+    def targets = modrinthModsDirs
+    inputs.file(jarFile)
+    onlyIf { !targets.isEmpty() }
+    doLast {
+        def src = jarFile.get().asFile
+        targets.each { dir ->
+            //同じ mod の古いバージョンが残っていると二重ロードになるので消してから置く
+            dir.listFiles()?.each { f ->
+                if (f.name.startsWith('realtrainmodunofficial') && f.name.endsWith('.jar') && f.name != src.name) {
+                    f.delete()
+                }
+            }
+            java.nio.file.Files.copy(src.toPath(), new File(dir, src.name).toPath(),
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            logger.lifecycle("deployed ${src.name} -> ${dir}")
+        }
     }
-    from(tasks.named('jar').flatMap { it.archiveFile })
-    into(modrinthModsDir)
 }
 
 tasks.named('jar').configure {

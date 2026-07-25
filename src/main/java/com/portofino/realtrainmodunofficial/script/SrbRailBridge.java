@@ -28,15 +28,27 @@ import java.util.List;
  */
 public final class SrbRailBridge {
 
+    /**
+     * SRB が敷設に使うレールマップの版。
+     * <p>SRB は非 fixRTM 環境では {@code new RailMapBasic(start, end)} = <b>版 0</b> で敷く。
+     * 版 1 以上には「アンカーの向きが dir から導かれる値と違えば必ずベジェにする」条件が入り、
+     * SRB 独自のアンカー規約と噛み合わない。マーカー用の版 (現行) を渡していたため、
+     * 直線 61 ブロックの区間が 83.75 に膨らみ、分岐のトング付近が潰れていた。
+     */
+    private static final int RAIL_MAP_VERSION = 0;
+
     /** SRB の createRailPosition 相当。data の各値から RTMU の RailPosition を生成する。 */
     public RailPosition createRailPosition(int blockX, int blockY, int blockZ, int markerDir,
                                            double switchType, double anchorLength, double anchorPitch,
                                            double anchorYaw, double cantCenter, double cantEdge, double height) {
+        //★SRB が渡す値は<b>そのまま使う</b>。補正しない。
+        //以前はアンカー長や向きを RTM の流儀へ「直して」いたが、それは敷設に使う
+        //レールマップの版が違っていたのを辻褄合わせしていただけだった (下の RAIL_MAP_VERSION)。
+        //版さえ合えば SRB の値は最初から正しく、補正するとかえって形が悪くなる
+        //(実測: 直線区間 61.00 が正、補正ありだと分岐が 41.60 → 56.05 に伸びる)。
         RailPosition rp = new RailPosition(blockX, blockY, blockZ, markerDir, (int) switchType);
-        if (anchorLength >= 0.0D) {
-            rp.anchorLengthHorizontal = (float) anchorLength;
-            rp.anchorLengthVertical = (float) anchorLength;
-        }
+        rp.anchorLengthHorizontal = (float) anchorLength;
+        rp.anchorLengthVertical = (float) anchorLength;
         rp.anchorPitch = (float) anchorPitch;
         rp.anchorYaw = (float) anchorYaw;
         rp.cantCenter = (float) cantCenter;
@@ -56,6 +68,9 @@ public final class SrbRailBridge {
         rps.add(start);
         rps.add(end);
         boolean ok = buildRailFaithful(level, rps, toModelId(modelId));
+        if (!ok) {
+            notifyFailure(level, "レールを敷けませんでした (2点間)。設置場所を変えてみてください。");
+        }
         return ok;
     }
 
@@ -71,12 +86,40 @@ public final class SrbRailBridge {
             modelId == null ? "" : modelId, net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
         RailPosition first = rps.get(0);
         return jp.ngt.rtm.rail.BlockMarker.createRail(
-            level, first.blockX, first.blockY, first.blockZ, rps, prop, true, true);
+            level, first.blockX, first.blockY, first.blockZ, rps, prop, true, true, RAIL_MAP_VERSION);
+    }
+
+    /** 直前に出した診断。同じ内容は繰り返さない (毎 tick 呼ばれるため)。 */
+    private static String lastDebug = "";
+
+    /** スクリプトから状態を 1 行出す。内容が変わった時だけログに残る。 */
+    public void debug(String msg) {
+        if (msg == null || msg.equals(lastDebug)) {
+            return;
+        }
+        lastDebug = msg;
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info("[SRB] {}", msg);
     }
 
     /** SRB スクリプトが敷設失敗を通知するのに使う。 */
     public void logError(String msg) {
         com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn("[SRB] {}", msg);
+    }
+
+    /**
+     * 敷設に失敗したことをその場のプレイヤーへ伝える。
+     * <p>SRB 自身のメッセージは「An error occurred while generating rails」だけで、
+     * 何が起きたのか分からない。RTMU 側で分かっている理由はチャットにも出す。
+     */
+    private static void notifyFailure(Level level, String reason) {
+        try {
+            if (level != null && level.getServer() != null) {
+                level.getServer().getPlayerList().broadcastSystemMessage(
+                    net.minecraft.network.chat.Component.literal("§c[RTMU] " + reason), false);
+            }
+        } catch (Throwable ignored) {
+            //通知に失敗しても敷設処理には影響させない
+        }
     }
 
     /** SRB の buildBranchRail 相当(3点以上で分岐レール)。 */
@@ -104,8 +147,27 @@ public final class SrbRailBridge {
                   .append(" dir=").append(rp.direction).append(" sw=").append(rp.switchType).append(") ");
             }
             logError(sb.toString());
+            notifyFailure(level, "分岐レールを敷けませんでした (地点 " + rps.size()
+                + ")。分岐の角度・間隔が本家の許容範囲を超えている可能性があります。");
         }
         return ok;
+    }
+
+    /**
+     * レールアイテムのモデル ID。
+     * <p>★アイテム個別の選択が入っていなければ<b>選択中のレール</b>へ落とす
+     * (マーカーで敷くときと同じ既定: {@code BlockMarker.getRailProperty})。
+     * ここで空文字を返すと SRB 側は「レールを持っていない」と判断して敷設処理を
+     * 丸ごと飛ばすため、レールを持っているのに何も建たなくなる。
+     */
+    private static String modelIdOf(ItemStack stack) {
+        String id = LegacyItemStackBridge.getSelectedModelId(stack);
+        if (id != null && !id.isBlank()) {
+            return id;
+        }
+        com.portofino.realtrainmodunofficial.rail.RailDefinition def =
+            com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
+        return def != null ? def.getId() : "";
     }
 
     /** SRB の deleteRail 相当。(x,y,z) にレール(コア or 当たり判定)があれば撤去し true。 */
@@ -143,18 +205,23 @@ public final class SrbRailBridge {
 
     /** SRB の getPlayerRail 相当。プレイヤーが持つレールアイテムの選択モデルIDを返す(無ければ "")。 */
     public String heldRailModelId(Object playerObj) {
-        if (!(playerObj instanceof Player player)) {
+        //★スクリプトへ渡るプレイヤーは RTMU のラッパー (jp.ngt.mccompat.PlayerCompat) のことがある。
+        //1.12 のフィールド名 (field_71071_by など) をスクリプトへ見せるための包みで、
+        //生の Player ではない。ここで剥がさないと「レールを持っていない」と誤判定し、
+        //SRB の敷設条件から外れて何も建たなくなる (Q も敷設ブロックの後ろなので効かなく見える)。
+        Player player = jp.ngt.mccompat.PlayerCompat.unwrap(playerObj);
+        if (player == null) {
+            debug("手持ち判定: プレイヤーが取れない → "
+                + (playerObj == null ? "null" : playerObj.getClass().getName()));
             return "";
         }
         ItemStack main = player.getMainHandItem();
         if (main != null && main.getItem() instanceof RailItem) {
-            String id = LegacyItemStackBridge.getSelectedModelId(main);
-            return id == null ? "" : id;
+            return modelIdOf(main);
         }
         ItemStack off = player.getOffhandItem();
         if (off != null && off.getItem() instanceof RailItem) {
-            String id = LegacyItemStackBridge.getSelectedModelId(off);
-            return id == null ? "" : id;
+            return modelIdOf(off);
         }
         return "";
     }
@@ -255,11 +322,26 @@ public final class SrbRailBridge {
         return null;
     }
 
+    /**
+     * SRB から渡された「レール」からモデル ID を取り出す。
+     * <p>差し替え後の {@code getPlayerRail} は ID の文字列を返すが、差し替えが効いていない
+     * 経路から本家の状態オブジェクトが来ることもあるので両方受ける。どちらでも読めなければ
+     * <b>選択中のレール</b>へ落とす (マーカーで敷くときと同じ既定)。
+     */
     private static String toModelId(Object modelId) {
-        if (modelId == null) {
-            return null;
+        if (modelId instanceof CharSequence cs) {
+            String s = cs.toString().trim();
+            if (!s.isEmpty()) {
+                return s;
+            }
+        } else if (modelId instanceof jp.ngt.rtm.modelpack.state.ResourceState state) {
+            String s = state.getResourceName();
+            if (s != null && !s.isBlank()) {
+                return s;
+            }
         }
-        String s = modelId.toString();
-        return s.isBlank() ? null : s;
+        com.portofino.realtrainmodunofficial.rail.RailDefinition def =
+            com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
+        return def != null ? def.getId() : null;
     }
 }

@@ -1,7 +1,22 @@
 package com.portofino.realtrainmodunofficial.client.screen;
 
+import com.mojang.blaze3d.platform.Lighting;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 import com.portofino.realtrainmodunofficial.client.PackButtonTextureCache;
+import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
+import com.portofino.realtrainmodunofficial.client.renderer.BogieRenderer;
+import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
+import com.portofino.realtrainmodunofficial.rail.RailRegistry;
+import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
+import com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.world.phys.Vec3;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -15,6 +30,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -73,6 +91,16 @@ public class ModelSelectScreen extends Screen {
     private int clusterLeftX;
 
     private boolean draggingScrollbar = false;
+
+    // ---- モデルプレビュー ----
+    /** ロード済みモデル (画面をまたいで使い回す)。 */
+    private static final Map<String, MqoModelLoader.MqoModel> MODEL_CACHE = new ConcurrentHashMap<>();
+    /** 読めなかった id (毎フレーム探しに行かないように覚えておく)。 */
+    private static final Set<String> MISSING_MODEL_CACHE = ConcurrentHashMap.newKeySet();
+
+    /** スクリプト車両をプレビューするための、ワールド未追加の一時エンティティ。 */
+    private com.portofino.realtrainmodunofficial.entity.TrainEntity previewEntity;
+    private String previewEntityId;
     /** 選択画面を開いている間は F1 相当で HUD を隠す。閉じたら戻す退避値。 */
     private boolean prevHideGui;
 
@@ -109,6 +137,7 @@ public class ModelSelectScreen extends Screen {
     private int scrollbarX() { return width - SCROLLBAR_W - 3; }   // 画面右端
     private int listRight() { return LIST_LEFT + BTN_W; }
     private int centerY() { return height / 2 - BTN_H / 2; }
+
 
     @Override
     protected void init() {
@@ -220,11 +249,260 @@ public class ModelSelectScreen extends Screen {
             g.renderOutline(cx, cyy, FIELD_H, FIELD_H, 0xFFFFFFFF);
         }
 
+        //一覧のボタンをクリックして選んだモデルを右手に浮かべる
+        renderSelectedPreview(g);
+
         super.render(g, mouseX, mouseY, pt);
 
         if (filtered.isEmpty()) {
             g.drawCenteredString(font, Component.translatable("screen.realtrainmodunofficial.no_models"),
                 LIST_LEFT + BTN_W / 2, cy + 12, 0xAAAAAA);
+        }
+    }
+
+
+    // ============================================================ モデルプレビュー
+    // 本家 GuiSelectModel.renderModel + ModelSet*Client.renderModelInGui の移植。
+    //
+    // 本家は「一覧のボタンにマウスを乗せている間だけ」画面右手にモデルを浮かべる。
+    // GUI の平行投影ではなく<b>透視投影を張り直して</b>描くのが特徴で、そのため
+    // 拡大縮小や回転の操作は無く、機種ごとに決め打ちの 3/4 視点になる。
+    // 1.21 には固定機能パイプラインが無いので、投影行列の差し替えで同じことをする。
+
+    /** 本家 gluPerspective(80, 1.0, 5, 1000)。アスペクトを 1.0 にするのも本家どおり。 */
+    private static final float PREVIEW_FOV_DEG = 80.0F;
+    private static final float PREVIEW_NEAR = 5.0F;
+    private static final float PREVIEW_FAR = 1000.0F;
+
+    private void renderSelectedPreview(GuiGraphics g) {
+        ModelInfo info = null;
+        for (ModelInfo m : filtered) {
+            if (m.id().equals(selectedId)) {
+                info = m;
+                break;
+            }
+        }
+        if (info == null) {
+            return;
+        }
+        MqoModelLoader.MqoModel model = getOrLoadModel(info.id(), info.packName());
+        if (model == null) {
+            return;
+        }
+        VehicleDefinition vehicleDef = VehicleRegistry.getById(info.id());
+
+        //ここまでに積んだ GUI の頂点を吐き出してから投影を差し替える
+        g.flush();
+
+        RenderSystem.backupProjectionMatrix();
+        org.joml.Matrix4fStack modelView = RenderSystem.getModelViewStack();
+        modelView.pushMatrix();
+        try {
+            RenderSystem.setProjectionMatrix(
+                new org.joml.Matrix4f().perspective(
+                    (float) Math.toRadians(PREVIEW_FOV_DEG), 1.0F, PREVIEW_NEAR, PREVIEW_FAR),
+                com.mojang.blaze3d.vertex.VertexSorting.DISTANCE_TO_ORIGIN);
+
+            //★本家 glLoadIdentity 相当。これが要る。
+            //1.21 の GUI は modelview に translate(0,0,-11000) が入っており、そこへ
+            //near=5 / far=1000 の透視投影を張ると<b>全部が遠クリップされて何も出ない</b>。
+            modelView.identity();
+            RenderSystem.applyModelViewMatrix();
+
+            //機種ごとの配置は PoseStack 側に積む (頂点は CPU で変換される)
+            PoseStack ps = new PoseStack();
+            applyGuiPlacement(ps, info.id(), vehicleDef);
+
+            //本家 RenderHelper.enableStandardItemLighting + GL_DEPTH_TEST
+            Lighting.setupFor3DItems();
+            //平行投影で描いた GUI の深度値とは尺度が違うので、いったん深度を流す
+            RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+            RenderSystem.enableDepthTest();
+            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+
+            MultiBufferSource.BufferSource buf = Minecraft.getInstance().renderBuffers().bufferSource();
+            Object previewEnt = (vehicleDef != null && (model.hasRenderScript() || vehicleDef.hasScript()))
+                ? getOrCreatePreviewEntity(vehicleDef, model) : null;
+            renderPreviewModel(model, vehicleDef, ps, buf, previewEnt);
+            buf.endBatch();
+
+            RenderSystem.disableDepthTest();
+            //以降の GUI (ボタン/文字) が透視投影の深度に負けないよう戻しておく
+            RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
+            Lighting.setupFor3DItems();
+        } catch (Throwable t) {
+            //プレビューが失敗しても選択画面自体は使えるようにする
+        } finally {
+            modelView.popMatrix();
+            RenderSystem.applyModelViewMatrix();
+            RenderSystem.restoreProjectionMatrix();
+            RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        }
+    }
+
+    /**
+     * 本家 {@code renderModelInGui} の機種別配置。X:右が+, Z:手前が+ (本家のコメントどおり)。
+     */
+    private static void applyGuiPlacement(PoseStack ps, String id, VehicleDefinition vehicleDef) {
+        if (vehicleDef != null) {
+            //ModelSetVehicleBaseClient
+            ps.translate(11.0F, -1.0F, -12.0F);
+            ps.mulPose(Axis.YP.rotationDegrees(-65.0F));
+            ps.scale(1.2F, 1.2F, 1.2F);
+            return;
+        }
+        if (RailRegistry.getById(id) != null) {
+            //ModelSetRailClient
+            ps.translate(3.0F, -2.0F, -6.0F);
+            ps.mulPose(Axis.ZP.rotationDegrees(10.0F));
+            ps.mulPose(Axis.YP.rotationDegrees(-50.0F));
+            ps.scale(1.5F, 1.5F, 1.5F);
+            return;
+        }
+        //ModelSetMachineClient / ModelSetOrnamentClient (設置物はこちら)
+        ps.translate(3.0F, -1.0F, -10.0F);
+        ps.mulPose(Axis.YP.rotationDegrees(-60.0F));
+    }
+
+    /**
+     * 本家は {@code model.render(null, cfg, 0/1, 0)} で pass0/pass1 を描く。
+     * RTMU はスクリプト車両の描画経路が別なので、そちらを優先し、無ければベイク経路で 2 パス描く。
+     */
+    private static void renderPreviewModel(MqoModelLoader.MqoModel model, VehicleDefinition vehicleDef,
+                                           PoseStack poseStack, MultiBufferSource.BufferSource buffer,
+                                           Object previewEnt) {
+        poseStack.pushPose();
+        try {
+            if (vehicleDef != null) {
+                Vec3 offset = vehicleDef.getModelOffset();
+                poseStack.translate(offset.x, offset.y, offset.z);
+                float modelScale = vehicleDef.getModelScale();
+                poseStack.scale(modelScale, modelScale, modelScale);
+            }
+
+            boolean rendered = false;
+            if (vehicleDef != null && vehicleDef.hasScript()) {
+                try {
+                    com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.Scripted scripted =
+                        com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(vehicleDef);
+                    rendered = scripted != null && scripted.render(previewEnt, 0.0F, poseStack, buffer,
+                        LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, model);
+                } catch (Throwable ignored) {
+                    rendered = false;
+                }
+            }
+            if (!rendered) {
+                //本家 pass0 → pass1 の順。entity を渡さないと doCulling も発光判定も引けない。
+                MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer,
+                    LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, false, null, null, previewEnt);
+                MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer,
+                    LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, true, null, null, previewEnt);
+            }
+
+            //本家 renderPartsInGui 相当: 台車も一緒に出す
+            if (vehicleDef != null) {
+                boolean selfDrawsRunningGear = model.hasOwnWheelGroups();
+                List<VehicleDefinition.BogieDefinition> bogies = vehicleDef.getBogies();
+                for (int i = 0; i < bogies.size(); i++) {
+                    VehicleDefinition.BogieDefinition bogieDef = bogies.get(i);
+                    if (skipPreviewBogie(selfDrawsRunningGear, bogieDef)) {
+                        continue;
+                    }
+                    try {
+                        BogieRenderer.renderBogie(poseStack, i, bogieDef, vehicleDef,
+                            null, buffer, LightTexture.FULL_BRIGHT, 0.0F, 1.0F);
+                    } catch (Throwable ignored) {
+                        //台車 1 つの失敗で車体プレビューまで消さない
+                    }
+                }
+            }
+        } finally {
+            poseStack.popPose();
+        }
+    }
+
+    private static boolean skipPreviewBogie(boolean selfDrawsRunningGear, VehicleDefinition.BogieDefinition bogieDef) {
+        if (bogieDef == null || bogieDef.modelFile() == null || bogieDef.modelFile().isBlank()) {
+            return true;
+        }
+        if (BogieRenderer.isDummyBogieModel(bogieDef.modelFile())) {
+            return true;
+        }
+        return selfDrawsRunningGear && bogieDef.modelFile().toLowerCase(Locale.ROOT).endsWith(".class");
+    }
+
+    /** 車両 / 設置物 / レールのどれかとして id からモデルを引く。失敗は覚えて再探索しない。 */
+    private MqoModelLoader.MqoModel getOrLoadModel(String id, String packName) {
+        if (id == null || id.isBlank() || MISSING_MODEL_CACHE.contains(id)) {
+            return null;
+        }
+        MqoModelLoader.MqoModel cached = MODEL_CACHE.get(id);
+        if (cached != null) {
+            return cached;
+        }
+        MqoModelLoader.MqoModel model = null;
+        try {
+            VehicleDefinition vd = VehicleRegistry.getById(id);
+            if (vd != null && vd.getModelFile() != null && !vd.getModelFile().isBlank()) {
+                model = MqoModelLoader.loadModelForVehicle(vd);
+            }
+            if (model == null) {
+                var iod = InstalledObjectRegistry.getById(id);
+                if (iod != null && iod.getModelFile() != null && !iod.getModelFile().isBlank()) {
+                    model = MqoModelLoader.loadModelFromPack(
+                        iod.getPackName(), iod.getModelFile(), iod.getTextureOverrides(), null, iod.isSmoothing());
+                }
+            }
+            if (model == null) {
+                var rd = RailRegistry.getById(id);
+                if (rd != null && rd.getModelFile() != null && !rd.getModelFile().isBlank()) {
+                    model = MqoModelLoader.loadModelFromPack(
+                        rd.getPackName(), rd.getModelFile(), rd.getTextureOverrides(), null, false);
+                }
+            }
+        } catch (Exception ignored) {
+            model = null;
+        }
+        if (model != null) {
+            MODEL_CACHE.put(id, model);
+        } else {
+            MISSING_MODEL_CACHE.add(id);
+        }
+        return model;
+    }
+
+    /**
+     * スクリプトを適用するための、ワールドへ追加していない一時車両。
+     * スクリプトは entity の状態を読んで本体やドア・ライトを配置するので、null だと
+     * 例外を投げて「スクリプト無し描画」に落ちる車両が多い。
+     */
+    private com.portofino.realtrainmodunofficial.entity.TrainEntity getOrCreatePreviewEntity(
+            VehicleDefinition def, MqoModelLoader.MqoModel model) {
+        if (def == null || def.getId() == null) {
+            return null;
+        }
+        if (previewEntity != null && def.getId().equals(previewEntityId)) {
+            return previewEntity;
+        }
+        try {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.level == null) {
+                return null;
+            }
+            com.portofino.realtrainmodunofficial.entity.TrainEntity e =
+                com.portofino.realtrainmodunofficial.entity.TrainEntity.create(
+                    mc.level, def.getId(), 0.0D, 0.0D, 0.0D, 0.0F, def.getTrainDistance());
+            if (e == null) {
+                return null;
+            }
+            if (model.getScriptEngine() != null) {
+                e.setScriptEngine(model.getScriptEngine());
+            }
+            previewEntity = e;
+            previewEntityId = def.getId();
+            return e;
+        } catch (Throwable t) {
+            return null;
         }
     }
 

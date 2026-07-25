@@ -19,28 +19,51 @@ public final class TitleScreenWarningOverlay {
     //同意画面をこのセッションで一度開いたか (タイトルへ戻る度に開き直さない)。
     private static boolean consentOpened;
 
+    //前提パック不足の警告をこのセッションで一度出したか。
+    private static boolean warningOpened;
+
     /**
-     * タイトル画面が開いたら、README 未同意のパックがあれば同意画面を出す。
-     * (パック読み込みはタイトル画面より前に済んでいるので、この時点で未決一覧が揃っている)
+     * タイトル画面が開いたときの順番:
+     * <ol>
+     *   <li>README 未同意のパックがあれば、まず同意画面を出す</li>
+     *   <li>同意が全部片付いたら、前提パックが足りないものを警告画面 (OK) で知らせる</li>
+     * </ol>
+     * 同意画面は閉じるとタイトルへ戻るので、そこでこのイベントがもう一度走り、
+     * 未決が無くなった時点で警告へ進む。同意画面が無い環境では最初の 1 回で警告が出る。
+     * (パック読み込みはタイトル画面より前に済んでいるので、この時点で一覧は揃っている)
      */
     @SubscribeEvent
     public static void onScreenInit(ScreenEvent.Init.Post event) {
         if (!(event.getScreen() instanceof TitleScreen)) {
             return;
         }
-        if (consentOpened || !com.portofino.realtrainmodunofficial.pack.PackConsent.hasPending()) {
+        Minecraft mc = Minecraft.getInstance();
+        if (com.portofino.realtrainmodunofficial.pack.PackConsent.hasPending()) {
+            if (consentOpened) {
+                return;
+            }
+            consentOpened = true;
+            //init 中の setScreen 再入を避けて次tickで開く。
+            mc.execute(() -> {
+                if (mc.screen instanceof TitleScreen) {
+                    var screen = com.portofino.realtrainmodunofficial.client.screen.PackConsentScreen
+                            .createIfPending(mc.screen);
+                    if (screen != null) {
+                        mc.setScreen(screen);
+                    }
+                }
+            });
             return;
         }
-        consentOpened = true;
-        Minecraft mc = Minecraft.getInstance();
-        //init 中の setScreen 再入を避けて次tickで開く。
+        if (warningOpened || !com.portofino.realtrainmodunofficial.pack.PackPrerequisiteCheck.hasMissing()) {
+            return;
+        }
+        warningOpened = true;
         mc.execute(() -> {
             if (mc.screen instanceof TitleScreen) {
-                var screen = com.portofino.realtrainmodunofficial.client.screen.PackConsentScreen
-                        .createIfPending(mc.screen);
-                if (screen != null) {
-                    mc.setScreen(screen);
-                }
+                mc.setScreen(new com.portofino.realtrainmodunofficial.client.screen.PackWarningScreen(
+                    mc.screen,
+                    com.portofino.realtrainmodunofficial.pack.PackPrerequisiteCheck.getMissing()));
             }
         });
     }

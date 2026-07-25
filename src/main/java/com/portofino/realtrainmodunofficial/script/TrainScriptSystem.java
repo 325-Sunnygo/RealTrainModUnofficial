@@ -522,41 +522,79 @@ public class TrainScriptSystem {
     }
 
 
-    /** SRB3のサーバスクリプトにネイティブ敷設ブリッジの上書き定義を追加する。 */
-    private static String appendSuperRailBuilderOverrides(String script) {
+    /**
+     * SRB3 のスクリプトにネイティブ敷設ブリッジの上書き定義を追加する。
+     * <p>SRB のビルダーは<b>車 (ModelVehicle)</b> なので、そのサーバースクリプトは
+     * {@code CarServerScripts} が読む。読み込み経路が複数あるので、どの経路からでも
+     * 同じ差し込みができるよう公開してある。
+     */
+    public static String appendSuperRailBuilderOverrides(String script) {
         if (script == null || !script.contains("SuperRailBuilderVersion")) {
             return script;
         }
+        //server / render の 2 本ある。render 側はキー入力とマーカー操作を担当していて、
+        //こちらにも 1.12 API のシムが要る (プレイヤーのインベントリ・旧 BlockPos)。
+        //★ここで render を弾くと Enter も Q も効かなくなる。共通シムは両方へ入れること。
         boolean isServer = script.contains("function buildNormalRail");
+        //★差し替えは<b>分岐敷設だけ</b>に絞る。
+        //SRB の他の処理 (プレイヤーに乗る・手持ちレールの判定・タイル取得・直線敷設) は
+        //SRB 本来の実装のまま動いているので触らない。以前ここで一式まとめて差し替えたら、
+        //ビルダーがプレイヤーの頭に乗らなくなった。動いているものは置き換えない。
+        //
+        //差し替えは<b>関数宣言</b>で行う (代入ではない)。宣言は巻き上げで解析時に確定し
+        //同名は後勝ちなので、実行時に何が起きても必ずこちらが使われる。
         StringBuilder sb = new StringBuilder();
-        sb.append("\n;(function(){ try {\n");
-        // --- server/render 共通: プレイヤー/インベントリの MCP API を触る関数を差し替える ---
-        // getPlayerRail は「手持ちレールのモデルID(真偽値兼用)」を __SRB__ 経由で返す。
-        // player は server では rider ラッパー(__srbReal)、render では実 LocalPlayer。
-        sb.append("  getSelectedSlotItem = function(player){ return null; };\n");
-        sb.append("  hasPlayerMarker = function(player){ return false; };\n");
-        sb.append("  getPlayerRail = function(player) { try { var p = (player && player.__srbReal)?player.__srbReal:player; var id = __SRB__.heldRailModelId(p); return (id && (''+id).length>0)?(''+id):null; } catch(e){ return null; } };\n");
-        // doFollowingはサーバ側のみで移動し、クライアントは同期+補間で追従
-        sb.append("  doFollowing = function(entity, hostPlayer){ try{ if(!entity||!hostPlayer) return; var w=entity.field_70170_p; if(w && w.isClientSide && w.isClientSide()) return; var p=hostPlayer.__srbReal?hostPlayer.__srbReal:hostPlayer; if(!p||!p.getX) return; entity.func_70107_b(p.getX(), p.getY()+2, p.getZ()); try{entity.field_70159_w=0; entity.field_70181_x=0; entity.field_70179_y=0;}catch(e2){} }catch(e){} };\n");
-        // getTileEntity: 1.12.2 の net.minecraft.util.math.BlockPos を new せず、座標直接版 func_175625_s を使う。
-        // 当たり判定/道床ブロックはコアに解決して返す(__SRB__.railCoreAt)。レール沿いどこでも接続検出が効き、
-        // 接続マーカーが接線ロックされる(本家挙動)。フォールバックで素の func_175625_s。
-        sb.append("  getTileEntity = function(world, x, y, z){ try{ if(typeof __SRB__!=='undefined'&&__SRB__) return __SRB__.railCoreAt(world, Math.floor(x), Math.floor(y), Math.floor(z)); return world.func_175625_s(Math.floor(x), Math.floor(y), Math.floor(z)); }catch(e){ try{ return world.func_175625_s(Math.floor(x), Math.floor(y), Math.floor(z)); }catch(e2){ return null; } } };\n");
-        // getTileEntityPos は func_174877_v(MCP)を使うので、座標は __SRB__.tilePos 経由で取る(レール接続検出用)。
-        sb.append("  getTileEntityPos = function(tile){ try{ var p=__SRB__.tilePos(tile); return {x:p[0],y:p[1],z:p[2]}; }catch(e){ return {x:0,y:0,z:0}; } };\n");
-        if (isServer) {
-            // --- server 専用: rider ラッパー + 敷設ブリッジ ---
-            sb.append("  var __srbWrap = function(p){ if(!p) return null; if(p.__srbReal) return p; return { __srbReal:p, func_145782_y:function(){return p.getId();}, func_184210_p:function(){try{p.stopRiding();}catch(e){}}, func_70078_a:function(t){} }; };\n");
-            sb.append("  getRider = function(entity){ try{ var ps=entity.func_184188_bt(); var r=(ps&&ps.size()>0)?ps.get(0):null; return __srbWrap(r); }catch(e){ return null; } };\n");
-            sb.append("  getRidingEntity = function(entity){ try{ return __srbWrap(entity.func_184187_bx()); }catch(e){ return null; } };\n");
-            sb.append("  createRailPosition = function(data) { return __SRB__.createRailPosition(data.blockX|0, data.blockY|0, data.blockZ|0, data.markerDir|0, (data.switchType!=null?Number(data.switchType):0), (data.anchorLength!=null?Number(data.anchorLength):-1), (data.anchorPitch!=null?Number(data.anchorPitch):0), (data.anchorYaw!=null?Number(data.anchorYaw):0), (data.cantCenter!=null?Number(data.cantCenter):0), (data.cantEdge!=null?Number(data.cantEdge):0), (data.height!=null?Number(data.height):0)); };\n");
-            //戻り値をそのまま返す (SRB 側は真偽で成否を見る)。失敗理由は Java 側がログに出す。
-            sb.append("  buildNormalRail = function(world, startRP, endRP, railItem) { try { return __SRB__.buildNormalRail(world, startRP, endRP, railItem); } catch(e){ try{__SRB__.logError('buildNormalRail: '+e);}catch(e2){} return false; } };\n");
-            sb.append("  buildBranchRail = function(world, rps, railItem) { try { var l=new java.util.ArrayList(); for(var i=0;i<rps.length;i++) l.add(rps[i]); return __SRB__.buildBranchRail(world, l, railItem); } catch(e){ try{__SRB__.logError('buildBranchRail: '+e);}catch(e2){} return false; } };\n");
-            sb.append("  deleteRail = function(world, x, y, z) { try { return __SRB__.deleteRail(world, x|0, y|0, z|0); } catch(e){ return false; } };\n");
-            sb.append("  deleteRailRP = function(world, rp) { return deleteRail(world, rp.blockX, rp.blockY, rp.blockZ); };\n");
+        sb.append("\n// ---- RTMU: SuperRailBuilder3 の分岐敷設をネイティブへ ----\n");
+        //--- ここから下は「1.12 の Minecraft API が 1.21 に無い」ぶんの橋渡し。
+        //    SRB の敷設ロジックそのものは差し替えない。
+        //player.field_71071_by (旧インベントリ) は 1.21 に無く、触ると即例外。
+        //render 側はマーカー操作のたびにここを通るので、落とすと操作が全部死ぬ。
+        sb.append("function getSelectedSlotItem(player){ return null; }\n");
+        sb.append("function hasPlayerMarker(player){ return false; }\n");
+        //getTileEntity: SRB 本来の実装は new net.minecraft.util.math.BlockPos(...) を使うが
+        //1.21 にそのクラスは無く、new した時点で例外になって onUpdate ごと死ぬ
+        //(= 敷設も Q での終了も効かなくなる)。当たり判定/道床ブロックはコアへ解決して返す。
+        sb.append("function getTileEntity(world, x, y, z){ try{ if(typeof __SRB__!=='undefined'&&__SRB__)"
+                + " return __SRB__.railCoreAt(world, Math.floor(x), Math.floor(y), Math.floor(z));"
+                + " return world.func_175625_s(Math.floor(x), Math.floor(y), Math.floor(z)); }catch(e){"
+                + " try{ return world.func_175625_s(Math.floor(x), Math.floor(y), Math.floor(z)); }catch(e2){ return null; } } }\n");
+        sb.append("function getTileEntityPos(tile){ try{ var p=__SRB__.tilePos(tile); return {x:p[0],y:p[1],z:p[2]}; }"
+                + " catch(e){ return {x:0,y:0,z:0}; } }\n");
+        //deleteRail も同じ理由 (旧 BlockPos + 旧ブロック判定)。敷設の直前に必ず呼ばれるので、
+        //ここが落ちると何も建たない。
+        sb.append("function deleteRail(world, x, y, z){ try { return __SRB__.deleteRail(world, x|0, y|0, z|0); }"
+                + " catch(e){ return false; } }\n");
+        sb.append("function deleteRailRP(world, rp){ return deleteRail(world, rp.blockX, rp.blockY, rp.blockZ); }\n");
+        //手持ちレールの取得もブリッジへ。SRB 本来の getPlayerRail は ResourceStateRail を
+        //組み立てて返すが、RTMU のレールアイテムは選択モデルを<b>データコンポーネント</b>で
+        //持っており旧 NBT には入っていない。シムの readFromNBT も空実装なので、SRB 側には
+        //常に既定値しか入らず「レールを持って敷いてもそのレールにならない」状態になる。
+        //ブリッジはアイテムから直接モデル ID を読む (マーカーで敷くときと同じ経路)。
+        sb.append("function getPlayerRail(player){ try { var p=(player&&player.__srbReal)?player.__srbReal:player;"
+                + " var id=__SRB__.heldRailModelId(p); return (id&&(''+id).length>0)?(''+id):null; } catch(e){ return null; } }\n");
+        //直線敷設もブリッジへ。上の getPlayerRail が返すのはモデル ID の文字列なので、
+        //SRB 本来の buildNormalRail (ResourceState を前提) には渡せない。
+        sb.append("function buildNormalRail(world, startRP, endRP, railItem){ try {"
+                + " return __SRB__.buildNormalRail(world, startRP, endRP, railItem); }"
+                + " catch(e){ try{__SRB__.logError('buildNormalRail: '+e);}catch(e2){} return false; } }\n");
+        //createRailPosition も差し替える。SRB は anchorLength を<b>無条件で書き込む</b>ので、
+        //未計算 (0 / -1) がそのまま RailPosition に入り、ベジェが潰れてトング付近の
+        //形が崩れる。ブリッジ側は負値なら書かず RTMU の既定を残す。
+        //(プレイヤーまわりの関数は SRB 本来の実装で正しく動くので触らない)
+        sb.append("function createRailPosition(data){ return __SRB__.createRailPosition(data.blockX|0, data.blockY|0,"
+                + " data.blockZ|0, data.markerDir|0, (data.switchType!=null?Number(data.switchType):0),"
+                + " (data.anchorLength!=null?Number(data.anchorLength):-1), (data.anchorPitch!=null?Number(data.anchorPitch):0),"
+                + " (data.anchorYaw!=null?Number(data.anchorYaw):0), (data.cantCenter!=null?Number(data.cantCenter):0),"
+                + " (data.cantEdge!=null?Number(data.cantEdge):0), (data.height!=null?Number(data.height):0)); }\n");
+        sb.append("function buildBranchRail(world, rps, railItem){ try {"
+                + " var l=new java.util.ArrayList(); for(var i=0;i<rps.length;i++) l.add(rps[i]);"
+                + " return __SRB__.buildBranchRail(world, l, railItem); }"
+                + " catch(e){ try{__SRB__.logError('buildBranchRail: '+e);}catch(e2){} return false; } }\n");
+        if (!isServer) {
+            RealTrainModUnofficial.LOGGER.info("[SRB] client shim injected");
+            return script + sb.toString();
         }
-        sb.append("} catch(e){} })();\n");
+        RealTrainModUnofficial.LOGGER.info("[SRB] branch build override injected");
         return script + sb.toString();
     }
 

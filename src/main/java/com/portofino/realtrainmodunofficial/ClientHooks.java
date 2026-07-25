@@ -120,16 +120,6 @@ public final class ClientHooks {
         invokeClient("toggleCamera", new Class<?>[]{});
     }
 
-    /** レンズを持って右クリック → そのレンズを装着 (id = CameraLens.id) */
-    public static void mountCameraLens(String lensId) {
-        invokeClient("mountCameraLens", new Class<?>[]{String.class}, lensId);
-    }
-
-    /** テレコンを持って右クリック → 装着 (id = Teleconverter.id) */
-    public static void attachTeleconverter(String tcId) {
-        invokeClient("attachTeleconverter", new Class<?>[]{String.class}, tcId);
-    }
-
     /** 駅ブロック右クリック → 現在のタグを添えて駅設定 GUI を開く (client のみ)。 */
     public static void openStationScreen(BlockPos pos, int bits) {
         invokeClient("openStationScreen", new Class<?>[]{BlockPos.class, int.class}, pos, bits);

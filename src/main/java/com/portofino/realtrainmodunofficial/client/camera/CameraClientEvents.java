@@ -274,15 +274,7 @@ public final class CameraClientEvents {
         int y = f[1] + 8;
         int line = 11;
 
-        //0 行目: 装着レンズ (+ テレコン)。撮り鉄が「今どのレンズか」を一目で分かるように。
-        String lensLine = "§b" + s.getLens().shortLabel();
-        if (s.getTeleconverter() != Teleconverter.NONE) {
-            lensLine += " §e+" + fmtF(s.getTeleconverter().factor) + "×";
-        }
-        g.drawString(font, lensLine, x, y, COL_ACCENT, true);
-        y += line;
-
-        //1 行目: 焦点距離 / F値 / シャッター (実機の表示に寄せる)
+        //焦点距離 / F値 / シャッター (実機の表示に寄せる)
         String main = String.format("§f%dmm  §fF%s  §f1/%d",
             Math.round(s.getFocalMm()), fmtF(s.getFStop()), s.getShutterDenominator());
         g.drawString(font, main, x, y, COL_TEXT, true);
