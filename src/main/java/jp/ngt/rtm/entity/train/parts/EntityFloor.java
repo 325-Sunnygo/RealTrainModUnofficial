@@ -61,7 +61,7 @@ public class EntityFloor extends EntityVehiclePart {
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
-        if (this.getVehicle() == null || this.getVehicle().isRemoved()) {
+        if (this.isOrphan()) {
             if (!this.level().isClientSide) {
                 this.discard();
             }
@@ -74,17 +74,10 @@ public class EntityFloor extends EntityVehiclePart {
     public void tick() {
         super.tick();
         //車体側の一覧へ自分を登録しておく (車体が移動後に位置を押し出すため)。
-        //クライアントでは床はトラッカー経由で個別に湧くので setupFloors を通らず、
-        //ここで登録しないと車体からは追従させられない。
-        EntityVehicleBase<?> parent = this.getVehicle();
-        if (parent != null) {
-            parent.setFloor(this);
-        }
+        //本命は onAddedToLevel での登録。ここは spawn 時点でまだ車体が
+        //解決できなかった場合 (spawn パケットの到着順) の取りこぼし対策。
+        this.registerToVehicle();
         if (!this.level().isClientSide) {
-            //親車両が消えたら追従して消える
-            if (this.tickCount > 100 && this.getVehicle() == null) {
-                this.discard();
-            }
             //スニークで降車 (バニラ経路が効かない場合の保険)
             for (Entity rider : new java.util.ArrayList<>(this.getPassengers())) {
                 if (rider instanceof Player player && player.isShiftKeyDown()) {

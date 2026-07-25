@@ -48,8 +48,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
     private static final Map<String, Long> FAILED_RENDER_UNTIL_NANOS = new ConcurrentHashMap<>();
     /** 信号の点灯用テクスチャ差し替えマップ (定義ID → overrides)。毎フレームの Map 生成を避ける。 */
     private static final Map<String, Map<String, String>> LIGHT_TEXTURE_OVERRIDES = new ConcurrentHashMap<>();
-    /** 診断: 改札のグループ名を定義IDごとに1回だけログするための記録。 */
-    private static final Set<String> TICKET_GATE_LOGGED = ConcurrentHashMap.newKeySet();
 
     public InstalledObjectBlockEntityRenderer(BlockEntityRendererProvider.Context context) {
     }
@@ -93,10 +91,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                 definition.isSmoothing()
             );
             if (model != null) {
-                // 診断: 改札の扉グループ名と barMoveCount を1回だけ記録(扉トランスフォームの対象特定用)。
-                if (blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE
-                    && TICKET_GATE_LOGGED.add(definition.getId())) {
-                }
                 boolean pushed = false;
                 try {
                     boolean compatibilityHeavy = shouldUseCompatibilityRendering(definition, model);

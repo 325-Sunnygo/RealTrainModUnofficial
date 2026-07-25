@@ -2589,9 +2589,6 @@ public class TrainScriptSystem {
                     }
                 }
             }
-            // 初回調査用。通常プレイでは script 初期化ログだけでもかなり多くなるため debug に留める。
-            if (scriptRegisteredGroups.size() < 200) {
-            }
             // RTM 原作の Parts は .render(renderer) で対応グループを描画する。
             // ここで実用版 ScriptParts を返し、bogieF.render(renderer) 等が機能するようにする。
             return new ScriptParts(this, usable);
@@ -5080,12 +5077,8 @@ public class TrainScriptSystem {
         }
 
         public void sendChatMessageToAll(Object... args) {
-            if (args != null && args.length > 0) {
-            }
         }
         public void info(Object... args) {
-            if (args != null && args.length > 0) {
-            }
         }
         public void warn(Object... args) {
             if (args != null && args.length > 0) {

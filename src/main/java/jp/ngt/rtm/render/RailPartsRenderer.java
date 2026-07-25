@@ -107,6 +107,28 @@ public class RailPartsRenderer extends PartsRenderer {
         }
     }
 
+    /**
+     * レール 1 区間の明るさ。レール面のすぐ上で拾う。
+     * <p>そこが完全に真っ暗 (= ブロックの中でサンプリングしてしまった) の時だけ 1〜2 段上へ
+     * 逃がす。空の明るさで塗りつぶすような救済はしない — 本家に無いうえ、日陰やトンネルでも
+     * レールだけ明るく浮く。
+     */
+    private static int sampleBrightness(TileEntityLargeRailCore tile, double wx, double wy, double wz) {
+        net.minecraft.world.level.Level level = tile.getLevel();
+        if (level == null) {
+            return 0;
+        }
+        net.minecraft.core.BlockPos sp = net.minecraft.core.BlockPos.containing(wx, wy + 0.25D, wz);
+        int light = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, sp);
+        if (light == 0) {
+            light = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, sp.above());
+        }
+        if (light == 0) {
+            light = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, sp.above(2));
+        }
+        return light;
+    }
+
     public void renderStaticParts(Object tileObj, double x, double y, double z) {
         if (!(tileObj instanceof TileEntityLargeRailCore tile)) {
             return;
@@ -146,6 +168,13 @@ public class RailPartsRenderer extends PartsRenderer {
             float relY = (float) (y + h - origin.getY() - 0.0625D);
             float relZ = (float) (z + p1[0] - origin.getZ());
 
+            //本家 renderRailMapStatic と同じく、明るさは<b>区間ごと</b>にサンプリングする。
+            //
+            //★コアブロック 1 点で全長を代表させてはいけない。コアはバラストや地面に
+            //埋まっていて getLightColor が 0 を返すことが多く、その 0 が統合メッシュへ
+            //焼き込まれると「直線レールが真っ黒のまま、リログするまで戻らない」状態になる
+            //(焼き直しの判定もそのコア 1 点しか見ていないため、永久に更新されない)。
+            rec.brightness(sampleBrightness(tile, origin.getX() + relX, origin.getY() + relY, origin.getZ() + relZ));
             rec.push();
             rec.translate(relX, relY, relZ);
             rec.rotate(yaw, 0.0F, 1.0F, 0.0F);

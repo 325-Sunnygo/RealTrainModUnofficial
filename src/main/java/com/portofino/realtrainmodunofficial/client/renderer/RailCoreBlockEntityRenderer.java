@@ -28,7 +28,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
      * RTM本家の RailPartsRendererBase#createRailPos と同じ length*2 を基準にする。
      * Baru系は pos 番号で枕木・バラスト周期を決めるため、ここを増やすと部品間隔が詰まって壊れる。
      */
-    private static int computeRailSampleMax(RailMap map, double length, RailDefinition definition, double cameraDistanceSq) {
+    private static int computeRailSampleMax(RailMap map, double length, RailDefinition definition) {
         // RTM本家 RailPartsRendererBase#createRailPos と同じ length*2 固定。
         // 枕木・バラスト・レールの間隔は視点距離で変えない (ユーザー要望「視界でレールの間隔が
         // 変わる、変えないで」)。以前はカメラ距離で density / cap を下げて LOD していたが、
@@ -49,10 +49,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         return ((pos & 15) - 7.5f) * 1.2e-6f;
     }
 
-    private static int computeRenderStride(double cameraDistanceSq, boolean compatibilityHeavy) {
-        // 枕木・バラストの周期が視点で変わらないことを優先する。
-        return 1;
-    }
 
     private enum RenderSwitchLayout {
         NONE,
@@ -81,11 +77,14 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         long profilerStart = ClientRenderProfiler.begin();
         try {
             if (!be.isLoaded()) return;
-            // レールがたまに真っ暗になる対策: ディスパッチャの packedLight はコア BE の
-            // ブロック位置でサンプリングされるが、コアは道床/地面の中にあることが多く
-            // 光量 0 になる。<b>ほぼ真っ暗な時だけ</b>レール上面 (1〜2 ブロック上) で取り直す。
-            // 常に max 合成すると日陰・夕暮れでも空の明るさで描かれ、
-            // 「周囲は暗いのにレールだけ明るい」不自然さが出る (ユーザー報告)。
+            // ディスパッチャの packedLight はコア BE のブロック位置でサンプリングされる。
+            // コアは道床/地面の中にあることが多く光量 0 になるので、ほぼ真っ暗な時だけ
+            // レール上面 (1〜2 ブロック上) で取り直す。
+            //
+            // ★ここはあくまで「基準値」。実際の明るさは本家と同じく区間ごとに
+            //   サンプリングして記録に入れる (RailPartsRenderer.sampleBrightness)。
+            //   空の明るさで塗りつぶす応急処置は撤去した — 日陰やトンネルでもレールだけ
+            //   明るく浮くうえ、本来の「光が変われば焼き直す」判定を殺していた。
             if (be.getLevel() != null) {
                 int blockL = packedLight & 0xFFFF;
                 int skyL = (packedLight >> 16) & 0xFFFF;
@@ -94,28 +93,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     int above1 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above());
                     int above2 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above(2));
                     packedLight = maxPackedLight(packedLight, maxPackedLight(above1, above2));
-                    //コアの上まで埋まっている (掘割・道床埋込・高架下) と上2ブロックでも 0 のまま
-                    //レール全体が真っ黒に焼かれる。レール両端点の上でも取り直して max 合成する。
-                    jp.ngt.rtm.rail.util.RailPosition[] rps = be.getRailPositions();
-                    if (rps != null) {
-                        for (jp.ngt.rtm.rail.util.RailPosition rp : rps) {
-                            if (rp == null) {
-                                continue;
-                            }
-                            net.minecraft.core.BlockPos ep =
-                                net.minecraft.core.BlockPos.containing(rp.posX, rp.posY + 1.0D, rp.posZ);
-                            packedLight = maxPackedLight(packedLight,
-                                net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), ep));
-                        }
-                    }
-                    //どこを取っても真っ暗 = ライトエンジンがまだこの区画を照らしていない
-                    //(ワールド入場直後によく起きる)。この値で焼くと「読み込み済みなのに
-                    //レールだけ真っ黒」が固定化する。空が見えているなら日光を仮置きし、
-                    //次フレーム以降に正しい値へ焼き直させる。
-                    if (packedLight == 0 && be.getLevel().canSeeSky(be.getBlockPos().above())) {
-                        packedLight = net.minecraft.client.renderer.LightTexture.pack(
-                                0, be.getLevel().getMaxLocalRawBrightness(be.getBlockPos().above()));
-                    }
                 }
             }
             RailDefinition def = RailRegistry.getById(be.getRailDefinitionId());
@@ -258,11 +235,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                               MqoModelLoader.MqoModel model, RailMap[] maps, float partialTick,
                               PoseStack poseStack, MultiBufferSource buffer,
                               int packedLight, int packedOverlay) {
-            //compatibilityHeavy はこのパスでしか使わないので、早期 return の後で求める。
-            boolean compatibilityHeavy = shouldUseCompatibilityRendering(def, model);
-            net.minecraft.world.phys.Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
-            double cameraDistanceSq = cameraPos.distanceToSqr(be.getBlockPos().getX() + 0.5, be.getBlockPos().getY() + 0.5, be.getBlockPos().getZ() + 0.5);
-
             BlockPos origin = be.getBlockPos();
             double ox = origin.getX();
             double oy = origin.getY();
@@ -286,13 +258,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     for (int mi = 0; mi < maps.length; mi++) {
                         if (maps[mi] != null) {
                             renderMapGroups(be, maps[mi], poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model,
-                                def, cameraDistanceSq, compatibilityHeavy, RailGroup.BASE, mi * 0.01F);
+                                def, RailGroup.BASE, mi * 0.01F);
                         }
                     }
                     for (jp.ngt.rtm.rail.util.Point point : points) {
                         if (point != null) {
                             renderSwitchPoint(be, point, partialTick, poseStack, buffer, packedLight, ox, oy, oz, mo, scale,
-                                model, def, cameraDistanceSq, compatibilityHeavy);
+                                model, def);
                         }
                     }
                     return;
@@ -304,7 +276,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     RailMap map = maps[mapIndex];
                     if (map != null) {
                         renderRailMap(be, map, mapIndex, layout, activeIndex, previousIndex, switchProgress,
-                            poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, cameraDistanceSq, compatibilityHeavy,
+                            poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def,
                             null, true);
                     }
                 }
@@ -315,7 +287,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             RailMap activeMap = maps[activeIndex];
             if (activeMap != null) {
                 renderRailMap(be, activeMap, activeIndex, RenderSwitchLayout.NONE, activeIndex, activeIndex, 1.0F,
-                    poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, cameraDistanceSq, compatibilityHeavy, null);
+                    poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, null);
             }
     }
 
@@ -337,13 +309,11 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         float scale,
         MqoModelLoader.MqoModel model,
         RailDefinition definition,
-        double cameraDistanceSq,
-        boolean compatibilityHeavy,
         RailSample[] primarySamples
     ) {
         renderRailMap(blockEntity, map, mapIndex, layout, activeIndex, previousIndex, switchProgress,
-            poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, definition, cameraDistanceSq,
-            compatibilityHeavy, primarySamples, false);
+            poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, definition,
+            primarySamples, false);
     }
 
     private void renderRailMap(
@@ -364,8 +334,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         float scale,
         MqoModelLoader.MqoModel model,
         RailDefinition definition,
-        double cameraDistanceSq,
-        boolean compatibilityHeavy,
         RailSample[] primarySamples,
         boolean trimEnds
     ) {
@@ -374,9 +342,9 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             return;
         }
 
-        int max = computeRailSampleMax(map, length, definition, cameraDistanceSq);
+        int max = computeRailSampleMax(map, length, definition);
         RailSample[] samples = getOrCreateSamples(map, new BlockPos((int) ox, (int) oy, (int) oz), max);
-        int stride = computeRenderStride(cameraDistanceSq, compatibilityHeavy);
+        int stride = 1;
         int[] clip = computeSwitchClip(map, mapIndex, layout, activeIndex, previousIndex, switchProgress, max);
         // 重なり除去: 基準ルート(primarySamples)と重なっている根元(先頭サンプル)は描かない。
         // ルート0と十分離れた(分岐した)位置から描くことで、トランクのレール二重描画を防ぐ。
@@ -406,10 +374,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 oz,
                 mo,
                 scale,
-                model,
-                cameraDistanceSq,
-                compatibilityHeavy
-            );
+                model
+                );
         }
         if (endIndex > startIndex && (endIndex - startIndex) % stride != 0) {
             RailSample sample = samples[endIndex];
@@ -432,10 +398,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 oz,
                 mo,
                 scale,
-                model,
-                cameraDistanceSq,
-                compatibilityHeavy
-            );
+                model
+                );
         }
     }
 
@@ -532,13 +496,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
     /** RailMap に沿って指定グループ(base/ballast 等)を全長描画する。 */
     private void renderMapGroups(TileEntityLargeRailCore be, RailMap map, PoseStack poseStack, MultiBufferSource buffer,
                                  int packedLight, double ox, double oy, double oz, net.minecraft.world.phys.Vec3 mo, float scale,
-                                 MqoModelLoader.MqoModel model, RailDefinition def, double cameraDistanceSq, boolean compatibilityHeavy,
+                                 MqoModelLoader.MqoModel model, RailDefinition def,
                                  RailGroup group, float depthBias) {
         double length = map.getLength();
         if (length < 1.0e-4) return;
-        int max = computeRailSampleMax(map, length, def, cameraDistanceSq);
+        int max = computeRailSampleMax(map, length, def);
         RailSample[] samples = getOrCreateSamples(map, new BlockPos((int) ox, (int) oy, (int) oz), max);
-        int stride = computeRenderStride(cameraDistanceSq, compatibilityHeavy);
+        int stride = 1;
         for (int i = 0; i < samples.length; i += stride) {
             RailSample s = samples[i];
             poseStack.pushPose();
@@ -556,11 +520,11 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                                    float partialTick,
                                    PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                                    double ox, double oy, double oz, net.minecraft.world.phys.Vec3 mo, float scale,
-                                   MqoModelLoader.MqoModel model, RailDefinition def, double cameraDistanceSq, boolean compatibilityHeavy) {
+                                   MqoModelLoader.MqoModel model, RailDefinition def) {
         if (point.branchDir == jp.ngt.rtm.rail.util.RailDir.NONE || point.rmBranch == null) {
             // 分岐なし区間: rmMain の半分(頂点→中間点)を両レールで描画。
             renderRailMapDynamic(be, point.rmMain, jp.ngt.rtm.rail.util.RailDir.NONE,
-                point.mainDirIsPositive, 0.0F, 0, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, cameraDistanceSq, compatibilityHeavy, 0.0F);
+                point.mainDirIsPositive, 0.0F, 0, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, 0.0F);
             return;
         }
         //partialTick 補間版を使い、トングの動きを frame 間で滑らかにする (素の getMovement() は 20Hz でカクつく)。
@@ -569,10 +533,10 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         float move = movement * TONG_MOVE;
         // rmMain は基準(bias 0)、rmBranch は分岐点付近で同位置に重なるため微小に持ち上げて z-fight 回避。
         renderRailMapDynamic(be, point.rmMain, point.branchDir, point.mainDirIsPositive, move, tongIndex,
-            poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, cameraDistanceSq, compatibilityHeavy, 0.0F);
+            poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, 0.0F);
         move = (1.0F - movement) * TONG_MOVE;
         renderRailMapDynamic(be, point.rmBranch, point.branchDir.invert(), point.branchDirIsPositive, move, tongIndex,
-            poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, cameraDistanceSq, compatibilityHeavy, 0.012F);
+            poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, 0.012F);
     }
 
     /** 本家 LibRenderRail.renderRailMapDynamic 移植。半分の区間+トング分離アニメ。 */
@@ -580,12 +544,12 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                                       jp.ngt.rtm.rail.util.RailDir dir, boolean par3, float move, int tongIndex,
                                       PoseStack poseStack, MultiBufferSource buffer, int packedLight,
                                       double ox, double oy, double oz, net.minecraft.world.phys.Vec3 mo, float scale,
-                                      MqoModelLoader.MqoModel model, RailDefinition def, double cameraDistanceSq, boolean compatibilityHeavy,
+                                      MqoModelLoader.MqoModel model, RailDefinition def,
                                       float depthBias) {
         jp.ngt.rtm.rail.util.RailDir LEFT = jp.ngt.rtm.rail.util.RailDir.LEFT;
         jp.ngt.rtm.rail.util.RailDir RIGHT = jp.ngt.rtm.rail.util.RailDir.RIGHT;
         double railLength = rms.getLength();
-        int max = computeRailSampleMax(rms, railLength, def, cameraDistanceSq);
+        int max = computeRailSampleMax(rms, railLength, def);
         int halfMax = max / 2;
         // 中間点(halfMax)を隣の Point と二重描画して z-fight しないよう、後半側は halfMax+1 から開始。
         int startIndex = par3 ? 0 : halfMax + 1;
@@ -805,14 +769,12 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         net.minecraft.world.phys.Vec3 mo,
         float scale,
         MqoModelLoader.MqoModel model,
-        RailDefinition definition,
-        double cameraDistanceSq,
-        boolean compatibilityHeavy
+        RailDefinition definition
     ) {
-        int previousMax = computeRailSampleMax(previousMap, previousMap.getLength(), definition, cameraDistanceSq);
-        int activeMax = computeRailSampleMax(activeMap, activeMap.getLength(), definition, cameraDistanceSq);
+        int previousMax = computeRailSampleMax(previousMap, previousMap.getLength(), definition);
+        int activeMax = computeRailSampleMax(activeMap, activeMap.getLength(), definition);
         int max = Math.max(previousMax, activeMax);
-        int stride = computeRenderStride(cameraDistanceSq, compatibilityHeavy);
+        int stride = 1;
         for (int i = 0; i <= max; i += stride) {
             float t = max <= 0 ? 0.0F : i / (float) max;
             int previousIndex = Mth.clamp(Math.round(t * previousMax), 0, previousMax);
@@ -825,7 +787,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             float yaw = Mth.rotLerp(progress, previousMap.getRailYaw(previousMax, previousIndex), activeMap.getRailYaw(activeMax, activeIndex));
             float pitch = Mth.rotLerp(progress, previousMap.getRailPitch(previousMax, previousIndex), activeMap.getRailPitch(activeMax, activeIndex));
             float roll = Mth.rotLerp(progress, previousMap.getCant(previousMax, previousIndex), activeMap.getCant(activeMax, activeIndex));
-            renderRailSample(blockEntity, wx, wy, wz, yaw, pitch, roll, i, max, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, cameraDistanceSq, compatibilityHeavy);
+            renderRailSample(blockEntity, wx, wy, wz, yaw, pitch, roll, i, max, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model);
         }
         if (max > 0 && max % stride != 0) {
             double[] previousPoint = previousMap.getRailPos(previousMax, previousMax);
@@ -836,7 +798,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             float yaw = Mth.rotLerp(progress, previousMap.getRailYaw(previousMax, previousMax), activeMap.getRailYaw(activeMax, activeMax));
             float pitch = Mth.rotLerp(progress, previousMap.getRailPitch(previousMax, previousMax), activeMap.getRailPitch(activeMax, activeMax));
             float roll = Mth.rotLerp(progress, previousMap.getCant(previousMax, previousMax), activeMap.getCant(activeMax, activeMax));
-            renderRailSample(blockEntity, wx, wy, wz, yaw, pitch, roll, max, max, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, cameraDistanceSq, compatibilityHeavy);
+            renderRailSample(blockEntity, wx, wy, wz, yaw, pitch, roll, max, max, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model);
         }
     }
 
@@ -858,9 +820,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         double oz,
         net.minecraft.world.phys.Vec3 mo,
         float scale,
-        MqoModelLoader.MqoModel model,
-        double cameraDistanceSq,
-        boolean compatibilityHeavy
+        MqoModelLoader.MqoModel model
     ) {
         //本家 1.7.10 の TESR と同じく「レールのその区間の位置」の明るさで描く。
         //コア 1 点の明るさ (常に埋没 → 上ブロック=空の明るさで救済) を全長に使うと、
@@ -889,11 +849,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             packedLight,
             net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
             false,
-            groupName -> shouldRenderRailGroup(model, groupName, pos, max, compatibilityHeavy, cameraDistanceSq),
+            groupName -> shouldRenderRailGroup(model, groupName, pos, max),
             null
         );
-        double translucentThreshold = compatibilityHeavy ? 38.0D : 72.0D;
-        if (model.hasTranslucentBatches() && cameraDistanceSq < translucentThreshold * translucentThreshold) {
+        //★半透明パスは距離で切らない。本家 BasicRailPartsRenderer.shouldRenderObject は
+        //無条件 true で、距離やグループ名でレールを間引く仕組みそのものが無い。
+        //ここで切ると遠くのレールからガラス/半透明部品だけが消える。
+        if (model.hasTranslucentBatches()) {
             MqoModelLoader.renderModelWithoutScript(
                 model,
                 poseStack,
@@ -901,15 +863,14 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 packedLight,
                 net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY,
                 true,
-                groupName -> shouldRenderRailGroup(model, groupName, pos, max, compatibilityHeavy, cameraDistanceSq),
+                groupName -> shouldRenderRailGroup(model, groupName, pos, max),
                 null
             );
         }
         poseStack.popPose();
     }
 
-    private static boolean shouldRenderRailGroup(MqoModelLoader.MqoModel model, String groupName, int pos, int max,
-                                                 boolean compatibilityHeavy, double cameraDistanceSq) {
+    private static boolean shouldRenderRailGroup(MqoModelLoader.MqoModel model, String groupName, int pos, int max) {
         String lower = groupName == null ? "" : groupName.toLowerCase(java.util.Locale.ROOT);
         if (lower.matches("[lr][0-9]+")) {
             return false;
@@ -939,19 +900,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         if (lower.equals("ladder")) {
             return (pos + 1) % 10 == 0 || (pos + 5) % 10 == 0 || (pos + 9) % 10 == 0;
         }
-        if (compatibilityHeavy) {
-            if (lower.contains("glass")
-                || lower.contains("alpha")
-                || lower.contains("window")) {
-                return false;
-            }
-            if (cameraDistanceSq > 2500.0D && (lower.contains("detail")
-                || lower.contains("bolt")
-                || lower.contains("plate")
-                || lower.contains("side"))) {
-                return false;
-            }
-        }
         boolean endpoint = pos == 0 || pos == max;
         // 一部パックは end/cap 名で端面パーツを持つ。中間で出すと長い先端が飛び出す。
         if (lower.contains("end") || lower.contains("cap") || lower.contains("terminal")) {
@@ -960,14 +908,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         return true;
     }
 
-    private static boolean shouldUseCompatibilityRendering(RailDefinition definition, MqoModelLoader.MqoModel model) {
-        if (definition == null || model == null) {
-            return false;
-        }
-        return model.getTotalVertexCount() >= 9_000
-            || model.getBatchCount() >= 72
-            || model.getTranslucentBatchCount() >= 10;
-    }
 
     private static int parseTrailingNumber(String value) {
         int end = value.length();

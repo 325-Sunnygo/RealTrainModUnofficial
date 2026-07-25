@@ -103,6 +103,52 @@ public final class RailScriptRenderers {
         }
     }
 
+    /** レールごとの明るさ指紋。前回焼いた時から光が変わったかを判定する。 */
+    private static final java.util.Map<BlockPos, Long> LIGHT_SIGNATURES = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * このレールの明るさが前回から変わったか。
+     * <p>
+     * 明るさは記録 (GLRecorder) と統合メッシュの両方に<b>焼き込まれる</b>ので、光が変わったら
+     * 記録ごと作り直さないと元に戻らない。以前はコアブロック 1 点の明るさだけを見ていたが、
+     * コアはバラストや地面に埋まっていて {@code getLightColor} が 0 のまま動かないことがあり、
+     * 「直線レールが真っ黒で、リログするまで直らない」状態になっていた。
+     * <p>
+     * レール上を等間隔に拾って指紋にする。読むのは光配列だけなので毎フレームでも軽い。
+     */
+    private static boolean lightChanged(BlockPos pos, TileEntityLargeRailCore be, RailMap[] maps) {
+        long signature = lightSignature(be, maps);
+        Long previous = LIGHT_SIGNATURES.put(pos, signature);
+        return previous == null || previous != signature;
+    }
+
+    /** レール上の等間隔サンプル点の明るさから作る指紋。 */
+    private static long lightSignature(TileEntityLargeRailCore be, RailMap[] maps) {
+        net.minecraft.world.level.Level level = be.getLevel();
+        if (level == null || maps == null) {
+            return 0L;
+        }
+        //端と中間で 9 点。レール全体が一斉に暗い→明るいへ変わる読み込み直後を確実に捉えられる。
+        final int probes = 8;
+        long signature = 1L;
+        for (RailMap map : maps) {
+            if (map == null) {
+                continue;
+            }
+            for (int i = 0; i <= probes; i++) {
+                double[] p = map.getRailPos(probes, i);
+                double h = map.getRailHeight(probes, i);
+                net.minecraft.core.BlockPos sp = net.minecraft.core.BlockPos.containing(p[1], h + 0.25D, p[0]);
+                int light = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, sp);
+                if (light == 0) {
+                    light = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, sp.above());
+                }
+                signature = signature * 31L + light;
+            }
+        }
+        return signature;
+    }
+
     /**
      * スクリプト無しレールの本家デフォルト描画 (作り直し後の標準パス)。
      *
@@ -117,7 +163,9 @@ public final class RailScriptRenderers {
         BlockPos pos = be.getBlockPos();
         GLRecorder rec = PLAIN_CACHE.get(pos);
         boolean rebuilt = false;
-        if (rec == null || be.shouldRerenderRail) {
+        //指紋は毎フレーム更新する (初回に記録し損ねると次フレームで無駄な作り直しが 1 回入る)
+        boolean lightChanged = lightChanged(pos, be, maps);
+        if (rec == null || be.shouldRerenderRail || lightChanged) {
             rec = new GLRecorder();
             GLRecorder.activate(rec);
             try {
@@ -215,7 +263,9 @@ public final class RailScriptRenderers {
                 return false;
             }
             GLRecorder rec = this.staticCache.get(pos);
-            boolean rebuilt = rec == null || be.shouldRerenderRail;
+            //明るさは記録に焼き込まれるので、光が変わったら記録ごと作り直す (lightChanged 参照)
+            boolean lightChanged = lightChanged(pos, be, maps);
+            boolean rebuilt = rec == null || be.shouldRerenderRail || lightChanged;
             if (rebuilt) {
                 rec = new GLRecorder();
                 GLRecorder.activate(rec);

@@ -121,9 +121,30 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                 //開閉は<b>旧 TrainEntity のレンダラーにしか実装されていなかった</b>。実際に描画されるのは
                 //こちらの本家系レンダラーなので、スクリプトを持たないパック (=大半の車両) では
                 //ドアが一切動かなかった。ここで同じ変換を適用する。
-                MqoModelLoader.GroupTransform doorTransform = (stack, groupName) -> {
-                    TrainEntityRenderer.applyDoorTransform(stack, def.getLeftDoors(), groupName, entity.doorMoveL, true);
-                    TrainEntityRenderer.applyDoorTransform(stack, def.getRightDoors(), groupName, entity.doorMoveR, false);
+                //本家 BasicVehiclePartsRenderer.render と同じ変換。動かす部品は JSON の
+                //objects で決まる (名前の推測はしない)。パンタも同じ仕組みで動く。
+                java.util.Map<String, java.util.List<TrainEntityRenderer.PartsStep>> leftChains =
+                        TrainEntityRenderer.partsChains(def.getLeftDoors());
+                java.util.Map<String, java.util.List<TrainEntityRenderer.PartsStep>> rightChains =
+                        TrainEntityRenderer.partsChains(def.getRightDoors());
+                MqoModelLoader.GroupTransform doorTransform = new MqoModelLoader.GroupTransform() {
+                    @Override public void apply(PoseStack stack, String groupName) {
+                        if (leftChains.isEmpty() && rightChains.isEmpty()) {
+                            TrainEntityRenderer.applyDoorTransform(stack, def.getLeftDoors(), groupName, entity.doorMoveL, true);
+                            TrainEntityRenderer.applyDoorTransform(stack, def.getRightDoors(), groupName, entity.doorMoveR, false);
+                            return;
+                        }
+                        TrainEntityRenderer.applyPartsTransform(stack, leftChains, groupName, entity.doorMoveL);
+                        TrainEntityRenderer.applyPartsTransform(stack, rightChains, groupName, entity.doorMoveR);
+                    }
+                    @Override public boolean mayModify(String groupName) {
+                        if (groupName == null || groupName.isEmpty()) return false;
+                        if (leftChains.isEmpty() && rightChains.isEmpty()) {
+                            return groupName.length() >= 4 && TrainEntityRenderer.containsDoorWord(groupName);
+                        }
+                        return TrainEntityRenderer.hasPartsTransform(leftChains, groupName)
+                                || TrainEntityRenderer.hasPartsTransform(rightChains, groupName);
+                    }
                 };
                 tSec = ClientRenderProfiler.sec();
                 //この経路も entity を渡せない (renderModel の 6 引数版) ため、カリング判定

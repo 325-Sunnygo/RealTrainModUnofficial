@@ -121,8 +121,6 @@ public final class WorldConverter {
         scan.blockIds = blockIds;
         scanWorld(output, scan);
 
-        if (!scan.blocks.isEmpty()) {
-        }
         scan.unknownBlocks.forEach((n, c) ->
                 RealTrainModUnofficial.LOGGER.warn("[convert] {}: 対応表に無い MOD ブロック {} ({} 個)", name, n, c));
 
@@ -134,9 +132,9 @@ public final class WorldConverter {
         //レールまで巻き添えで壊してしまう。ゲーム内で消そうとしてもこの連鎖には勝てないので、
         //<b>Minecraft がチャンクを読む前に</b>消しておく。
         Set<Integer> railIds = LegacyBlockIds.railBlockIds(blockIds);
-        int stripped = railIds.isEmpty() ? 0 : stripBlocks(output, railIds);
-        if (stripped > 0) {
-        } else if (railIds.isEmpty() && !blockIds.isEmpty()) {
+        //レールブロックは Minecraft がチャンクを読む前に消す (副作用が目的。戻り値は使わない)
+        if (!railIds.isEmpty()) {
+            stripBlocks(output, railIds);
         }
 
         RestoreData data = new RestoreData();

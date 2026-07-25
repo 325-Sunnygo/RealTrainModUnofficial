@@ -3,18 +3,12 @@ package jp.ngt.ngtlib.renderer.model;
 import jp.ngt.ngtlib.io.NGTFileLoader;
 import jp.ngt.ngtlib.io.NGTLog;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 /**
  * 本家 jp.ngt.ngtlib.renderer.model.ModelLoader のスクリプト互換移植。
@@ -23,10 +17,6 @@ import java.util.zip.ZipInputStream;
  */
 public final class ModelLoader {
     private static final Map<String, PolygonModel> CACHE = new ConcurrentHashMap<>();
-    private static final Pattern OBJECT_PATTERN = Pattern.compile("^Object\\s+\"(.+?)\"");
-    private static final Pattern V_PATTERN = Pattern.compile("V\\(([^)]*)\\)");
-    private static final Pattern M_PATTERN = Pattern.compile("M\\(([^)]*)\\)");
-    private static final Pattern UV_PATTERN = Pattern.compile("UV\\(([^)]*)\\)");
 
     private ModelLoader() {
     }
@@ -66,118 +56,63 @@ public final class ModelLoader {
      * MQO テキストから直接 (VehicleScriptRenderers が車体モデルグラフ生成に使用)。
      */
     public static PolygonModel parse(byte[] bytes, String name) throws IOException {
-        String text = extractMqoText(bytes, name);
+        String text = MqoReader.extractText(bytes, name);
         PolygonModel model = new PolygonModel();
         if (text == null) {
             return model;
         }
+        //★書式の解釈は MqoReader だけが持つ ([[MqoReader]])。ここは「スクリプトが見る
+        //グラフ」への組み立てに徹する: 座標は 0.01 倍、面の頂点は逆順格納。
+        MqoReader.read(text, new MqoReader.Handler() {
+            private GroupObject current;
+            private final List<float[]> verts = new ArrayList<>();
 
-        GroupObject current = null;
-        List<float[]> verts = new ArrayList<>();
-        int mode = 0;//0:none, 1:vertex, 2:face
-        for (String rawLine : text.split("\r?\n")) {
-            String line = rawLine.trim();
-            if (line.isEmpty()) {
-                continue;
+            @Override
+            public void objectStart(String objectName) {
+                this.current = new GroupObject(objectName);
+                model.groupObjects.add(this.current);
+                this.verts.clear();
             }
-            Matcher om = OBJECT_PATTERN.matcher(line);
-            if (om.find()) {
-                current = new GroupObject(om.group(1));
-                model.groupObjects.add(current);
-                verts = new ArrayList<>();
-                mode = 0;
-                continue;
-            }
-            if (current == null) {
-                continue;
-            }
-            if (line.startsWith("vertex ")) {
-                mode = 1;
-                continue;
-            }
-            if (line.startsWith("BVertex")) {
-                mode = 3;//バイナリ頂点は未対応
-                continue;
-            }
-            if (line.startsWith("face ")) {
-                mode = 2;
-                continue;
-            }
-            if (line.equals("}")) {
-                mode = 0;
-                continue;
-            }
-            if (mode == 1) {
-                String[] t = line.split("\\s+");
-                if (t.length >= 3) {
-                    try {
-                        verts.add(new float[]{
-                                Float.parseFloat(t[0]) * 0.01F,
-                                Float.parseFloat(t[1]) * 0.01F,
-                                Float.parseFloat(t[2]) * 0.01F});
-                    } catch (NumberFormatException ignored) {
-                    }
+
+            @Override
+            public void facet(float angle) {
+                if (this.current != null) {
+                    this.current.smoothingAngle = angle;
                 }
-            } else if (mode == 2) {
-                parseFaceLine(line, verts, current);
             }
-        }
+
+            @Override
+            public void verticesStart() {
+                this.verts.clear();
+            }
+
+            @Override
+            public void vertex(float x, float y, float z) {
+                this.verts.add(new float[]{x * 0.01F, y * 0.01F, z * 0.01F});
+            }
+
+            @Override
+            public void face(int count, int materialId, int[] vertexIndices, float[] uvs) {
+                if (this.current != null) {
+                    addFace(this.current, this.verts, count, materialId, vertexIndices, uvs);
+                }
+            }
+        });
         return model;
     }
 
-    private static void parseFaceLine(String line, List<float[]> verts, GroupObject group) {
-        int sp = line.indexOf(' ');
-        if (sp <= 0) {
-            return;
-        }
-        int count;
-        try {
-            count = Integer.parseInt(line.substring(0, sp).trim());
-        } catch (NumberFormatException e) {
-            return;
-        }
-        if (count < 3) {
-            return;
-        }
-        Matcher vm = V_PATTERN.matcher(line);
-        if (!vm.find()) {
-            return;
-        }
-        String[] vidx = vm.group(1).trim().split("\\s+");
-        if (vidx.length < count) {
-            return;
-        }
-        int matId = 0;
-        Matcher mm = M_PATTERN.matcher(line);
-        if (mm.find()) {
-            try {
-                matId = Integer.parseInt(mm.group(1).trim());
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        float[] uvs = null;
-        Matcher um = UV_PATTERN.matcher(line);
-        if (um.find()) {
-            String[] ut = um.group(1).trim().split("\\s+");
-            if (ut.length >= count * 2) {
-                uvs = new float[count * 2];
-                try {
-                    for (int i = 0; i < count * 2; i++) {
-                        uvs[i] = Float.parseFloat(ut[i]);
-                    }
-                } catch (NumberFormatException e) {
-                    uvs = null;
-                }
-            }
-        }
-        //本家 MqoModel.parseFaceQuads は addVertex(3 - i, ...) で頂点/UV を逆順格納する。
-        //法線 (=CustomAnimator の左右判定/CustomMonitor の向き) がこれに依存するため必ず一致させる。
+    /**
+     * 本家 MqoModel.parseFaceQuads は addVertex(3 - i, ...) で頂点/UV を<b>逆順</b>格納する。
+     * 法線 (= CustomAnimator の左右判定 / CustomMonitor の向き) がこれに依存するため必ず一致させる。
+     */
+    private static void addFace(GroupObject group, List<float[]> verts,
+                                int count, int materialId, int[] vertexIndices, float[] uvs) {
         Vertex[] faceVerts = new Vertex[count];
         float[] revUvs = uvs != null ? new float[count * 2] : null;
         try {
             for (int i = 0; i < count; i++) {
                 int rev = count - 1 - i;
-                float[] v = verts.get(Integer.parseInt(vidx[i]));
+                float[] v = verts.get(vertexIndices[i]);
                 faceVerts[rev] = new Vertex(v[0], v[1], v[2]);
                 if (revUvs != null) {
                     revUvs[rev * 2] = uvs[i * 2];
@@ -187,28 +122,14 @@ public final class ModelLoader {
         } catch (Exception e) {
             return;
         }
-        Face face = new Face(faceVerts, revUvs, matId);
+        Face face = new Face(faceVerts, revUvs, materialId);
         //本家はロード時に法線計算済み — スクリプト (CustomAnimator 等) は
         //face.faceNormal が非 null である前提で toVec() を呼ぶ
         face.calculateFaceNormal(VecAccuracy.LOW);
         group.faces.add(face);
     }
 
-    private static String extractMqoText(byte[] bytes, String name) throws IOException {
-        //mqoz = zip 内に .mqo
-        if (bytes.length > 4 && bytes[0] == 'P' && bytes[1] == 'K') {
-            try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(bytes))) {
-                ZipEntry entry;
-                while ((entry = zip.getNextEntry()) != null) {
-                    if (entry.getName().toLowerCase(Locale.ROOT).endsWith(".mqo")) {
-                        return new String(zip.readAllBytes(), Charset.forName("Shift_JIS"));
-                    }
-                }
-            }
-            return null;
-        }
-        return new String(bytes, Charset.forName("Shift_JIS"));
-    }
+
 
     private static String pathOf(Object resource) {
         if (resource instanceof jp.ngt.mccompat.ResourceLocation compat) {

@@ -227,8 +227,6 @@ public class TrainEntity extends Entity {
     // 位置(同期オフセット)のレール継ぎ目グリッチ除去用。0=後/1=前。
     private final int[] clientBogieOffRejectCount = {0, 0};
     private int interactionHitboxRefreshCooldown;
-    /** 診断用: STALL ログのスパム防止クールダウン(tick)。 */
-    private int stallLogCooldown;
     private float rotationRoll;
     private float prevRotationRoll;
     public float doorMoveL;
@@ -1472,11 +1470,6 @@ public class TrainEntity extends Entity {
                     activeRailBodyDirection = preBodyDirection;
                     syncActiveRailStateFromAnchors(preBodyDirection == 0 ? 1 : preBodyDirection);
                     setDeltaMovement(Vec3.ZERO);
-                    if (stallLogCooldown <= 0) {
-                        stallLogCooldown = 20;
-                        jp.ngt.rtm.rail.util.RailMap fm = frontRailAnchor.map();
-                        jp.ngt.rtm.rail.util.RailMap rm = rearRailAnchor.map();
-                    }
                     return true;
                     }
                 }
@@ -1926,16 +1919,6 @@ public class TrainEntity extends Entity {
         return new RailAnchor(anchor.map(), anchor.split(), anchor.index(), normalized);
     }
 
-    /** [RTM-DBG] レールマップの始点/終点ブロック座標を文字列化(分岐遷移の診断用)。 */
-    private static String railEndpoints(jp.ngt.rtm.rail.util.RailMap m) {
-        try {
-            jp.ngt.rtm.rail.util.RailPosition s = m.getStartRP();
-            jp.ngt.rtm.rail.util.RailPosition e = m.getEndRP();
-            return "[" + s.blockX + "," + s.blockY + "," + s.blockZ + "->" + e.blockX + "," + e.blockY + "," + e.blockZ + "]";
-        } catch (Throwable t) {
-            return "[?]";
-        }
-    }
 
     private RailAnchor advanceAnchorAlongPath(RailAnchor anchor, double offsetMeters) {
         if (anchor == null || anchor.map() == null || anchor.split() <= 0) {
@@ -2221,8 +2204,6 @@ public class TrainEntity extends Entity {
             }
         }
         railLookupIncludeAllSegments = false;
-        if (best == null) {
-        }
         return best;
     }
 

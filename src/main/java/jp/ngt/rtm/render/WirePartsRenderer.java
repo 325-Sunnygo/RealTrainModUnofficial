@@ -52,18 +52,9 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
 
     public void renderWireDynamic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
         if (this.script != null) {
-            //診断: wire スクリプトの失敗を可視化する (原因特定後に doScriptIgnoreError へ戻す)
-            try {
-                ScriptUtil.doScriptFunction(this.script, "renderWireDynamic", tile, connection, vec, partialTicks, pass);
-            } catch (Throwable t) {
-                if (!WIRE_DIAG_WARNED) {
-                    WIRE_DIAG_WARNED = true;
-                }
-            }
+            ScriptUtil.doScriptIgnoreError(this.script, "renderWireDynamic", tile, connection, vec, partialTicks, pass);
         }
     }
-
-    private static boolean WIRE_DIAG_WARNED;
 
     /**
      * セクション i を描くか (端の間引き等)。スクリプトが未定義なら常に描く。

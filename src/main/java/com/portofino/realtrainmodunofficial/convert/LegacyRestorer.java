@@ -51,7 +51,6 @@ public final class LegacyRestorer {
     private static final Deque<RestoreData.ObjectRecord> OBJECTS = new ArrayDeque<>();
     private static final Deque<RestoreData.EntityRecord> ENTITIES = new ArrayDeque<>();
     private static final Deque<RestoreData.BlockRecord> BLOCKS = new ArrayDeque<>();
-    private static int blocksPlaced;
 
     private static Path worldDir;
     private static boolean running;
@@ -79,7 +78,6 @@ public final class LegacyRestorer {
             return;
         }
         worldDir = dir;
-        blocksPlaced = 0;
         //レールを先に敷く。あとから置く設置物がレールのマスに当たったら 1 段上へ逃がすので、
         //順番が逆だとレールが設置物を上書きしてしまう。
         List<RestoreData.ObjectRecord> ordered = new ArrayList<>(data.objects);
@@ -140,7 +138,6 @@ public final class LegacyRestorer {
             BlockPos pos = new BlockPos(rec.x, rec.y, rec.z);
             //flag 2 = クライアントへ送るだけ (隣接更新を走らせない = 大量に置いても軽い)
             level.setBlock(pos, state, 2);
-            blocksPlaced++;
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("[convert] ブロックの復元に失敗 {},{},{} ({})",
                     rec.x, rec.y, rec.z, rec.name, t);
@@ -149,8 +146,6 @@ public final class LegacyRestorer {
 
     private static void finish() {
         running = false;
-        if (blocksPlaced > 0) {
-        }
         MISSING.stream().distinct().sorted().forEach(name ->
                 RealTrainModUnofficial.LOGGER.warn("[convert] モデルが見つかりません (パックを入れてください): {}", name));
         MISSING_POLES.forEach(name ->
@@ -258,35 +253,6 @@ public final class LegacyRestorer {
 
         //本家の "makeRail" = 土台ブロックも作る、"isCreative" = 資材を消費しない
         boolean ok = BlockMarker.createRail(level, rec.x, rec.y, rec.z, rps, prop, true, true);
-        if (ok) {
-            //[診断] 敷いた直後のコアと土台の中身を出す (モデルが「適当なもの」になる原因の切り分け)
-            List<RailPosition> sorted = new java.util.ArrayList<>(rps);
-            sorted.sort(java.util.Comparator.comparingInt(o -> o.blockY));
-            RailPosition first = sorted.get(0);
-            BlockPos corePos = new BlockPos(first.blockX, first.blockY, first.blockZ);
-            net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(corePos);
-            if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore core) {
-            } else {
-                RealTrainModUnofficial.LOGGER.warn("[convert-diag] コアが見つかりません @ {} (be={})", corePos, be);
-            }
-            //土台の起点を数える
-            int okBase = 0;
-            int badBase = 0;
-            for (int dx = -6; dx <= 6; dx++) {
-                for (int dz = -6; dz <= 6; dz++) {
-                    BlockPos p2 = corePos.offset(dx, 0, dz);
-                    if (level.getBlockEntity(p2) instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase base
-                            && !(base instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore)) {
-                        int[] sp = base.getStartPoint();
-                        if (sp[0] == corePos.getX() && sp[1] == corePos.getY() && sp[2] == corePos.getZ()) {
-                            okBase++;
-                        } else {
-                            badBase++;
-                        }
-                    }
-                }
-            }
-        }
         if (ok && com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(prop.railModel) == null) {
             RealTrainModUnofficial.LOGGER.warn("[convert] レールのモデル {} が見つかりません (パックを入れてください)", prop.railModel);
         }
@@ -350,8 +316,6 @@ public final class LegacyRestorer {
                     }
                 }
             }
-        }
-        if (removed > 0) {
         }
     }
 

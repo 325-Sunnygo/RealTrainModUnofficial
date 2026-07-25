@@ -70,28 +70,16 @@ public final class McteuMiniatureBridge {
         if (stack == null || stack.isEmpty()) {
             return null;
         }
-        //--- 診断ログ (初見のアイテムID/ミニチュアIDを 1 度だけ出す。原因特定後に外す) ---
         net.minecraft.resources.ResourceLocation rid = BuiltInRegistries.ITEM.getKey(stack.getItem());
         String ridStr = rid == null ? "null" : rid.toString();
         boolean mini = MINIATURE_ITEM_ID.equals(ridStr);
         boolean avail = ensureInit();
-        if (DIAG_SEEN.add("item:" + ridStr)) {
-            diag("held item id=" + ridStr + " isMiniature=" + mini + " mcteuAvailable=" + avail);
-        }
         if (!mini || !avail) {
             return null;
         }
         try {
             String id = (String) mGetMiniatureId.invoke(null, stack);
             Object data = (id == null || id.isEmpty()) ? null : mLoadItemData.invoke(null, id);
-            if (DIAG_SEEN.add("mini:" + id)) {
-                int bc = -1;
-                if (data != null) {
-                    Object blocks = fBlocks.get(data);
-                    bc = (blocks instanceof java.util.List<?> l) ? l.size() : -1;
-                }
-                diag("miniatureId='" + id + "' loadItemData=" + (data == null ? "NULL" : "ok") + " blocks=" + bc);
-            }
             if (id == null || id.isEmpty() || data == null) {
                 return null;
             }
@@ -100,22 +88,13 @@ public final class McteuMiniatureBridge {
                 return (CompoundTag) cached[1];
             }
             CompoundTag tag = convert(data);
-            if (DIAG_SEEN.add("conv:" + id)) {
-                diag("converted id='" + id + "' -> " + (tag == null ? "NULL" : "BlocksData size=" + tag.getList("BlocksData", 10).size()));
-            }
             if (tag != null) {
                 CACHE.put(id, new Object[]{data, tag});
             }
             return tag;
         } catch (Throwable t) {
-            diag("exception for id: " + t);
             return null;
         }
-    }
-
-    private static final java.util.Set<String> DIAG_SEEN = ConcurrentHashMap.newKeySet();
-
-    private static void diag(String msg) {
     }
 
     /** MCTEU の {@code MiniatureData} を RTMU の NGTObject NBT へ変換する。 */
@@ -178,11 +157,9 @@ public final class McteuMiniatureBridge {
             mToBlockState = entryCls.getMethod("toBlockState");
 
             available = true;
-            diag("ensureInit OK — MCTEUnofficial detected, miniature bridge enabled");
         } catch (Throwable t) {
             // MCTEU 未導入 or API 変更。NGTO Builder は RTMU 自前ミニチュアで動作する。
             available = false;
-            diag("ensureInit FAILED (MCTEU 未導入 or API 変更): " + t);
         }
         return available;
     }

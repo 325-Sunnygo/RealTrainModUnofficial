@@ -275,6 +275,11 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     protected void setupFloors() {
         this.vehicleFloors.stream().filter(java.util.Objects::nonNull).forEach(Entity::discard);
         this.vehicleFloors.clear();
+        //★実行時の一覧だけでは足りない。車体がチャンク再読込等で作り直されると一覧は
+        //空なのに、ワールドには前の座席が生きたまま残っていることがある。そのまま
+        //新しい座席を湧かせると二重になり、古い方が「車体から離れた座れない当たり判定」
+        //として残る。周囲を実際に調べて、この車体に紐づく座席を先に片付ける。
+        this.discardStrayFloors();
 
         this.floorLoaded = true;
         float[][] slots = this.getConfig().getSlotPos();
@@ -298,12 +303,23 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         }
     }
 
+    /**
+     * 車体が消えたら座席も消える。
+     * <p>
+     * 理由を問わず片付ける。座席はワールドに保存しない派生データなので、
+     * 車体が戻ってくるとき ({@code floorLoaded=false} → {@code setupFloors}) に
+     * 必ず作り直される。残しておく利点は無く、残すと当たり判定だけが取り残される。
+     * <p>
+     * 実行時の一覧は取りこぼしうるので、周囲の実物も ID で照合して掃除する
+     * (列車を壊したのに当たり判定が残る、というユーザー報告への対策)。
+     */
     @Override
     public void remove(RemovalReason reason) {
         super.remove(reason);
-        if (!this.level().isClientSide && reason.shouldDestroy()) {
+        if (!this.level().isClientSide) {
             this.vehicleFloors.stream().filter(java.util.Objects::nonNull).forEach(Entity::discard);
             this.vehicleFloors.clear();
+            this.discardStrayFloors();
         }
     }
 
@@ -374,6 +390,27 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     }
 
     /**
+     * この車体に紐づく座席がワールドに残っていれば片付ける。
+     * <p>
+     * 判定は<b>エンティティ ID</b>で行う。{@code floor.getVehicle() == this} だと、
+     * この車体が既に削除済みのとき座席側の引き直しが失敗して null になり、
+     * 自分の座席なのに<b>1 つも拾えない</b>。撤去時の後始末でこそ効いてほしい処理なので、
+     * 車体が生きているかどうかに左右されない ID 比較を使う。
+     */
+    private void discardStrayFloors() {
+        if (this.level().isClientSide()) {
+            return;
+        }
+        net.minecraft.world.phys.AABB area = this.getBoundingBox().inflate(48.0D, 16.0D, 48.0D);
+        for (jp.ngt.rtm.entity.train.parts.EntityFloor floor
+                : this.level().getEntitiesOfClass(jp.ngt.rtm.entity.train.parts.EntityFloor.class, area)) {
+            if (floor.getVehicleId() == this.getId()) {
+                floor.discard();
+            }
+        }
+    }
+
+    /**
      * 本家 onModelChanged: モデルが差し替わった時の後始末。
      * <p>
      * サーバー側は座席 (slotPos) がモデル依存なので床を作り直させる
@@ -393,8 +430,57 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
     /** 本家 setFloor: EntityFloor から自分を登録してもらう。 */
     public void setFloor(jp.ngt.rtm.entity.train.parts.EntityFloor floor) {
-        if (floor != null && !this.vehicleFloors.contains(floor)) {
+        if (floor != null && floor.getVehicleId() == this.getId() && !this.vehicleFloors.contains(floor)) {
             this.vehicleFloors.add(floor);
+        }
+    }
+
+    /** 次に座席の取りこぼしを探しに行くまでの残り tick。 */
+    private int floorScanCooldown;
+
+    /**
+     * config 上あるべき座席の数。
+     */
+    private int expectedFloorCount() {
+        T cfg = this.getConfig();
+        if (cfg == null) {
+            return 0;
+        }
+        float[][] slots = cfg.getSlotPos();
+        return slots == null ? 0 : slots.length;
+    }
+
+    /**
+     * 一覧に載っていない自分の座席を周囲から拾い直す。
+     * <p>
+     * 座席の登録は座席側から行う ({@code onAddedToLevel} / 座席の tick) が、これは
+     * <b>取りこぼしうる</b>。特にクライアントでは、座席の spawn パケットを処理する時点で
+     * まだ {@code DATA_VEHICLE} が届いておらず (同期データは spawn の<b>後</b>に来る)、
+     * その瞬間の登録は必ず失敗する。あとは座席自身の tick での再試行頼みで、そこが
+     * 回らないと車体の一覧は<b>空のまま</b>になる。
+     * <p>
+     * 一覧が空だと下の押し出しが丸ごと空振りし、座席はサーバーからの位置更新パケット
+     * だけで動くことになる。これが「走行中は当たり判定が置いていかれ、列車が止まると
+     * 順番に追いついてくる」正体 (パケットが届いた座席から順に現在位置へ飛ぶ)。
+     * <p>
+     * 車体側から掴みに行けば、座席が一度も tick していなくても、登録がどの順で
+     * 失敗していても関係なく貼り付く。
+     */
+    private void rescanFloors() {
+        if (this.floorScanCooldown > 0) {
+            --this.floorScanCooldown;
+            return;
+        }
+        this.floorScanCooldown = 20;
+        if (this.vehicleFloors.size() >= this.expectedFloorCount()) {
+            return;
+        }
+        //置いていかれた座席は車体から離れている可能性があるので広めに探す。
+        //ID が一致するものだけ拾うので、他車両の座席を取り込む心配は無い。
+        net.minecraft.world.phys.AABB area = this.getBoundingBox().inflate(64.0D, 32.0D, 64.0D);
+        for (jp.ngt.rtm.entity.train.parts.EntityFloor floor
+                : this.level().getEntitiesOfClass(jp.ngt.rtm.entity.train.parts.EntityFloor.class, area)) {
+            this.setFloor(floor);
         }
     }
 
@@ -404,8 +490,15 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
      * パーツ自身の tick でも追従しているが、tick 順によっては車体より先に回って
      * 1 tick 前の位置を使う。ここで車体の移動後に押し出しておけば、順序に関係なく
      * 当たり判定が車体と一致する。
+     * <p>
+     * ★座席が<b>自分では tick していない</b>場合 (チャンクの状態等) でも、車体は動いて
+     * いるのでここだけは必ず回る。走行中に座席の当たり判定だけ取り残されて座れなくなる
+     * 不具合の主対策。
      */
     protected void updateFloorPositions() {
+        //★空でも return しない。空こそが「追従が完全に止まっている」状態で、
+        //ここで拾い直さないと永久に復帰しない。
+        this.rescanFloors();
         if (this.vehicleFloors.isEmpty()) {
             return;
         }

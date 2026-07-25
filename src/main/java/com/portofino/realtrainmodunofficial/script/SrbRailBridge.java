@@ -74,7 +74,7 @@ public final class SrbRailBridge {
             level, first.blockX, first.blockY, first.blockZ, rps, prop, true, true);
     }
 
-    /** スクリプト側から呼ぶ診断ログ。 */
+    /** SRB スクリプトが敷設失敗を通知するのに使う。 */
     public void logError(String msg) {
         com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn("[SRB] {}", msg);
     }

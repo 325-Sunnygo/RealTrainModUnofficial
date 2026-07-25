@@ -127,22 +127,9 @@ public class BlockLargeRailBase extends BaseEntityBlock {
         return net.minecraft.world.item.ItemStack.EMPTY;
     }
 
-    /** [診断] 最初の 1 回だけ、誰がレールを壊したかスタックを出す。 */
-    private static boolean DIAG_LOGGED;
-
     @Override
     protected void onRemove(BlockState state, Level world, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock())) {
-            if (!DIAG_LOGGED && !world.isClientSide) {
-                DIAG_LOGGED = true;
-                StringBuilder sb = new StringBuilder();
-                StackTraceElement[] st = Thread.currentThread().getStackTrace();
-                for (int i = 2; i < Math.min(st.length, 30); i++) {
-                    sb.append("\n    ").append(st[i]);
-                }
-                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
-                        "[convert-diag] 最初のレール破壊 {} → {}{}", pos, newState.getBlock(), sb);
-            }
             BlockEntity be = world.getBlockEntity(pos);
             if (be instanceof TileEntityLargeRailBase tile0) {
                 TileEntityLargeRailCore core = tile0.getRailCore();

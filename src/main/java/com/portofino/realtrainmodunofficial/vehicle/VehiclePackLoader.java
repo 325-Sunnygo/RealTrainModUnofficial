@@ -37,28 +37,8 @@ public class VehiclePackLoader {
         loadFromExternalDirectories();
         loadFromGameDirectories();
         VehicleRegistry.setDefinitions(LOADED);
-        dumpLoadedList();
     }
 
-    /**
-     * 診断: ロード済み車両の一覧をファイルへ出力
-     * (「一部の車両が読み込まれない」報告の切り分け用 — 一覧に有る=登録済み/表示側、無い=パース段階)
-     */
-    private static void dumpLoadedList() {
-        try {
-            Path out = FMLPaths.GAMEDIR.get().resolve("config").resolve("realtrainmodunofficial").resolve("loaded_vehicles.txt");
-            Files.createDirectories(out.getParent());
-            List<String> lines = LOADED.stream()
-                .map(d -> String.format("%s :: %s :: type=%s bogies=%d model=%s",
-                    d.getPackName(), d.getId(), d.getVehicleType(),
-                    d.getBogies() == null ? 0 : d.getBogies().size(),
-                    d.getModelFile()))
-                .sorted()
-                .collect(java.util.stream.Collectors.toList());
-            Files.write(out, lines, java.nio.charset.StandardCharsets.UTF_8);
-        } catch (Exception e) {
-        }
-    }
 
     private static void loadFromModJar() {
         // 本家の既定モデルを全て同梱する方針にしたので、列車 (ModelTrain_*) も自動車
@@ -679,7 +659,15 @@ public class VehiclePackLoader {
 
     private static void appendDoorAnimations(JsonObject obj, String key, List<VehicleDefinition.DoorAnimationDefinition> out) {
         if (obj == null || !obj.has(key) || !obj.get(key).isJsonArray()) return;
-        for (JsonElement element : obj.getAsJsonArray(key)) {
+        appendVehicleParts(obj.getAsJsonArray(key), out);
+    }
+
+    /**
+     * 本家 {@code BasicVehiclePartsRenderer.getParts} と同じ読み取り。
+     * {@code childParts} を再帰で辿り、{@code transform} は全要素を並び順のまま保持する。
+     */
+    private static void appendVehicleParts(JsonArray array, List<VehicleDefinition.DoorAnimationDefinition> out) {
+        for (JsonElement element : array) {
             if (!element.isJsonObject()) continue;
             JsonObject door = element.getAsJsonObject();
             List<String> objects = new ArrayList<>();
@@ -691,31 +679,56 @@ public class VehiclePackLoader {
                     }
                 }
             }
-            if (objects.isEmpty()) continue;
+            List<VehicleDefinition.DoorAnimationDefinition> children = new ArrayList<>();
+            if (door.has("childParts") && door.get("childParts").isJsonArray()) {
+                appendVehicleParts(door.getAsJsonArray("childParts"), children);
+            }
+            if (objects.isEmpty() && children.isEmpty()) continue;
             Vec3 pos = parseVec3(door, "pos", 1.0D);
-            Vec3 translation = parseDoorTranslation(door);
-            out.add(new VehicleDefinition.DoorAnimationDefinition(objects, pos, translation));
+            List<float[]> transforms = parseVehiclePartsTransforms(door);
+            out.add(new VehicleDefinition.DoorAnimationDefinition(
+                    objects, pos, firstTranslation(transforms), transforms, children));
         }
     }
 
-    private static Vec3 parseDoorTranslation(JsonObject door) {
+    /**
+     * 本家 {@code VehicleParts.transform}: 要素数 3 = 平行移動、4 = 回転。
+     * <b>長さをそのまま保持する</b> — 4 要素を平行移動として読むと
+     * {@code {angle, vecX, vecY, vecZ}} が {@code translate(angle, vecX, vecY)} になり、
+     * 回転式のドア (プラグドア・バス扉) が明後日の方向へ飛ぶ。
+     */
+    private static List<float[]> parseVehiclePartsTransforms(JsonObject door) {
         if (door == null || !door.has("transform") || !door.get("transform").isJsonArray()) {
-            return Vec3.ZERO;
+            return List.of();
         }
-        JsonArray transforms = door.getAsJsonArray("transform");
-        if (transforms.isEmpty() || !transforms.get(0).isJsonArray()) {
-            return Vec3.ZERO;
+        List<float[]> out = new ArrayList<>();
+        for (JsonElement element : door.getAsJsonArray("transform")) {
+            if (!element.isJsonArray()) continue;
+            JsonArray entry = element.getAsJsonArray();
+            if (entry.size() != 3 && entry.size() != 4) continue;
+            float[] values = new float[entry.size()];
+            try {
+                for (int i = 0; i < values.length; i++) {
+                    values[i] = entry.get(i).getAsFloat();
+                }
+            } catch (Exception e) {
+                continue;
+            }
+            out.add(values);
         }
-        JsonArray first = transforms.get(0).getAsJsonArray();
-        if (first.size() < 3) {
-            return Vec3.ZERO;
-        }
-        try {
-            return new Vec3(first.get(0).getAsDouble(), first.get(1).getAsDouble(), first.get(2).getAsDouble());
-        } catch (Exception e) {
-            return Vec3.ZERO;
-        }
+        return out;
     }
+
+    /** 最初の平行移動 (ドア位置の推定用)。回転しかない部品は ZERO。 */
+    private static Vec3 firstTranslation(List<float[]> transforms) {
+        for (float[] t : transforms) {
+            if (t.length == 3) {
+                return new Vec3(t[0], t[1], t[2]);
+            }
+        }
+        return Vec3.ZERO;
+    }
+
 
     private static List<Float> parseFloatList(JsonObject root, JsonObject trainModel, String key) {
         JsonArray array = null;

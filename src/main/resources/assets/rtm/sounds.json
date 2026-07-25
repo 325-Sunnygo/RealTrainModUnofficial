@@ -1,470 +1,470 @@
 {
-	"block.crossing_gate": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:block/crossing_gate",
-				"stream": false
-			}
-		]
-	},
-	"block.metal": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:block/metal",
-				"stream": false
-			}
-		]
-	},
-	"block.toryanse": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:block/toryanse",
-				"stream": false
-			}
-		]
-	},
-	"broadcast.going_home": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:broadcast/going_home",
-				"stream": false
-			}
-		]
-	},
-	"broadcast.siren": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:broadcast/siren",
-				"stream": false
-			}
-		]
-	},
-	"item.gun": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:item/gun",
-				"stream": false
-			}
-		]
-	},
-	"none": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:none",
-				"stream": false
-			}
-		]
-	},
-	"train.223_air": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/223_air",
-				"stream": false
-			}
-		]
-	},
-	"train.223_run": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/223_run",
-				"stream": false
-			}
-		]
-	},
-	"train.223_run_tunnel": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/223_run_tunnel",
-				"stream": false
-			}
-		]
-	},
-	"train.223_s0": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/223_s0",
-				"stream": false
-			}
-		]
-	},
-	"train.223_s1": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/223_s1",
-				"stream": false
-			}
-		]
-	},
-	"train.223_s2": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/223_s2",
-				"stream": false
-			}
-		]
-	},
-	"train.313_cp": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/313_cp",
-				"stream": false
-			}
-		]
-	},
-	"train.ats": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/ats",
-				"stream": false
-			}
-		]
-	},
-	"train.ats_bell": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/ats_bell",
-				"stream": false
-			}
-		]
-	},
-	"train.brakeR_w": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/brakeR_w",
-				"stream": false
-			}
-		]
-	},
-	"train.cp_A": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/cp_A",
-				"stream": false
-			}
-		]
-	},
-	"train.cp_fin": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/cp_fin",
-				"stream": false
-			}
-		]
-	},
-	"train.dc110_stn": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/dc110_stn",
-				"stream": false
-			}
-		]
-	},
-	"train.door": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/door",
-				"stream": false
-			}
-		]
-	},
-	"train.joint": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/joint",
-				"stream": false
-			}
-		]
-	},
-	"train.joint_reverb": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/joint_reverb",
-				"stream": false
-			}
-		]
-	},
-	"train.kanjo.osaka_kanjo_1": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/kanjo/osaka_kanjo_1",
-				"stream": false
-			}
-		]
-	},
-	"train.kanjo.osaka_kanjo_2": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/kanjo/osaka_kanjo_2",
-				"stream": false
-			}
-		]
-	},
-	"train.kanjo.osaka_kanjo_3": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/kanjo/osaka_kanjo_3",
-				"stream": false
-			}
-		]
-	},
-	"train.lever": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/lever",
-				"stream": false
-			}
-		]
-	},
-	"train.o220_release": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/o220_release",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_223_go-mid": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_223_go-mid",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_223_kankuRapid": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_223_kankuRapid",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_223_mid-stop": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_223_mid-stop",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_223_mid": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_223_mid",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_223_release": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_223_release",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_223mh": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_223mh",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_E231sbb_go-mid": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_E231sbb_go-mid",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_E231sbb_mid-stop": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_E231sbb_mid-stop",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_E231sbb_mid-top": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_E231sbb_mid-top",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_E231sbb_mid": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_E231sbb_mid",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_E231sbb_top-mid": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_E231sbb_top-mid",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_E231sbb_top": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_E231sbb_top",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_dc40r_a-i": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_dc40r_a-i",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_dc40r_a": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_dc40r_a",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_dc40r_go-a": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_dc40r_go-a",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_dc40r_i-stop": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_dc40r_i-stop",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_dc40r_i": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_dc40r_i",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_dc40r_stn": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_dc40r_stn",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_tetsudoushouka": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_tetsudoushouka",
-				"stream": false
-			}
-		]
-	},
-	"train.rtm_wh_00l": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/rtm_wh_00l",
-				"stream": false
-			}
-		]
-	},
-	"train.run_trailer": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/run_trailer",
-				"stream": false
-			}
-		]
-	},
-	"train.tsurikake": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/tsurikake",
-				"stream": false
-			}
-		]
-	},
-	"train.tsurikake_n": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/tsurikake_n",
-				"stream": false
-			}
-		]
-	},
-	"train.tsurikake_x2": {
-		"category": "master",
-		"sounds": [
-			{
-				"name": "rtm:train/tsurikake_x2",
-				"stream": false
-			}
-		]
-	}
+  "block.crossing_gate": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:block/crossing_gate",
+        "stream": false
+      }
+    ]
+  },
+  "block.metal": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:block/metal",
+        "stream": false
+      }
+    ]
+  },
+  "block.toryanse": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:block/toryanse",
+        "stream": false
+      }
+    ]
+  },
+  "broadcast.going_home": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:broadcast/going_home",
+        "stream": false
+      }
+    ]
+  },
+  "broadcast.siren": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:broadcast/siren",
+        "stream": false
+      }
+    ]
+  },
+  "item.gun": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:item/gun",
+        "stream": false
+      }
+    ]
+  },
+  "none": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:none",
+        "stream": false
+      }
+    ]
+  },
+  "train.223_air": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/223_air",
+        "stream": false
+      }
+    ]
+  },
+  "train.223_run": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/223_run",
+        "stream": false
+      }
+    ]
+  },
+  "train.223_run_tunnel": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/223_run_tunnel",
+        "stream": false
+      }
+    ]
+  },
+  "train.223_s0": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/223_s0",
+        "stream": false
+      }
+    ]
+  },
+  "train.223_s1": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/223_s1",
+        "stream": false
+      }
+    ]
+  },
+  "train.223_s2": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/223_s2",
+        "stream": false
+      }
+    ]
+  },
+  "train.313_cp": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/313_cp",
+        "stream": false
+      }
+    ]
+  },
+  "train.ats": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/ats",
+        "stream": false
+      }
+    ]
+  },
+  "train.ats_bell": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/ats_bell",
+        "stream": false
+      }
+    ]
+  },
+  "train.braker_w": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/braker_w",
+        "stream": false
+      }
+    ]
+  },
+  "train.cp_a": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/cp_a",
+        "stream": false
+      }
+    ]
+  },
+  "train.cp_fin": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/cp_fin",
+        "stream": false
+      }
+    ]
+  },
+  "train.dc110_stn": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/dc110_stn",
+        "stream": false
+      }
+    ]
+  },
+  "train.door": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/door",
+        "stream": false
+      }
+    ]
+  },
+  "train.joint": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/joint",
+        "stream": false
+      }
+    ]
+  },
+  "train.joint_reverb": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/joint_reverb",
+        "stream": false
+      }
+    ]
+  },
+  "train.kanjo.osaka_kanjo_1": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/kanjo/osaka_kanjo_1",
+        "stream": false
+      }
+    ]
+  },
+  "train.kanjo.osaka_kanjo_2": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/kanjo/osaka_kanjo_2",
+        "stream": false
+      }
+    ]
+  },
+  "train.kanjo.osaka_kanjo_3": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/kanjo/osaka_kanjo_3",
+        "stream": false
+      }
+    ]
+  },
+  "train.lever": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/lever",
+        "stream": false
+      }
+    ]
+  },
+  "train.o220_release": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/o220_release",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_223_go-mid": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_223_go-mid",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_223_kankurapid": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_223_kankurapid",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_223_mid-stop": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_223_mid-stop",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_223_mid": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_223_mid",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_223_release": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_223_release",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_223mh": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_223mh",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_e231sbb_go-mid": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_e231sbb_go-mid",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_e231sbb_mid-stop": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_e231sbb_mid-stop",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_e231sbb_mid-top": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_e231sbb_mid-top",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_e231sbb_mid": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_e231sbb_mid",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_e231sbb_top-mid": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_e231sbb_top-mid",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_e231sbb_top": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_e231sbb_top",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_dc40r_a-i": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_dc40r_a-i",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_dc40r_a": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_dc40r_a",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_dc40r_go-a": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_dc40r_go-a",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_dc40r_i-stop": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_dc40r_i-stop",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_dc40r_i": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_dc40r_i",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_dc40r_stn": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_dc40r_stn",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_tetsudoushouka": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_tetsudoushouka",
+        "stream": false
+      }
+    ]
+  },
+  "train.rtm_wh_00l": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/rtm_wh_00l",
+        "stream": false
+      }
+    ]
+  },
+  "train.run_trailer": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/run_trailer",
+        "stream": false
+      }
+    ]
+  },
+  "train.tsurikake": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/tsurikake",
+        "stream": false
+      }
+    ]
+  },
+  "train.tsurikake_n": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/tsurikake_n",
+        "stream": false
+      }
+    ]
+  },
+  "train.tsurikake_x2": {
+    "category": "master",
+    "sounds": [
+      {
+        "name": "rtm:train/tsurikake_x2",
+        "stream": false
+      }
+    ]
+  }
 }

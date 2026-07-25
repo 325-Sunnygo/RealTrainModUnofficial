@@ -21,7 +21,29 @@ public class VehicleDefinition {
         }
     }
 
-    public record DoorAnimationDefinition(List<String> objects, Vec3 closedPosition, Vec3 openTranslation) {
+    /**
+     * 本家 {@code VehicleBaseConfig.VehicleParts} と同じ形。
+     * <p>
+     * ドア・パンタグラフなど「開度 (0..1) に応じて動く部品」の定義。
+     * <ul>
+     *   <li>{@code objects} … 動かすモデルグループ名</li>
+     *   <li>{@code closedPosition} … 変換の原点 (本家 {@code pos})。本家は
+     *       {@code translate(pos) → 各 transform → translate(-pos)} の順で適用するので、
+     *       回転はこの点を軸に回る</li>
+     *   <li>{@code transforms} … 本家 {@code transform}。要素数 <b>3 = 平行移動</b> {x,y,z}、
+     *       <b>4 = 回転</b> {angle, vecX, vecY, vecZ}。<b>並び順に全て適用する</b></li>
+     *   <li>{@code childParts} … 本家 {@code childParts}。親の変換を受けた上で
+     *       同じ開度で自分の変換も適用される (パンタの菱形リンク等)</li>
+     * </ul>
+     * {@code openTranslation} は最初の平行移動。ドア位置の推定 (乗客 NPC) が使う。
+     */
+    public record DoorAnimationDefinition(List<String> objects, Vec3 closedPosition, Vec3 openTranslation,
+                                          List<float[]> transforms, List<DoorAnimationDefinition> childParts) {
+        public DoorAnimationDefinition {
+            objects = objects == null ? List.of() : List.copyOf(objects);
+            transforms = transforms == null ? List.of() : List.copyOf(transforms);
+            childParts = childParts == null ? List.of() : List.copyOf(childParts);
+        }
     }
 
     public record RollsignDefinition(float[] uv, float[][][] pos, boolean doAnimation, boolean disableLighting) {

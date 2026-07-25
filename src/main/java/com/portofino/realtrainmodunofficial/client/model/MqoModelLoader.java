@@ -81,12 +81,7 @@ public final class MqoModelLoader {
         renderFrame++;
     }
     private static final String TEXTURE_META_SEPARATOR = "|ptmeta=";
-    private static final Pattern V_PATTERN = Pattern.compile("V\\((.+?)\\)");
-    private static final Pattern UV_PATTERN = Pattern.compile("UV\\((.+?)\\)");
-    private static final Pattern M_PATTERN = Pattern.compile("M\\((.+?)\\)");
-    private static final Pattern TEX_PATTERN = Pattern.compile("tex\\(\"([^\"]+)\"\\)");
     /** MQO マテリアルの col(r g b a)。4番目がアルファ(不透明度)。RTM はガラス等をこの a<1 で半透明にする。 */
-    private static final Pattern COL_PATTERN = Pattern.compile("col\\(\\s*([-0-9.]+)\\s+([-0-9.]+)\\s+([-0-9.]+)\\s+([-0-9.]+)\\s*\\)");
     private static final Object MODEL_CACHE_LOCK = new Object();
     private static final LinkedHashMap<String, CachedModel> MODEL_CACHE = new LinkedHashMap<>(64, 0.75F, true);
     private static final Set<String> FAILED_MODEL_KEYS = ConcurrentHashMap.newKeySet();
@@ -94,7 +89,6 @@ public final class MqoModelLoader {
     private static final Map<String, TextureInfo> TEXTURE_INFO_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, ScriptTextureData> SCRIPT_TEXTURE_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, ResourceSearchResult> RESOURCE_SEARCH_CACHE = new ConcurrentHashMap<>();
-    private static final Set<String> MISSING_SCRIPT_WARNINGS = ConcurrentHashMap.newKeySet();
     private static final Set<String> SHADER_MOD_IDS = Set.of("iris", "oculus");
     private static volatile List<Path> sharedPackCandidates;
     private static ResourceLocation fallbackWhite;
@@ -863,81 +857,69 @@ public final class MqoModelLoader {
         List<Vec3> currentVerts = new ArrayList<>();
         // key = groupName + "|" + matKey so each object×material pair is a separate batch
         Map<String, BatchBuilder> byGroup = new LinkedHashMap<>();
-        int mirrorType = -1;
-        int braceType = -1;
-        String currentGroup = "default";
-        float currentFacetAngle = RTM_DEFAULT_SMOOTHING_ANGLE;
-        Pattern OBJ_NAME = Pattern.compile("Object\\s+\"([^\"]*)\"");
 
-        String[] lines = mqoText.split("\\R");
-        for (String raw : lines) {
-            String line = raw.trim();
-            if (line.isEmpty() || line.startsWith("//")) continue;
-            if (line.equals("{")) continue;
-            if (line.startsWith("}")) {
-                braceType = -1;
-                continue;
+        //★MQO 書式の解釈は jp.ngt.ngtlib.renderer.model.MqoReader に一本化してある。
+        //ここは読み取った内容を描画バッチへ組むだけ (座標 0.01 倍・頂点順はそのまま)。
+        //以前はこのメソッドが独自に同じ書式を舐めており、スクリプト側の ModelLoader と
+        //解釈が二重管理になっていた。
+        final int[] mirrorType = {-1};
+        final float[] facetAngle = {RTM_DEFAULT_SMOOTHING_ANGLE};
+        final String[] groupName = {"default"};
+        final Exception[] failure = new Exception[1];
+
+        jp.ngt.ngtlib.renderer.model.MqoReader.read(mqoText, new jp.ngt.ngtlib.renderer.model.MqoReader.Handler() {
+            @Override
+            public void material(int index, String name, String texPath, float r, float g, float b, float a) {
+                materialOrder.add(name);
+                materialTexPaths.add(texPath);
+                materialAlphas.add(a);
+                materialColors.add(new float[]{r, g, b});
             }
-            if (braceType >= 0) {
-                if (braceType == 1) {
-                    Vec3 v = parseVertexLine(line);
-                    if (v != null) currentVerts.add(v);
-                } else if (braceType == 2) {
-                    addFaceLine(line, currentVerts, materialOrder, materialTexPaths, materialAlphas, materialColors, textureOverrides, opener, mirrorType, currentGroup, currentFacetAngle, byGroup);
-                } else if (braceType == 3) {
-                    String[] tok = line.split("\\s+");
-                    if (tok.length > 0) {
-                        String name = tok[0].replace("\"", "");
-                        if (!name.isBlank()) {
-                            materialOrder.add(name);
-                            Matcher texMatcher = TEX_PATTERN.matcher(line);
-                            materialTexPaths.add(texMatcher.find() ? texMatcher.group(1) : null);
-                            Matcher colMatcher = COL_PATTERN.matcher(line);
-                            float matAlpha = 1.0F;
-                            float[] matColor = {1.0F, 1.0F, 1.0F};
-                            if (colMatcher.find()) {
-                                try {
-                                    matColor[0] = Float.parseFloat(colMatcher.group(1));
-                                    matColor[1] = Float.parseFloat(colMatcher.group(2));
-                                    matColor[2] = Float.parseFloat(colMatcher.group(3));
-                                    matAlpha = Float.parseFloat(colMatcher.group(4));
-                                } catch (NumberFormatException ignored) {}
-                            }
-                            materialAlphas.add(matAlpha);
-                            materialColors.add(matColor);
-                        }
-                    }
+
+            @Override
+            public void objectStart(String name) {
+                mirrorType[0] = -1;
+                facetAngle[0] = RTM_DEFAULT_SMOOTHING_ANGLE;
+                groupName[0] = name == null || name.isEmpty() ? "default" : name;
+            }
+
+            @Override
+            public void facet(float angle) {
+                facetAngle[0] = angle;
+            }
+
+            @Override
+            public void mirrorAxis(int axis) {
+                //mirror_axis はビットマスク(1=X,2=Y,4=Z)。ビット判定で取りこぼしを防ぐ
+                mirrorType[0] = (axis & 1) != 0 ? 0 : (axis & 2) != 0 ? 1 : (axis & 4) != 0 ? 2 : -1;
+            }
+
+            @Override
+            public void verticesStart() {
+                currentVerts.clear();
+            }
+
+            @Override
+            public void vertex(float x, float y, float z) {
+                currentVerts.add(new Vec3(x * 0.01F, y * 0.01F, z * 0.01F));
+            }
+
+            @Override
+            public void face(int count, int materialId, int[] vertexIndices, float[] uvs) {
+                if (failure[0] != null) {
+                    return;
                 }
-                continue;
-            }
-            if (line.startsWith("Material ")) { braceType = 3; continue; }
-            if (line.startsWith("vertex ")) { currentVerts.clear(); braceType = 1; continue; }
-            if (line.startsWith("face ")) { braceType = 2; continue; }
-            if (line.startsWith("Object ")) {
-                mirrorType = -1;
-                currentFacetAngle = RTM_DEFAULT_SMOOTHING_ANGLE;
-                Matcher m = OBJ_NAME.matcher(line);
-                currentGroup = m.find() ? m.group(1) : "default";
-                continue;
-            }
-            if (line.startsWith("facet ")) {
-                String[] p = line.split("\\s+");
-                if (p.length > 1) {
-                    try {
-                        currentFacetAngle = Float.parseFloat(p[1]);
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-                continue;
-            }
-            if (line.startsWith("mirror_axis ")) {
-                String[] p = line.split("\\s+");
-                if (p.length > 1) {
-                    int axis = Integer.parseInt(p[1]);
-                    //mirror_axisはビットマスク(1=X,2=Y,4=Z)。ビット判定で取りこぼしを防ぐ
-                    mirrorType = (axis & 1) != 0 ? 0 : (axis & 2) != 0 ? 1 : (axis & 4) != 0 ? 2 : -1;
+                try {
+                    addFace(count, materialId, vertexIndices, uvs, currentVerts, materialOrder, materialTexPaths,
+                        materialAlphas, materialColors, textureOverrides, opener, mirrorType[0], groupName[0],
+                        facetAngle[0], byGroup);
+                } catch (Exception e) {
+                    failure[0] = e;
                 }
             }
+        });
+        if (failure[0] != null) {
+            throw failure[0];
         }
 
         List<Batch> out = new ArrayList<>();
@@ -1246,27 +1228,16 @@ public final class MqoModelLoader {
     private record ObjFaceVertex(Vec3 position, float u, float v, Vector3f normal) {
     }
 
-    private static Vec3 parseVertexLine(String line) {
-        String[] t = line.split("\\s+");
-        try {
-            if (t.length == 2) {
-                float x = Float.parseFloat(t[0]) * 0.01f;
-                float y = Float.parseFloat(t[1]) * 0.01f;
-                return new Vec3(x, y, 0);
-            }
-            if (t.length >= 3) {
-                float x = Float.parseFloat(t[0]) * 0.01f;
-                float y = Float.parseFloat(t[1]) * 0.01f;
-                float z = Float.parseFloat(t[2]) * 0.01f;
-                return new Vec3(x, y, z);
-            }
-        } catch (NumberFormatException ignored) {
-        }
-        return null;
-    }
 
-    private static void addFaceLine(
-        String line,
+    /**
+     * 面 1 枚をバッチへ足す。書式の解釈は {@link jp.ngt.ngtlib.renderer.model.MqoReader} 側で
+     * 済んでおり、ここへは解析済みの値だけが渡る。
+     */
+    private static void addFace(
+        int vertexCount,
+        int materialId,
+        int[] vidx,
+        float[] uvs,
         List<Vec3> verts,
         List<String> materialOrder,
         List<String> materialTexPaths,
@@ -1279,26 +1250,19 @@ public final class MqoModelLoader {
         float facetAngle,
         Map<String, BatchBuilder> byGroup
     ) throws Exception {
-        String[] tokens = line.split("\\s+");
-        if (tokens.length == 0) return;
-        int vertexCount = Integer.parseInt(tokens[0]);
-        if (vertexCount < 3) return;
-        byte matId = (byte) parseMaterialId(line);
+        if (vertexCount < 3 || vidx == null) return;
+        byte matId = (byte) materialId;
         TextureInfo textureInfo = resolveTexture(matId, materialOrder, materialTexPaths, textureOverrides, opener);
         float matAlpha = (matId & 0xFF) < materialAlphas.size() ? materialAlphas.get(matId & 0xFF) : 1.0F;
         int matKey = matId & 0xFF;
-        String vi = matchGroup(V_PATTERN, line);
-        String uv = matchGroup(UV_PATTERN, line);
-        if (vi == null) return;
-        String[] vidx = vi.trim().split("\\s+");
-        float[] uvs = parseUv(uv, vertexCount);
+        if (uvs != null && uvs.length < vertexCount * 2) uvs = null;
         float avgY = 0f;
         float faceMinY = Float.MAX_VALUE, faceMaxY = -Float.MAX_VALUE;
         {
             int cnt = Math.min(vertexCount, vidx.length);
             for (int i = 0; i < cnt; i++) {
                 try {
-                    float vy = (float) verts.get(Integer.parseInt(vidx[i])).y;
+                    float vy = (float) verts.get(vidx[i]).y;
                     avgY += vy;
                     if (vy < faceMinY) faceMinY = vy;
                     if (vy > faceMaxY) faceMaxY = vy;
@@ -1340,7 +1304,7 @@ public final class MqoModelLoader {
         }
     }
 
-    private static boolean shouldSkipLegacyShadowPlaneFace(String groupName, List<Vec3> verts, String[] vidx,
+    private static boolean shouldSkipLegacyShadowPlaneFace(String groupName, List<Vec3> verts, int[] vidx,
                                                            int vertexCount, float faceMinY, float faceMaxY) {
         if (groupName == null || verts == null || vidx == null) {
             return false;
@@ -1351,7 +1315,7 @@ public final class MqoModelLoader {
         int cnt = Math.min(vertexCount, vidx.length);
         for (int i = 0; i < cnt; i++) {
             try {
-                Vec3 v = verts.get(Integer.parseInt(vidx[i]));
+                Vec3 v = verts.get(vidx[i]);
                 float x = (float) v.x;
                 float z = (float) v.z;
                 if (x < minX) minX = x;
@@ -1398,9 +1362,9 @@ public final class MqoModelLoader {
         return veryLowFlatPlate || (underBody && veryLong && slabLike);
     }
 
-    private static void addQuad(List<Vec3> verts, String[] vidx, float[] uvs, byte matId, BatchBuilder bb, int mirrorType) {
+    private static void addQuad(List<Vec3> verts, int[] vidx, float[] uvs, byte matId, BatchBuilder bb, int mirrorType) {
         int[] ix = new int[4];
-        for (int i = 0; i < 4; i++) ix[i] = Integer.parseInt(vidx[i]);
+        for (int i = 0; i < 4; i++) ix[i] = vidx[i];
         Vec3[] p = new Vec3[4];
         float[] u = new float[4];
         float[] v = new float[4];
@@ -1447,13 +1411,13 @@ public final class MqoModelLoader {
         }
     }
 
-    private static void addPolygonFan(List<Vec3> verts, String[] vidx, float[] uvs, int vertexCount, BatchBuilder bb, int mirrorType) {
+    private static void addPolygonFan(List<Vec3> verts, int[] vidx, float[] uvs, int vertexCount, BatchBuilder bb, int mirrorType) {
         Vec3[] p = new Vec3[vertexCount];
         float[] localU = new float[vertexCount];
         float[] localV = new float[vertexCount];
         for (int i = 0; i < vertexCount; i++) {
             int si = vertexCount - 1 - i;
-            p[si] = verts.get(Integer.parseInt(vidx[i]));
+            p[si] = verts.get(vidx[i]);
             if (uvs != null) {
                 localU[si] = uvs[i * 2];
                 localV[si] = uvs[i * 2 + 1];
@@ -1535,26 +1499,7 @@ public final class MqoModelLoader {
         return true;
     }
 
-    private static float[] parseUv(String uv, int vertexCount) {
-        if (uv == null || uv.isBlank()) return null;
-        String[] parts = uv.trim().split("\\s+");
-        if (parts.length < vertexCount * 2) return null;
-        float[] out = new float[vertexCount * 2];
-        for (int i = 0; i < vertexCount * 2; i++) {
-            out[i] = Float.parseFloat(parts[i]);
-        }
-        return out;
-    }
 
-    private static int parseMaterialId(String line) {
-        String m = matchGroup(M_PATTERN, line);
-        if (m == null || m.isBlank()) return 0;
-        try {
-            return Integer.parseInt(m.trim());
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
 
     private static String matchGroup(Pattern pat, String line) {
         Matcher mm = pat.matcher(line);
@@ -1620,11 +1565,6 @@ public final class MqoModelLoader {
                 }
             }
         } catch (Exception ignored) {
-            if (hasExplicitPath) {
-                String warnKey = packPath + "|" + normalized;
-                if (MISSING_SCRIPT_WARNINGS.add(warnKey)) {
-                }
-            }
             // legacy resource manager may not be initialized or the script may not be available
         }
 
@@ -3612,26 +3552,6 @@ public final class MqoModelLoader {
                 }
                 renderListCache.put(normalizedGroupNames, ordered);
             }
-            //方向幕(dest*/type*)診断: グループが前回と変わったときだけ出す (幕切替を確実に捉える)
-            if (signDiagBudget > 0) {
-                for (String n : normalizedGroupNames) {
-                    if (n.startsWith("dest") || n.startsWith("type")) {
-                        String sig = normalizedGroupNames.toString();
-                        if (!sig.equals(lastSignDiag)) {
-                            lastSignDiag = sig;
-                            signDiagBudget--;
-                            int verts = 0;
-                            for (Batch b : ordered) {
-                                verts += b.vertexCount;
-                            }
-                            RealTrainModUnofficial.LOGGER.info(
-                                "[RTMU] sign diag: groups={} matchedBatches={} verts={} translucentPass={}",
-                                normalizedGroupNames, ordered.size(), verts, translucent);
-                        }
-                        break;
-                    }
-                }
-            }
             if (ordered.isEmpty()) {
                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GROUPS, secStart);
@@ -3658,15 +3578,25 @@ public final class MqoModelLoader {
         // Set→ソート済みBatchリストのキャッシュ。毎フレームの確保とsortを省く
         private final java.util.IdentityHashMap<Set<String>, List<Batch>> renderListCache = new java.util.IdentityHashMap<>();
 
-        /** 方向幕診断ログの残量 (全モデル共通)。 */
-        private static int signDiagBudget = 100;
-        /** 直近に出した方向幕診断のグループ集合 (変化時のみログを出す)。 */
-        private static String lastSignDiag = "";
 
         /** 本家LIGHTパス相当。legacyPass 2=室内灯/3=前照灯/4=尾灯。 */
         public void renderNamedGroupsEmissive(PoseStack poseStack, MultiBufferSource buffer,
                                               int packedLight, int overlay,
                                               Set<String> normalizedGroupNames, int legacyPass) {
+            renderNamedGroupsEmissive(poseStack, buffer, packedLight, overlay, normalizedGroupNames, legacyPass, null);
+        }
+
+        /**
+         * @param groupTransform ドア/パンタ等の可動部変換。
+         *        <p>★本家 {@code BasicVehiclePartsRenderer.render(entity, pass, …)} は
+         *        <b>全パスで同じ変換</b>を通す。ここに渡さないと、発光パスだけ可動部が
+         *        閉じた位置に描かれる — 室内灯を点けた E131 で「ドアは開いているのに
+         *        内装のドアが開かない」ように見えたのはこれ (光る側だけ元位置に残る)。
+         */
+        public void renderNamedGroupsEmissive(PoseStack poseStack, MultiBufferSource buffer,
+                                              int packedLight, int overlay,
+                                              Set<String> normalizedGroupNames, int legacyPass,
+                                              GroupTransform groupTransform) {
             if (normalizedGroupNames == null || normalizedGroupNames.isEmpty() || legacyPass < 2) {
                 return;
             }
@@ -3679,9 +3609,6 @@ public final class MqoModelLoader {
             float alpha = lit ? 0.8F : 1.0F;
             // 発光面は法線方向に僅かに押し出してz-fightを防ぐ
             float depthBias = 0.0015F * (legacyPass - 1);
-            PoseStack.Pose pose = poseStack.last();
-            Matrix4f mat = pose.pose();
-            Matrix3f norm = pose.normal();
             float[] normalOut = new float[3];
             //夜間グロー: 発光面を拡大シェルで加算合成する
             float glow = lit ? glowDarkness(packedLight) : 0.0F;
@@ -3690,6 +3617,17 @@ public final class MqoModelLoader {
                 if (groupBatches == null || groupBatches.isEmpty()) {
                     continue;
                 }
+                //可動部は変換を掛けた行列で描く (グループごとに push/pop)
+                String rawGroupName = groupBatches.get(0).groupName;
+                boolean willTransform = groupTransform != null && groupTransform.mayModify(rawGroupName);
+                if (willTransform) {
+                    poseStack.pushPose();
+                    groupTransform.apply(poseStack, rawGroupName);
+                }
+                try {
+                PoseStack.Pose pose = poseStack.last();
+                Matrix4f mat = pose.pose();
+                Matrix3f norm = pose.normal();
                 for (Batch batch : groupBatches) {
                     ResourceLocation tex = batch.emissiveTextureForPass(legacyPass);
                     if (tex == null) {
@@ -3735,6 +3673,11 @@ public final class MqoModelLoader {
                         //控えめな「ぼんやり発光」: 小さめのシェル 1 枚だけ (ビーム等の派手な演出はなし)
                         VertexConsumer gvc = buffer.getBuffer(RenderType.eyes(tex));
                         emitGlowShell(gvc, mat, norm, batch, 1.4F, 0.010F, 0.20F * glow, overlay, normalOut);
+                    }
+                }
+                } finally {
+                    if (willTransform) {
+                        poseStack.popPose();
                     }
                 }
             }
@@ -3822,6 +3765,12 @@ public final class MqoModelLoader {
         public void renderAllGroupsEmissive(PoseStack poseStack, MultiBufferSource buffer,
                                             int packedLight, int overlay, int legacyPass,
                                             GroupPredicate groupFilter) {
+            renderAllGroupsEmissive(poseStack, buffer, packedLight, overlay, legacyPass, groupFilter, null);
+        }
+
+        public void renderAllGroupsEmissive(PoseStack poseStack, MultiBufferSource buffer,
+                                            int packedLight, int overlay, int legacyPass,
+                                            GroupPredicate groupFilter, GroupTransform groupTransform) {
             if (legacyPass < 2 || batchesByNormalizedGroup.isEmpty()) {
                 return;
             }
@@ -3832,7 +3781,7 @@ public final class MqoModelLoader {
                         && groupFilter.shouldRender(e.getValue().get(0).groupName))
                     .map(Map.Entry::getKey)
                     .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-            renderNamedGroupsEmissive(poseStack, buffer, packedLight, overlay, names, legacyPass);
+            renderNamedGroupsEmissive(poseStack, buffer, packedLight, overlay, names, legacyPass, groupTransform);
         }
 
         /** このモデルのGPU VBOを全て解放する(キャッシュ追い出し時)。 */
@@ -4457,7 +4406,7 @@ public final class MqoModelLoader {
                         if (!shouldRenderEmissivePass(entity, pass)) {
                             continue;
                         }
-                        renderAllGroupsEmissive(poseStack, buffer, packedLight, overlay, pass, opaqueFilter);
+                        renderAllGroupsEmissive(poseStack, buffer, packedLight, overlay, pass, opaqueFilter, groupTransform);
                     }
                 }
                 // 全不透明(script + baked)描画後に、溜めておいた半透明を最後に一括描画する。
@@ -4544,7 +4493,7 @@ public final class MqoModelLoader {
                     if (!shouldRenderEmissivePass(entity, pass)) {
                         continue;
                     }
-                    renderAllGroupsEmissive(poseStack, buffer, packedLight, overlay, pass, opaqueFilter);
+                    renderAllGroupsEmissive(poseStack, buffer, packedLight, overlay, pass, opaqueFilter, groupTransform);
                 }
             }
             if (deferTrans && scriptRenderer != null) {

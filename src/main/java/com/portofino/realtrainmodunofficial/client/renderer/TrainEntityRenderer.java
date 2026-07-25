@@ -195,30 +195,30 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             boolean modelHasScript = modelScriptRunning || def.hasScript();
             MqoModelLoader.GroupPredicate groupFilter =
                 groupName -> shouldRenderTrainGroup(groupName, renderInterior, aggressiveDistanceCulling, compatibilityHeavy, def, modelHasScript, modelScriptRunning);
+            //本家 BasicVehiclePartsRenderer と同じく、動かす部品は JSON の objects で決まる。
+            //名前に "door" を含むか等の推測はしない (本家に無いし、扉/panel 等の命名で外れる)。
+            java.util.Map<String, java.util.List<PartsStep>> leftChains = partsChains(def.getLeftDoors());
+            java.util.Map<String, java.util.List<PartsStep>> rightChains = partsChains(def.getRightDoors());
             MqoModelLoader.GroupTransform doorTransform = new MqoModelLoader.GroupTransform() {
                 @Override public void apply(PoseStack stack, String groupName) {
                     applyRunningGearTransform(stack, entity, def, model, groupName, renderYaw, partialTicks);
-                    applyDoorTransform(stack, def.getLeftDoors(), groupName, entity.doorMoveL, true);
-                    applyDoorTransform(stack, def.getRightDoors(), groupName, entity.doorMoveR, false);
+                    if (leftChains.isEmpty() && rightChains.isEmpty()) {
+                        applyDoorTransform(stack, def.getLeftDoors(), groupName, entity.doorMoveL, true);
+                        applyDoorTransform(stack, def.getRightDoors(), groupName, entity.doorMoveR, false);
+                        return;
+                    }
+                    applyPartsTransform(stack, leftChains, groupName, entity.doorMoveL);
+                    applyPartsTransform(stack, rightChains, groupName, entity.doorMoveR);
                 }
                 @Override public boolean mayModify(String groupName) {
-                    // door 系グループ以外は pushPose 不要 ⇒ Pose (Matrix4f+Matrix3f) 確保を回避。
-                    // SL のような扉なし車両では全 batch でスキップされる。
-                    if (groupName == null || groupName.length() < 4) return false;
+                    // 動かない batch は pushPose 不要 ⇒ Pose (Matrix4f+Matrix3f) 確保を回避。
+                    if (groupName == null || groupName.isEmpty()) return false;
                     if (isRunningGearGroup(groupName)) return true;
-                    // i + 3 が最後の有効インデックスになるよう n = length - 4。
-                    // 旧コードは n = length - 3 で i = n のとき charAt(i+3) = charAt(length) で IOOB。
-                    for (int i = 0, n = groupName.length() - 4; i <= n; i++) {
-                        char c0 = groupName.charAt(i);
-                        if (c0 != 'd' && c0 != 'D') continue;
-                        char c1 = groupName.charAt(i + 1);
-                        char c2 = groupName.charAt(i + 2);
-                        char c3 = groupName.charAt(i + 3);
-                        if ((c1 == 'o' || c1 == 'O') && (c2 == 'o' || c2 == 'O') && (c3 == 'r' || c3 == 'R')) {
-                            return true;
-                        }
+                    if (leftChains.isEmpty() && rightChains.isEmpty()) {
+                        //ドア定義の無いパックは名前推定フォールバックに掛かる可能性がある
+                        return groupName.length() >= 4 && containsDoorWord(groupName);
                     }
-                    return false;
+                    return hasPartsTransform(leftChains, groupName) || hasPartsTransform(rightChains, groupName);
                 }
             };
             // Direct GL 経路の前に他エンティティのバッチを flush し、深度バッファ整合性を保つ。
@@ -307,16 +307,106 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             || lower.contains("台車");
     }
 
-    public static void applyDoorTransform(PoseStack poseStack, java.util.List<VehicleDefinition.DoorAnimationDefinition> doors,
-                                           String groupName, float progressTicks, boolean leftSide) {
-        if (groupName == null) {
+    /** 本家 EntityVehicleBase.MAX_DOOR_MOVE。開度は doorMove / これ。 */
+    public static final float MAX_DOOR_MOVE = 60.0F;
+
+    /** 本家 VehicleParts の変換 1 段 ({@code pos} を原点にした {@code transform} 列)。 */
+    public record PartsStep(float[] pos, java.util.List<float[]> transforms) {
+    }
+
+    private static final java.util.Map<java.util.List<VehicleDefinition.DoorAnimationDefinition>,
+            java.util.Map<String, java.util.List<PartsStep>>> PARTS_CHAIN_CACHE =
+            java.util.Collections.synchronizedMap(new java.util.IdentityHashMap<>());
+
+    /**
+     * 本家 {@code BasicVehiclePartsRenderer.getParts} 相当。
+     * <p>親子の入れ子を「グループ名 → 根から順に適用する変換列」へ平坦化する。本家は
+     * 子を親の行列の中で描くので、子のグループには親の変換も掛かる。平坦化しておけば
+     * バッチ単位描画でも同じ結果になり、探索も 1 回の map 参照で済む。
+     */
+    public static java.util.Map<String, java.util.List<PartsStep>> partsChains(
+            java.util.List<VehicleDefinition.DoorAnimationDefinition> parts) {
+        if (parts == null || parts.isEmpty()) {
+            return java.util.Map.of();
+        }
+        return PARTS_CHAIN_CACHE.computeIfAbsent(parts, key -> {
+            java.util.Map<String, java.util.List<PartsStep>> out = new java.util.HashMap<>();
+            collectPartsChains(key, java.util.List.of(), out);
+            return out;
+        });
+    }
+
+    private static void collectPartsChains(java.util.List<VehicleDefinition.DoorAnimationDefinition> parts,
+                                           java.util.List<PartsStep> parent,
+                                           java.util.Map<String, java.util.List<PartsStep>> out) {
+        for (VehicleDefinition.DoorAnimationDefinition part : parts) {
+            java.util.List<PartsStep> chain = new java.util.ArrayList<>(parent);
+            net.minecraft.world.phys.Vec3 p = part.closedPosition();
+            chain.add(new PartsStep(new float[]{(float) p.x, (float) p.y, (float) p.z}, part.transforms()));
+            java.util.List<PartsStep> frozen = java.util.List.copyOf(chain);
+            for (String name : part.objects()) {
+                //大小どちらの綴りでも引けるようにしておく (完全一致が当たれば lowercase を作らずに済む)
+                out.put(name, frozen);
+                out.putIfAbsent(name.toLowerCase(java.util.Locale.ROOT), frozen);
+            }
+            if (!part.childParts().isEmpty()) {
+                collectPartsChains(part.childParts(), frozen, out);
+            }
+        }
+    }
+
+    /** このグループに動く部品の定義があるか (pushPose を省くための判定)。 */
+    public static boolean hasPartsTransform(java.util.Map<String, java.util.List<PartsStep>> chains, String groupName) {
+        if (chains.isEmpty() || groupName == null) {
+            return false;
+        }
+        return chains.containsKey(groupName)
+                || chains.containsKey(groupName.toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /**
+     * 本家 {@code BasicVehiclePartsRenderer.renderParts} の忠実移植。
+     * <pre>
+     *   translate(pos) → transform を並び順に全て適用 → translate(-pos)
+     *   transform の要素数 3 = 平行移動 {x,y,z} × move
+     *                     4 = 回転 {angle × move, vecX, vecY, vecZ}
+     * </pre>
+     * 開度の補間も本家と同じ {@code sigmoid}。
+     */
+    public static void applyPartsTransform(PoseStack poseStack,
+                                           java.util.Map<String, java.util.List<PartsStep>> chains,
+                                           String groupName, float progressTicks) {
+        if (chains.isEmpty() || groupName == null) {
             return;
         }
-        // 早期除外: groupName が "door"/"Door"/"DOOR" を含まないなら何もしない。
-        // 大半の batch (body, wheel, rod 等) がここで弾かれるため lowercase/regex を省ける。
-        // 列車 1 台あたり ~100 batch × 2 (L/R) = 200 回呼ばれる hot path。
-        if (groupName.indexOf('d') < 0 && groupName.indexOf('D') < 0) return;
-        boolean mayBeDoor = false;
+        java.util.List<PartsStep> chain = chains.get(groupName);
+        if (chain == null) {
+            chain = chains.get(groupName.toLowerCase(java.util.Locale.ROOT));
+        }
+        if (chain == null) {
+            return;
+        }
+        float move = sigmoid(Mth.clamp(progressTicks / MAX_DOOR_MOVE, 0.0F, 1.0F));
+        for (PartsStep step : chain) {
+            float[] pos = step.pos();
+            poseStack.translate(pos[0], pos[1], pos[2]);
+            for (float[] t : step.transforms()) {
+                if (t.length == 3) {
+                    poseStack.translate(t[0] * move, t[1] * move, t[2] * move);
+                } else if (t.length == 4) {
+                    float angle = t[0] * move;
+                    if (angle != 0.0F && (t[1] != 0.0F || t[2] != 0.0F || t[3] != 0.0F)) {
+                        poseStack.mulPose(new org.joml.Quaternionf()
+                                .rotationAxis(angle * Mth.DEG_TO_RAD, t[1], t[2], t[3]));
+                    }
+                }
+            }
+            poseStack.translate(-pos[0], -pos[1], -pos[2]);
+        }
+    }
+
+    /** グループ名が "door" を含むか (ドア定義の無いパック向けフォールバックの絞り込み)。 */
+    static boolean containsDoorWord(String groupName) {
         for (int i = 0, n = groupName.length() - 4; i <= n; i++) {
             char c0 = groupName.charAt(i);
             if (c0 != 'd' && c0 != 'D') continue;
@@ -324,27 +414,34 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             char c2 = groupName.charAt(i + 2);
             char c3 = groupName.charAt(i + 3);
             if ((c1 == 'o' || c1 == 'O') && (c2 == 'o' || c2 == 'O') && (c3 == 'r' || c3 == 'R')) {
-                mayBeDoor = true;
-                break;
+                return true;
             }
         }
-        if (!mayBeDoor) return;
-        float progress = smoothstep(Mth.clamp(progressTicks / 60.0F, 0.0F, 1.0F));
+        return false;
+    }
+
+    /** 本家 PartsRenderer.sigmoid (開度 0..1 のイージング)。 */
+    private static float sigmoid(float x) {
+        if (x == 1.0F || x == 0.0F) {
+            return x;
+        }
+        float f0 = (x - 0.5F) * 5.0F;
+        float f1 = (float) ((double) f0 / Math.sqrt(1.0D + (double) f0 * (double) f0));
+        return (f1 + 1.0F) * 0.5F;
+    }
+
+    public static void applyDoorTransform(PoseStack poseStack, java.util.List<VehicleDefinition.DoorAnimationDefinition> doors,
+                                           String groupName, float progressTicks, boolean leftSide) {
+        if (groupName == null) {
+            return;
+        }
         if (doors == null || doors.isEmpty()) {
-            applyLegacyDoorFallback(poseStack, groupName, progress, leftSide);
+            //JSON にドア定義が無いパック向けの名前推定フォールバック (本家には無い RTMU の補助)
+            applyLegacyDoorFallback(poseStack, groupName,
+                    smoothstep(Mth.clamp(progressTicks / MAX_DOOR_MOVE, 0.0F, 1.0F)), leftSide);
             return;
         }
-        for (VehicleDefinition.DoorAnimationDefinition door : doors) {
-            if (!matchesDoorGroup(door.objects(), groupName)) {
-                continue;
-            }
-            poseStack.translate(
-                door.openTranslation().x * progress,
-                door.openTranslation().y * progress,
-                door.openTranslation().z * progress
-            );
-            return;
-        }
+        applyPartsTransform(poseStack, partsChains(doors), groupName, progressTicks);
     }
 
     private static void applyLegacyDoorFallback(PoseStack poseStack, String groupName, float progress, boolean leftSide) {
@@ -366,17 +463,6 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         poseStack.translate(0.0D, 0.0D, opensTowardPositiveZ ? slide : -slide);
     }
 
-    private static boolean matchesDoorGroup(java.util.List<String> objects, String groupName) {
-        if (objects == null || objects.isEmpty() || groupName == null || groupName.isBlank()) {
-            return false;
-        }
-        for (String objectName : objects) {
-            if (objectName != null && objectName.equalsIgnoreCase(groupName)) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     private static float smoothstep(float x) {
         return x * x * (3.0F - 2.0F * x);

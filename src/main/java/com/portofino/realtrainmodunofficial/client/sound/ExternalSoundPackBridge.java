@@ -89,7 +89,6 @@ public final class ExternalSoundPackBridge {
             deleteDirectoryIfExists(GENERATED_PACK_ROOT);
             Files.createDirectories(GENERATED_PACK_ROOT);
             Map<String, JsonObject> mergedSoundDefs = new HashMap<>();
-            boolean copiedAnySoundAsset = false;
             for (Path candidate : collectCandidatePacks()) {
                 try {
                     //README 同意ゲート: 未同意/拒否のパックの音は取り込まない (zip のみ対象)。
@@ -98,21 +97,19 @@ public final class ExternalSoundPackBridge {
                         continue;
                     }
                     if (Files.isDirectory(candidate)) {
-                        copiedAnySoundAsset |= collectFromDirectory(candidate, mergedSoundDefs);
+                        collectFromDirectory(candidate, mergedSoundDefs);
                     } else if (isSupportedArchive(candidate)) {
-                        copiedAnySoundAsset |= collectFromArchive(candidate, mergedSoundDefs);
+                        collectFromArchive(candidate, mergedSoundDefs);
                     }
                 } catch (Exception e) {
                 }
             }
-            boolean wroteAnyJson = writeMergedSoundsJson(mergedSoundDefs);
+            writeMergedSoundsJson(mergedSoundDefs);
             //中身が空でも pack.mcmeta を書いて<b>有効なパックとして常に返す</b>。こうしておくと、
             //起動時に同意済みの音パックが 1 つも無くても pack が登録され、後からタイトル画面で
             //README 同意 → {@link #rebuild()} + reloadResourcePacks したときに新しい音を足せる。
             //(以前は空だと pack ごと削除して null=未登録にしていたため、その状況では同意しても
             // 再読込で音が復活しなかった。)
-            if (!copiedAnySoundAsset && !wroteAnyJson) {
-            }
             writePackMeta();
             return GENERATED_PACK_ROOT;
         } catch (Exception e) {

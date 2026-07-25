@@ -32,8 +32,6 @@ public final class LegacyScriptSoundManager {
     //消えた列車の登録を掃除する頻度 (play 呼び出し回数)
     private static int pruneCounter;
 
-    //---- 一時診断: どの経路・音量・推定範囲で音が鳴るか実測する (音IDごと2秒throttle) ----
-    //実減衰 = max(音量,1.0) × 16 ブロック (createFixedRangeEvent は減衰に無関係)。
     /**
      * 音量を安全化。<b>NaN → 0 (無音)</b>。
      * <p>パックの音スクリプトの音量補間 (fadeCon 等) がゼロ除算で NaN / ±Infinity を返すことがあり、
@@ -451,6 +449,11 @@ public final class LegacyScriptSoundManager {
         String resolvedPath = ExternalSoundPackBridge.sanitizeSoundPath(soundName.trim().replace('\\', '/'));
         if (resolvedPath.startsWith("sounds/")) {
             resolvedPath = resolvedPath.substring("sounds/".length());
+        } else if (resolvedPath.startsWith("sound/")) {
+            //1.7.10 のアセットは sounds/ ではなく sound/ 配下。パックの指定
+            //("sound/train/DoorOpn" 等) はこの綴りで来るので同じように剥がす。
+            //剥がさないと rtm:sound.train.dooropn という存在しないイベントを引く。
+            resolvedPath = resolvedPath.substring("sound/".length());
         }
         if (resolvedPath.endsWith(".ogg")) {
             resolvedPath = resolvedPath.substring(0, resolvedPath.length() - ".ogg".length());

@@ -93,7 +93,6 @@ public final class VehicleScriptRenderers {
 
             //無音終了 (ネイティブ/メモリ由来) の切り分け用。1 車両につき 1 回だけ出る。
             RealTrainModUnofficial.LOGGER.info("[RTMU] vehicle script init: {} ({})", def.getId(), def.getScriptPath());
-            installScriptTrace(se, def.getId());
             ModelObject modelObject = buildModelObject(def);
             RealTrainModUnofficial.LOGGER.info("[RTMU] vehicle model graph built: {} groups={}", def.getId(),
                     modelObject != null && modelObject.model != null ? modelObject.model.groupObjects.size() : -1);
@@ -111,9 +110,6 @@ public final class VehicleScriptRenderers {
         }
     }
 
-    /** 起動から数十回だけ出す診断カウンタ (フレーム毎に溢れさせない)。 */
-    private static int scriptTraceBudget = 60;
-
     /**
      * 描画中の車両モデルの素テクスチャパス集合 (小文字正規化)。
      * BIND_TEXTURE の再生で「素テクスチャへ戻す bind = 上書き解除」を判定する。
@@ -126,50 +122,6 @@ public final class VehicleScriptRenderers {
         return rawPath != null && activeDefaultTexPaths.contains(rawPath);
     }
 
-    /** スクリプトから呼ぶ診断ログ。無音終了時に「最後にどのライブラリまで入ったか」を残す。 */
-    public static void scriptTrace(String msg) {
-        if (scriptTraceBudget > 0) {
-            scriptTraceBudget--;
-            RealTrainModUnofficial.LOGGER.info("[RTMU] script trace: {}", msg);
-        }
-    }
-
-    /**
-     * パックライブラリ (hi03 系) の描画エントリを包んで進行位置をログに出す。
-     * Java 例外を伴わない無音終了 (ネイティブ/メモリ) では、最後に出たトレースが死んだ場所になる。
-     */
-    private static void installScriptTrace(ScriptEngine se, String id) {
-        try {
-            se.put("__RTMU_TRACE__", (java.util.function.Consumer<String>) VehicleScriptRenderers::scriptTrace);
-            se.eval(
-                "(function(){\n"
-                + "  var tag = '" + id.replace("'", "") + "';\n"
-                + "  var wrap = function(name, obj, method) {\n"
-                + "    try {\n"
-                + "      if (!obj || typeof obj[method] !== 'function') return;\n"
-                + "      var f = obj[method];\n"
-                + "      obj[method] = function() {\n"
-                + "        __RTMU_TRACE__.accept(tag + ' > ' + name + '.' + method + ' enter');\n"
-                + "        var r = f.apply(this, arguments);\n"
-                + "        __RTMU_TRACE__.accept(tag + ' > ' + name + '.' + method + ' exit');\n"
-                + "        return r;\n"
-                + "      };\n"
-                + "    } catch (e) {}\n"
-                + "  };\n"
-                + "  try { if (typeof ATS_P_Ps_State !== 'undefined') wrap('ATS', ATS_P_Ps_State.prototype, 'onUpdate'); } catch(e){}\n"
-                + "  try { if (typeof CustomMonitor_ATSDisplay !== 'undefined') wrap('ATSDisplay', CustomMonitor_ATSDisplay.prototype, 'render'); } catch(e){}\n"
-                + "  try { if (typeof CustomAnimator !== 'undefined') wrap('Animator', CustomAnimator.prototype, 'render'); } catch(e){}\n"
-                + "  try { if (typeof DoorRenderer !== 'undefined') wrap('Door', DoorRenderer.prototype, 'render'); } catch(e){}\n"
-                + "  try { if (typeof CustomLightParts !== 'undefined') wrap('Light', CustomLightParts.prototype, 'render'); } catch(e){}\n"
-                + "  try { if (typeof renderRollsign === 'function') { var rs = renderRollsign; renderRollsign = function(){ __RTMU_TRACE__.accept(tag + ' > renderRollsign enter'); var r = rs.apply(this, arguments); __RTMU_TRACE__.accept(tag + ' > renderRollsign exit'); return r; }; } } catch(e){}\n"
-                + "  try { if (typeof renderDriversCab === 'function') { var dc = renderDriversCab; renderDriversCab = function(){ __RTMU_TRACE__.accept(tag + ' > renderDriversCab enter'); var r = dc.apply(this, arguments); __RTMU_TRACE__.accept(tag + ' > renderDriversCab exit'); return r; }; } } catch(e){}\n"
-                + "  try { if (typeof renderPantograph === 'function') { var pg = renderPantograph; renderPantograph = function(){ __RTMU_TRACE__.accept(tag + ' > renderPantograph enter'); var r = pg.apply(this, arguments); __RTMU_TRACE__.accept(tag + ' > renderPantograph exit'); return r; }; } } catch(e){}\n"
-                + "  try { if (typeof renderBogie === 'function') { var bg = renderBogie; renderBogie = function(){ __RTMU_TRACE__.accept(tag + ' > renderBogie enter'); var r = bg.apply(this, arguments); __RTMU_TRACE__.accept(tag + ' > renderBogie exit'); return r; }; } } catch(e){}\n"
-                + "})();\n");
-        } catch (Throwable ignored) {
-            //診断が入らなくても描画には影響させない
-        }
-    }
 
     private static Object newRenderer(Class<?> rc) throws ReflectiveOperationException {
         try {
@@ -356,23 +308,11 @@ public final class VehicleScriptRenderers {
          * スクリプト描画の実処理 (本家 RenderVehicleBase.doRender と同じ)。
          * sink が非 null のとき、再生した各パスの記録を追加してキャッシュに残す。
          */
-        /** 初回描画だけ段階ログを出す (無音終了の切り分け用)。 */
-        private int firstRenderTrace;
-
-        private void trace(String step) {
-            if (firstRenderTrace < 8) {
-                firstRenderTrace++;
-                RealTrainModUnofficial.LOGGER.info("[RTMU] render step: {}", step);
-            }
-        }
-
         private boolean renderReal(Object entity, float partialTick, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight, int packedOverlay,
                                    MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
-            trace("normal-record");
             //本家 RenderVehicleBase.doRender: 通常描画 (RenderPass.NORMAL) → 発光描画 (renderBodyLight)
             GLRecorder normal = record(entity, RenderPass.NORMAL.id, partialTick);
-            trace("normal-recorded");
             //★ isEmpty ではなく hasGeometry で判定する。スクリプトが何も描かずに落ちると
             //  glPushMatrix だけが残り isEmpty()==false になるため、「描画済み」と誤判定して
             //  素のモデル描画がスキップされ、車体が透明になる (223 系で発生)。
@@ -383,10 +323,8 @@ public final class VehicleScriptRenderers {
             //本家 ResourceState.exclusionParts: スクリプトが描画から外したパーツ (開いたドア等)。
             //スクリプトの render() 内で add/removeExclusionParts が呼ばれた後に読む。
             java.util.Set<String> excluded = exclusionPartsOf(entity);
-            trace("normal-replay");
             replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
                     RenderPass.NORMAL.id, excluded);
-            trace("normal-replayed");
             if (sink != null) {
                 //excluded はエンティティ内部のライブ集合なので、キャッシュにはスナップショットを残す。
                 sink.add(new CachedPass(normal, RenderPass.NORMAL.id, excluded == null ? null : Set.copyOf(excluded)));
@@ -397,7 +335,6 @@ public final class VehicleScriptRenderers {
             //★マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED)。
             //  スクリプトは currentMatId に応じてオーバーレイを描くため、pass0 の本体描画とは別に
             //  「オーバーレイを持つ matId」で render() を呼び直して tess 描画のみを拾う。
-            trace("overlays");
             renderMaterialOverlays(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
                     bodyModel, sink);
             //★発光パス (2-4) は半透明パス (1=窓) より先に描く。
@@ -405,7 +342,6 @@ public final class VehicleScriptRenderers {
             //  が先に深度を書くと、後から描いた室内灯/尾灯が窓越しの視線で深度テストに落ち、
             //  「外から見るとライトが消えている・乗ると点いている」珍現象になる。
             //  灯り→窓の順なら、窓ガラスの色が灯りの上にブレンドされる (本家の見た目と同じ)。
-            trace("bodyLight");
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
                     bodyModel, graph, sink);
             //★半透明パス (TRANSPARENT=1)。本家 RenderVehicleBase は毎フレーム pass0(不透明)+
@@ -417,7 +353,6 @@ public final class VehicleScriptRenderers {
             //  ここで pass 1 を実行し replay する。下記 replay は legacyPass==TRANSPARENT のとき
             //  renderNamedGroups を translucent=true で呼び、window テクスチャ+ブレンドで描く。
             //  pass0 は opaque テクスチャ (窓の部分αは落ちる) なので二重描画にはならない。
-            trace("transparent");
             GLRecorder transparent = record(entity, RenderPass.TRANSPARENT.id, partialTick);
             if (transparent != null && transparent.hasGeometry()) {
                 replay(transparent, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,

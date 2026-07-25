@@ -177,7 +177,19 @@ public final class GLRecorder {
         this.cmds.add(new Cmd(Op.COLOR, r, g, b, a, null));
     }
 
+    /**
+     * 記録に含まれる明るさの指紋。
+     * <p>明るさは頂点に焼き込まれるので、ワールドの光が変われば記録ごと作り直す必要がある。
+     * 焼き直すべきかを「記録を作り直して指紋を比べる」だけで判断できるようにしておく。
+     */
+    private long lightSignature;
+
+    public long getLightSignature() {
+        return this.lightSignature;
+    }
+
     public void brightness(int packedLight) {
+        this.lightSignature = this.lightSignature * 31L + packedLight;
         this.cmds.add(new Cmd(Op.BRIGHTNESS, packedLight, 0, 0, 0, null));
     }
 

@@ -160,8 +160,6 @@ public class EntityBogie extends Entity {
         return super.makeBoundingBox().move(0.0D, -EntityTrainBase.TRAIN_HEIGHT, 0.0D);
     }
 
-    private static long lastRailLostLog;
-
     /**
      * 分岐で台車が追従すべきレールマップを選ぶ。
      *
@@ -320,13 +318,6 @@ public class EntityBogie extends Entity {
             if (this.getTrain() != null) {
                 this.getTrain().stopTrain(true);
             }
-            //診断: カーブ脱線報告の切り分け (毎秒 1 回まで)
-            long now = System.currentTimeMillis();
-            if (now - lastRailLostLog > 1000L) {
-                lastRailLostLog = now;
-                jp.ngt.ngtlib.io.NGTLog.debug("[Bogie] rail lost at %.2f, %.2f, %.2f movYaw=%.1f speed=%.3f front=%s",
-                        px, py, pz, this.movingYaw, speed, String.valueOf(this.isFront()));
-            }
             return false;
         }
 
@@ -421,13 +412,6 @@ public class EntityBogie extends Entity {
                     return true;
                 }
 
-                //乗り移りログ (隣線への飛び移り診断用)
-                if (this.currentRailMap != null) {
-                    jp.ngt.ngtlib.io.NGTLog.debug("[Bogie] rail change -> core(%d,%d,%d) gap=%.4f switch=%s",
-                            coreObj.getBlockPos().getX(), coreObj.getBlockPos().getY(), coreObj.getBlockPos().getZ(),
-                            this.currentRailMap.minEndpointGap(railMap),
-                            String.valueOf(coreObj instanceof TileEntityLargeRailSwitchCore));
-                }
                 this.currentRailObj = coreObj;
                 this.currentRailMap = railMap;
                 this.split = (int) (this.currentRailMap.getLength() * (double) SPLITS_PER_METER);

@@ -33,9 +33,13 @@ public abstract class EntityVehiclePart extends Entity {
     private EntityVehicleBase<?> parent;
     private UUID unloadedParent;
 
+    /** 最後に車体から位置を押してもらった時刻。親を引けなくても「生きている」証拠になる。 */
+    private long lastFollowTick;
+
     public EntityVehiclePart(EntityType<?> type, Level level) {
         super(type, level);
         this.noPhysics = true;
+        this.lastFollowTick = level.getGameTime();//spawn 直後を孤児扱いしないための猶予
     }
 
     @Override
@@ -92,12 +96,17 @@ public abstract class EntityVehiclePart extends Entity {
 
     @Override
     public boolean canBeCollidedWith() {
-        return !this.isRemoved();
+        return !this.isRemoved() && !this.isOrphan();
     }
 
+    /**
+     * 親を失ったパーツはクリック対象にしない。
+     * <p>掃除役が回収するまでの数 tick でも、取り残された当たり判定が本物の座席の
+     * 手前に居るとクリックを吸ってしまうため、両サイドで即座に無効化する。
+     */
     @Override
     public boolean isPickable() {
-        return !this.isRemoved();
+        return !this.isRemoved() && !this.isOrphan();
     }
 
     @Override
@@ -114,8 +123,34 @@ public abstract class EntityVehiclePart extends Entity {
             EntityVehicleBase<?> vehicle = this.getVehicle();
             if (vehicle != null) {
                 this.updatePartPos(vehicle);
+            } else if (!this.level().isClientSide && this.isOrphan()) {
+                //親車両が居ないパーツは即座に消す。放置すると「車体から離れた場所に
+                //座れない当たり判定だけが残る」状態になる (ユーザー報告)。
+                //ここが回らない状況の保険として SeatCleanup が別途掃除する。
+                this.discard();
             }
         }
+    }
+
+    /**
+     * 座席/床パーツは<b>ワールドに保存しない</b>。
+     * <p>
+     * これらは車体の設定 (slotPos) から毎回作り直される派生データで、保存する意味が無い。
+     * 一方で保存していると次の経路で<b>幽霊座席</b>が量産される:
+     * <ol>
+     *   <li>{@code floorLoaded} は NBT に保存されないので、車体がチャンク再読込等で
+     *       作り直されるたび {@code setupFloors} が走り、座席を<b>新しく</b>湧かせる</li>
+     *   <li>そのとき捨てられるのは車体が実行時に持っている一覧だけで、
+     *       <b>セーブから復活した古い座席は対象外</b></li>
+     *   <li>古い座席は自分の tick で親を UUID から引き直せたときだけ自滅するので、
+     *       引き直せないと当たり判定だけがその場に残り続ける</li>
+     * </ol>
+     * 保存しなければこの経路ごと無くなる (既存ワールドに残っている分も、
+     * 一度読み込まれた後は上の親なしチェックで消える)。
+     */
+    @Override
+    public boolean shouldBeSaved() {
+        return false;
     }
 
     /**
@@ -124,6 +159,7 @@ public abstract class EntityVehiclePart extends Entity {
      * (視点は完全に自由、本家の座席と同じ感覚)。
      */
     public void updatePartPos(EntityVehicleBase<?> vehicle) {
+        this.lastFollowTick = this.level().getGameTime();
         Vec3 v3 = this.getPartVec();
         v3 = v3.rotateAroundZ(-vehicle.rotationRoll);
         v3 = v3.rotateAroundX(vehicle.getXRot());
@@ -139,14 +175,47 @@ public abstract class EntityVehiclePart extends Entity {
     }
 
     /**
-     * 本家 setPositionAndRotation2: 車体追従中はトラッカー同期を無視
+     * 本家 setPositionAndRotation2 相当。ただし<b>トラッカー座標をそのまま使わない</b>。
+     * <p>
+     * クライアントの車体は「最後に受けたサーバー位置へ数 tick かけて寄せる」補間なので、
+     * サーバーの座席座標をそのまま入れると<b>車体より数 tick 先</b>に飛んでガタつく。
+     * 代わりに<b>車体基準で計算し直す</b>。
+     * <p>
+     * ★これは追従の 3 本目の経路でもある。座席の追従は
+     * ①座席自身の tick ②車体の {@code updateFloorPositions} ③ここ (トラッカー更新ごと)
+     * の 3 経路で行う。座席のチャンクが tick していない等で ①② が止まっても、
+     * トラッカー更新は届くのでここで必ず車体位置へ復帰でき、<b>置いていかれたまま
+     * 戻らない状態にならない</b> (走行中に座席の当たり判定が取り残される不具合の対策)。
      */
     @Override
     public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps) {
         EntityVehicleBase<?> vehicle = this.getVehicle();
-        if (vehicle == null) {
-            this.setPos(x, y, z);
-            this.setRot(yaw, pitch);
+        if (vehicle != null) {
+            this.updatePartPos(vehicle);
+        }
+        //★親が引けないときはトラッカー座標を<b>使わない</b>。パーツの位置は車体からの
+        //純粋な計算結果で、ネットワーク越しの座標は必ず数 tick 古い。ここで入れてしまうと
+        //車体に貼り付いていた当たり判定が過去の位置へ引き戻される。親が居ないなら
+        //どのみち掃除対象なので、その場に留めておけばよい。
+    }
+
+    /**
+     * ワールドに追加された時点で車体の一覧へ登録する。
+     * <p>tick 内で登録していると、座席が何らかの理由で tick しないとき車体側からも
+     * 押し出せず、取り残されたまま復帰できない。追加時に登録しておけば車体の
+     * {@code updateFloorPositions} が必ず面倒を見る。
+     */
+    @Override
+    public void onAddedToLevel() {
+        super.onAddedToLevel();
+        this.registerToVehicle();
+    }
+
+    /** 車体の追従リストへ自分を登録する (座席のみ。両サイド)。 */
+    protected void registerToVehicle() {
+        EntityVehicleBase<?> vehicle = this.getVehicle();
+        if (vehicle != null && this instanceof EntityFloor floor) {
+            vehicle.setFloor(floor);
         }
     }
 
@@ -155,14 +224,51 @@ public abstract class EntityVehiclePart extends Entity {
         this.parent = vehicle;
     }
 
+    /**
+     * 親車体。<b>居なくなっていたら必ず null を返す</b>。
+     * <p>
+     * ★以前はここで引き直しに失敗しても {@code parent} に削除済みの車体が
+     * 残ったままで、それをそのまま返していた。すると座席は「親は居る」と判断して
+     * <b>削除済み車体の最後の座標を書き続け</b>、その場に凍りついた当たり判定として
+     * 残り続ける (親なし判定にも引っ掛からないので自滅もしない)。
+     * 列車を壊した跡・チャンク再読込で車体だけ作り直された跡に、座れない座席が
+     * 取り残される不具合の原因。
+     */
     public EntityVehicleBase<?> getVehicle() {
         if (this.parent == null || this.parent.isRemoved()) {
+            this.parent = null;
             Entity entity = this.level().getEntity(this.entityData.get(DATA_VEHICLE));
-            if (entity instanceof EntityVehicleBase<?> vehicle) {
+            if (entity instanceof EntityVehicleBase<?> vehicle && !vehicle.isRemoved()) {
                 this.parent = vehicle;
             }
         }
         return this.parent;
+    }
+
+    /** 親車体のエンティティ ID (車体が既に消えていても引ける)。 */
+    public int getVehicleId() {
+        return this.entityData.get(DATA_VEHICLE);
+    }
+
+    /**
+     * 親を失っていて、もうワールドに居てはいけない状態か。
+     * <p>掃除役 ({@code SeatCleanup}) と当たり判定の有効/無効の両方がこれを見る。
+     */
+    public boolean isOrphan() {
+        if (this.isIndependent) {
+            return false;//設置型パーツは単独で存在してよい
+        }
+        if (this.unloadedParent != null) {
+            return false;//セーブから復帰中。親を引き直すまで待つ
+        }
+        if (this.getVehicle() != null) {
+            return false;
+        }
+        //★自分では親を引けなくても、車体が位置を押してくれているなら生きている。
+        //車体側の一覧に載っていれば追従は成立していて、当たり判定も正しい場所にある。
+        //ここを「親が引けない = 孤児」で切ってしまうと、追従できている座席まで
+        //クリック不可になる。
+        return this.level().getGameTime() - this.lastFollowTick > 40L;
     }
 
     /**

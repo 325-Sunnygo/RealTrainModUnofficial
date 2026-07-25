@@ -132,11 +132,7 @@ public class RailPackLoader {
                         return;
                     }
                     try {
-                        int before = LOADED.size();
                         loadRailPackFile(zipPath, zipPath.getFileName().toString());
-                        int added = LOADED.size() - before;
-                        if (added > 0) {
-                        }
                     } catch (Exception e) {
                         RealTrainModUnofficial.LOGGER.warn("Failed to load rail pack {}", zipPath.getFileName(), e);
                     }
@@ -200,11 +196,7 @@ public class RailPackLoader {
         for (NestedArchive nested : nestedArchives) {
             Path materialized = materializeNestedPack(nested.name(), nested.bytes());
             try (InputStream input = Files.newInputStream(materialized)) {
-                int before = LOADED.size();
                 loadRailPack(input, nested.name(), depth + 1, charset);
-                int added = LOADED.size() - before;
-                if (added > 0) {
-                }
             }
         }
     }

@@ -1147,7 +1147,6 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
             this.definitionId = wireModelId;
             this.category = InstalledObjectCategory.WIRE.name();
         }
-        //診断: 選択ワイヤーモデルが取れているか・定義が解決するか (原因特定後に外す)
         setChanged();
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
