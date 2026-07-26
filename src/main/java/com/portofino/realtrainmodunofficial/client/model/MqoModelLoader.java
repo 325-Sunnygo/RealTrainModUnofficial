@@ -442,7 +442,25 @@ public final class MqoModelLoader {
         if (texturePath == null || texturePath.isBlank()) {
             texturePath = ClassModelGeometry.defaultTexture(modelFile);
         }
-        ResourceLocation texture = resolveClassModelTexture(packPath, texturePath);
+        //★材質オプションはパスに "|ptmeta=..." として埋め込まれている
+        //(VehiclePackLoader.encodeTextureDescriptor)。MQO 経路は TextureBinding.parse で
+        //剥がしているが、ここは素通しだったためファイルが見つからずフォールバックになり、
+        //<b>オプション付きの材質だけテクスチャが化ける</b>。
+        //実機では 'Light' を持つ kiha600 だけが暗くなり、オプション無しの kiha600_rusty は正常、
+        //という形で出た。パスとオプションを分離してから解決する。
+        TextureBinding classBinding = TextureBinding.parse(texturePath);
+        ResourceLocation texture = resolveClassModelTexture(packPath, classBinding.path());
+        //Light 材質なら本家どおり ***_light0/1/2 を引く (従来は空配列で発光パスが効かなかった)。
+        ResourceLocation[] classEmissive = resolveLegacyLightTextures(classBinding, new TextureOpener() {
+            @Override
+            public InputStream open(String rel) throws Exception {
+                return openTexture(packPath, rel);
+            }
+            @Override
+            public String getPackKey() {
+                return packPath == null ? "" : packPath.toString();
+            }
+        });
         float minU = Float.POSITIVE_INFINITY;
         float maxU = Float.NEGATIVE_INFINITY;
         float minV = Float.POSITIVE_INFINITY;
@@ -453,7 +471,7 @@ public final class MqoModelLoader {
             minV = Math.min(minV, data[i + 7]);
             maxV = Math.max(maxV, data[i + 7]);
         }
-        Batch batch = new Batch(0, ClassModelGeometry.groupName(modelFile), texture, new ResourceLocation[0],
+        Batch batch = new Batch(0, ClassModelGeometry.groupName(modelFile), texture, classEmissive,
             data, data.length / ClassModelGeometry.STRIDE, 0, false, minU, maxU, minV, maxV);
         return new MqoModel(List.of(batch), List.of(texture));
     }
@@ -2578,7 +2596,23 @@ public final class MqoModelLoader {
      * スクリプトの色指定や UV 変換。そのため「動いている間は CPU / 止まると VBO」と
      * 経路が入れ替わり、切り替わった瞬間だけ深度がずれて一瞬重なって見える。
      *
-     * <p>本家は変換経路が 1 つしかないのでこの問題自体が存在しない。経路を CPU 側へ固定する。
+     * <p>【実測】この定数が効く {@code canUseStaticVbo} は {@code if (fullbright)} の内側にあり、
+     * その {@code fullbright} は呼び出し元で<b>ハードコード false</b>。つまり静的 VBO 経路は
+     * 現状<b>到達不能</b>で、この定数は実質無効。将来 fullbright 経路を復活させるときの
+     * 安全弁として残してある。
+     *
+     * <p>本家は変換経路が 1 つしかないのでこの問題自体が存在しない。
+     *
+     * <p>★さらに VBO 経路は<b>明るさが間違っている</b>。頂点フォーマットが
+     * {@code POSITION_TEX_COLOR_NORMAL} でライトマップ (UV2) を持たず、
+     * 描画も {@code getRendertypeCloudsShader} なのでライトマップを参照しない
+     * = <b>常に全明</b>で描かれる。CPU 経路は {@code setLight(packedLight)} で実際の明るさを使う。
+     *
+     * <p>発光材質だけを CPU 側へ寄せると、同じ車両の中で
+     * 「Light 材質 = 実際の明るさ / それ以外 = 全明」という<b>明るさの混在</b>が起きる。
+     * 実機で kiha600 (材質 'Light') だけが暗く、kiha600_rusty (オプション無し) は
+     * 明るいままという形で出た。暗い側が正しく、明るい側が誤り。
+     * 揃えるため CPU 経路へ固定する。
      */
     private static final boolean PIN_CPU_TRANSFORM = true;
 

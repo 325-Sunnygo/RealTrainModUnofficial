@@ -15,6 +15,21 @@ import net.minecraft.world.level.Level;
  * @param <T> 本家は VehicleBaseConfig; 当面 TrainConfig のみ。
  */
 public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
+    /**
+     * 本家 {@code EntityVehicleBase.getBrightnessForRender} 相当。
+     *
+     * <p>1.7.10 のバニラ {@code Entity.getBrightnessForRender} は
+     * <pre>int j = MathHelper.floor_double(this.posY + (double)(this.height / 2.0F));</pre>
+     * と<b>車体の中心の高さ</b>で明るさを取る。1.21 の {@code getLightProbePosition} は
+     * 既定で<b>足元</b>を返すため、レールや道床の中を拾って日中でも暗くなる。
+     * 本家と同じ「中心で拾う」に揃える。
+     */
+    @Override
+    public net.minecraft.world.phys.Vec3 getLightProbePosition(float partialTicks) {
+        return new net.minecraft.world.phys.Vec3(
+            this.getX(), this.getY() + this.getBbHeight() * 0.5D, this.getZ());
+    }
+
     public static final int MAX_SEAT_ROTATION = 45;
     public static final int MAX_DOOR_MOVE = 60;
     public static final int MAX_PANTOGRAPH_MOVE = 40;

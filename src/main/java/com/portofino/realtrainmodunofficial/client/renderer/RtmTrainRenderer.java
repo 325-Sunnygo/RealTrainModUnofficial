@@ -164,8 +164,19 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                     //entity を渡す版を使う。渡さないとカリング (doCulling) も
                     //発光パスの点灯判定 (前照灯/尾灯/室内灯) も引けない。
                     //本家 preRenderBody / postRenderBody と同じ位置で室内灯を挟む。
+                    //★本家 preRenderBody は室内灯の GL 点光源を
+                    //  「室内灯が点いていて、かつ周囲が暗い (getLightValue < 7)」ときだけ有効にする。
+                    //RTMU はここを無条件で有効にしていたため、車内にある光源に対して
+                    //<b>車体外面は法線が逆を向き係数 0.2 (ambient のみ)</b> になり、
+                    //日中でも車体が暗く描かれていた。
+                    //判定は applyInteriorLighting が既に同じ条件で行っているので、
+                    //その結果 (bodyLight が FULL_BRIGHT になったか) を使って揃える。
+                    boolean interiorLightingActive =
+                        !def.getInteriorLights().isEmpty()
+                        && bodyLight == net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
                     com.portofino.realtrainmodunofficial.client.render.InteriorLighting.begin(
-                        def.getInteriorLights(), interiorLightState == 2, entity.level().getGameTime() * 50L);
+                        interiorLightingActive ? def.getInteriorLights() : null,
+                        interiorLightState == 2, entity.level().getGameTime() * 50L);
                     try {
                         MqoModelLoader.renderModel(model, poseStack, buffer, bodyLight, filter, doorTransform, entity);
                     } finally {

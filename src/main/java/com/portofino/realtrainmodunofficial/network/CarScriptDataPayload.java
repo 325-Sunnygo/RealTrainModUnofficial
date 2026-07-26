@@ -35,10 +35,6 @@ public record CarScriptDataPayload(int entityId, String key, String value) imple
         return TYPE;
     }
 
-    /** 【調査用】受信済みキー (1 キー 1 回だけログを出す)。 */
-    private static final java.util.Set<String> SEEN_KEYS =
-        java.util.concurrent.ConcurrentHashMap.newKeySet();
-
     public static void handleOnServer(CarScriptDataPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             if (context.player() == null) {
@@ -47,10 +43,6 @@ public record CarScriptDataPayload(int entityId, String key, String value) imple
             Entity entity = context.player().level().getEntity(payload.entityId());
             if (entity instanceof CarEntity car) {
                 car.setScriptDataValue(payload.key(), payload.value());
-                //【調査用】クライアントのスクリプトが書いた値がサーバーへ届いているかを
-                //キーごとに 1 回だけ記録する。入力が通っているかの切り分け用。
-                if (SEEN_KEYS.size() < 100 && SEEN_KEYS.add(payload.key())) {
-                }
             }
         });
     }
