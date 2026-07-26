@@ -36,9 +36,21 @@ public final class ScriptUtil {
             init();
         }
         // MOD のクラスローダを appLoader として渡す (Packages.jp.ngt.* 解決の鍵)
-        return SEM.getScriptEngine(
+        ScriptEngine se = SEM.getScriptEngine(
                 new String[]{"-doe", "--language=es6"},
                 ScriptUtil.class.getClassLoader());
+        //★本家 doScript:47-51 と同じ mozilla_compat ロードをここへ引き上げる。
+        //本家は doScript の中でだけ読んでいたが、RTMU はエンジン生成箇所が複数あり、
+        //読んでいない経路 (サーバー/サウンドスクリプト) で importPackage が未定義になる。
+        //旧 injectScriptCompatibility が importPackage を no-op で生やして隠していたため、
+        //それを撤去した時点で「"importPackage" is not defined」が表面化した。
+        //importPackage は未定義名しか束縛しないので、後段の PRELUDE の束縛を壊さない。
+        try {
+            se.eval("load(\"nashorn:mozilla_compat.js\");");
+        } catch (javax.script.ScriptException e) {
+            NGTLog.debug("[ScriptUtil] mozilla_compat load failed: %s", e.getMessage());
+        }
+        return se;
     }
 
     /**

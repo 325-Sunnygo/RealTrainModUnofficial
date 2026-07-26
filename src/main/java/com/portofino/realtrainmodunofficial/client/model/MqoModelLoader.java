@@ -131,7 +131,12 @@ public final class MqoModelLoader {
             model = loadFallbackRailModel();
         }
         if (model != null) {
-            if (packPath != null) loadScriptForModel(model, packPath, def.getScriptPath());
+            //★OpList 経路 (系統B) へはスクリプトを積まない。
+            //描画スクリプトは VehicleScriptRenderers / RailScriptRenderers (系統A) が
+            //GLRecorder + replay で実行する。ここで同じ .js をもう一つのエンジンへ
+            //読み込むと 1 つの車両が 2 系統の描画意味論を持つ (調査で D18 として検出)。
+            //系統B は本家に無い RTMU 独自経路なので、投入をやめて一本化する。
+
             cacheModel(key, model);
         } else {
             FAILED_MODEL_KEYS.add(key);
@@ -182,7 +187,6 @@ public final class MqoModelLoader {
         MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), true, def.getModelScale());
         if (model != null) {
             attachScriptModelGraph(model, def.getModelFile());
-            loadScriptForModel(model, packPath, scriptPath, def.getId());
             cacheModel(key, model);
         } else {
             RealTrainModUnofficial.LOGGER.warn("loadModelForVehicle: model is null");
@@ -345,7 +349,6 @@ public final class MqoModelLoader {
         MqoModel model = loadInternal(packPath, modelFile, tex, true);
         if (model != null) {
             if (!script.isBlank()) {
-                loadScriptForModel(model, packPath, script, def.getId());
             }
             cacheModel(key, model);
         }
@@ -473,6 +476,8 @@ public final class MqoModelLoader {
         }
         Batch batch = new Batch(0, ClassModelGeometry.groupName(modelFile), texture, classEmissive,
             data, data.length / ClassModelGeometry.STRIDE, 0, false, minU, maxU, minV, maxV);
+        batch.lightOptionDeclared = classBinding != null && classBinding.hasLightTextures();
+        batch.noSubTextures = classBinding != null && classBinding.noSubTextures();
         return new MqoModel(List.of(batch), List.of(texture));
     }
 
@@ -573,7 +578,6 @@ public final class MqoModelLoader {
         }
         MqoModel model = loadInternal(packPath, modelFile, tex, smoothing);
         if (model != null) {
-            loadScriptForModel(model, packPath, scriptPath);
             cacheModel(key, model);
         } else {
             FAILED_MODEL_KEYS.add(key);
@@ -1272,6 +1276,8 @@ public final class MqoModelLoader {
             final String batchGroupName = currentGroup;
             BatchBuilder bb = byGroup.computeIfAbsent(batchKey,
                 k -> new BatchBuilder(byGroup.size(), batchGroupName, textureInfo.location, textureInfo.emissiveTextures, materialId, translucent, 60.0F));
+            bb.lightOptionDeclared |= textureInfo.lightOptionDeclared;
+            bb.noSubTextures |= textureInfo.noSubTextures;
 
             if (faceVertices.length == 4) {
                 emitObjQuad(faceVertices[0], faceVertices[1], faceVertices[2], faceVertices[3], bb);
@@ -1545,6 +1551,8 @@ public final class MqoModelLoader {
             b.baseColorG = colG;
             b.baseColorB = colB;
             b.glassTranslucent = textureInfo.hasGlassBand;
+            b.lightOptionDeclared = textureInfo.lightOptionDeclared;
+            b.noSubTextures = textureInfo.noSubTextures;
             b.texHasTranslucentPixels = textureInfo.hasAnyTranslucentPixel;
             b.pass1Mask = textureInfo.pass1Mask;
             b.opaqueTexture = textureInfo.opaqueLocation;
@@ -1822,111 +1830,7 @@ public final class MqoModelLoader {
         });
     }
 
-    private static void loadScriptForModel(MqoModel model, Path packPath, String scriptPath) {
-        loadScriptForModel(model, packPath, scriptPath, null);
-    }
-
-    private static void loadScriptForModel(MqoModel model, Path packPath, String scriptPath, String modelName) {
-        if (model == null || packPath == null) {
-            RealTrainModUnofficial.LOGGER.warn("loadScriptForModel: model or packPath is null");
-            return;
-        }
-        String normalized = normalizeScriptPath(scriptPath);
-        String leaf = normalized.contains("/") ? normalized.substring(normalized.lastIndexOf('/') + 1) : normalized;
-        boolean hasExplicitPath = !normalized.isBlank();
-
-
-        try {
-            if (hasExplicitPath) {
-                String legacyScript = VehicleModelPackManager.INSTANCE.getScript(normalized);
-                if (legacyScript == null || legacyScript.isBlank()) {
-                    legacyScript = VehicleModelPackManager.INSTANCE.getScript(leaf);
-                }
-                if (legacyScript != null && !legacyScript.isBlank()) {
-                    TrainScriptSystem.loadScript(normalized, legacyScript, model, modelName);
-                    return;
-                }
-            }
-        } catch (Exception ignored) {
-            // legacy resource manager may not be initialized or the script may not be available
-        }
-
-        try {
-            if (Files.isDirectory(packPath)) {
-                Path scriptFile = null;
-                if (hasExplicitPath) {
-                    scriptFile = resolveFilePathInPack(packPath, normalized);
-                    if (scriptFile == null) {
-                        scriptFile = resolveFilePathInPack(packPath, leaf);
-                    }
-                }
-                if (scriptFile != null && Files.exists(scriptFile)) {
-                    String script = PackTextDecoder.readText(scriptFile);
-                    script = preprocessScriptIncludesForDirectory(scriptFile, rootDirectory(packPath));
-                    TrainScriptSystem.loadScript(normalized, script, model, modelName);
-                } else {
-                    Path fallback = findFallbackScriptFile(packPath);
-                    if (fallback != null) {
-                        RealTrainModUnofficial.LOGGER.warn("Model script {} not found in pack directory {}; using fallback {}", normalized, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), fallback);
-                        String script = PackTextDecoder.readText(fallback);
-                        script = preprocessScriptIncludesForDirectory(fallback, rootDirectory(packPath));
-                        TrainScriptSystem.loadScript(fallback.toString(), script, model, modelName);
-                    } else {
-                        if (hasExplicitPath) {
-                            ResourceSearchResult external = findResource(normalized, packPath);
-                            if (external != null && !packPath.equals(external.packPath())) {
-                                loadScriptFromResource(model, external, normalized, modelName);
-                            } else {
-                                RealTrainModUnofficial.LOGGER.warn("Model script not found in pack directory: {} (normalized={})", com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), normalized);
-                            }
-                        } else {
-                            RealTrainModUnofficial.LOGGER.warn("No fallback model script found in pack directory: {}", com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
-                        }
-                    }
-                }
-            } else {
-                try (ZipFile zf = new ZipFile(packPath.toFile())) {
-                    ZipEntry entry = null;
-                    if (hasExplicitPath) {
-                        entry = findEntry(zf, normalized);
-                        if (entry == null && !leaf.isBlank()) {
-                            entry = findEntry(zf, leaf);
-                        }
-                    }
-                    if (entry != null) {
-                        try (InputStream in = zf.getInputStream(entry)) {
-                            String script = PackTextDecoder.readText(in);
-                            script = preprocessScriptIncludesForZip(zf, entry.getName(), script);
-                            TrainScriptSystem.loadScript(normalized, script, model, modelName);
-                        }
-                    } else {
-                        ZipEntry fallback = findFallbackScriptEntry(zf);
-                        if (fallback != null) {
-                            RealTrainModUnofficial.LOGGER.warn("Model script {} not found in pack zip {}; using fallback {}", normalized, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), fallback.getName());
-                            try (InputStream in = zf.getInputStream(fallback)) {
-                                String script = PackTextDecoder.readText(in);
-                                script = preprocessScriptIncludesForZip(zf, fallback.getName(), script);
-                                TrainScriptSystem.loadScript(fallback.getName(), script, model, modelName);
-                            }
-                        } else {
-                            if (hasExplicitPath) {
-                                ResourceSearchResult external = findResource(normalized, packPath);
-                                if (external != null && !packPath.equals(external.packPath())) {
-                                    loadScriptFromResource(model, external, normalized, modelName);
-                                } else {
-                                    RealTrainModUnofficial.LOGGER.warn("Model script not found in pack zip: {} (normalized={})", com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), normalized);
-                                }
-                            } else {
-                                RealTrainModUnofficial.LOGGER.warn("No fallback model script found in pack zip: {}", com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
-                            }
-                        }
-                    }
-                }
-            }
-        } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load script {} from pack {}", scriptPath, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), e);
-        }
-    }
+    //★loadScriptForModel は撤去。OpList 経路 (系統B) へのスクリプト投入をやめたため。
 
     private static ScriptEngine loadStandaloneScript(Path packPath, String scriptPath, String modelName) {
         if (packPath == null) {
@@ -2010,26 +1914,6 @@ public final class MqoModelLoader {
         return null;
     }
 
-    private static void loadScriptFromResource(MqoModel model, ResourceSearchResult resource, String scriptPath, String modelName) throws IOException {
-        if (resource.filePath() != null) {
-            Path scriptFile = resource.filePath();
-            String script = PackTextDecoder.readText(scriptFile);
-            script = preprocessScriptIncludesForDirectory(scriptFile, rootDirectory(resource.packPath()));
-            TrainScriptSystem.loadScript(scriptPath, script, model, modelName);
-            return;
-        }
-        try (ZipFile zip = new ZipFile(resource.packPath().toFile())) {
-            ZipEntry entry = zip.getEntry(resource.zipEntryName());
-            if (entry == null) {
-                return;
-            }
-            try (InputStream in = zip.getInputStream(entry)) {
-                String script = PackTextDecoder.readText(in);
-                script = preprocessScriptIncludesForZip(zip, entry.getName(), script);
-                TrainScriptSystem.loadScript(scriptPath, script, model, modelName);
-            }
-        }
-    }
 
     private static Path rootDirectory(Path packPath) {
         if (packPath == null) {
@@ -2186,23 +2070,6 @@ public final class MqoModelLoader {
 
     private record IncludeSource(String identifier, String content) {}
 
-    private static Path findFallbackScriptFile(Path root) throws IOException {
-        if (root == null || !Files.exists(root)) return null;
-        Path found = null;
-        try (var stream = Files.walk(root)) {
-            for (Path file : (Iterable<Path>) stream::iterator) {
-                if (!Files.isRegularFile(file)) continue;
-                String relative = root.relativize(file).toString().replace('\\', '/');
-                if (!relative.toLowerCase(Locale.ROOT).contains("/scripts/")) continue;
-                if (!relative.toLowerCase(Locale.ROOT).endsWith(".js")) continue;
-                if (found != null) {
-                    return null;
-                }
-                found = file;
-            }
-        }
-        return found;
-    }
 
     private static ZipEntry findFallbackScriptEntry(ZipFile zf) {
         if (zf == null) return null;
@@ -2447,7 +2314,9 @@ public final class MqoModelLoader {
                     Minecraft.getInstance().getTextureManager().register(windowLoc, windowTex);
                 }
                 // 発光解決はサブライトテクスチャがあるときのみ(無条件だと二重描画)
-                TextureInfo info = new TextureInfo(baseLoc, resolveLegacyLightTextures(binding, opener), alphaBlendOption || partialAlpha || glassBand, partialAlpha, glassBand, opaqueLoc, windowLoc);
+                TextureInfo info = new TextureInfo(baseLoc, resolveLegacyLightTextures(binding, opener, img), alphaBlendOption || partialAlpha || glassBand, partialAlpha, glassBand, opaqueLoc, windowLoc);
+                info.lightOptionDeclared = binding.hasLightTextures();
+                info.noSubTextures = binding.noSubTextures();
                 //割合判定 (3%/1.5%) は運転席窓のような小さなガラス領域を見逃すため、正確な全画素判定で上書き
                 info.hasAnyTranslucentPixel = hasAnyTranslucentPixel(img);
                 //pass1 で実際に色が出るテクセルの位置。面ごとの提出要否をこれで判定する。
@@ -2467,6 +2336,11 @@ public final class MqoModelLoader {
     }
 
     private static ResourceLocation[] resolveLegacyLightTextures(TextureBinding binding, TextureOpener opener) {
+        return resolveLegacyLightTextures(binding, opener, null);
+    }
+
+    private static ResourceLocation[] resolveLegacyLightTextures(TextureBinding binding, TextureOpener opener,
+                                                                 com.mojang.blaze3d.platform.NativeImage baseImg) {
         if (binding == null || !binding.hasLightTextures()) {
             return new ResourceLocation[0];
         }
@@ -2485,7 +2359,7 @@ public final class MqoModelLoader {
             if (candidate == null || candidate.isBlank()) {
                 continue;
             }
-            slots[i] = tryLoadOptionalTexture(candidate, opener, binding.cacheKey() + "#light" + i);
+            slots[i] = tryLoadOptionalTexture(candidate, opener, binding.cacheKey() + "#light" + i, baseImg);
         }
         //末尾が全部 null なら配列ごと縮める (「発光材質でない」判定を変えないため)
         int last = -1;
@@ -2530,7 +2404,73 @@ public final class MqoModelLoader {
         }
     }
 
+    /**
+     * 「ベーステクスチャの不透明部分を覆える」と判明した発光テクスチャ。
+     *
+     * <p>pass0 が実際に描くのは<b>ベースの α==255 の画素だけ</b> (本家 renderBodyNormal の
+     * {@code glAlphaFunc(GL_EQUAL, 1.0)})。したがって pass0 を省略してよい条件は
+     * 「_light0 が完全不透明」ではなく<b>「ベースが α==255 の場所で _light0 も α==255」</b>。
+     *
+     * <p>内装テクスチャは窓などに α を持つため前者では落ちてしまい、
+     * 内装だけ二重描画が残ってちらついた。</p>
+     */
+    private static final java.util.Set<ResourceLocation> EMISSIVE_COVERS_BASE =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** {@link #EMISSIVE_COVERS_BASE} の問い合わせ。 */
+    static boolean isFullyOpaqueEmissive(ResourceLocation loc) {
+        return loc != null && EMISSIVE_COVERS_BASE.contains(loc);
+    }
+
+    /**
+     * ベースが α==255 の全画素で発光テクスチャも α==255 か。
+     * <p>解像度が違う場合は正規化座標の最近傍で引く。
+     */
+    private static boolean emissiveCoversBase(com.mojang.blaze3d.platform.NativeImage base,
+                                              com.mojang.blaze3d.platform.NativeImage light) {
+        if (base == null || light == null) {
+            return false;
+        }
+        int bw = base.getWidth(), bh = base.getHeight();
+        int lw = light.getWidth(), lh = light.getHeight();
+        if (bw <= 0 || bh <= 0 || lw <= 0 || lh <= 0) {
+            return false;
+        }
+        for (int y = 0; y < bh; y++) {
+            int ly = lh == bh ? y : (int) ((long) y * lh / bh);
+            for (int x = 0; x < bw; x++) {
+                if (((base.getPixelRGBA(x, y) >> 24) & 0xFF) != 0xFF) {
+                    continue;
+                }
+                int lx = lw == bw ? x : (int) ((long) x * lw / bw);
+                if (((light.getPixelRGBA(lx, ly) >> 24) & 0xFF) != 0xFF) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 「この車両の発光パス (RenderPass.LIGHT) が今フレーム実際に描くグループ名」。
+     * <p>{@link VehicleScriptRenderers} が NORMAL パスの再生前後で設定/解除する。
+     * 設定されている間、{@code renderNamedGroups} は「発光パスが不透明な {@code _light0} で
+     * 描き直すグループ」を pass0 で描かない。同じ面を 2 回描かなくなるので z-fighting が消える。
+     */
+    private static java.util.Set<String> lightCoveredGroups;
+
+    /** ワールド描画スレッド専用。必ず finally で null に戻すこと。 */
+    public static void setLightCoveredGroups(java.util.Set<String> groups) {
+        lightCoveredGroups = groups;
+    }
+
+
     private static ResourceLocation tryLoadOptionalTexture(String path, TextureOpener opener, String cacheKeySuffix) {
+        return tryLoadOptionalTexture(path, opener, cacheKeySuffix, null);
+    }
+
+    private static ResourceLocation tryLoadOptionalTexture(String path, TextureOpener opener, String cacheKeySuffix,
+                                                           com.mojang.blaze3d.platform.NativeImage baseImg) {
         try (InputStream in = opener.open(path)) {
             if (in == null) {
                 return null;
@@ -2543,6 +2483,10 @@ public final class MqoModelLoader {
                 "dynamic/mqo/" + Integer.toHexString(cacheKeySuffix.hashCode())
             );
             Minecraft.getInstance().getTextureManager().register(loc, tex);
+            //ベースの不透明部分を覆えるなら pass0 を省略できる。
+            if (baseImg != null && emissiveCoversBase(baseImg, img)) {
+                EMISSIVE_COVERS_BASE.add(loc);
+            }
             return loc;
         } catch (Exception ignored) {
             return null;
@@ -3009,6 +2953,17 @@ public final class MqoModelLoader {
         boolean hasAnyTranslucentPixel;
         /** pass1で色が出るテクセルの粗いマスク。null=全面描画。 */
         java.util.BitSet pass1Mask;
+        /**
+         * テクスチャ指定に {@code Light} オプションが書かれていたか。
+         * <p>本家 {@code ModelObject.light} 相当。{@code ***_light0.png} が実在するかとは<b>別</b>で、
+         * ファイルが 1 つも無くても Light 指定があれば true。223 のようにライトを
+         * テクスチャ差し替えではなく<b>ジオメトリ</b>(head_light_on 等) で描くパックは
+         * この状態になる。{@link #emissiveTextures} の長さで代用してはいけない
+         * (あちらは VBO/CPU 変換の分岐にも使われている)。
+         */
+        boolean lightOptionDeclared;
+        /** {@link TextureBinding#noSubTextures()} (本家 subTextures == null) の引き継ぎ。 */
+        boolean noSubTextures;
 
         TextureInfo(ResourceLocation location, ResourceLocation[] emissiveTextures, boolean isTranslucent) {
             this(location, emissiveTextures, isTranslucent, false, false, location, location);
@@ -3069,7 +3024,13 @@ public final class MqoModelLoader {
                         || lowered.equals("glassalpha")) {
                         options.add(lowered);
                     } else if (lowered.equals("onetex") || lowered.equals("one_tex")) {
-                        // RTM の "OneTex" フラグ: モデル全体が1テクスチャを共有する → 無視
+                        //★本家 ModelObject:56-59 (1.12.2)
+                        //  boolean disableSubTex = texOption.contains("OneTex");
+                        //  int texSize = flagLight && !disableSubTex ? 3 : 0;
+                        //OneTex = サブテクスチャを作らない (TextureSet.subTextures == null)。
+                        //捨ててしまうと「_light を引かない材質」と「_light を引けなかった材質」を
+                        //区別できなくなる。前者は素テクスチャで描き、後者は描かないのが本家。
+                        options.add("onetex");
                     } else {
                         lightTexturePaths.add(trimmed);
                     }
@@ -3080,6 +3041,15 @@ public final class MqoModelLoader {
 
         boolean hasLightTextures() {
             return options.contains("light");
+        }
+
+        /**
+         * 本家 {@code TextureSet.subTextures == null} 相当。
+         * <p>本家は明示的なライトテクスチャ名 (textures 配列の 4 要素目以降) があれば
+         * {@code texSize} をそちらで上書きするので、その場合は subTextures を持つ。
+         */
+        boolean noSubTextures() {
+            return options.contains("onetex") && lightTexturePaths.isEmpty();
         }
 
         String cacheKey() {
@@ -3301,6 +3271,11 @@ public final class MqoModelLoader {
         float minV = Float.POSITIVE_INFINITY;
         float maxV = Float.NEGATIVE_INFINITY;
 
+        /** {@link TextureInfo#lightOptionDeclared} の引き継ぎ。 */
+        boolean lightOptionDeclared;
+        /** {@link TextureInfo#noSubTextures} の引き継ぎ。 */
+        boolean noSubTextures;
+
         BatchBuilder(int order, String groupName, ResourceLocation texture, ResourceLocation[] emissiveTextures, int materialId, boolean translucent, float smoothingAngle) {
             this.order = order;
             this.groupName = groupName;
@@ -3352,6 +3327,8 @@ public final class MqoModelLoader {
             float safeMinV = Float.isFinite(minV) ? minV : 0.0F;
             float safeMaxV = Float.isFinite(maxV) ? maxV : 1.0F;
             Batch built = new Batch(order, groupName, texture, emissiveTextures, data, data.length / 8, materialId, translucent, safeMinU, safeMaxU, safeMinV, safeMaxV);
+            built.lightOptionDeclared = this.lightOptionDeclared;
+            built.noSubTextures = this.noSubTextures;
             built.baseAlpha = baseAlpha;
             built.baseColorR = baseColorR;
             built.baseColorG = baseColorG;
@@ -3932,6 +3909,35 @@ public final class MqoModelLoader {
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GROUPS, secStart);
                 return;
             }
+            //★発光パスが不透明な _light0 で描き直すグループは pass0 で描かない。
+            //本家は即時描画で「後に描いた発光パスが必ず残る」ため 2 回描いても問題ないが、
+            //1.21 では同一深度の勝敗が画素ごとに揺れて可動部 (座席) がちらつく。
+            //深度をずらして勝たせると、今度は遠方・浅い角度で内装が車体を突き抜ける
+            //(ポリゴンオフセットは傾き比例なので遠方ほど効く)。
+            //_light0 が不透明なら pass0 の描画は完全に覆われて見えないので、
+            //描かなければ良い。1 枚しか描かないので z-fighting は原理的に起きない。
+            java.util.Set<String> covered = lightCoveredGroups;
+            if (covered != null && !translucent) {
+                List<Batch> filtered = null;
+                for (int i = 0; i < ordered.size(); i++) {
+                    Batch b = ordered.get(i);
+                    if (covered.contains(b.normalizedKey()) && b.isLight0FullyOpaque()) {
+                        if (filtered == null) {
+                            filtered = new ArrayList<>(ordered.subList(0, i));
+                        }
+                    } else if (filtered != null) {
+                        filtered.add(b);
+                    }
+                }
+                if (filtered != null) {
+                    if (filtered.isEmpty()) {
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GROUPS, secStart);
+                        return;
+                    }
+                    ordered = filtered;
+                }
+            }
             Object entity = scriptRenderer != null ? scriptRenderer.getCurrentEntity() : null;
             boolean fullbright = false;
             //door_*は除外を無視して常に描く(スライドで開閉を表現)
@@ -4011,13 +4017,44 @@ public final class MqoModelLoader {
                 Matrix4f mat = pose.pose();
                 Matrix3f norm = pose.normal();
                 for (Batch batch : groupBatches) {
-                    ResourceLocation tex = batch.emissiveTextureForPass(legacyPass);
-                    if (tex == null) {
-                        //本家 renderWithTexture: `if (!this.textures[i].doLighting) continue;`
-                        //Light フラグの無い材質は LIGHT パスで<b>単に飛ばす</b>。
-                        //以前はここで「グループ名に light を含む」batch を素テクスチャの不透明で
-                        //描き直していたが、本家に無い処理で、消灯時にもライトが点いて見える原因だった。
+                    //★本家 ModelObject.renderWithTexture (1.12.2 jp/ngt/rtm/render/ModelObject.java:216-227)
+                    //の忠実移植。LIGHT/LIGHT_FRONT/LIGHT_BACK では:
+                    //
+                    //  if (!textures[i].doLighting) continue;                  // Light 指定の無い材質は飛ばす
+                    //  if (textures[i].subTextures != null) {
+                    //      texture = textures[i].subTextures[pass.id - 2];     // _light0/1/2 を貼る
+                    //  } else {
+                    //      texture = textures[i].material.texture;             // ★無ければ素テクスチャ
+                    //  }
+                    //
+                    //RTMU は「発光テクスチャが引けない = 描かない」にしていたため、
+                    //Light 指定はあるが ***_light*.png を 1 枚も持たないパックのライトが
+                    //まるごと消えていた。223 が該当する: 指定は "AlphaBlend, Light, OneTex" で
+                    //_light テクスチャは無く、前照灯/尾灯/室内灯を head_light_on / room_light と
+                    //いう<b>ジオメトリ</b>で描く (Render223.js:89-92,158-164)。
+                    //本家はこの場合 223.png のまま描くので、ライトが出る。
+                    //本家 `if (!this.textures[i].doLighting) continue;`
+                    //Light 指定の無い材質は LIGHT パスで描かない。
+                    if (!batch.lightOptionDeclared) {
                         continue;
+                    }
+                    ResourceLocation tex;
+                    if (batch.noSubTextures) {
+                        //本家 subTextures == null の枝 = <b>OneTex 指定</b>。
+                        //223 (AlphaBlend, Light, OneTex) がこれ。本家は _light の実在を見ず
+                        //素テクスチャのまま LIGHT パスを描くので、ライトはスクリプトが
+                        //ジオメトリ (head_light_on / room_light) で出す。
+                        tex = batch.texture;
+                    } else {
+                        //本家 subTextures != null の枝。位置で引く (pass.id - 2)。
+                        tex = batch.emissiveTextureForPass(legacyPass);
+                        if (tex == null) {
+                            //Light と書いてあるのに ***_light*.png を同梱していないパック
+                            //(JRCT_Keyo/Sagami/Tsurumi の 205 系など、導入パックで 41 材質)。
+                            //ここで素テクスチャに落とすと pass3/4 の FULL_BRIGHT + α0.8 で
+                            //車体そのものが光り、通常描画と重なって見える。描かないのが正しい。
+                            continue;
+                        }
                     }
                     //★本家 RenderVehicleBase.renderBodyLight の忠実移植。
                     //  isLightON = (i > 0) のときだけ disableLighting + glEnable(GL_BLEND)
@@ -4128,6 +4165,21 @@ public final class MqoModelLoader {
 
 
         /** このモデルに発光 (Light) マテリアルのバッチが 1 つでもあるか。 */
+        /**
+         * どれかの材質が {@code Light} オプションを宣言しているか (本家 {@code modelObj.light})。
+         * <p>本家 RenderVehicleBase:92 のライトパスのゲートはこれ。{@code ***_light*.png} の
+         * 実在ではない。スクリプトがジオメトリでライトを描くパック (223 の head_light_on 等) は
+         * 発光テクスチャを 1 つも持たないので、{@link #hasEmissiveBatches()} では拾えない。
+         */
+        public boolean hasLightOption() {
+            for (Batch b : batches) {
+                if (b.lightOptionDeclared) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public boolean hasEmissiveBatches() {
             for (Batch b : batches) {
                 if (b.emissiveTextures.length > 0) {
@@ -5203,34 +5255,28 @@ public final class MqoModelLoader {
         }
 
         private static float getDepthBias(Batch batch, String lowerGroupName, boolean scriptTexture) {
-            if (batch == null || scriptTexture) {
-                return 0.0F;
-            }
-            if (isCabControlGroup(lowerGroupName)) {
-                return 0.0F;
-            }
-            if (isScriptDisplayGroup(lowerGroupName)) {
-                return 0.0002F;
-            }
-            if (isLegacyDisplayGroup(lowerGroupName)) {
-                return 0.0002F;
-            }
-            //★ライトグループの頂点押し出しは廃止。
-            //本家は頂点を一切押し出さない (RenderVehicleBase.renderBodyLight は
-            //ブレンド alpha=0.8 と doRender ゲートだけ)。RTMU が名前で light と判定した
-            //グループを 1mm 押し出していたため、室内灯まわりのポリゴンが浮いて
-            //「重なって見える」状態になっていた (京葉線等)。
-            //発光パスの深度分離は RtmuRenderTypes.emissiveBlendLayered の
-            //POLYGON_OFFSET_LAYERING (GPU 側のポリゴンオフセット) が既に担っており、
-            //頂点を動かす必要はない。
-            if (!batch.translucent) {
-                return 0.0F;
-            }
-            if (lowerGroupName.equals("alpha")) {
-                return 0.0012F;
-            }
+            //★本家は頂点を<b>一切</b>動かさない。
+            //
+            //本家 RenderVehicleBase / ModelObject には glPolygonOffset も頂点押し出しも無い
+            //(rtm_src を全走査して確認。glDepthMask はライトのグロー描画にしか出てこない)。
+            //面の前後は「同じジオメトリを同じ深度で描き、後から描いた方が残る」(GL_LEQUAL) で
+            //決まり、パスの中身は
+            //  pass0: glAlphaFunc(GL_EQUAL, 1.0) = α==255 の画素だけ   (renderBodyNormal:160)
+            //  pass1: glAlphaFunc(GL_LESS,  1.0) = α<255 の画素だけ    (renderBodyTransparent)
+            //と<b>排他</b>なので、そもそも重ならない。
+            //
+            //RTMU はグループ名で表示器 (方向幕/速度計) や alpha グループを見つけて
+            //法線方向へ 0.2mm / 1.2mm 押し出していた。これは本家に無い処理で、
+            //・押し出した面が隣の面を突き抜ける
+            //・見る角度で浮いて二重に見える
+            //という「重なって見える」現象そのものを作っていた。
+            //
+            //元々これを入れた理由 (VBO の GPU 変換と発光パスの CPU 変換で深度が数 ULP ずれ、
+            //同一面が z-fighting する) は PIN_CPU_TRANSFORM=true で全バッチを CPU 変換に
+            //固定した時点で消えている。押し出しは撤去して本家と同じ「動かさない」に戻す。
             return 0.0F;
         }
+
 
         private static boolean shouldForceLegacyAlphaCutout(Batch batch, String lowerGroupName, boolean scriptTexture) {
             if (batch == null || scriptTexture || !batch.translucent) {
@@ -5442,6 +5488,41 @@ public final class MqoModelLoader {
         volatile com.mojang.blaze3d.vertex.VertexBuffer fullbrightVbo;
         volatile boolean vboBuildAttempted;
         volatile boolean vboBuildFailed;
+
+        /** {@link TextureInfo#lightOptionDeclared} の引き継ぎ。 */
+        boolean lightOptionDeclared;
+        /** {@link TextureInfo#noSubTextures} の引き継ぎ。 */
+        boolean noSubTextures;
+
+        /** 正規化グループ名 (発光パスが描いたグループとの突合用)。遅延計算。 */
+        private String normalizedKeyCached;
+        /** {@code _light0} が完全不透明か。遅延計算。 */
+        private Boolean light0OpaqueCached;
+
+        String normalizedKey() {
+            String k = normalizedKeyCached;
+            if (k == null) {
+                k = groupName == null ? "" : groupName.trim().toLowerCase(Locale.ROOT);
+                normalizedKeyCached = k;
+            }
+            return k;
+        }
+
+        /**
+         * このバッチの {@code _light0} が完全不透明か。
+         * <p>true なら発光パス (RenderPass.LIGHT) の描画が pass0 の描画を<b>完全に覆う</b>ので、
+         * pass0 側を省略しても見た目が変わらない。省略すれば同じ面が 2 回描かれなくなり、
+         * z-fighting (座席のちらつき) が原理的に起きなくなる。
+         */
+        boolean isLight0FullyOpaque() {
+            Boolean c = light0OpaqueCached;
+            if (c == null) {
+                ResourceLocation t = emissiveTextureForPass(jp.ngt.rtm.render.RenderPass.LIGHT.id);
+                c = isFullyOpaqueEmissive(t);
+                light0OpaqueCached = c;
+            }
+            return c;
+        }
 
         Batch(int order, String groupName, ResourceLocation texture, ResourceLocation[] emissiveTextures, float[] data, int vertexCount, int materialId, boolean translucent,
               float minU, float maxU, float minV, float maxV) {

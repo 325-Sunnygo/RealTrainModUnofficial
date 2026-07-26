@@ -118,6 +118,105 @@ public final class VehicleScriptRenderers {
      */
     private static java.util.Set<String> activeDefaultTexPaths = java.util.Set.of();
 
+    // ---- 車両の半透明パス (本家 Forge 描画パス 1) の遅延描画 ----
+    //
+    //★本家 RenderVehicleBase.renderVehicleMain:78 は
+    //    int pass = MinecraftForgeClient.getRenderPass();
+    //  で<b>Forge の描画パス</b>を見ており、車体 (不透明) はパス 0、
+    //  発光/方向幕/半透明 (renderBodyTransparent) はパス <b>1</b> で描く。
+    //  1.12.2 の EntityRenderer.renderWorldPass はパス 1 を
+    //  「地形半透明のあと・パス 0 の TileEntity 描画のあと」に回すので、
+    //  レール (TESR = パス 0) は車両のガラスより<b>先</b>に描き終わっている。
+    //  だから本家では窓越しにレールが見える。
+    //
+    //  1.21 の RTMU は 1 回で描き切るため、車両の半透明が
+    //  エンティティ描画中に endBatch() で即 flush され、そのあとに
+    //  ブロックエンティティ (レール = RailDrawQueue の AFTER_BLOCK_ENTITIES) が描かれる。
+    //  ガラスは本家どおり深度を書く (RtmuRenderTypes.glassNoDepth) ので、
+    //  あとから描かれるレールが深度テストで落ちて<b>レールだけ消える</b>。
+    //  内装にも半透明があるとその面でも同じことが起きるため症状が目立つ。
+    //
+    //  そこで半透明パスの再生だけをここへ積み、レールを描き終えた直後
+    //  (RailDrawQueue の AFTER_BLOCK_ENTITIES ハンドラ末尾) で再生する。
+    //  本家のパス 0 → パス 1 と同じ前後関係になる。発光パスは従来どおり
+    //  その場で描く (発光→窓の順は「ライトが外から見えない」対策で必要)。
+    private record DeferredTranslucent(GLRecorder rec, org.joml.Matrix4f pose, org.joml.Matrix3f normal,
+                                       int packedLight, int packedOverlay,
+                                       MqoModelLoader.MqoModel model, PolygonModel graph,
+                                       java.util.Set<String> excluded, Object entity,
+                                       java.util.Set<String> defaultTexPaths) {
+    }
+
+    private static final java.util.List<DeferredTranslucent> TRANSLUCENT_QUEUE = new java.util.ArrayList<>();
+
+    /**
+     * ワールド描画中か。モデル選択画面のプレビューなど<b>ワールド描画の外</b>で
+     * {@code Scripted.render} が呼ばれることがあり、そこで積むと次フレームの
+     * ワールド描画で見当違いの場所に出てしまう。その場合は積まずその場で描く。
+     */
+    private static boolean levelRenderActive;
+
+    /** ワールド描画の開始 ({@link RailDrawQueue} が早い段階のフックで呼ぶ)。 */
+    static void beginLevelRender() {
+        levelRenderActive = true;
+    }
+
+    private static boolean enqueueTranslucent(GLRecorder rec, PoseStack poseStack, int packedLight, int packedOverlay,
+                                           MqoModelLoader.MqoModel model, PolygonModel graph,
+                                           java.util.Set<String> excluded, Object entity,
+                                           java.util.Set<String> defaultTexPaths) {
+        if (!levelRenderActive) {
+            return false;
+        }
+        PoseStack.Pose pose = poseStack.last();
+        TRANSLUCENT_QUEUE.add(new DeferredTranslucent(
+            rec,
+            new org.joml.Matrix4f(pose.pose()),
+            new org.joml.Matrix3f(pose.normal()),
+            packedLight, packedOverlay, model, graph,
+            excluded == null ? null : java.util.Set.copyOf(excluded),
+            entity,
+            defaultTexPaths));
+        return true;
+    }
+
+    /**
+     * 積んでおいた車両の半透明パスを描く。{@link RailDrawQueue} がレールを描き終えた直後に呼ぶ。
+     * <p>キューが空でも安全 (何もしない)。例外は握りつぶす — ここで落ちると以降のフレームが
+     * 積みっぱなしになるため、必ずキューを空にする。
+     */
+    static void flushDeferredTranslucent() {
+        levelRenderActive = false;
+        if (TRANSLUCENT_QUEUE.isEmpty()) {
+            return;
+        }
+        net.minecraft.client.renderer.MultiBufferSource.BufferSource buffer =
+            net.minecraft.client.Minecraft.getInstance().renderBuffers().bufferSource();
+        try {
+            for (DeferredTranslucent d : TRANSLUCENT_QUEUE) {
+                PoseStack ps = new PoseStack();
+                ps.last().pose().set(d.pose());
+                ps.last().normal().set(d.normal());
+                activeDefaultTexPaths = d.defaultTexPaths();
+                com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer
+                    .setCurrentVehicle(d.entity());
+                try {
+                    replay(d.rec(), ps, buffer, d.packedLight(), d.packedOverlay(),
+                        d.model(), d.graph(), RenderPass.TRANSPARENT.id, d.excluded());
+                } finally {
+                    com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer
+                        .setCurrentVehicle(null);
+                    activeDefaultTexPaths = java.util.Set.of();
+                }
+            }
+            buffer.endBatch();
+        } catch (Throwable t) {
+            RealTrainModUnofficial.LOGGER.warn("Deferred vehicle translucent draw failed", t);
+        } finally {
+            TRANSLUCENT_QUEUE.clear();
+        }
+    }
+
     /** bind の元パスがモデルの素テクスチャなら true (=上書き解除)。 */
     static boolean isDefaultTexturePath(String rawPath) {
         return rawPath != null && activeDefaultTexPaths.contains(rawPath);
@@ -328,8 +427,23 @@ public final class VehicleScriptRenderers {
             //本家 ResourceState.exclusionParts: スクリプトが描画から外したパーツ (開いたドア等)。
             //スクリプトの render() 内で add/removeExclusionParts が呼ばれた後に読む。
             java.util.Set<String> excluded = exclusionPartsOf(entity);
-            replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
-                    RenderPass.NORMAL.id, excluded);
+            //★発光パス (RenderPass.LIGHT) を<b>先に記録</b>する。記録は GLRecorder に積むだけで
+            //描画はしないので、順序は変わらない。ここで「発光パスが実際に描くグループ」が分かる。
+            //_light0 が不透明なグループは発光パスの描画が pass0 を完全に覆うので、
+            //pass0 側を描かない (MqoModelLoader.setLightCoveredGroups)。同じ面を 2 回描かなくなり、
+            //同一深度の勝敗が揺れて座席がちらつく問題が原理的に消える。
+            //※覆うグループは<b>発光パスが実際に描いたものだけ</b>に限ること。
+            //  oer30000 は pass0 でしか描かない部品 (render_frontParts1/6) があり、
+            //  無条件に省くと前面部品が丸ごと消える。
+            GLRecorder preLight0 = recordLight0IfNeeded(entity, partialTick, bodyModel);
+            java.util.Set<String> coveredGroups = groupsDrawnBy(preLight0);
+            MqoModelLoader.setLightCoveredGroups(coveredGroups);
+            try {
+                replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
+                        RenderPass.NORMAL.id, excluded);
+            } finally {
+                MqoModelLoader.setLightCoveredGroups(null);
+            }
             if (sink != null) {
                 //excluded はエンティティ内部のライブ集合なので、キャッシュにはスナップショットを残す。
                 sink.add(new CachedPass(normal, RenderPass.NORMAL.id, excluded == null ? null : Set.copyOf(excluded)));
@@ -355,7 +469,7 @@ public final class VehicleScriptRenderers {
             //なる。パスの区切りで明示的に flush して即時描画と同じ順序にする。
             flushBatch(buffer);
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
-                    bodyModel, graph, sink);
+                    bodyModel, graph, sink, preLight0);
             flushBatch(buffer);
             //★半透明パス (TRANSPARENT=1)。本家 RenderVehicleBase は毎フレーム pass0(不透明)+
             //  pass1(半透明) を回すが、RTMU は従来 pass1 を飛ばしていた。そのため:
@@ -368,8 +482,14 @@ public final class VehicleScriptRenderers {
             //  pass0 は opaque テクスチャ (窓の部分αは落ちる) なので二重描画にはならない。
             GLRecorder transparent = record(entity, RenderPass.TRANSPARENT.id, partialTick);
             if (transparent != null && transparent.hasGeometry()) {
-                replay(transparent, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
-                        RenderPass.TRANSPARENT.id, excluded);
+                //★ここでは描かず、レールを描き終えたあとへ回す (本家 Forge 描画パス 1 と同じ位置)。
+                //詳細は TRANSLUCENT_QUEUE のコメント。
+                if (!enqueueTranslucent(transparent, poseStack, packedLight, packedOverlay, bodyModel, graph,
+                        excluded, entity, this.defaultTexPaths)) {
+                    //ワールド描画の外 (モデル選択画面のプレビュー等) は従来どおりその場で描く。
+                    replay(transparent, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
+                            RenderPass.TRANSPARENT.id, excluded);
+                }
                 if (sink != null) {
                     sink.add(new CachedPass(transparent, RenderPass.TRANSPARENT.id,
                             excluded == null ? null : Set.copyOf(excluded)));
@@ -400,6 +520,54 @@ public final class VehicleScriptRenderers {
             }
         }
 
+        /**
+         * 発光パス (i==0 = RenderPass.LIGHT) を先行記録する。
+         * <p>{@code renderBodyLight} の i==0 と<b>同じ条件</b>で判定すること。条件がずれると
+         * 「pass0 を省いたのに発光パスが描かない」= 面が消える。
+         */
+        private GLRecorder recordLight0IfNeeded(Object entity, float partialTick,
+                                                MqoModelLoader.MqoModel bodyModel) {
+            if (bodyModel == null) {
+                return null;
+            }
+            if (!(bodyModel.hasLightOption() || bodyModel.hasEmissiveBatches())) {
+                return null;
+            }
+            if (!(entity instanceof EntityTrainBase train)) {
+                return null;
+            }
+            int mode = train.getTrainStateData(TrainState.TrainStateType.State_Light.id);
+            //本家 RenderVehicleBase.renderBodyLight の i==0: doRender = (mode == 0 || mode == 1)
+            if (mode != 0 && mode != 1) {
+                return null;
+            }
+            GLRecorder rec = record(entity, RenderPass.LIGHT.id, partialTick);
+            if (rec == null) {
+                return null;
+            }
+            if (!rec.hasGeometry()) {
+                return null;
+            }
+            return rec;
+        }
+
+        /** 記録の中で実際に描画されたグループ名 (正規化済み)。 */
+        private static java.util.Set<String> groupsDrawnBy(GLRecorder rec) {
+            if (rec == null) {
+                return null;
+            }
+            java.util.Set<String> out = new java.util.HashSet<>();
+            for (GLRecorder.Cmd c : rec.getCommands()) {
+                if ((c.op == GLRecorder.Op.RENDER_PARTS || c.op == GLRecorder.Op.RENDER_GROUPS)
+                        && c.payload instanceof java.util.Set<?> names) {
+                    for (Object n : names) {
+                        out.add(String.valueOf(n));
+                    }
+                }
+            }
+            return out.isEmpty() ? null : out;
+        }
+
         private static java.util.Set<String> exclusionPartsOf(Object entity) {
             if (entity instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> vehicle) {
                 jp.ngt.rtm.modelpack.state.ResourceState state = vehicle.getResourceState();
@@ -426,7 +594,8 @@ public final class VehicleScriptRenderers {
          */
         private void renderBodyLight(Object entity, float partialTick, PoseStack poseStack,
                                      MultiBufferSource buffer, int packedLight, int packedOverlay,
-                                     MqoModelLoader.MqoModel bodyModel, PolygonModel graph, List<CachedPass> sink) {
+                                     MqoModelLoader.MqoModel bodyModel, PolygonModel graph, List<CachedPass> sink,
+                                     GLRecorder preLight0) {
             if (!(entity instanceof EntityTrainBase train)) {
                 return;
             }
@@ -437,7 +606,15 @@ public final class VehicleScriptRenderers {
             //点いて見える</b> (183系/201系/EF65/ED75/多機能検測車/JRCT103・205 等の報告)。
             //本家に無い経路なので撤去した。スクリプトはライト形状を pass0 でも描いており
             //(render_light は pass==0 でも呼ばれる)、そちらは状態を見て出し分けている。
-            if (bodyModel == null || !bodyModel.hasEmissiveBatches()) {
+            //★ゲートは本家と同じく<b>テクスチャ指定に Light と書かれているか</b>
+            //(= modelObj.light)。以前は hasEmissiveBatches() = 「***_light*.png が実際に
+            //解決できたか」で見ていたが、この 2 つは別物。223 は指定が
+            //"AlphaBlend, Light, OneTex" なのに _light テクスチャを 1 枚も持たず、
+            //前照灯/尾灯/室内灯を head_light_on / room_light という<b>ジオメトリ</b>で描く。
+            //そのため発光テクスチャ判定では LIGHT パスごと落ち、ライトが一切出なかった。
+            //消灯時に点いて見える問題は下の doRender (ライトモード判定) が防いでいるので、
+            //ゲートを本家に合わせても再発しない。
+            if (bodyModel == null || !(bodyModel.hasLightOption() || bodyModel.hasEmissiveBatches())) {
                 return;
             }
             int dir = train.getTrainDirection();
@@ -460,7 +637,8 @@ public final class VehicleScriptRenderers {
                     continue;
                 }
                 int pass = RenderPass.LIGHT.id + i;
-                GLRecorder rec = record(entity, pass, partialTick);
+                //i==0 は NORMAL より前に記録済み。二重にスクリプトを走らせない。
+                GLRecorder rec = (i == 0 && preLight0 != null) ? preLight0 : record(entity, pass, partialTick);
                 //スクリプトが発光パスの途中で落ちても、そこまでに描いたライトは活かす。
                 if (rec == null || !rec.hasGeometry()) {
                     continue;

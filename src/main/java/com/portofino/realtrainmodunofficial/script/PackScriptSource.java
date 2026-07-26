@@ -97,6 +97,9 @@ public final class PackScriptSource {
             bindOpt("EnumParticleTypes", "jp.ngt.mccompat.EnumParticleTypes") +
             bindOpt("NGTMath", "jp.ngt.ngtlib.math.NGTMath") +
             bindOpt("Vec3", "jp.ngt.ngtlib.math.Vec3") +
+            //本家 RenderMotor / RenderClutch / RenderReversGear が
+            //renderer.getRotation(entity, Axis.POSITIVE_Y) で使う。
+            bindOpt("Axis", "jp.ngt.ngtlib.math.Axis") +
             bindOpt("NGTUtil", "jp.ngt.ngtlib.util.NGTUtil") +
             bindOpt("NGTUtilClient", "jp.ngt.ngtlib.util.NGTUtilClient") +
             bindOpt("MCWrapper", "jp.ngt.ngtlib.util.MCWrapper") +

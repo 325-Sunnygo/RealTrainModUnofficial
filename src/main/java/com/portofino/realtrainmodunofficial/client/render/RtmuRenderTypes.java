@@ -24,6 +24,35 @@ import java.util.function.Function;
  */
 public final class RtmuRenderTypes extends RenderType {
 
+
+    /**
+     * 発光パス用の<b>ごく小さい</b>ポリゴンオフセット。
+     *
+     * <p>pass0 と発光パスは同じ頂点・同じ行列で描いているが、<b>シェーダーが別</b>
+     * (pass0 = ENTITY_CUTOUT / 前照灯・尾灯 = ENTITY_TRANSLUCENT_EMISSIVE) なので、
+     * 同じ式でも最適化の違いで深度が僅かにずれ、画素ごとに勝敗が揺れる。
+     * これは傾き比例の差なので、units だけのオフセットでは消えない (実測)。
+     *
+     * <p>ただし傾き係数を大きくすると、遠方・浅い角度で内装が車体を突き抜けて
+     * 破線に見える (実測: factor -1 で発生)。ずれ自体は ULP 規模なので、
+     * 桁で言えば十分すぎる小さい値にする。
+     */
+    private static final LayeringStateShard LIGHT_PASS_OFFSET = new LayeringStateShard(
+        "rtmu_light_pass_offset",
+        () -> {
+            com.mojang.blaze3d.systems.RenderSystem.polygonOffset(-0.05F, -1.0F);
+            com.mojang.blaze3d.systems.RenderSystem.enablePolygonOffset();
+        },
+        () -> {
+            com.mojang.blaze3d.systems.RenderSystem.polygonOffset(0.0F, 0.0F);
+            com.mojang.blaze3d.systems.RenderSystem.disablePolygonOffset();
+        });
+
+    //★以前の経緯:
+    //同一深度の「後勝ち」を深度バイアスで作ると、傾き比例のため<b>遠方・浅い角度</b>で
+    //内装が車体を突き抜けて破線に見える (実測)。二重描画そのものを止める方向へ変更した
+    //(MqoModelLoader.setLightCoveredGroups)。
+
     private RtmuRenderTypes(String name, VertexFormat format, VertexFormat.Mode mode, int bufferSize,
                             boolean affectsCrumbling, boolean sortOnUpload, Runnable setupState, Runnable clearState) {
         super(name, format, mode, bufferSize, affectsCrumbling, sortOnUpload, setupState, clearState);
@@ -143,6 +172,20 @@ public final class RtmuRenderTypes extends RenderType {
                     .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                     .setOverlayState(OVERLAY)
                     .setCullState(cull ? CULL : NO_CULL)
+                    //★深度は<b>書かない</b> (色だけ書く)。
+                    //前照灯/尾灯パスは車体と<b>完全に同じ面</b>を _light1/_light2 で
+                    //α0.8 ブレンドして重ねるだけの<b>上塗り</b>で、深度は pass0 が既に書いている。
+                    //State_Light=2 (前照灯・尾灯) では i==1 と i==2 が<b>両方</b>走るため、
+                    //同じ面に深度を書くレイヤーが 3 枚 (pass0 + 2 枚) 重なり、
+                    //1.21 のバッチ描画では勝敗が定まらずちらつく
+                    //(実測: State_Light=2 のときだけ内装がちらつく)。
+                    //深度書き込みを止めれば重ね順は提出順で決まり、揺れなくなる。
+                    //本家は即時描画で順序が保証されるので depthMask を触る必要が無かっただけで、
+                    //見た目 (色の重なり) は本家と同じになる。
+                    //★ポリゴンオフセットで勝たせる手は使わない。傾き比例なので遠方・浅い角度で
+                    //内装が車体を突き抜けて破線に見える (実測で確認済み)。
+                    .setWriteMaskState(COLOR_WRITE)
+                .setLayeringState(LIGHT_PASS_OFFSET)
                     .createCompositeState(true))));
     }
 
@@ -162,6 +205,7 @@ public final class RtmuRenderTypes extends RenderType {
                 .setLightmapState(LIGHTMAP)
                 .setOverlayState(OVERLAY)
                 .setCullState(CULL)
+                .setLayeringState(LIGHT_PASS_OFFSET)
                 .createCompositeState(true)));
 
     private static final Function<ResourceLocation, RenderType> EMISSIVE_CUTOUT_NO_CULL_LAYERED = Util.memoize(tex ->
@@ -174,6 +218,7 @@ public final class RtmuRenderTypes extends RenderType {
                 .setLightmapState(LIGHTMAP)
                 .setOverlayState(OVERLAY)
                 .setCullState(NO_CULL)
+                .setLayeringState(LIGHT_PASS_OFFSET)
                 .createCompositeState(true)));
 
     /** 室内灯パス (i==0) 用。本家と同じ不透明描画に、深度だけのオフセットを足したもの。 */

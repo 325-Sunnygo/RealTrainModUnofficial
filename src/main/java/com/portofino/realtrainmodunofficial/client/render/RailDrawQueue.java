@@ -96,6 +96,12 @@ public final class RailDrawQueue {
      */
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
+        //エンティティ描画より前の段階で「いまワールドを描いている」印を付ける。
+        //モデル選択画面のプレビューはこの外で描かれるので、そちらは遅延させない。
+        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SOLID_BLOCKS) {
+            VehicleScriptRenderers.beginLevelRender();
+            return;
+        }
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_BLOCK_ENTITIES) {
             return;
         }
@@ -103,6 +109,12 @@ public final class RailDrawQueue {
         //(この段階はブロックエンティティ描画=drawBaked 呼び出しの直後・毎フレーム1回)。
         RailMeshCache.beginFrame();
         flush();
+        //★レールを描き終えた「あと」に車両の半透明を描く。
+        //本家は Forge 描画パス 1 (地形半透明・パス0の TileEntity のあと) で
+        //renderBodyTransparent を呼ぶので、レールはガラスより先に描き終わっている。
+        //RTMU は 1 パスで描くため、ここで前後関係を本家に合わせないと
+        //深度を書いたガラスに遮られてレールだけが消える。
+        VehicleScriptRenderers.flushDeferredTranslucent();
     }
 
     private static void flush() {
