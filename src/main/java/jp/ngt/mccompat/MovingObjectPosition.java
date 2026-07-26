@@ -18,6 +18,14 @@ public final class MovingObjectPosition {
     public final Vec3Compat field_72307_f;
     /** sideHit */
     public final int field_72310_e;
+    /**
+     * sideHit (1.8+ の EnumFacing 版)。
+     * <pre>NGTO Builder.zip!.../Wire/render_Wire.js:538  mop.field_178784_b</pre>
+     * スクリプトは続けて {@code .func_176745_a()} でインデックスを取るため、
+     * 生の {@link net.minecraft.core.Direction} を持たせる。
+     */
+    public final net.minecraft.core.Direction field_178784_b;
+
     /** typeOfHit: 0=MISS(TILE?), ここでは常にブロックヒットのみ生成 */
     public final String typeOfHit = "BLOCK";
 
@@ -27,6 +35,7 @@ public final class MovingObjectPosition {
         this.field_72309_d = hit.getBlockPos().getZ();
         this.field_72307_f = new Vec3Compat(hit.getLocation());
         this.field_72310_e = hit.getDirection().ordinal();
+        this.field_178784_b = hit.getDirection();
     }
 
     /** func_178782_a = getBlockPos (1.12) */

@@ -39,6 +39,14 @@ public final class Keyboard {
     public static final int KEY_O = 24;
     public static final int KEY_P = 25;
     public static final int KEY_RETURN = 28;
+    /**
+     * KEY_NONE = 0。本家 LWJGL2 の「キー未割り当て」。
+     * <p>NGTO Builder 2 の InputManager が修飾キーの初期値に使う。未定義だと
+     * {@code Keyboard.isKeyDown(undefined)} になり、そこで入力処理ごと止まる
+     * (= どのキーも反応しない)。
+     */
+    public static final int KEY_NONE = 0;
+
     public static final int KEY_LCONTROL = 29;
     public static final int KEY_A = 30;
     public static final int KEY_S = 31;
@@ -69,6 +77,9 @@ public final class Keyboard {
     public static final int KEY_RMENU = 184;
 
     public static boolean isKeyDown(int lwjgl2Key) {
+        if (lwjgl2Key == KEY_NONE) {
+            return false;
+        }
         int glfwKey = toGlfw(lwjgl2Key);
         if (glfwKey < 0) {
             return false;
@@ -79,6 +90,54 @@ public final class Keyboard {
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    /**
+     * 本家 Keyboard.getKeyName。操作説明の表示に使う (NGTO Builder 2 のヘルプ表示)。
+     * GLFW のキー名を返し、取れないものは LWJGL2 のコード番号を文字列で返す。
+     */
+    public static String getKeyName(int lwjgl2Key) {
+        if (lwjgl2Key == KEY_NONE) {
+            return "NONE";
+        }
+        int glfwKey = toGlfw(lwjgl2Key);
+        if (glfwKey >= 0) {
+            try {
+                String name = GLFW.glfwGetKeyName(glfwKey, 0);
+                if (name != null && !name.isBlank()) {
+                    return name.toUpperCase(java.util.Locale.ROOT);
+                }
+            } catch (Throwable ignored) {
+                //名前を持たないキー (ENTER 等) はここに来る
+            }
+            String fixed = fixedKeyName(glfwKey);
+            if (fixed != null) {
+                return fixed;
+            }
+        }
+        return String.valueOf(lwjgl2Key);
+    }
+
+    /** glfwGetKeyName が null を返す特殊キーの表示名。 */
+    private static String fixedKeyName(int glfwKey) {
+        return switch (glfwKey) {
+            case GLFW.GLFW_KEY_ENTER -> "ENTER";
+            case GLFW.GLFW_KEY_SPACE -> "SPACE";
+            case GLFW.GLFW_KEY_TAB -> "TAB";
+            case GLFW.GLFW_KEY_ESCAPE -> "ESCAPE";
+            case GLFW.GLFW_KEY_BACKSPACE -> "BACKSPACE";
+            case GLFW.GLFW_KEY_LEFT_CONTROL -> "LCONTROL";
+            case GLFW.GLFW_KEY_RIGHT_CONTROL -> "RCONTROL";
+            case GLFW.GLFW_KEY_LEFT_SHIFT -> "LSHIFT";
+            case GLFW.GLFW_KEY_RIGHT_SHIFT -> "RSHIFT";
+            case GLFW.GLFW_KEY_LEFT_ALT -> "LMENU";
+            case GLFW.GLFW_KEY_RIGHT_ALT -> "RMENU";
+            case GLFW.GLFW_KEY_UP -> "UP";
+            case GLFW.GLFW_KEY_DOWN -> "DOWN";
+            case GLFW.GLFW_KEY_LEFT -> "LEFT";
+            case GLFW.GLFW_KEY_RIGHT -> "RIGHT";
+            default -> null;
+        };
     }
 
     /** 本家 Keyboard.isCreated 互換 */

@@ -1,0 +1,39 @@
+{
+  "trainName": "c-toki200",
+  "trainType": "CC",
+
+  "trainModel2": {
+      "modelFile": "c-toki200.mqo",
+      "textures": [["default", "textures/train/c-toki200/c-toki200.png"]]
+  },
+  "bogieModel2": {
+      "modelFile": "bogie_c-toki200.mqo",
+      "textures": [["default", "textures/train/c-toki200/bogie_c-toki200.png"]]
+  },
+
+  "buttonTexture": "textures/train/c-toki200/button_c-toki200.png",
+  "soundScriptPath": "scripts/sound_trailer.js",
+  "sound_Stop": "",
+  "sound_S_A": "",
+  "sound_Acceleration": "",
+  "sound_Deceleration": "",
+  "sound_D_S": "",
+  "sound_Horn": "",
+
+  "seatPos": [],
+  "playerPos": [
+    [0.6, 0.0, 5.0],
+    [-0.6, 0.0, -5.0]
+  ],
+  "bogiePos": [
+    [0.0, 0.0, 3.4],
+    [0.0, 0.0, -3.4]
+  ],
+  "trainDistance": 5.61,
+  "jointDelay" : [[0.0, 1.9, 3.0, 4.9], [0.0, 1.9, 3.0, 4.9]],
+  "doCulling": true,
+	"smoothing": true,
+  "accuracy": "LOW",
+  "collisionParts": ["-all"],
+  "tags": "ngt5479 toki200"
+}

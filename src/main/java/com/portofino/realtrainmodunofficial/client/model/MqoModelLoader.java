@@ -179,7 +179,7 @@ public final class MqoModelLoader {
         if (cached != null) {
             return cached;
         }
-        MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), true);
+        MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), true, def.getModelScale());
         if (model != null) {
             attachScriptModelGraph(model, def.getModelFile());
             loadScriptForModel(model, packPath, scriptPath, def.getId());
@@ -352,12 +352,159 @@ public final class MqoModelLoader {
         return model;
     }
 
+    /**
+     * 本家の Java 実装モデル ({@code ModelBogie.class} 等) を、MQO と同じバッチ表現へ組み立てる。
+     * <p>頂点は {@link ClassModelGeometry} がバニラの {@code ModelPart} に焼かせた物をそのまま使う。
+     * 材質は 1 つ (テクスチャ 1 枚) だけなのでバッチも 1 つ。
+     */
+    /**
+     * 本家の {@code .ngto} (ボクセル) モデルをバッチ表現へ組み立てる。
+     * <p>テクスチャはブロックアトラス 1 枚。ガラス等は別バッチ (半透明) に分ける。
+     */
+    private static MqoModel buildNgtoModel(ResourceSearchResult resource, String modelFile, float voxelScale) {
+        try {
+            List<NgtoModelGeometry.Part> parts = NgtoModelGeometry.buildParts(readBytes(resource), modelFile, voxelScale);
+            if (parts.isEmpty()) {
+                RealTrainModUnofficial.LOGGER.warn("NGTO produced no geometry: {}", modelFile);
+                return null;
+            }
+            ResourceLocation atlas = net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS;
+            List<Batch> batches = new ArrayList<>();
+            for (NgtoModelGeometry.Part part : parts) {
+                //.ngtz はパーツ名でスクリプトから部分描画される。グループ名に使う。
+                addNgtoBatch(batches, part.opaque(), atlas, part.name(), false);
+                addNgtoBatch(batches, part.translucent(), atlas, part.name(), true);
+            }
+            if (batches.isEmpty()) {
+                return null;
+            }
+            MqoModel built = new MqoModel(batches, List.of(atlas));
+            built.voxelModel = true;
+            return built;
+        } catch (Exception e) {
+            RealTrainModUnofficial.LOGGER.warn("Failed to load NGTO {}", modelFile, e);
+            return null;
+        }
+    }
+
+    private static void addNgtoBatch(List<Batch> out, float[] data, ResourceLocation texture,
+                                     String groupName, boolean translucent) {
+        if (data == null || data.length == 0) {
+            return;
+        }
+        float minU = Float.POSITIVE_INFINITY;
+        float maxU = Float.NEGATIVE_INFINITY;
+        float minV = Float.POSITIVE_INFINITY;
+        float maxV = Float.NEGATIVE_INFINITY;
+        for (int i = 0; i + NgtoModelGeometry.STRIDE <= data.length; i += NgtoModelGeometry.STRIDE) {
+            minU = Math.min(minU, data[i + 6]);
+            maxU = Math.max(maxU, data[i + 6]);
+            minV = Math.min(minV, data[i + 7]);
+            maxV = Math.max(maxV, data[i + 7]);
+        }
+        out.add(new Batch(out.size(), groupName, texture, new ResourceLocation[0], data,
+            data.length / NgtoModelGeometry.STRIDE, 0, translucent, minU, maxU, minV, maxV));
+    }
+
+    private static byte[] readBytes(ResourceSearchResult resource) throws IOException {
+        if (resource.filePath() != null) {
+            return Files.readAllBytes(resource.filePath());
+        }
+        try (ZipFile zip = new ZipFile(resource.packPath().toFile())) {
+            ZipEntry entry = zip.getEntry(resource.zipEntryName());
+            if (entry == null) {
+                throw new IOException("Missing zip entry: " + resource.zipEntryName());
+            }
+            try (InputStream in = zip.getInputStream(entry)) {
+                return in.readAllBytes();
+            }
+        }
+    }
+
+    private static MqoModel buildClassModel(Path packPath, String modelFile, Map<String, String> textureOverrides) {
+        float[] data = ClassModelGeometry.build(modelFile);
+        if (data == null || data.length == 0) {
+            RealTrainModUnofficial.LOGGER.warn("Built-in class model produced no geometry: {}", modelFile);
+            return null;
+        }
+        String texturePath = null;
+        if (textureOverrides != null) {
+            texturePath = firstNonBlankValue(textureOverrides.get("default"), textureOverrides.get(""));
+            if (texturePath == null) {
+                for (String value : textureOverrides.values()) {
+                    if (value != null && !value.isBlank()) {
+                        texturePath = value;
+                        break;
+                    }
+                }
+            }
+        }
+        if (texturePath == null || texturePath.isBlank()) {
+            texturePath = ClassModelGeometry.defaultTexture(modelFile);
+        }
+        ResourceLocation texture = resolveClassModelTexture(packPath, texturePath);
+        float minU = Float.POSITIVE_INFINITY;
+        float maxU = Float.NEGATIVE_INFINITY;
+        float minV = Float.POSITIVE_INFINITY;
+        float maxV = Float.NEGATIVE_INFINITY;
+        for (int i = 0; i + ClassModelGeometry.STRIDE <= data.length; i += ClassModelGeometry.STRIDE) {
+            minU = Math.min(minU, data[i + 6]);
+            maxU = Math.max(maxU, data[i + 6]);
+            minV = Math.min(minV, data[i + 7]);
+            maxV = Math.max(maxV, data[i + 7]);
+        }
+        Batch batch = new Batch(0, ClassModelGeometry.groupName(modelFile), texture, new ResourceLocation[0],
+            data, data.length / ClassModelGeometry.STRIDE, 0, false, minU, maxU, minV, maxV);
+        return new MqoModel(List.of(batch), List.of(texture));
+    }
+
+    private static String firstNonBlankValue(String a, String b) {
+        if (a != null && !a.isBlank()) {
+            return a;
+        }
+        return b != null && !b.isBlank() ? b : null;
+    }
+
+    /** {@code minecraft:textures/entity/minecart.png} のような名前空間付きも受ける。 */
+    private static ResourceLocation resolveClassModelTexture(Path packPath, String texturePath) {
+        if (texturePath == null || texturePath.isBlank()) {
+            return fallbackTexture();
+        }
+        if (texturePath.indexOf(':') >= 0) {
+            ResourceLocation direct = ResourceLocation.tryParse(texturePath);
+            if (direct != null) {
+                return direct;
+            }
+        }
+        ResourceLocation resolved = resolvePackTexture(packPath, texturePath);
+        if (resolved != null && !resolved.equals(fallbackTexture())) {
+            return resolved;
+        }
+        //パックに無いならバニラのリソースとして引く。minecart は
+        //"textures/entity/minecart.png" = バニラのテクスチャで、パック内には存在しない。
+        //ここを通さないと 4x4 の白テクスチャになる (真っ白な面として出る)。
+        ResourceLocation vanilla = ResourceLocation.tryParse("minecraft:" + texturePath);
+        if (vanilla != null && Minecraft.getInstance() != null
+                && Minecraft.getInstance().getResourceManager().getResource(vanilla).isPresent()) {
+            return vanilla;
+        }
+        return resolved != null ? resolved : fallbackTexture();
+    }
+
     public static ResourceLocation resolvePackTexture(String packName, String texturePath) {
         if (packName == null || packName.isBlank() || texturePath == null || texturePath.isBlank()) {
             return fallbackTexture();
         }
         Path packPath = RailPackLoader.resolvePackPath(packName);
         if (packPath == null) {
+            return fallbackTexture();
+        }
+        return resolvePackTexture(packPath, texturePath);
+    }
+
+    /** パス直指定版。パック名を持たない経路 ({@link #loadInternal}) から使う。 */
+    private static ResourceLocation resolvePackTexture(Path packPath, String texturePath) {
+        if (packPath == null || texturePath == null || texturePath.isBlank()) {
             return fallbackTexture();
         }
         //RTMU 追加: アニメーション GIF を方向幕/種別幕などに直接使えるようにする。
@@ -447,6 +594,26 @@ public final class MqoModelLoader {
     }
 
     private static MqoModel loadInternal(Path packPath, String modelFile, Map<String, String> textureOverrides, boolean smoothing) {
+        return loadInternal(packPath, modelFile, textureOverrides, smoothing, 1.0F);
+    }
+
+    /**
+     * @param voxelScale ボクセルモデル (.ngto/.ngtz) の縮尺。本家 {@code NGTOParts.render} は
+     *                   {@code glScalef(scale)} を<b>パーツの形状の内側だけ</b>に掛ける。
+     *                   描画の最上位で掛けると、スクリプトが台車/ドアを置くための
+     *                   {@code glTranslatef} まで縮んで<b>全部が車両中央に寄る</b>。
+     *                   なのでここで形状へ焼き込み、描画側では掛けない。
+     */
+    private static MqoModel loadInternal(Path packPath, String modelFile, Map<String, String> textureOverrides,
+                                         boolean smoothing, float voxelScale) {
+        //本家 Java 実装モデル (ModelBogie.class / ModelTrain_kiha600.class / ModelTrain_Minecart.class)。
+        //ファイルとして存在しないので、パックを探す前にここで組み立てる。
+        //★車体・台車・プレビューで入口が違う (loadModelForVehicle / loadModelForVehiclePart /
+        //  loadModelFromPack) ので、<b>共通の底</b>であるここで受ける。入口ごとに足すと
+        //  必ず取りこぼす (実際、台車だけ出て車体が出ない状態になった)。
+        if (ClassModelGeometry.isSupported(modelFile)) {
+            return buildClassModel(packPath, modelFile, textureOverrides);
+        }
         if (packPath == null || !Files.exists(packPath)) return null;
         logModelLoadDetail("begin", "packPath={}, modelFile={}, smoothing={}, textureOverrides={}", packPath, modelFile, smoothing, textureOverrides);
         try {
@@ -473,6 +640,10 @@ public final class MqoModelLoader {
                         return modelPackPath.toString();
                     }
                 };
+                if (lowerModelFile.endsWith(".ngto") || lowerModelFile.endsWith(".ngtz")) {
+                    //本家の .ngto/.ngtz はボクセル。ブロックの焼き済みモデルから面を組む。
+                    return buildNgtoModel(modelResource, modelFile, voxelScale);
+                }
                 if (lowerModelFile.endsWith(".obj")) {
                     return bakeObj(readText(modelResource), opener, textureOverrides, smoothing);
                 }
@@ -504,6 +675,10 @@ public final class MqoModelLoader {
                         return modelPackPath.toString();
                     }
                 };
+                if (lowerModelFile.endsWith(".ngto") || lowerModelFile.endsWith(".ngtz")) {
+                    //本家の .ngto/.ngtz はボクセル。ブロックの焼き済みモデルから面を組む。
+                    return buildNgtoModel(modelResource, modelFile, voxelScale);
+                }
                 if (lowerModelFile.endsWith(".obj")) {
                     return bakeObj(readText(modelResource), opener, textureOverrides, smoothing);
                 }
@@ -517,6 +692,10 @@ public final class MqoModelLoader {
             return null;
         }
     }
+
+    /** 別パック解決のログを 1 組合せ 1 回だけ出すための記録。 */
+    private static final java.util.Set<String> CROSS_PACK_LOGGED =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private static InputStream openTexture(Path packPath, String relative) throws IOException {
         if (packPath == null) {
@@ -545,6 +724,15 @@ public final class MqoModelLoader {
         ResourceSearchResult fallback = findResource(relative, packPath);
         if (fallback == null || packPath.equals(fallback.packPath())) {
             return null;
+        }
+        //別パックから引いた時だけ 1 回記録する。分割パック (定義とテクスチャが別 zip) で
+        //「どのパックの絵が実際に使われたか」を後から確認できるようにする。
+        //同名ファイルを多数持つパックの取り違えは、これを見ないと切り分けられない。
+        if (CROSS_PACK_LOGGED.add(packPath + "|" + relative)) {
+            RealTrainModUnofficial.LOGGER.info("[RTMU] テクスチャ/資産を別パックから解決: {} → {} ({})",
+                relative,
+                com.portofino.realtrainmodunofficial.util.LogPaths.safe(fallback.packPath()),
+                fallback.zipEntryName() != null ? fallback.zipEntryName() : fallback.filePath());
         }
         return openResource(fallback);
     }
@@ -637,12 +825,16 @@ public final class MqoModelLoader {
                 return candidate;
             }
         }
-        String leaf = norm.contains("/") ? norm.substring(norm.lastIndexOf('/') + 1) : norm;
+        //★zip 版 (findEntry) と同じく<b>ファイル名だけの一致は取らない</b>。
+        //assets/<domain>/ を基準にした完全パス (サフィックス) 一致のみ。
+        String suffix = ("/" + norm).toLowerCase(Locale.ROOT);
         try (var stream = Files.walk(root)) {
             for (Path file : (Iterable<Path>) stream::iterator) {
                 if (!Files.isRegularFile(file)) continue;
-                String name = file.getFileName().toString();
-                if (name.equalsIgnoreCase(norm) || name.equalsIgnoreCase(leaf)) return file;
+                String rel = root.relativize(file).toString().replace('\\', '/').toLowerCase(Locale.ROOT);
+                if (rel.equals(norm.toLowerCase(Locale.ROOT)) || ("/" + rel).endsWith(suffix)) {
+                    return file;
+                }
             }
         }
         return null;
@@ -664,46 +856,28 @@ public final class MqoModelLoader {
                 return direct;
             }
         }
-        //★一致の強さで順位を付ける。以前は「フルパス一致」と「ファイル名だけ一致」を
-        //同じループで先着順に返していたため、<b>同名ファイルが複数あるパックで別物を掴んだ</b>。
-        //例: 0系パックは JNR_S0_c_edit.png をバリアントごとに 44 個持っており、
-        //先頭に並んだ別編成のテクスチャが貼られる (鼻先だけ色が違う等)。
-        //ファイル名だけの一致は<b>候補が 1 個しかないときに限る</b>。
-        String leaf = norm.contains("/") ? norm.substring(norm.lastIndexOf('/') + 1) : norm;
+        //★<b>ファイル名だけの一致は取らない</b>。本家 ModelPackManager.getResource は
+        //assets/<domain>/<path> の完全一致でしか引かない。
+        //以前は「そのパック内に同名が 1 個しか無ければ採用」としていたが、パックが複数ある
+        //環境では<b>正しいパックを見る前に別パックの同名ファイルで確定</b>してしまう。
+        //実例: 相模線の `205_main_mi/SG/205m.png` が、鶴見線パックに 1 個だけある
+        //`205_main_mi/TR/205m.png` に化けていた (中間車だけ鶴見線の色になる)。
+        //サフィックス一致は assets/<domain>/ を基準にした完全パス解決なので残す。
         String suffixLower = ("/" + norm).toLowerCase(Locale.ROOT);
-        ZipEntry fullMatch = null;
         ZipEntry suffixMatch = null;
-        ZipEntry leafMatch = null;
-        int leafHits = 0;
         java.util.Enumeration<? extends ZipEntry> en = zf.entries();
         while (en.hasMoreElements()) {
             ZipEntry ze = en.nextElement();
             if (ze.isDirectory()) continue;
             String name = ze.getName().replace('\\', '/');
             if (name.equalsIgnoreCase(norm)) {
-                fullMatch = ze;
-                break;
+                return ze;
             }
             if (suffixMatch == null && name.toLowerCase(Locale.ROOT).endsWith(suffixLower)) {
                 suffixMatch = ze;
-                continue;
-            }
-            int slash = name.lastIndexOf('/');
-            String shortName = slash >= 0 ? name.substring(slash + 1) : name;
-            if (shortName.equalsIgnoreCase(leaf)) {
-                leafHits++;
-                if (leafMatch == null) leafMatch = ze;
             }
         }
-        if (fullMatch != null) return fullMatch;
-        if (suffixMatch != null) return suffixMatch;
-        if (leafHits == 1) return leafMatch;
-        if (leafHits > 1) {
-            RealTrainModUnofficial.LOGGER.warn(
-                "[RTMU] {} は同名が {} 個あり、パスが一致するものがありません。誤ったテクスチャを貼らないため未解決にします",
-                norm, leafHits);
-        }
-        return null;
+        return suffixMatch;
     }
 
     private static List<String> candidateResourcePaths(String norm) {
@@ -740,7 +914,6 @@ public final class MqoModelLoader {
             return null;
         }
         String normalized = normalize(relative).replaceFirst("^/+", "");
-        String leaf = normalized.contains("/") ? normalized.substring(normalized.lastIndexOf('/') + 1) : normalized;
         String preferredKey = preferredPackPath == null ? "" : preferredPackPath.toAbsolutePath().normalize().toString();
         String cacheKey = preferredKey + "|" + normalized;
         ResourceSearchResult cached = RESOURCE_SEARCH_CACHE.get(cacheKey);
@@ -754,6 +927,12 @@ public final class MqoModelLoader {
             candidates.add(preferredPackPath.toAbsolutePath().normalize());
         }
         candidates.addAll(getSharedPackCandidates());
+        //★本家と同じく<b>完全パスだけ</b>で解決する。
+        //本家 ModelPackManager.getResource は ResourceLocationCustom(domain, path) を作るだけで
+        //探索しない (MC のリソースパック機構が assets/&lt;domain&gt;/&lt;path&gt; を完全一致で引く)。
+        //RTMU にはファイル名だけで探すフォールバックがあったが、JRCT パックのように
+        //全系列で `.../button/1.png` と同名のボタン画像を持つパックでは<b>別系列の絵</b>を
+        //掴む (同名 5 個)。車両とボタンが一致しない原因だったので撤去した。
         for (Path candidate : candidates) {
             logModelLoadDetail("resource-scan", "relative={} candidatePack={}", normalized, candidate);
             ResourceSearchResult found = findResourceInPack(candidate, normalized);
@@ -763,16 +942,8 @@ public final class MqoModelLoader {
                 RESOURCE_SEARCH_CACHE.put(cacheKey, found);
                 return found;
             }
-            if (!leaf.equals(normalized)) {
-                found = findResourceInPack(candidate, leaf);
-                if (found != null) {
-                    logModelLoadDetail("resource-hit-leaf", "relative={} leaf={} candidatePack={} filePath={} zipEntry={}",
-                        normalized, leaf, candidate, found.filePath(), found.zipEntryName());
-                    RESOURCE_SEARCH_CACHE.put(cacheKey, found);
-                    return found;
-                }
-            }
         }
+
         logModelLoadDetail("resource-miss", "relative={} preferredPack={} searchedPacks={}", normalized, preferredPackPath, candidates);
         RESOURCE_SEARCH_CACHE.put(cacheKey, MISSING_RESOURCE);
         return null;
@@ -983,7 +1154,7 @@ public final class MqoModelLoader {
         List<Batch> out = new ArrayList<>();
         applyObjectWideSmoothing(byGroup.values(), smoothing);
         for (BatchBuilder bb : byGroup.values()) {
-            if (!bb.positions.isEmpty()) out.add(bb.bake(false));
+            if (!bb.positions.isEmpty()) out.add(bb.bake());
         }
         List<ResourceLocation> materialTextures = new ArrayList<>(materialOrder.size());
         StringBuilder mapping = new StringBuilder();
@@ -1098,7 +1269,7 @@ public final class MqoModelLoader {
         applyObjectWideSmoothing(byGroup.values(), smoothing);
         for (BatchBuilder bb : byGroup.values()) {
             if (!bb.positions.isEmpty()) {
-                Batch batch = bb.bake(false);
+                Batch batch = bb.bake();
                 out.add(batch);
                 uniqueTextures.add(batch.texture);
             }
@@ -1185,12 +1356,17 @@ public final class MqoModelLoader {
 
     private static void putObjVertex(BatchBuilder bb, ObjFaceVertex vertex, Vector3f fallbackNormal) {
         Vector3f normal = vertex.normal() != null ? new Vector3f(vertex.normal()) : new Vector3f(fallbackNormal);
-        if (normal.lengthSquared() <= 1.0E-8F) {
-            normal.set(0.0F, 1.0F, 0.0F);
-        } else {
-            normal.normalize();
+        if (!FaceNormals.normalize(normal)) {
+            normal.set(fallbackNormal);
+            FaceNormals.normalize(normal);
         }
         bb.put(vertex.position(), normal, vertex.u(), vertex.v());
+    }
+
+    /** 面積 0 (3 点が一直線/同一点) か。大きさでは判定しない。 */
+    private static boolean isUsableNormal(Vector3f n) {
+        float max = Math.max(Math.abs(n.x), Math.max(Math.abs(n.y), Math.abs(n.z)));
+        return max > 0.0F && Float.isFinite(max);
     }
 
     private static Vector3f chooseFaceNormal(ObjFaceVertex v0, ObjFaceVertex v1, ObjFaceVertex v2, ObjFaceVertex v3) {
@@ -1201,15 +1377,11 @@ public final class MqoModelLoader {
         Vector3f e1 = new Vector3f((float) (v1.position().x - v0.position().x), (float) (v1.position().y - v0.position().y), (float) (v1.position().z - v0.position().z));
         Vector3f e2 = new Vector3f((float) (v2.position().x - v0.position().x), (float) (v2.position().y - v0.position().y), (float) (v2.position().z - v0.position().z));
         Vector3f normal = e1.cross(e2);
-        if (normal.lengthSquared() <= 1.0E-8F && v3 != null) {
+        if (!isUsableNormal(normal) && v3 != null) {
             e2.set((float) (v3.position().x - v0.position().x), (float) (v3.position().y - v0.position().y), (float) (v3.position().z - v0.position().z));
             normal = e1.cross(e2);
         }
-        if (normal.lengthSquared() <= 1.0E-8F) {
-            normal.set(0.0F, 1.0F, 0.0F);
-        } else {
-            normal.normalize();
-        }
+        FaceNormals.normalize(normal);
         return normal;
     }
 
@@ -1454,8 +1626,9 @@ public final class MqoModelLoader {
         Vector3f e1 = new Vector3f((float) (p1.x - p0.x), (float) (p1.y - p0.y), (float) (p1.z - p0.z));
         Vector3f e2 = new Vector3f((float) (p2.x - p0.x), (float) (p2.y - p0.y), (float) (p2.z - p0.z));
         Vector3f n = e1.cross(e2);
-        if (n.lengthSquared() > 1.0e-8f) n.normalize();
-        else n.set(0, 1, 0);
+        //★大きさで捨てない。文字のような細かい三角形は |n|^2 が 1e-10 台になるので、
+        //閾値を置くと正常な面まで法線が真上へ差し替わる ([[FaceNormals]])。
+        FaceNormals.normalize(n);
         bb.put(p0, n, u0, v0);
         bb.put(p1, n, u1, v1);
         bb.put(p2, n, u2, v2);
@@ -1507,8 +1680,9 @@ public final class MqoModelLoader {
         Vector3f e1 = new Vector3f((float) (p1.x - p0.x), (float) (p1.y - p0.y), (float) (p1.z - p0.z));
         Vector3f e2 = new Vector3f((float) (p2.x - p0.x), (float) (p2.y - p0.y), (float) (p2.z - p0.z));
         Vector3f n = e1.cross(e2);
-        if (n.lengthSquared() > 1.0e-8f) n.normalize();
-        else n.set(0, 1, 0);
+        //★大きさで捨てない。文字のような細かい三角形は |n|^2 が 1e-10 台になるので、
+        //閾値を置くと正常な面まで法線が真上へ差し替わる ([[FaceNormals]])。
+        FaceNormals.normalize(n);
         // QUADSモードは4頂点/面が必要 → 3頂点の三角形は縮退クワッドとして扱う (v0,v1,v2,v2)
         bb.put(p0, n, u0, v0);
         bb.put(p1, n, u1, v1);
@@ -1548,7 +1722,7 @@ public final class MqoModelLoader {
             default -> new float[]{1, 1, -1};
         };
         Vector3f o = new Vector3f(n.x * m[0], n.y * m[1], n.z * m[2]);
-        if (o.lengthSquared() > 1.0e-8f) o.normalize();
+        FaceNormals.normalize(o);
         return o;
     }
 
@@ -2278,18 +2452,34 @@ public final class MqoModelLoader {
         if (binding == null || !binding.hasLightTextures()) {
             return new ResourceLocation[0];
         }
+        //★本家 TextureSet は subTextures[pass.id - 2] と<b>位置で</b>引く。
+        //  i=0 → LIGHT(室内灯) / i=1 → LIGHT_FRONT(前照灯) / i=2 → LIGHT_BACK(尾灯)
+        //以前はここで「見つかったものだけ詰めて」配列を作っていたため、
+        //例えば _light0 が無く _light1/_light2 だけある材質で添字が 1 つずつ手前へずれ、
+        //前照灯用テクスチャが室内灯パスに回っていた。前照灯・尾灯 (mode 2) では
+        //pass3 と pass4 の両方が走るので、同じ面が二重に描かれて「重なって見える」。
+        //本家と同じく<b>位置は固定し、無いものは null のまま</b>にする。
         List<String> explicitPaths = binding.lightTexturePaths();
         int count = Math.max(3, explicitPaths.size());
-        List<ResourceLocation> found = new ArrayList<>();
+        ResourceLocation[] slots = new ResourceLocation[count];
         for (int i = 0; i < count; i++) {
             String candidate = i < explicitPaths.size() ? explicitPaths.get(i) : deriveLegacyLightTexturePath(binding.path(), i);
-            if (candidate == null || candidate.isBlank()) continue;
-            ResourceLocation loaded = tryLoadOptionalTexture(candidate, opener, binding.cacheKey() + "#light" + i);
-            if (loaded != null) {
-                found.add(loaded);
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+            slots[i] = tryLoadOptionalTexture(candidate, opener, binding.cacheKey() + "#light" + i);
+        }
+        //末尾が全部 null なら配列ごと縮める (「発光材質でない」判定を変えないため)
+        int last = -1;
+        for (int i = 0; i < count; i++) {
+            if (slots[i] != null) {
+                last = i;
             }
         }
-        return found.toArray(new ResourceLocation[0]);
+        if (last < 0) {
+            return new ResourceLocation[0];
+        }
+        return java.util.Arrays.copyOf(slots, last + 1);
     }
 
     private static String deriveLegacyLightTexturePath(String basePath, int index) {
@@ -2374,6 +2564,23 @@ public final class MqoModelLoader {
         char c = path.charAt(0);
         return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) && path.charAt(1) == ':';
     }
+
+    /**
+     * 車体の頂点変換を<b>CPU 側に固定</b>するか。
+     *
+     * <p>静的 VBO の高速経路は {@code mv = ModelView × pose} を CPU で合成して
+     * <b>頂点変換を GPU</b>で行うが、発光パスやスクリプト描画は<b>CPU</b>で pose を掛けて提出する。
+     * {@code (A·B)·v} と {@code A·(B·v)} は float32 で数 ULP ずれ、同一面でも深度が一致せず z-fighting する。
+     *
+     * <p>さらに VBO を使うかの判定には<b>フレームごとに変わる条件</b>が含まれる:
+     * {@code InteriorLighting.isActive()} (車両位置の明るさ)、
+     * {@code groupTransform != null} (座席回転・ドア・パンタが動いている間だけ CPU)、
+     * スクリプトの色指定や UV 変換。そのため「動いている間は CPU / 止まると VBO」と
+     * 経路が入れ替わり、切り替わった瞬間だけ深度がずれて一瞬重なって見える。
+     *
+     * <p>本家は変換経路が 1 つしかないのでこの問題自体が存在しない。経路を CPU 側へ固定する。
+     */
+    private static final boolean PIN_CPU_TRANSFORM = true;
 
     private static boolean shouldCullModelFaces(Object rawEntity) {
         //replay経路はentityがnullのため、描画中の車両からdoCullingを引く
@@ -2894,7 +3101,10 @@ public final class MqoModelLoader {
             return;
         }
         List<SmoothFace> faces = new ArrayList<>();
-        Map<String, List<SmoothFace>> byPosition = new HashMap<>();
+        //陰影用: 本家と同じ「座標が完全に一致する頂点だけを同一視」。
+        //押し出し用: 従来どおり 1mm グリッド (下の bias の説明を参照)。
+        Map<PosKey, List<SmoothFace>> byExactPosition = new HashMap<>();
+        Map<PosKey, List<SmoothFace>> byGridPosition = new HashMap<>();
         for (BatchBuilder builder : builders) {
             if (builder == null || builder.positions.isEmpty()) {
                 continue;
@@ -2915,12 +3125,9 @@ public final class MqoModelLoader {
                 SmoothFace face = new SmoothFace(builder, first, normal);
                 faces.add(face);
                 for (int k = 0; k < 4; k++) {
-                    String key = positionKey(builder.positions, (first + k) * 8);
-                    List<SmoothFace> list = byPosition.computeIfAbsent(key, ignored -> new ArrayList<>());
-                    //本家 !list.contains(face): 同じ面は同じ位置に 1 回だけ (縮退 p2==p3 の二重登録防止)
-                    if (list.isEmpty() || list.get(list.size() - 1) != face) {
-                        list.add(face);
-                    }
+                    int offset = (first + k) * 8;
+                    register(byExactPosition, exactPositionKey(builder.positions, offset), face);
+                    register(byGridPosition, gridPositionKey(builder.positions, offset), face);
                 }
             }
         }
@@ -2933,21 +3140,25 @@ public final class MqoModelLoader {
             for (int k = 0; k < 4; k++) {
                 int vi = face.firstVertex + k;
                 int o = vi * 8;
-                String key = positionKey(face.builder.positions, o);
-                List<SmoothFace> shared = byPosition.get(key);
                 //本家: vec = 自面の法線から開始し、他の面は面法線角が facet 以下なら加算
                 Vector3f shade = new Vector3f(face.normal);
                 //depthBias の押し出し方向: 同位置の全面の平均 (facet 閾値なし)。
                 //閾値ありの法線で押すと硬いエッジで同位置の頂点が別方向に動き、
                 //light/display グループの押し出しで面が割れて隙間が開く。
                 Vector3f bias = new Vector3f(face.normal);
-                if (shared != null) {
-                    for (SmoothFace other : shared) {
+                List<SmoothFace> exact = byExactPosition.get(exactPositionKey(face.builder.positions, o));
+                if (exact != null && smoothing) {
+                    for (SmoothFace other : exact) {
+                        if (other != face && face.normal.dot(other.normal) >= cosThreshold) {
+                            shade.add(other.normal);
+                        }
+                    }
+                }
+                List<SmoothFace> grid = byGridPosition.get(gridPositionKey(face.builder.positions, o));
+                if (grid != null) {
+                    for (SmoothFace other : grid) {
                         if (other != face) {
                             bias.add(other.normal);
-                            if (smoothing && face.normal.dot(other.normal) >= cosThreshold) {
-                                shade.add(other.normal);
-                            }
                         }
                     }
                 }
@@ -2974,10 +3185,53 @@ public final class MqoModelLoader {
         });
     }
 
-    private static String positionKey(List<Float> positions, int offset) {
-        return Math.round(positions.get(offset) * 1000.0F) + ","
-            + Math.round(positions.get(offset + 1) * 1000.0F) + ","
-            + Math.round(positions.get(offset + 2) * 1000.0F);
+    /** 頂点の同一判定キー。生ビットなので「完全一致」も「1mm グリッド」も同じ器で扱える。 */
+    private record PosKey(int x, int y, int z) {}
+
+    private static void register(Map<PosKey, List<SmoothFace>> map, PosKey key, SmoothFace face) {
+        List<SmoothFace> list = map.computeIfAbsent(key, ignored -> new ArrayList<>());
+        //本家 !list.contains(face): 同じ面は同じ位置に 1 回だけ (縮退 p2==p3 の二重登録防止)。
+        //1 面の 4 頂点は連続して登録するので、重複は必ず末尾に居る。
+        if (list.isEmpty() || list.get(list.size() - 1) != face) {
+            list.add(face);
+        }
+    }
+
+    /**
+     * 陰影用の頂点キー。<b>本家と同じく座標の完全一致</b>で同一視する。
+     * <p>本家 {@code Vertex} は {@code hashCode} が生ビット由来・{@code equals} が 1e-4 許容なので、
+     * HashMap 上では実質「ビットが同じ頂点だけが同じ束」になる。これに合わせる。
+     * <p>★以前はここが {@code round(x*1000)} の <b>1mm グリッド</b>だった。1mm 未満しか離れていない
+     * 別頂点まで束ねてしまうため、ナンバープレートの文字のように細かい面が集まる所で、
+     * 本来混ざらない面の法線が混ざって<b>変な位置に影が出ていた</b>。D51 (D51-498_1.mqoz) の
+     * body-2 で実測すると、本家アルゴリズムとの差は<b>頂点の 8.28% が 5°以上・最大 58.5°</b>。
+     * 完全一致にすると 0% になる (0.1mm グリッドでも 0.19% 残る) ので、グリッドではなく完全一致にする。
+     * <p>{@code -0.0F} は {@code 0.0F} へ寄せる。ミラー生成は座標に -1 を掛けるので、鏡像面上の
+     * 頂点が {@code -0.0F} になり、寄せないとミラーの継ぎ目で法線が繋がらない
+     * (本家は {@code x == 0.0F} の頂点を元の {@code Vertex} のまま使うので繋がる)。
+     */
+    private static PosKey exactPositionKey(List<Float> positions, int offset) {
+        return new PosKey(
+            Float.floatToIntBits(zeroNormalized(positions.get(offset))),
+            Float.floatToIntBits(zeroNormalized(positions.get(offset + 1))),
+            Float.floatToIntBits(zeroNormalized(positions.get(offset + 2))));
+    }
+
+    /**
+     * depthBias の押し出し方向用の頂点キー。こちらは従来どおり 1mm グリッド。
+     * <p>用途が「重なっている面を一緒に押し出して隙間を作らない」で、本家に対応物が無い
+     * RTMU 独自処理なので、陰影とは別の粒度で構わない。むしろ完全一致にすると、
+     * わずかにズレた頂点が別方向へ押されて light/display グループに隙間が開く。
+     */
+    private static PosKey gridPositionKey(List<Float> positions, int offset) {
+        return new PosKey(
+            Math.round(positions.get(offset) * 1000.0F),
+            Math.round(positions.get(offset + 1) * 1000.0F),
+            Math.round(positions.get(offset + 2) * 1000.0F));
+    }
+
+    private static float zeroNormalized(float value) {
+        return value == 0.0F ? 0.0F : value;
     }
 
     private static final class BatchBuilder {
@@ -3054,10 +3308,9 @@ public final class MqoModelLoader {
             return faceSignatures.add(builder.toString());
         }
 
-        Batch bake(boolean smoothing) {
-            if (smoothing) {
-                applySmoothNormals();
-            }
+        //スムージングは applyObjectWideSmoothing (オブジェクト単位・本家準拠) で済ませてある。
+        //バッチ単位でやり直すと材質の境目で法線が切れるので、ここではやらない。
+        Batch bake() {
             float[] data = new float[positions.size()];
             for (int i = 0; i < positions.size(); i++) data[i] = positions.get(i);
             float safeMinU = Float.isFinite(minU) ? minU : 0.0F;
@@ -3078,56 +3331,6 @@ public final class MqoModelLoader {
             return built;
         }
 
-        private void applySmoothNormals() {
-            int vertexCount = positions.size() / 8;
-            if (vertexCount <= 0) {
-                return;
-            }
-
-            Map<String, List<Integer>> byPosition = new HashMap<>();
-            Vector3f[] originalNormals = new Vector3f[vertexCount];
-            for (int i = 0; i < vertexCount; i++) {
-                int o = i * 8;
-                byPosition.computeIfAbsent(positionKey(o), k -> new ArrayList<>()).add(i);
-                originalNormals[i] = new Vector3f(positions.get(o + 3), positions.get(o + 4), positions.get(o + 5));
-                if (originalNormals[i].lengthSquared() > 1.0E-8F) {
-                    originalNormals[i].normalize();
-                } else {
-                    originalNormals[i].set(0.0F, 1.0F, 0.0F);
-                }
-            }
-
-            float angle = this.smoothingAngle > 0.0F ? this.smoothingAngle : RTM_DEFAULT_SMOOTHING_ANGLE;
-            float cosThreshold = (float) Math.cos(Math.toRadians(angle));
-            for (int i = 0; i < vertexCount; i++) {
-                int o = i * 8;
-                List<Integer> shared = byPosition.get(positionKey(o));
-                if (shared == null || shared.isEmpty()) {
-                    continue;
-                }
-
-                Vector3f current = originalNormals[i];
-                Vector3f sum = new Vector3f();
-                for (int other : shared) {
-                    Vector3f normal = originalNormals[other];
-                    if (current.dot(normal) >= cosThreshold) {
-                        sum.add(normal);
-                    }
-                }
-                if (sum.lengthSquared() > 1.0E-8F) {
-                    sum.normalize();
-                    positions.set(o + 3, sum.x);
-                    positions.set(o + 4, sum.y);
-                    positions.set(o + 5, sum.z);
-                }
-            }
-        }
-
-        private String positionKey(int offset) {
-            return Math.round(positions.get(offset) * 1000.0F) + ","
-                + Math.round(positions.get(offset + 1) * 1000.0F) + ","
-                + Math.round(positions.get(offset + 2) * 1000.0F);
-        }
     }
 
     public static final class MqoModel {
@@ -3186,10 +3389,20 @@ public final class MqoModelLoader {
         // 床下の蓋(下向き面)用。車体シェルの底Y・XZ範囲を遅延計算してキャッシュ。
         // 片面表示のままだと開いた底から中の暗い空間が透けて黒く見えるため、底に下向きの
         // グレー板を1枚足して塞ぐ(両面表示は使わない=禁止ルール遵守)。
+        private boolean voxelModel;
         private volatile float[] bodyCapRect; // {minX, minZ, maxX, maxZ, bottomY}
         private volatile boolean bodyCapComputed;
 
         public MqoModel(List<Batch> batches, List<ResourceLocation> materialTextures) {
+            //★提出順を本家に合わせる: 本家 ModelObject.renderWithTexture は
+            //  for (材質 i) { currentMatId = i; renderer.render(...) }
+            //で<b>材質が外側</b>。RTMU は (グループ, 材質) の初出順に持っていたので
+            //実質「グループが外側」で、重なった面の<b>どちらが後に描かれるか</b>が本家と逆になる。
+            //深度が同値な重なり面は「後に描いた方が残る」ので、順が違うと本家では見えない面が
+            //手前に出る (D51 の「動かず貼り付いた斑」)。材質→初出順で並べ替えて本家と揃える。
+            batches = new ArrayList<>(batches);
+            batches.sort(java.util.Comparator.<Batch>comparingInt(b -> b.materialId)
+                .thenComparingInt(b -> b.order));
             this.batches = batches;
             this.batchesByNormalizedGroup = buildBatchIndex(batches);
             this.scriptModel = new ScriptModel(materialTextures);
@@ -3502,6 +3715,37 @@ public final class MqoModelLoader {
             return false;
         }
 
+        /**
+         * 本体モデルが<b>自前の台車パーツ</b>を持つか。
+         * <p>.ngtz の車両は台車を {@code bogieM_F} のようなパーツとしてモデルに内蔵しつつ、
+         * JSON では {@code ModelBogie.class} を指していることがある。その場合に組込台車を
+         * 重ねると二重になるので、こちらを優先する。
+         * <p>{@link #hasOwnWheelGroups()} と分けてあるのは、あちらが「SL の動輪」判定で、
+         * 実ファイルの台車モデルを持つ車両にも効いてしまうと本物の台車が消えるため。
+         */
+        /**
+         * ボクセルモデル (.ngto/.ngtz) か。
+         * <p>本家 {@code NGTZModel} はパーツごとに<b>自分のグリッドの中央</b>へ寄せて描き、
+         * 実際の位置決めはパックのスクリプトが {@code glTranslatef} で行う。
+         * そのためスクリプトが走っている間、ベイク済みモデルを別に描いてはいけない
+         * (台車やドアが車両の中央に出る / 本体が二重になってチカチカする)。
+         */
+        public boolean isVoxelModel() {
+            return this.voxelModel;
+        }
+
+        public boolean hasOwnBogieGroups() {
+            for (Batch batch : batches) {
+                String g = batch.groupNameLower;
+                if (g == null) continue;
+                if (g.contains("bogie") || g.contains("daisya") || g.contains("daisha")
+                        || g.contains("sharin") || g.contains("台車")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /** モデル内の全グループ名 (正規化済み: trim + toLowerCase) を返す。 */
         public java.util.Set<String> getAllNormalizedGroupNames() {
             java.util.Set<String> result = new java.util.LinkedHashSet<>();
@@ -3702,20 +3946,20 @@ public final class MqoModelLoader {
             //     GLHelper.disableLighting();
             //     GLHelper.setLightmapMaxBrightness();
             //     this.renderWithTexture(entity, 2, par3);
-            //     GL11.glColor4f(1,1,1,1); GLHelper.enableLighting();
-            // ブレンドは alphaBlend の分岐内だけで、その直後に disable される。つまり発光パスは
-            // 「フルブライト・ブレンド無し・depthMask は既定の ON」。
-            // i > 0 (前照灯/尾灯) の blend + glColor4f(1,1,1,0.8) は従来の解釈を据え置く。
-            boolean lit = legacyPass >= 3;
-            int light = lit ? net.minecraft.client.renderer.LightTexture.FULL_BRIGHT : packedLight;
-            float alpha = lit ? 0.8F : 1.0F;
-            //本家 renderBodyLight は発光パスで頂点を押し出さない。i>0 (前照灯/尾灯) だけは
-            //ブレンド描画なので、従来の z-fight 回避の押し出しを残す。
-            //i==0 (LIGHT) は不透明・深度書き込みで同一頂点を描き直すだけ (LEQUAL で後勝ち)。
-            float depthBias = lit ? 0.0015F * (legacyPass - 1) : 0.0F;
+            //★本家 RenderVehicleBase.renderBodyLight の忠実移植。
+            //  isLightON = (i > 0) のときだけ
+            //      disableLighting() + glEnable(GL_BLEND) + glBlendFunc(SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
+            //      + glColor4f(1,1,1,0.8) + setLightmapMaxBrightness()
+            //  i == 0 (RenderPass.LIGHT) は<b>状態を一切変えない</b> = 通常ライティング・
+            //  周囲の明るさ・ブレンド無し・深度書き込みあり。
+            //  本家は頂点を押し出さないので depthBias も持たない。
+            //  「LIGHT は NORMAL/TRANSPARENT の後」という順序は、1.21 の遅延バッファでは
+            //  提出順では保証されないので renderReal 側でパスの区切りに flush を入れて担保する。
+            boolean isLightON = legacyPass > 2;
+            int light = isLightON ? net.minecraft.client.renderer.LightTexture.FULL_BRIGHT : packedLight;
+            float alpha = isLightON ? 0.8F : 1.0F;
+            boolean cullFaces = shouldCullModelFaces(null);
             float[] normalOut = new float[3];
-            //夜間グロー: 発光面を拡大シェルで加算合成する
-            float glow = lit ? glowDarkness(packedLight) : 0.0F;
             for (String name : normalizedGroupNames) {
                 List<Batch> groupBatches = batchesByNormalizedGroup.get(name);
                 if (groupBatches == null || groupBatches.isEmpty()) {
@@ -3735,11 +3979,10 @@ public final class MqoModelLoader {
                 for (Batch batch : groupBatches) {
                     ResourceLocation tex = batch.emissiveTextureForPass(legacyPass);
                     if (tex == null) {
-                        //旧式ライト(発光テクスチャ無し)はlight名グループだけ不透明で描く
-                        if (legacyPass == 2 && isLightGroupName(batch.groupNameLower)) {
-                            renderLightGroupOpaque(batch, poseStack, buffer, packedLight, overlay);
-                        }
-                        // Light フラグの無いマテリアル (本家の doLighting == false と同じ) はスキップ
+                        //本家 renderWithTexture: `if (!this.textures[i].doLighting) continue;`
+                        //Light フラグの無い材質は LIGHT パスで<b>単に飛ばす</b>。
+                        //以前はここで「グループ名に light を含む」batch を素テクスチャの不透明で
+                        //描き直していたが、本家に無い処理で、消灯時にもライトが点いて見える原因だった。
                         continue;
                     }
                     //★本家 RenderVehicleBase.renderBodyLight の忠実移植。
@@ -3749,30 +3992,24 @@ public final class MqoModelLoader {
                     //  ブレンド無し・depthMask は既定の ON、つまり単なる不透明テクスチャ差し替え。
                     //  基本テクスチャが透明で実体が ***_light0.png 側にある面 (0系の鼻) は
                     //  この不透明描画が深度を書くことで、後から描くレールに突き抜かれなくなる。
-                    VertexConsumer vc = lit
+                    //描画順は renderReal の flush で本家の即時描画と同じに保証されるので、
+                    //深度をずらす細工は要らない。本家と同じ描画状態だけを使う。
+                    //★前照灯/尾灯 (i>0) はポリゴンオフセット付き。同じ頂点に複数のライトパスが
+                    //重なると 1.21 では勝敗が定まらず、ポリゴンが重なったように見えるため。
+                    VertexConsumer vc = isLightON
                         ? buffer.getBuffer(com.portofino.realtrainmodunofficial.client.render
-                            .RtmuRenderTypes.emissiveDepthWrite(tex))
-                        : buffer.getBuffer(shouldCullModelFaces(null)
-                            ? RenderType.entityCutout(tex)
-                            : RenderType.entityCutoutNoCull(tex));
+                            .RtmuRenderTypes.emissiveBlendLayered(tex, legacyPass, cullFaces))
+                        //室内灯パスも本体と同一平面なので、深度だけずらしてちらつきを止める
+                        //(本家は即時描画で「後勝ち」が保証されるため不要な処理)。
+                        : buffer.getBuffer(com.portofino.realtrainmodunofficial.client.render
+                            .RtmuRenderTypes.emissiveCutoutLayered(tex, cullFaces));
                     for (int i = 0; i < batch.vertexCount; i++) {
                         int o = i * 8;
                         float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
                         float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
                         float u = batch.data[o + 6], v = batch.data[o + 7];
-                        //押し出しは biasNormals (同位置の全面平均・正規化済み)。陰影法線で押すと
-                        //硬いエッジで同位置の頂点が別方向に動き、面が割れて隙間が開く。
-                        float bnx = nx, bny = ny, bnz = nz;
-                        if (batch.biasNormals != null) {
-                            int bo = i * 3;
-                            bnx = batch.biasNormals[bo];
-                            bny = batch.biasNormals[bo + 1];
-                            bnz = batch.biasNormals[bo + 2];
-                        }
-                        float inv = (float) (1.0D / Math.sqrt(Math.max(1.0E-8F, bnx * bnx + bny * bny + bnz * bnz)));
-                        x += bnx * inv * depthBias;
-                        y += bny * inv * depthBias;
-                        z += bnz * inv * depthBias;
+                        //★本家は発光パスで頂点を押し出さない。手前に出す必要は
+                        //ポリゴンオフセット (RenderType 側) で満たしている。
                         float tnx = norm.m00() * nx + norm.m10() * ny + norm.m20() * nz;
                         float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
                         float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
@@ -3783,11 +4020,6 @@ public final class MqoModelLoader {
                             .setOverlay(overlay)
                             .setLight(light)
                             .setNormal(normalOut[0], normalOut[1], normalOut[2]);
-                    }
-                    if (glow > 0.05F) {
-                        //控えめな「ぼんやり発光」: 小さめのシェル 1 枚だけ (ビーム等の派手な演出はなし)
-                        VertexConsumer gvc = buffer.getBuffer(RenderType.eyes(tex));
-                        emitGlowShell(gvc, mat, norm, batch, 1.4F, 0.010F, 0.20F * glow, overlay, normalOut);
                     }
                 }
                 } finally {
@@ -3939,34 +4171,6 @@ public final class MqoModelLoader {
         }
 
         /** 旧式ライトを不透明ジオメトリとして描く(ガラス経路には触れない)。 */
-        private void renderLightGroupOpaque(Batch batch, PoseStack poseStack, MultiBufferSource buffer,
-                                            int packedLight, int overlay) {
-            ResourceLocation tex = batch.texture;
-            if (tex == null || batch.vertexCount <= 0) {
-                return;
-            }
-            VertexConsumer vc = buffer.getBuffer(RenderType.entityCutout(tex));
-            PoseStack.Pose pose = poseStack.last();
-            Matrix4f mat = pose.pose();
-            Matrix3f nm = pose.normal();
-            float[] normalOut = new float[3];
-            for (int i = 0; i < batch.vertexCount; i++) {
-                int o = i * 8;
-                float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
-                float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
-                float u = batch.data[o + 6], v = batch.data[o + 7];
-                float tnx = nm.m00() * nx + nm.m10() * ny + nm.m20() * nz;
-                float tny = nm.m01() * nx + nm.m11() * ny + nm.m21() * nz;
-                float tnz = nm.m02() * nx + nm.m12() * ny + nm.m22() * nz;
-                normalizeNormal(tnx, tny, tnz, normalOut);
-                VertexWriter.addVertex(vc, mat, x, y, z)
-                    .setColor(255, 255, 255, 255)
-                    .setUv(u, v)
-                    .setOverlay(overlay)
-                    .setLight(packedLight)
-                    .setNormal(normalOut[0], normalOut[1], normalOut[2]);
-            }
-        }
 
 
 
@@ -4252,7 +4456,18 @@ public final class MqoModelLoader {
                         }
                         // GPU VBO 高速経路: depthBias=0 かつ scriptRenderer の UV 変換が無ければ
                         // 静的 VBO を再利用。
-                        boolean canUseStaticVbo = depthBias == 0.0F
+                        //★発光テクスチャを持つ材質は VBO 高速経路に載せない。
+                        //VBO 経路は mv = ModelView × pose を CPU で合成して<b>頂点変換を GPU 側</b>で行うが、
+                        //発光パス (renderNamedGroupsEmissive) は<b>CPU 側</b>で pose を掛けてから提出する。
+                        //(A·B)·v と A·(B·v) は float32 で数 ULP ずれるため、同一面なのに深度が一致せず、
+                        //pass0 と発光パスが z-fighting を起こす (ライト点灯時だけ内装がちらつく原因)。
+                        //本家は変換経路が 1 つしかないのでこの問題自体が存在しない。
+                        //経路を揃えるため、発光する材質は CPU 変換側に統一する。
+                        boolean canUseStaticVbo = !PIN_CPU_TRANSFORM
+                            && !com.portofino.realtrainmodunofficial.client.render
+                                .InteriorLighting.isActive()
+                            && depthBias == 0.0F
+                            && batch.emissiveTextures.length == 0
                             && (scriptRenderer == null || !scriptRenderer.hasUvWindow());
                         com.mojang.blaze3d.vertex.VertexBuffer cachedVbo = canUseStaticVbo
                             ? batch.getOrBuildFullbrightVbo()
@@ -4329,13 +4544,26 @@ public final class MqoModelLoader {
                         }
                         //静的VBO高速経路。落ちたゲートを記録する(F8のVBO行)
                         int vboReason;
-                        if (captureMode) {
+                        if (PIN_CPU_TRANSFORM) {
+                            //経路固定 (PIN_CPU_TRANSFORM 参照)。VBO は使わない。
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
+                        } else if (captureMode) {
                             vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_CAPTURE;
                         } else if (needsBlend) {
                             vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BLEND;
                         } else if (groupTransform != null) {
                             vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_TRANSFORM;
                         } else if (depthBias != 0.0F) {
+                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
+                        } else if (batch.emissiveTextures.length > 0) {
+                            //★発光する材質は VBO 経路に載せない。
+                            //VBO は mv = ModelView × pose を CPU 合成して<b>頂点変換を GPU</b>で行うが、
+                            //発光パス (renderNamedGroupsEmissive) は<b>CPU</b>で pose を掛けてから提出する。
+                            //(A·B)·v と A·(B·v) は float32 で数 ULP ずれるため、同一面でも深度が一致せず、
+                            //pass0 と発光パスが画素単位で z-fighting する (内装がまだら状にちらつく)。
+                            //本家は変換経路が 1 つしかないのでこの問題自体が存在しない。経路を CPU 側へ揃える。
+                            //★判定は<b>バッチ単位</b>。モデル単位にすると発光しない面まで CPU 変換になり、
+                            //発光を持つ車両の描画負荷が上がる (実機で悪化を確認)。
                             vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
                         } else if (overlay != net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY) {
                             vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OVERLAY;
@@ -4420,8 +4648,22 @@ public final class MqoModelLoader {
                             float tnz = norm.m02()*nx + norm.m12()*ny + norm.m22()*nz;
                             normalizeNormal(tnx, tny, tnz, normalOut);
                             //頂点ごとのVector3f確保を避ける(GC削減)
+                            //本家 enableCustomLighting 相当: 室内灯の方を向いた面を明るくする。
+                            int vr = scriptRed;
+                            int vg = scriptGreen;
+                            int vb = scriptBlue;
+                            if (com.portofino.realtrainmodunofficial.client.render.InteriorLighting.isActive()) {
+                                float f = com.portofino.realtrainmodunofficial.client.render
+                                    .InteriorLighting.factor(x, y, z, nx, ny, nz);
+                                vr = Math.min(255, Math.round(vr * f
+                                    * com.portofino.realtrainmodunofficial.client.render.InteriorLighting.red()));
+                                vg = Math.min(255, Math.round(vg * f
+                                    * com.portofino.realtrainmodunofficial.client.render.InteriorLighting.green()));
+                                vb = Math.min(255, Math.round(vb * f
+                                    * com.portofino.realtrainmodunofficial.client.render.InteriorLighting.blue()));
+                            }
                             VertexWriter.addVertex(consumer, mat, x, y, z)
-                                .setColor(scriptRed, scriptGreen, scriptBlue, scriptAlpha)
+                                .setColor(vr, vg, vb, scriptAlpha)
                                 .setUv(u, v)
                                 .setOverlay(overlay)
                                 .setLight(packedLight)
@@ -4939,9 +5181,14 @@ public final class MqoModelLoader {
             if (isLegacyDisplayGroup(lowerGroupName)) {
                 return 0.0002F;
             }
-            if (isLightGroup(lowerGroupName)) {
-                return 0.0010F;
-            }
+            //★ライトグループの頂点押し出しは廃止。
+            //本家は頂点を一切押し出さない (RenderVehicleBase.renderBodyLight は
+            //ブレンド alpha=0.8 と doRender ゲートだけ)。RTMU が名前で light と判定した
+            //グループを 1mm 押し出していたため、室内灯まわりのポリゴンが浮いて
+            //「重なって見える」状態になっていた (京葉線等)。
+            //発光パスの深度分離は RtmuRenderTypes.emissiveBlendLayered の
+            //POLYGON_OFFSET_LAYERING (GPU 側のポリゴンオフセット) が既に担っており、
+            //頂点を動かす必要はない。
             if (!batch.translucent) {
                 return 0.0F;
             }

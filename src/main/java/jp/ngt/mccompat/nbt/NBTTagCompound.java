@@ -26,6 +26,21 @@ public final class NBTTagCompound {
         return null;
     }
 
+    /** func_74737_b = copy。NGTO Builder が編集前の NBT を退避するのに使う。 */
+    public NBTTagCompound func_74737_b() {
+        return new NBTTagCompound(this.tag.copy());
+    }
+
+    /** func_74760_g = getFloat */
+    public float func_74760_g(String key) {
+        return this.tag.getFloat(key);
+    }
+
+    /** func_74776_a = setFloat */
+    public void func_74776_a(String key, float value) {
+        this.tag.putFloat(key, value);
+    }
+
     /** func_74764_b = hasKey */
     public boolean func_74764_b(String key) {
         return tag.contains(key);

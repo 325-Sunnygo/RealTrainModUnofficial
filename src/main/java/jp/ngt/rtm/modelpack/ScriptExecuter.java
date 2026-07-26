@@ -25,14 +25,39 @@ public class ScriptExecuter {
     /** 本家 count: スクリプトから経過 tick として読まれる。 */
     public long count;
 
-    private final ServerLevel level;
-    private final Vec3 pos;
+    private ServerLevel level;
+    private Vec3 pos;
     private final String name;
+
+    /**
+     * 本家と同じ引数なし生成 (KaizPatchX ScriptExecuter は {@code new ScriptExecuter()})。
+     * world / 座標は本家同様 {@link #execScript} 時の caller から都度導出する
+     * (本家 getEntityWorld / getPlayerCoordinates が caller を見るのと同じ)。
+     */
+    public ScriptExecuter() {
+        this.name = "RTM Script Executer";
+    }
 
     public ScriptExecuter(ServerLevel level, Vec3 pos, String name) {
         this.level = level;
         this.pos = pos;
         this.name = name;
+    }
+
+    /** 本家 callMethod/getEntityWorld 相当: caller から world と座標を取り込む。 */
+    private void bindCaller(Object caller) {
+        if (caller instanceof net.minecraft.world.entity.Entity e) {
+            if (e.level() instanceof ServerLevel sl) {
+                this.level = sl;
+            }
+            this.pos = e.position();
+        } else if (caller instanceof net.minecraft.world.level.block.entity.BlockEntity be) {
+            if (be.getLevel() instanceof ServerLevel sl) {
+                this.level = sl;
+            }
+            net.minecraft.core.BlockPos p = be.getBlockPos();
+            this.pos = new Vec3(p.getX() + 0.5D, p.getY() + 0.5D, p.getZ() + 0.5D);
+        }
     }
 
     /**
@@ -75,7 +100,7 @@ public class ScriptExecuter {
 
     /** 本家 func_130014_f_ = getEntityWorld */
     public jp.ngt.mccompat.WorldCompat func_130014_f_() {
-        return new jp.ngt.mccompat.WorldCompat(this.level);
+        return this.level == null ? null : new jp.ngt.mccompat.WorldCompat(this.level);
     }
 
     public jp.ngt.mccompat.WorldCompat getEntityWorld() {
@@ -137,7 +162,16 @@ public class ScriptExecuter {
 
     /** 本家 execScript: 対象の onUpdate を 1 回呼び、count を進める。 */
     public void execScript(Object selector) {
+        this.bindCaller(selector);
         this.callMethod(selector, "onUpdate", selector, this);
         ++this.count;
+    }
+
+    /**
+     * 本家 execScript と同じ意味だが、エンジンを呼び出し側が持っている経路用。
+     * caller を束縛してから count を進める (呼び出し自体は呼び出し側が行う)。
+     */
+    public void beginScript(Object caller) {
+        this.bindCaller(caller);
     }
 }

@@ -45,6 +45,9 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 public class TrainEntity extends Entity {
+    /** 本家 EntityVehicleBase:43 相当。車両ごとに永続する ScriptExecuter (count を進める)。 */
+    public final jp.ngt.rtm.modelpack.ScriptExecuter scriptExecuter = new jp.ngt.rtm.modelpack.ScriptExecuter();
+
 
     private static final EntityDataAccessor<String> VEHICLE_ID =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.STRING);
@@ -672,8 +675,10 @@ public class TrainEntity extends Entity {
         boolean runScriptTick = !level().isClientSide() || shouldRunClientVisualScriptThisTick();
         if (level().isClientSide() && soundScriptEngine != null) {
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAutoRunningSound(this);
-            TrainScriptSystem.invokeScriptTick(soundScriptEngine, this);
-            TrainScriptSystem.invokeScriptUpdate(soundScriptEngine, this, 1.0F);
+            //本家 SoundUpdaterVehicle.update():45 と同じ onUpdate(su) 1 本。
+            //以前ここだけ「生エンティティを tick()/update() へ渡す」独自呼出になっていて、
+            //EntityTrainBase 側 (本家系) と全く違うフックを同じサウンドスクリプトに投げていた。
+            TrainScriptSystem.invokeSoundScript(soundScriptEngine, this);
         } else {
             if (level().isClientSide()) {
                 com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
@@ -701,7 +706,7 @@ public class TrainEntity extends Entity {
         ensureServerScriptLoaded();
         if (serverScriptEngine != null) {
             com.portofino.realtrainmodunofficial.script.TrainScriptSystem
-                .invokeServerScriptOnUpdate(serverScriptEngine, this);
+                .invokeServerScriptOnUpdate(serverScriptEngine, this, this.scriptExecuter);
         }
 
         if (scriptDataDirty && !scriptData.isEmpty()) {

@@ -29,7 +29,11 @@ public final class PackScriptSource {
      */
     public static final String PRELUDE_GL =
             "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n" +
-            "var GL12 = GL11;\n"
+            "var GL12 = GL11;\n" +
+            //LWJGL2 の BufferUtils / 1.12 の OpenGlHelper (NGTO Builder 2 が行列バッファと
+            //ブレンド指定に使う)。未定義だとそこでスクリプトが止まる。
+            "var BufferUtils = Java.type('jp.ngt.ngtlib.renderer.BufferUtilsCompat');\n" +
+            "var OpenGlHelper = Java.type('jp.ngt.ngtlib.renderer.OpenGlHelperCompat');\n"
             //Parts も描画機構に依存する。実 jp.ngt.rtm.render.Parts は GLRecorder へ描くので、
             //OpList 経路 (ScriptModelRenderer) が自前で用意した renderer 対応の Parts を
             //上書きしてはいけない (上書きすると parts.render() が全て空振りする)。
@@ -197,6 +201,8 @@ public final class PackScriptSource {
             //jni_FatalError→プロセスabort (SR1-200が設置直後に落ちていた原因)。
             {"Packages.org.lwjgl.opengl.GL11", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
             {"Packages.org.lwjgl.opengl.GL12", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
+            {"Packages.org.lwjgl.BufferUtils", "Packages.jp.ngt.ngtlib.renderer.BufferUtilsCompat"},
+            {"Packages.net.minecraft.client.renderer.OpenGlHelper", "Packages.jp.ngt.ngtlib.renderer.OpenGlHelperCompat"},
             {"Packages.org.lwjgl.input.Keyboard", "Packages.jp.ngt.mccompat.input.Keyboard"},
             {"Packages.org.lwjgl.input.Mouse", "Packages.jp.ngt.mccompat.input.Mouse"},
             {"Packages.net.minecraft.util.ResourceLocation", "Packages.jp.ngt.mccompat.ResourceLocation"},
@@ -207,11 +213,37 @@ public final class PackScriptSource {
             // NGTO Builder が hasTileEntity() で使う: 1.7.10 ITileEntityProvider = 1.21 EntityBlock
             // (BE を持つブロックのマーカーインタフェース)。未対応だと設置経路で instanceof が落ちる。
             {"Packages.net.minecraft.block.ITileEntityProvider", "Packages.net.minecraft.world.level.block.EntityBlock"},
+            //★1.7.10 のバニラ FQN。変換表に無いと Packages.<FQN> が何にも解決されず、
+            //  instanceof の右辺に渡った瞬間に
+            //  "instanceof must be called with a javascript or java object" で
+            //  スクリプトが停止する (NGTOBuilder2 のビーム設置が動かなかった原因)。
+            //  <b>長い名前から先に置換すること</b> (BlockLadder を Block より後に置くと
+            //  "LadderBlockLadder" のような壊れた名前になる)。
+            {"Packages.net.minecraft.block.BlockFenceGate", "Packages.net.minecraft.world.level.block.FenceGateBlock"},
+            {"Packages.net.minecraft.block.BlockLadder", "Packages.net.minecraft.world.level.block.LadderBlock"},
+            {"Packages.net.minecraft.block.BlockButton", "Packages.net.minecraft.world.level.block.ButtonBlock"},
+            {"Packages.net.minecraft.block.BlockStairs", "Packages.net.minecraft.world.level.block.StairBlock"},
+            {"Packages.net.minecraft.block.BlockDoor", "Packages.net.minecraft.world.level.block.DoorBlock"},
+            {"Packages.net.minecraft.block.BlockLog", "Packages.net.minecraft.world.level.block.RotatedPillarBlock"},
+            {"Packages.net.minecraft.entity.player.EntityPlayer", "Packages.net.minecraft.world.entity.player.Player"},
+            {"Packages.net.minecraft.nbt.NBTTagCompound", "Packages.jp.ngt.mccompat.nbt.NBTTagCompound"},
+            {"Packages.net.minecraft.init.Blocks", "Packages.jp.ngt.mccompat.init.Blocks"},
+            {"Packages.net.minecraft.client.renderer.texture.TextureMap", "Packages.jp.ngt.mccompat.TextureMap"},
             {"Packages.net.minecraft.world.EnumSkyBlock", "Packages.jp.ngt.mccompat.EnumSkyBlock"},
             {"Packages.net.minecraft.util.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
             {"Packages.net.minecraft.util.math.MathHelper", "Packages.jp.ngt.mccompat.MathHelper"},
             {"Packages.net.minecraft.util.EnumParticleTypes", "Packages.jp.ngt.mccompat.EnumParticleTypes"},
     };
+
+    /**
+     * {@code Packages.net.minecraft.block.Block} (裸の Block 型)。
+     * <p>上の FQN_REMAP は単純な {@code String.replace} なので、ここに素の {@code Block} を
+     * 並べると未収録の {@code BlockXxx} まで前方一致で壊す。そのため<b>表の全置換が終わった後</b>に、
+     * 後ろに識別子文字が続かない場合だけ置換する。
+     * <pre>NGTO Builder.zip!.../Liner/render_Liner.js  instanceof Packages.net.minecraft.block.Block</pre>
+     */
+    private static final Pattern BARE_VANILLA_BLOCK =
+        Pattern.compile("Packages\\.net\\.minecraft\\.block\\.Block(?![A-Za-z0-9_$])");
 
     /**
      * 1.7.10 Block の static メソッド呼び出し (getBlockFromItem 等) を互換クラスへ。
@@ -252,8 +284,75 @@ public final class PackScriptSource {
         String out = resolveIncludes(source, new HashSet<>());
         out = remapLegacyClasses(out);
         out = SELF_ASSIGN_DECL.matcher(out).replaceAll("");
+        out = remapVanillaOnlyMethods(out);
         return remapFieldAccess(out);
     }
+
+    /**
+     * レシーバが<b>バニラのインスタンス</b>で、シムで包むことも継承することもできない
+     * MCP 名メソッドを、静的ヘルパー呼び出しへ書き換える。
+     *
+     * <p>{@code blockSet.block.func_149716_u()} の {@code block} は
+     * {@code jp.ngt.ngtlib.block.BlockSet} のフィールドで型はバニラの {@code Block}。
+     * 型を変えると RTMU 側 30 箇所超に波及するため、ここで呼び出し形を変える。
+     */
+    private static String remapVanillaOnlyMethods(String source) {
+        String out = VANILLA_HAS_TILE_ENTITY.matcher(source)
+            .replaceAll("Packages.jp.ngt.mccompat.init.Blocks.func_149716_u($1)");
+        out = VANILLA_TILE_READ_NBT.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.tileentity.TileEntityCompat.func_145839_a($1, $2)");
+        out = VANILLA_TILE_WRITE_NBT.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.tileentity.TileEntityCompat.func_145841_b($1, $2)");
+        out = VANILLA_ENTITY_UUID.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.EntityCompatUtil.func_110124_au($1)");
+        out = VANILLA_CLOSE_SCREEN.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.EntityCompatUtil.func_71053_j($1)");
+        out = VANILLA_BLOCKPOS_OFFSET.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.VanillaCompat.func_177967_a($1, $2)");
+        out = VANILLA_FACING_INDEX.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.VanillaCompat.func_176745_a($1)");
+        out = VANILLA_ITEMBLOCK_GET_BLOCK.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.VanillaCompat.func_179223_d($1)");
+        out = VANILLA_TILE_SET_POS.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.VanillaCompat.func_174878_a($1, $2)");
+        return out;
+    }
+
+    /** {@code <式>.func_177967_a(facing, n)} = BlockPos.offset。BlockPos は実バニラ型で拡張できない。 */
+    private static final Pattern VANILLA_BLOCKPOS_OFFSET =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_177967_a\\(([^()]*)\\)");
+
+    /** {@code <式>.func_176745_a()} = EnumFacing.getIndex。 */
+    private static final Pattern VANILLA_FACING_INDEX =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_176745_a\\(\\)");
+
+    /** {@code <式>.func_179223_d()} = ItemBlock.getBlock。 */
+    private static final Pattern VANILLA_ITEMBLOCK_GET_BLOCK =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_179223_d\\(\\)");
+
+    /** {@code <式>.func_174878_a(pos)} = TileEntity.setPos。 */
+    private static final Pattern VANILLA_TILE_SET_POS =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_174878_a\\(([^()]*(?:\\([^()]*\\))?[^()]*)\\)");
+
+    /** {@code <式>.func_145839_a(nbt)} = TileEntity.readFromNBT。 */
+    private static final Pattern VANILLA_TILE_READ_NBT =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_145839_a\\(([^()]*)\\)");
+
+    /** {@code <式>.func_145841_b(nbt)} / {@code func_189515_b} = TileEntity.writeToNBT。 */
+    private static final Pattern VANILLA_TILE_WRITE_NBT =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_(?:145841_b|189515_b)\\(([^()]*)\\)");
+
+    /** {@code <式>.func_110124_au()} = Entity.getUniqueID。 */
+    private static final Pattern VANILLA_ENTITY_UUID =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_110124_au\\(\\)");
+
+    /** {@code <式>.func_71053_j()} = EntityPlayer.closeScreen。 */
+    private static final Pattern VANILLA_CLOSE_SCREEN =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_71053_j\\(\\)");
+
+    /** {@code <式>.func_149716_u()} = Block.hasTileEntity。 */
+    private static final Pattern VANILLA_HAS_TILE_ENTITY =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_149716_u\\(\\)");
 
     /**
      * Nashorn の「フィールドより getter を優先する」仕様を回避するための書き換え。
@@ -273,8 +372,18 @@ public final class PackScriptSource {
      * 両方が成立する。
      */
     public static String remapFieldAccess(String source) {
-        return SEAT_ROTATION_FIELD.matcher(source).replaceAll(".getSeatRotationRaw()");
+        String out = SEAT_ROTATION_FIELD.matcher(source).replaceAll(".getSeatRotationRaw()");
+        //tileEntity.field_145850_b = TileEntity.worldObj。レシーバがバニラ BlockEntity で
+        //フィールドを足せないため、静的ヘルパーへ回す。
+        //  NGTO Builder.zip!.../Wire/server_Wire.js:209  tileEntity.field_145850_b
+        out = TILE_WORLD_FIELD.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.tileentity.TileEntityCompat.field_145850_b($1)");
+        return out;
     }
+
+    /** {@code <式>.field_145850_b} = TileEntity.worldObj。 */
+    private static final Pattern TILE_WORLD_FIELD =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.field_145850_b\\b(?!\\s*\\()");
 
     public static String remapLegacyClasses(String source) {
         String out = source;
@@ -295,6 +404,10 @@ public final class PackScriptSource {
             out = BLOCK_STATIC_PATTERNS[i].matcher(out).replaceAll(
                     Matcher.quoteReplacement(BLOCK_STATIC_REPLACEMENTS[i]));
         }
+        //残った素の Block 型 (instanceof の右辺など)。静的アクセス形は上で "Block." に落ちているので、
+        //ここに来るのは型として使われているものだけ。
+        out = BARE_VANILLA_BLOCK.matcher(out)
+            .replaceAll(Matcher.quoteReplacement("Packages.net.minecraft.world.level.block.Block"));
         return out;
     }
 

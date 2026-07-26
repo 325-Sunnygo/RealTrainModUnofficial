@@ -70,6 +70,8 @@ public final class CarServerScripts {
         private final java.util.Map<Object, jp.ngt.rtm.modelpack.ScriptExecuter> executers =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
+        private boolean warnedClientSide;
+
         Entry(ScriptEngine engine) {
             this.engine = engine;
         }
@@ -79,6 +81,32 @@ public final class CarServerScripts {
          */
         public void onUpdate(Object entity) {
             if (engine == null || broken) {
+                return;
+            }
+            //★サーバースクリプトはサーバーでしか実行してはならない。
+            //クライアントで走ると、SRB の buildNormalRail がクライアントのワールドへ
+            //ブロックを置いてしまい (サーバーには存在しないので即消える)、
+            //「敷設したのに何も残らない」状態になる。実測でこの経路が確認されたため、
+            //入口でも塞ぐ (呼び出し側の tick ガードだけに頼らない)。
+            //サイドの判定は<b>スレッド</b>で行う。entity.level().isClientSide() は
+            //実測で当てにならなかった (ClientLevel.tickEntities から呼ばれているのに false を返す)。
+            net.minecraft.server.MinecraftServer srv =
+                net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+            boolean onServerThread = srv != null && srv.isSameThread();
+            if (!onServerThread) {
+                if (!warnedClientSide) {
+                    warnedClientSide = true;
+                    String lv = "?";
+                    boolean cs = false;
+                    if (entity instanceof net.minecraft.world.entity.Entity e) {
+                        lv = e.level().getClass().getSimpleName();
+                        cs = e.level().isClientSide();
+                    }
+                    RealTrainModUnofficial.LOGGER.warn(
+                        "[RTMU] サーバースクリプトがサーバースレッド外で呼ばれました (実行を中止): "
+                        + "thread={} level={} isClientSide={}",
+                        Thread.currentThread().getName(), lv, cs);
+                }
                 return;
             }
             try {

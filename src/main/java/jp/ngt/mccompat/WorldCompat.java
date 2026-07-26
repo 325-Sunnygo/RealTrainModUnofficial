@@ -136,7 +136,33 @@ public class WorldCompat {
             return false;
         }
         BlockPos pos = new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z));
-        return this.level.setBlock(pos, withMeta(b, meta), flag);
+        boolean placed = this.level.setBlock(pos, withMeta(b, meta), flag);
+        if (placed) {
+            applyLegacyMeta(pos, meta);
+        }
+        return placed;
+    }
+
+    /**
+     * 1.7.10 のブロックメタのうち、1.21 でブロック状態に落とせないものをタイルエンティティへ移す。
+     *
+     * <p>RTM 設置物 (碍子・架線柱等) の<b>メタは取付面</b> (0=下 1=上 2=北 3=南 4=西 5=東) で、
+     * 描画とワイヤー端点の両方がこれを見る
+     * ({@code InstalledObjectBlockEntityRenderer.rotateWirePosByMountFace})。
+     * 旧データ変換 ({@code LegacyRestorer}) も {@code setMountFace(rec.meta)} と対応付けている。
+     *
+     * <p>スクリプト設置はここを通るが、以前はメタを捨てていたため取付面が常に既定 (-1 = 地面置き) になり、
+     * 架線柱の向きが線路と揃わず傾いて見えていた:
+     * <pre>NGTOBuilder2!server_wire_catenary.js:91  new BlockSet(RTMBlock.insulator, pos[3], nbt)</pre>
+     */
+    private void applyLegacyMeta(BlockPos pos, int meta) {
+        if (meta < 0 || meta > 5) {
+            return;
+        }
+        if (this.level.getBlockEntity(pos)
+                instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be) {
+            be.setMountFace(meta);
+        }
     }
 
     private static final String[] COLORS_16 = {
@@ -196,7 +222,12 @@ public class WorldCompat {
         return be;
     }
 
-    /** func_175625_s = getTileEntity(BlockPos) (1.12) */
+    /**
+     * func_175625_s = getTileEntity(BlockPos) (1.12)。
+     * <p>★戻り値はバニラのまま。RTMU は {@code RTMCore.VERSION} に "1.7.10" を含むので、
+     * マルチターゲット対応のパックは 1.7.10 側の枝 ({@code func_147438_o}) を通る。
+     * ここでラッパーを返すと、通らない枝のために他パックの型を変えることになる。
+     */
     public net.minecraft.world.level.block.entity.BlockEntity func_175625_s(BlockPos pos) {
         return pos != null ? this.level.getBlockEntity(pos) : null;
     }
@@ -224,9 +255,21 @@ public class WorldCompat {
         this.level.sendBlockUpdated(pos, st, st, 3);
     }
 
-    /** func_180495_p = getBlockState (1.12) */
-    public net.minecraft.world.level.block.state.BlockState func_180495_p(BlockPos pos) {
-        return pos != null ? this.level.getBlockState(pos) : null;
+    /**
+     * func_180495_p = getBlockState。
+     * <p>素の 1.21 {@code BlockState} を返すと、スクリプトが続けて呼ぶ
+     * {@code func_177230_c()} / {@code func_177228_b()} が存在せず失敗する。
+     * 1.7.10 のメタ互換を持つ {@link BlockStateCompat} で包んで返す
+     * ({@code func_147439_a} / {@code func_72805_g} と同じ色メタ方式)。
+     */
+    public BlockStateCompat func_180495_p(BlockPos pos) {
+        return pos != null ? new BlockStateCompat(this.level.getBlockState(pos)) : null;
+    }
+
+    /** 座標 3 個で呼ぶスクリプト向け。 */
+    public BlockStateCompat func_180495_p(double x, double y, double z) {
+        return new BlockStateCompat(this.level.getBlockState(
+                new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z))));
     }
 
     private static net.minecraft.world.level.block.Block asBlock(Object block) {

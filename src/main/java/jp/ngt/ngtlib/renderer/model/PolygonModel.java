@@ -161,7 +161,7 @@ public class PolygonModel {
     public void renderPart(boolean smoothing, String objName) {
         GLRecorder rec = GLRecorder.active();
         if (rec != null && objName != null) {
-            rec.drawModelGroup(this, objName.toLowerCase(Locale.ROOT));
+            rec.drawModelGroup(this, objName.toLowerCase(Locale.ROOT), smoothing);
         }
     }
 
@@ -173,16 +173,16 @@ public class PolygonModel {
      * 全グループ描画。
      */
     public void renderAll() {
+        this.renderAll(false);
+    }
+
+    /** 本家 renderAll(smoothing)。smoothing=true なら再生側が頂点法線で描く。 */
+    public void renderAll(boolean smoothing) {
         GLRecorder rec = GLRecorder.active();
         if (rec != null) {
             for (GroupObject group : this.groupObjects) {
-                rec.drawModelGroup(this, group.name.toLowerCase(Locale.ROOT));
+                rec.drawModelGroup(this, group.name.toLowerCase(Locale.ROOT), smoothing);
             }
         }
-    }
-
-    /** 本家 renderAll(smoothing)。RTMU の再生側は法線を持たないので smoothing は効かない。 */
-    public void renderAll(boolean smoothing) {
-        this.renderAll();
     }
 }

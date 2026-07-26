@@ -352,23 +352,36 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
         }
     }
 
+    /**
+     * 本家 {@code RTMKeyHandlerClient} の KEY_CHIME_NEXT/PREV と同じ。
+     * <pre>
+     * i0 = state + delta;
+     * i0 = i0 &lt; type.min ? type.max : (i0 &gt; type.max ? 0 : i0);
+     * </pre>
+     * {@code State_Announcement} は min=0 / max=127 で、<b>パックの件数では折り返さない</b>。
+     */
     private static int resolveNextSoundIndex(TrainEntity controlTrain, int delta) {
-        VehicleDefinition definition = VehicleRegistry.getById(controlTrain.getVehicleId());
-        List<String> announcements = definition != null ? definition.getAnnouncementSounds() : List.of();
-        if (announcements.isEmpty()) {
-            return Math.max(0, controlTrain.getSoundIndex() + delta);
-        }
-        return Math.floorMod(controlTrain.getSoundIndex() + delta, announcements.size());
+        jp.ngt.rtm.entity.train.util.TrainState.TrainStateType type =
+            jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Announcement;
+        int i0 = controlTrain.getSoundIndex() + delta;
+        return i0 < type.min ? type.max : (i0 > type.max ? 0 : i0);
     }
 
+    /**
+     * 本家 {@code RTMKeyHandlerClient.playSound(player, 3)} と同じ。
+     * {@code if (sa0 != null && index < sa0.length)} で、<b>件数を超えた番号では何も鳴らさない</b>。
+     */
     private static void playSelectedAnnouncement(TrainEntity sourceTrain, TrainEntity controlTrain) {
         VehicleDefinition definition = VehicleRegistry.getById(controlTrain.getVehicleId());
-        if (definition == null || definition.getAnnouncementSounds().isEmpty()) {
+        if (definition == null) {
             return;
         }
-        int index = Math.floorMod(controlTrain.getSoundIndex(), definition.getAnnouncementSounds().size());
-        controlTrain.setSoundIndex(index);
-        broadcastTrainSound(sourceTrain, definition.getAnnouncementSounds().get(index), 1.0F, 1.0F);
+        List<String> announcements = definition.getAnnouncementSounds();
+        int index = controlTrain.getSoundIndex();
+        if (index < 0 || index >= announcements.size()) {
+            return;
+        }
+        broadcastTrainSound(sourceTrain, announcements.get(index), 1.0F, 1.0F);
     }
 
     private static void playHorn(TrainEntity sourceTrain, TrainEntity controlTrain) {

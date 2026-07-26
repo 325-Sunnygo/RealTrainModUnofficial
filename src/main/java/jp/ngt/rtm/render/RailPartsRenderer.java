@@ -129,6 +129,86 @@ public class RailPartsRenderer extends PartsRenderer {
         return light;
     }
 
+    /**
+     * 本家 {@code RailPartsRendererBase.createRailPos} の忠実移植。
+     * <p>全 RailMap の 0.5m 刻み各点を {@code {x, y, z, yaw, -pitch, cant}} で返す。
+     * 焼き込みキャッシュの無効化キーはこの配列から作る (形が変われば必ず値が変わる)。
+     */
+    public static float[][] createRailPos(TileEntityLargeRailCore tile) {
+        jp.ngt.rtm.rail.util.RailMap[] rms = tile.getAllRailMaps();
+        if (rms == null || rms.length == 0) {
+            return null;
+        }
+        float[] rev = jp.ngt.rtm.rail.util.RailPosition.REVISION[tile.getRailPositions()[0].direction];
+        int[] start = tile.getStartPoint();
+        java.util.List<float[]> list = new java.util.ArrayList<>();
+        for (jp.ngt.rtm.rail.util.RailMap rm : rms) {
+            if (rm == null) {
+                continue;
+            }
+            int max = (int) (rm.getLength() * 2.0D);
+            if (max < 1) {
+                max = 1;
+            }
+            double[] stPoint = rm.getRailPos(max, 0);
+            double startH = rm.getStartRP().posY;
+            float moveX = (float) (stPoint[1] - ((double) start[0] + 0.5D + (double) rev[0]));
+            float moveZ = (float) (stPoint[0] - ((double) start[2] + 0.5D + (double) rev[1]));
+            for (int i = 0; i <= max; ++i) {
+                double[] cur = rm.getRailPos(max, i);
+                list.add(new float[]{
+                    moveX + (float) (cur[1] - stPoint[1]),
+                    (float) (rm.getRailHeight(max, i) - startH),
+                    moveZ + (float) (cur[0] - stPoint[0]),
+                    rm.getRailRotation(max, i),
+                    -rm.getRailPitch(max, i),
+                    rm.getCant(max, i)});
+            }
+        }
+        return list.isEmpty() ? null : list.toArray(new float[0][]);
+    }
+
+    /**
+     * 本家 {@code getRailBrightness} の忠実移植。各点の位置で明るさを拾う。
+     * <p>★コアブロック 1 点で代表させてはいけない。コアはバラストに埋まっていて 0 を
+     * 返すことが多く、その 0 が焼き込まれると「レールが真っ黒のまま戻らない」になる。
+     */
+    public static int[] getRailBrightness(net.minecraft.world.level.Level level,
+                                          net.minecraft.core.BlockPos origin, float[][] rp) {
+        int[] out = new int[rp.length];
+        if (level == null) {
+            return out;
+        }
+        for (int i = 0; i < rp.length; i++) {
+            int x = origin.getX() + net.minecraft.util.Mth.floor(rp[i][0]);
+            int y = origin.getY() + net.minecraft.util.Mth.floor(rp[i][1]);
+            int z = origin.getZ() + net.minecraft.util.Mth.floor(rp[i][2]);
+            out[i] = brightnessAt(level, x, y, z);
+        }
+        return out;
+    }
+
+    /** 本家 {@code getBrightness}: 0 なら 1 段上へ逃がす。 */
+    private static int brightnessAt(net.minecraft.world.level.Level level, int x, int y, int z) {
+        net.minecraft.core.BlockPos p = new net.minecraft.core.BlockPos(x, y, z);
+        int b = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, p);
+        if (b <= 0) {
+            b = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, p.above());
+        }
+        return b;
+    }
+
+    /**
+     * 本家 KaizPatchX {@code createStaticRenderKey} の忠実移植。
+     * <p>レール形状・各点の明るさ・モデル (オブジェクト名/テクスチャ) をまとめた 1 個の int。
+     * {@code shouldRerenderRail} が立っていても<b>キーが同じなら焼き直さない</b>のが要点で、
+     * これが本家のレール軽量化の本体。
+     */
+    public static int createStaticRenderKey(float[][] fa, int[] brightness, int modelKey) {
+        int key = 31 * java.util.Arrays.deepHashCode(fa) + java.util.Arrays.hashCode(brightness);
+        return 31 * key + modelKey;
+    }
+
     public void renderStaticParts(Object tileObj, double x, double y, double z) {
         if (!(tileObj instanceof TileEntityLargeRailCore tile)) {
             return;

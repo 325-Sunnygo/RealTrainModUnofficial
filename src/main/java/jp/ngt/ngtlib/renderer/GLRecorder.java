@@ -10,7 +10,7 @@ import java.util.List;
 public final class GLRecorder {
 
     public enum Op {
-        PUSH, POP, TRANSLATE, ROTATE, SCALE, COLOR, BRIGHTNESS, RENDER_PARTS, RENDER_GROUPS,
+        PUSH, POP, TRANSLATE, ROTATE, SCALE, MULT_MATRIX, COLOR, BRIGHTNESS, RENDER_PARTS, RENDER_GROUPS,
         /**
          * テクスチャ差し替え (payload: ResourceLocation, null=デフォルトに戻す)
          */
@@ -165,6 +165,22 @@ public final class GLRecorder {
         this.cmds.add(new Cmd(Op.ROTATE, deg, x, y, z, null, quat));
     }
 
+    /**
+     * glMultMatrix 相当。列優先 16 要素をそのまま payload で運び、再生側で掛ける。
+     * <p>NGTO Builder 2 が任意姿勢のプレビューに使う。
+     */
+    public void multMatrix(float[] matrix) {
+        if (matrix == null || matrix.length < 16) {
+            return;
+        }
+        for (float v : matrix) {
+            if (!Float.isFinite(v)) {
+                return;
+            }
+        }
+        this.cmds.add(new Cmd(Op.MULT_MATRIX, 0, 0, 0, 0, null, matrix.clone()));
+    }
+
     public void scale(float x, float y, float z) {
         //NaN/Inf に加えて 0 倍も潰す (0 スケールは面が消える)
         float sx = Float.isFinite(x) ? x : 1.0F;
@@ -241,6 +257,15 @@ public final class GLRecorder {
     }
 
     public void drawModelGroup(Object model, String groupName) {
-        this.cmds.add(new Cmd(Op.DRAW_MODEL_GROUP, 0, 0, 0, 0, groupName, model));
+        this.drawModelGroup(model, groupName, false);
+    }
+
+    /**
+     * @param smoothing 本家 {@code renderPart(smoothing, ...)} の平滑指定。
+     *                  再生側 (VehicleScriptRenderers) が頂点法線を使うか面法線かの判断に使う。
+     *                  a スロットに 1/0 で載せる。
+     */
+    public void drawModelGroup(Object model, String groupName, boolean smoothing) {
+        this.cmds.add(new Cmd(Op.DRAW_MODEL_GROUP, smoothing ? 1.0F : 0.0F, 0, 0, 0, groupName, model));
     }
 }

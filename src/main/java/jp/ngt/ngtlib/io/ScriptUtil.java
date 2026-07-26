@@ -28,16 +28,24 @@ public final class ScriptUtil {
     }
 
     /**
-     * JavaScriptの実行
+     * エンジン生成。本家 ScriptUtil:40 と同一 (-doe / --language=es6)。
+     * RTMU 内でエンジンを作る箇所は全てここを通す (以前は別実装が並立していた)。
      */
-    public static ScriptEngine doScript(String s) {
+    public static ScriptEngine createEngine() {
         if (SEM == null) {
             init();
         }
         // MOD のクラスローダを appLoader として渡す (Packages.jp.ngt.* 解決の鍵)
-        ScriptEngine se = SEM.getScriptEngine(
+        return SEM.getScriptEngine(
                 new String[]{"-doe", "--language=es6"},
                 ScriptUtil.class.getClassLoader());
+    }
+
+    /**
+     * JavaScriptの実行
+     */
+    public static ScriptEngine doScript(String s) {
+        ScriptEngine se = createEngine();
         try {
             if (se.toString().contains("Nashorn") || se.getClass().getName().contains("nashorn")) {
                 // Java8ではimportPackage()が使えないので、その対策 (本家コメントのまま)

@@ -27,6 +27,41 @@ public final class GL11Facade {
         return GLRecorder.active();
     }
 
+    /**
+     * glPushAttrib / glPopAttrib は 1.21 に対応する状態スタックが無い。
+     * 記録側 (GLRecorder) は行列とテクスチャ・色しか持たないので、受けるだけの空実装。
+     * <p>NGTO Builder 2 が {@code glPushAttrib(GL_ENABLE_BIT)} で囲む箇所があり、
+     * 未定義だとそこでスクリプトが止まる。
+     */
+    public static void glPushAttrib(int mask) {
+    }
+
+    public static void glPopAttrib() {
+    }
+
+    /** glIsEnabled: 記録経路では実 GL 状態を持たないので、常に false を返す。 */
+    public static boolean glIsEnabled(int cap) {
+        return false;
+    }
+
+    /** glMultMatrix(FloatBuffer): 現在の行列に掛ける。 */
+    public static void glMultMatrix(java.nio.FloatBuffer matrix) {
+        GLRecorder r = rec();
+        if (r == null || matrix == null) {
+            return;
+        }
+        float[] m = new float[16];
+        int pos = matrix.position();
+        for (int i = 0; i < 16 && matrix.remaining() > i; i++) {
+            m[i] = matrix.get(pos + i);
+        }
+        r.multMatrix(m);
+    }
+
+    public static void glMultMatrixf(java.nio.FloatBuffer matrix) {
+        glMultMatrix(matrix);
+    }
+
     public static void glPushMatrix() {
         GLRecorder r = rec();
         if (r != null) r.push();

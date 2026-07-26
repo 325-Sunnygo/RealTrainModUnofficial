@@ -218,10 +218,8 @@ public class TrainScriptSystem {
     private static final String SCRIPT_MODEL_KEY = "__ptScriptModel";
     private static TrainScriptSystem instance;
     private ScriptEngine engine;
-    private final Map<UUID, EntityScriptContext> entityContexts = new HashMap<>();
     /** スクリプトに見せるRTMCore.VERSION。実クラスを唯一の出所にする。 */
     private static final String SCRIPT_CORE_VERSION = jp.ngt.rtm.RTMCore.VERSION;
-    private static final Set<Integer> DISABLED_SCRIPT_ENGINES = ConcurrentHashMap.newKeySet();
     private static final Set<String> REPORTED_SCRIPT_ERRORS = ConcurrentHashMap.newKeySet();
 
     public static final class ScriptCoreCompat {
@@ -272,24 +270,10 @@ public class TrainScriptSystem {
     }
 
     public void initialize() {
-        try {
-            ScriptEngineManager manager = new ScriptEngineManager(Thread.currentThread().getContextClassLoader());
-            engine = getAvailableScriptEngine(manager);
-            if (engine == null) {
-                manager = new ScriptEngineManager(TrainScriptSystem.class.getClassLoader());
-                engine = getAvailableScriptEngine(manager);
-            }
-            if (engine == null) {
-                RealTrainModUnofficial.LOGGER.warn("Nashorn script engine not available (org.openjdk.nashorn). NeoForge should provide nashorn-core on the platform library path.");
-            } else {
-            }
-        } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.error("Failed to initialize JavaScript engine: {}", e.getMessage(), e);
+        engine = createScriptEngine();
+        if (engine == null) {
+            RealTrainModUnofficial.LOGGER.warn("Nashorn script engine not available (org.openjdk.nashorn).");
         }
-    }
-
-    public void setScriptEngine(ScriptEngine engine) {
-        this.engine = engine;
     }
 
     public static ScriptEngine doScriptCompat(String script) {
@@ -366,13 +350,14 @@ public class TrainScriptSystem {
         return createScriptEngine();
     }
 
+    /**
+     * スクリプトエンジンは本家 {@link jp.ngt.ngtlib.io.ScriptUtil} の 1 本だけを使う。
+     * 本家 (KaizPatchX 1.7.10 ScriptUtil:36-54) は NashornScriptEngineFactory を直接叩き
+     * {@code -doe} / {@code --language=es6} を渡して毎回新規エンジンを作る。
+     * RTMU で以前ここに別実装 (createNashornEngine) があったが、同一処理の二重定義だったため撤去した。
+     */
     private static ScriptEngine createScriptEngine() {
-        ScriptEngineManager manager = new ScriptEngineManager(Thread.currentThread().getContextClassLoader());
-        ScriptEngine engine = getAvailableScriptEngine(manager);
-        if (engine == null) {
-            engine = getAvailableScriptEngine(new ScriptEngineManager(TrainScriptSystem.class.getClassLoader()));
-        }
-        return engine;
+        return jp.ngt.ngtlib.io.ScriptUtil.createEngine();
     }
 
     public static void loadScript(String scriptPath, Object model) {
@@ -415,24 +400,6 @@ public class TrainScriptSystem {
         }
     }
 
-    /** モデルスクリプト用エンジン。全経路と同一の標準Nashornを返す。 */
-    private static ScriptEngine getAvailableScriptEngine(ScriptEngineManager manager) {
-        return createNashornEngine();
-    }
-
-    private static ScriptEngine createNashornEngine() {
-        try {
-            org.openjdk.nashorn.api.scripting.NashornScriptEngineFactory factory =
-                new org.openjdk.nashorn.api.scripting.NashornScriptEngineFactory();
-            //ScriptUtil / 本家と同一フラグ。MOD クラスローダを渡して Packages.jp.ngt.* を解決させる。
-            return factory.getScriptEngine(
-                new String[]{"-doe", "--language=es6"},
-                TrainScriptSystem.class.getClassLoader());
-        } catch (Throwable t) {
-            RealTrainModUnofficial.LOGGER.error("Failed to create Nashorn script engine for model scripts", t);
-            return null;
-        }
-    }
 
     private static void loadScript(String scriptPath, String script, Object model, String modelName, ScriptEngine scriptEngine) {
         try {
@@ -528,75 +495,31 @@ public class TrainScriptSystem {
      * {@code CarServerScripts} が読む。読み込み経路が複数あるので、どの経路からでも
      * 同じ差し込みができるよう公開してある。
      */
+    /**
+     * かつてここに SuperRailBuilder3 専用の関数差し替えがあった (約 60 行)。
+     *
+     * <p>{@code getSelectedSlotItem} を常に null にし、{@code getPlayerRail} /
+     * {@code buildNormalRail} / {@code buildBranchRail} / {@code createRailPosition} /
+     * {@code getTileEntity} / {@code deleteRail} を RTMU のブリッジ ({@code __SRB__}) へ
+     * 差し替えるものだったが、これは<b>パック名で分岐する特別処理</b>であり本家に無い。
+     *
+     * <p>差し替えが必要だった理由 (1.21 に該当 API が無い) は全て解消済み:
+     * <ul>
+     *   <li>{@code player.field_71071_by} → {@link jp.ngt.mccompat.PlayerCompat.InventoryCompat}
+     *       (実配列 {@code field_70462_a} を持つ)</li>
+     *   <li>{@code net.minecraft.util.math.BlockPos} → FQN remap 済み</li>
+     *   <li>{@code railMap.canPlaceRail/setRail}・{@code Point.getActiveRailMap} →
+     *       {@code Object} を受けて {@code BlockUtil.toLevel} で解く形に統一</li>
+     *   <li>{@code tile.sendPacket} / TileEntity の座標 SRG フィールド → 追加済み</li>
+     *   <li>手持ちレール判定 → {@link jp.ngt.mccompat.ItemStackCompat#func_77973_b} で
+     *       2 種あるレールアイテムを本家の 1 種へ正規化</li>
+     * </ul>
+     * よってスクリプトは本家の実装のまま動くはずである。
+     */
     public static String appendSuperRailBuilderOverrides(String script) {
-        if (script == null || !script.contains("SuperRailBuilderVersion")) {
-            return script;
-        }
-        //server / render の 2 本ある。render 側はキー入力とマーカー操作を担当していて、
-        //こちらにも 1.12 API のシムが要る (プレイヤーのインベントリ・旧 BlockPos)。
-        //★ここで render を弾くと Enter も Q も効かなくなる。共通シムは両方へ入れること。
-        boolean isServer = script.contains("function buildNormalRail");
-        //★差し替えは<b>分岐敷設だけ</b>に絞る。
-        //SRB の他の処理 (プレイヤーに乗る・手持ちレールの判定・タイル取得・直線敷設) は
-        //SRB 本来の実装のまま動いているので触らない。以前ここで一式まとめて差し替えたら、
-        //ビルダーがプレイヤーの頭に乗らなくなった。動いているものは置き換えない。
-        //
-        //差し替えは<b>関数宣言</b>で行う (代入ではない)。宣言は巻き上げで解析時に確定し
-        //同名は後勝ちなので、実行時に何が起きても必ずこちらが使われる。
-        StringBuilder sb = new StringBuilder();
-        sb.append("\n// ---- RTMU: SuperRailBuilder3 の分岐敷設をネイティブへ ----\n");
-        //--- ここから下は「1.12 の Minecraft API が 1.21 に無い」ぶんの橋渡し。
-        //    SRB の敷設ロジックそのものは差し替えない。
-        //player.field_71071_by (旧インベントリ) は 1.21 に無く、触ると即例外。
-        //render 側はマーカー操作のたびにここを通るので、落とすと操作が全部死ぬ。
-        sb.append("function getSelectedSlotItem(player){ return null; }\n");
-        sb.append("function hasPlayerMarker(player){ return false; }\n");
-        //getTileEntity: SRB 本来の実装は new net.minecraft.util.math.BlockPos(...) を使うが
-        //1.21 にそのクラスは無く、new した時点で例外になって onUpdate ごと死ぬ
-        //(= 敷設も Q での終了も効かなくなる)。当たり判定/道床ブロックはコアへ解決して返す。
-        sb.append("function getTileEntity(world, x, y, z){ try{ if(typeof __SRB__!=='undefined'&&__SRB__)"
-                + " return __SRB__.railCoreAt(world, Math.floor(x), Math.floor(y), Math.floor(z));"
-                + " return world.func_175625_s(Math.floor(x), Math.floor(y), Math.floor(z)); }catch(e){"
-                + " try{ return world.func_175625_s(Math.floor(x), Math.floor(y), Math.floor(z)); }catch(e2){ return null; } } }\n");
-        sb.append("function getTileEntityPos(tile){ try{ var p=__SRB__.tilePos(tile); return {x:p[0],y:p[1],z:p[2]}; }"
-                + " catch(e){ return {x:0,y:0,z:0}; } }\n");
-        //deleteRail も同じ理由 (旧 BlockPos + 旧ブロック判定)。敷設の直前に必ず呼ばれるので、
-        //ここが落ちると何も建たない。
-        sb.append("function deleteRail(world, x, y, z){ try { return __SRB__.deleteRail(world, x|0, y|0, z|0); }"
-                + " catch(e){ return false; } }\n");
-        sb.append("function deleteRailRP(world, rp){ return deleteRail(world, rp.blockX, rp.blockY, rp.blockZ); }\n");
-        //手持ちレールの取得もブリッジへ。SRB 本来の getPlayerRail は ResourceStateRail を
-        //組み立てて返すが、RTMU のレールアイテムは選択モデルを<b>データコンポーネント</b>で
-        //持っており旧 NBT には入っていない。シムの readFromNBT も空実装なので、SRB 側には
-        //常に既定値しか入らず「レールを持って敷いてもそのレールにならない」状態になる。
-        //ブリッジはアイテムから直接モデル ID を読む (マーカーで敷くときと同じ経路)。
-        sb.append("function getPlayerRail(player){ try { var p=(player&&player.__srbReal)?player.__srbReal:player;"
-                + " var id=__SRB__.heldRailModelId(p); return (id&&(''+id).length>0)?(''+id):null; } catch(e){ return null; } }\n");
-        //直線敷設もブリッジへ。上の getPlayerRail が返すのはモデル ID の文字列なので、
-        //SRB 本来の buildNormalRail (ResourceState を前提) には渡せない。
-        sb.append("function buildNormalRail(world, startRP, endRP, railItem){ try {"
-                + " return __SRB__.buildNormalRail(world, startRP, endRP, railItem); }"
-                + " catch(e){ try{__SRB__.logError('buildNormalRail: '+e);}catch(e2){} return false; } }\n");
-        //createRailPosition も差し替える。SRB は anchorLength を<b>無条件で書き込む</b>ので、
-        //未計算 (0 / -1) がそのまま RailPosition に入り、ベジェが潰れてトング付近の
-        //形が崩れる。ブリッジ側は負値なら書かず RTMU の既定を残す。
-        //(プレイヤーまわりの関数は SRB 本来の実装で正しく動くので触らない)
-        sb.append("function createRailPosition(data){ return __SRB__.createRailPosition(data.blockX|0, data.blockY|0,"
-                + " data.blockZ|0, data.markerDir|0, (data.switchType!=null?Number(data.switchType):0),"
-                + " (data.anchorLength!=null?Number(data.anchorLength):-1), (data.anchorPitch!=null?Number(data.anchorPitch):0),"
-                + " (data.anchorYaw!=null?Number(data.anchorYaw):0), (data.cantCenter!=null?Number(data.cantCenter):0),"
-                + " (data.cantEdge!=null?Number(data.cantEdge):0), (data.height!=null?Number(data.height):0)); }\n");
-        sb.append("function buildBranchRail(world, rps, railItem){ try {"
-                + " var l=new java.util.ArrayList(); for(var i=0;i<rps.length;i++) l.add(rps[i]);"
-                + " return __SRB__.buildBranchRail(world, l, railItem); }"
-                + " catch(e){ try{__SRB__.logError('buildBranchRail: '+e);}catch(e2){} return false; } }\n");
-        if (!isServer) {
-            RealTrainModUnofficial.LOGGER.info("[SRB] client shim injected");
-            return script + sb.toString();
-        }
-        RealTrainModUnofficial.LOGGER.info("[SRB] branch build override injected");
-        return script + sb.toString();
+        return script;
     }
+
 
     private static void injectScriptCompatibility(ScriptEngine scriptEngine, ScriptModelRenderer renderer) {
         try {
@@ -1109,19 +1032,29 @@ public class TrainScriptSystem {
         }
     }
 
-    private static boolean isScriptDisabled(ScriptEngine scriptEngine) {
-        return scriptEngine != null && DISABLED_SCRIPT_ENGINES.contains(System.identityHashCode(scriptEngine));
-    }
 
-    private static void disableBrokenScript(ScriptEngine scriptEngine, String phase, Throwable error) {
+    /**
+     * 本家 {@link jp.ngt.ngtlib.io.ScriptUtil#doScriptIgnoreError} と同じ意味。
+     * <b>エラーが出てもスクリプトは止めない</b>。本家は printStackTrace して次の tick もそのまま呼ぶ。
+     *
+     * <p>以前 RTMU はここで engine を DISABLED_SCRIPT_ENGINES に入れ、以後セッション中ずっと
+     * 実行しないようにしていた。1 tick の一時的な失敗で、その車両のドア・パンタ・方向幕・音が
+     * まとめて永久停止するため本家と挙動が全く違っていた。
+     *
+     * <p>ログだけは engine+phase ごとに 1 回に絞る (本家の printStackTrace は毎 tick 出て実用にならないため)。
+     */
+    private static void reportScriptFailure(ScriptEngine scriptEngine, String phase, Throwable error) {
         if (scriptEngine == null) {
             return;
         }
-        reportScriptError(scriptEngine, phase, error);
-        if (DISABLED_SCRIPT_ENGINES.add(System.identityHashCode(scriptEngine))) {
-            RealTrainModUnofficial.LOGGER.warn("Disabling legacy train script after {} failed", phase, error);
+        if (LOGGED_SCRIPT_FAILURES.add(System.identityHashCode(scriptEngine) + "\u0000" + phase)) {
+            reportScriptError(scriptEngine, phase, error);
         }
     }
+
+    /** 既に 1 度ログした (engine, phase) の組。 */
+    private static final java.util.Set<String> LOGGED_SCRIPT_FAILURES =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private static void reportScriptError(ScriptEngine scriptEngine, String phase, Throwable error) {
         if (scriptEngine == null || error == null) {
@@ -1144,38 +1077,57 @@ public class TrainScriptSystem {
     }
 
     /** サーバスクリプトを毎tick実行する。onUpdate(entity, executer)形式。 */
-    public static void invokeServerScriptOnUpdate(ScriptEngine scriptEngine, Object entity) {
-        if (scriptEngine == null || isScriptDisabled(scriptEngine)) return;
+    /**
+     * 本家 ScriptExecuter.execScript (KaizPatchX jp/ngt/rtm/modelpack/ScriptExecuter.java:32-36) の移植。
+     * <pre>
+     * this.callMethod(selector, "onUpdate", selector, this);  // onUpdate(entity, executer)
+     * ++this.count;
+     * </pre>
+     * executer は<b>エンティティごとに永続</b>で、スクリプトは {@code count} を経過 tick として読む。
+     * 以前 RTMU はここへ null を渡していたため、scriptExecuter を使うパックが全て動かなかった。
+     */
+    public static void invokeServerScriptOnUpdate(ScriptEngine scriptEngine, Object entity,
+                                                  jp.ngt.rtm.modelpack.ScriptExecuter executer) {
+        if (scriptEngine == null) return;
+        if (executer != null) {
+            executer.beginScript(entity);   //本家 getEntityWorld 相当: caller から world/座標を取る
+        }
         try {
             scriptEngine.put("entity", entity);
-            scriptEngine.put("executer", null);
-            scriptEngine.put("executor", null);
+            scriptEngine.put("executer", executer);
+            scriptEngine.put("executor", executer);
         } catch (Throwable ignored) {
         }
         Invocable invocable = (Invocable) scriptEngine;
         try {
-            invocable.invokeFunction("onUpdate", entity, null);
+            invocable.invokeFunction("onUpdate", entity, executer);
+            if (executer != null) {
+                ++executer.count;
+            }
             return;
         } catch (NoSuchMethodException ignored) {
         } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "onUpdate(entity, executer) [server]", e);
+            reportScriptFailure(scriptEngine, "onUpdate(entity, executer) [server]", e);
             return;
         } catch (Throwable t) {
-            disableBrokenScript(scriptEngine, "onUpdate(entity, executer) [server-runtime]", t);
+            reportScriptFailure(scriptEngine, "onUpdate(entity, executer) [server-runtime]", t);
             return;
         }
         try {
             invocable.invokeFunction("onUpdate", entity);
+            if (executer != null) {
+                ++executer.count;
+            }
         } catch (NoSuchMethodException ignored) {
         } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "onUpdate(entity) [server]", e);
+            reportScriptFailure(scriptEngine, "onUpdate(entity) [server]", e);
         } catch (Throwable t) {
-            disableBrokenScript(scriptEngine, "onUpdate(entity) [server-runtime]", t);
+            reportScriptFailure(scriptEngine, "onUpdate(entity) [server-runtime]", t);
         }
     }
 
     public static void invokeScriptTick(ScriptEngine scriptEngine, Object entity) {
-        if (scriptEngine == null || isScriptDisabled(scriptEngine)) return;
+        if (scriptEngine == null) return;
         LegacyScriptExecutor compat = entity instanceof TrainEntity train ? new LegacyScriptExecutor(train) : null;
         try {
             scriptEngine.put("executer", compat);
@@ -1209,7 +1161,7 @@ public class TrainScriptSystem {
             } catch (NoSuchMethodException ignored) {
                 // no tick function
             } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "tick(entity)", e);
+                reportScriptFailure(scriptEngine, "tick(entity)", e);
                 return;
             }
             try {
@@ -1218,7 +1170,7 @@ public class TrainScriptSystem {
             } catch (NoSuchMethodException ignored) {
                 // no zero-arg tick function
             } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "tick()", e);
+                reportScriptFailure(scriptEngine, "tick()", e);
                 return;
             }
             if (compat != null) {
@@ -1228,7 +1180,7 @@ public class TrainScriptSystem {
                 } catch (NoSuchMethodException ignored) {
                     // no one-argument compat onUpdate
                 } catch (ScriptException e) {
-                    disableBrokenScript(scriptEngine, "onUpdate(compat)", e);
+                    reportScriptFailure(scriptEngine, "onUpdate(compat)", e);
                     return;
                 }
                 try {
@@ -1237,7 +1189,7 @@ public class TrainScriptSystem {
                 } catch (NoSuchMethodException ignored) {
                     // no two-argument onUpdate
                     } catch (ScriptException e) {
-                        disableBrokenScript(scriptEngine, "onUpdate(entity, compat)", e);
+                        reportScriptFailure(scriptEngine, "onUpdate(entity, compat)", e);
                         return;
                     }
                 }
@@ -1247,7 +1199,7 @@ public class TrainScriptSystem {
             } catch (NoSuchMethodException ignored) {
                 // no one-argument entity onUpdate
             } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "onUpdate(entity)", e);
+                reportScriptFailure(scriptEngine, "onUpdate(entity)", e);
                 return;
             }
         }
@@ -1265,13 +1217,13 @@ public class TrainScriptSystem {
                 " }"
             );
         } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "tick/onUpdate fallback", e);
+            reportScriptFailure(scriptEngine, "tick/onUpdate fallback", e);
         }
     }
 
     /** サウンドスクリプトを1tick回す。SoundScriptExecutorを必ず渡す。 */
     public static void invokeSoundScript(ScriptEngine scriptEngine, net.minecraft.world.entity.Entity train) {
-        if (scriptEngine == null || train == null || isScriptDisabled(scriptEngine)) {
+        if (scriptEngine == null || train == null) {
             return;
         }
         SoundScriptExecutor su = new SoundScriptExecutor(train);
@@ -1287,160 +1239,22 @@ public class TrainScriptSystem {
         if (!(scriptEngine instanceof Invocable invocable)) {
             return;
         }
-        //サウンド管理は本家 SoundUpdaterVehicle 方式 (LegacyScriptSoundManager.ACTIVE の登録制)。
-        //playSound は「登録済みなら音量/ピッチ更新のみ」なので、ここで特別な前後処理は不要。
+        //本家 SoundUpdaterVehicle.update():45 は 1 本だけ:
+        //  ScriptUtil.doScriptIgnoreError(modelset.se, "onUpdate", this);
+        //update(su,1.0F) / tick(su) というフックは本家に存在しないため持たない。
         try {
             invocable.invokeFunction("onUpdate", su);
-            return;
         } catch (NoSuchMethodException ignored) {
-            // onUpdate を持たないサウンドスクリプト → 下の形式を試す
-        } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "onUpdate(su) [sound]", e);
-            return;
-        }
-        try {
-            invocable.invokeFunction("update", su, 1.0F);
-            return;
-        } catch (NoSuchMethodException ignored) {
-            // update も無い
-        } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "update(su) [sound]", e);
-            return;
-        }
-        try {
-            invocable.invokeFunction("tick", su);
-        } catch (NoSuchMethodException ignored) {
-            // tick も無い → このスクリプトには回すものが無い
-        } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "tick(su) [sound]", e);
+            //onUpdate を持たないサウンドスクリプト = 本家では何も鳴らない
+        } catch (Throwable e) {
+            reportScriptFailure(scriptEngine, "onUpdate(su) [sound]", e);
         }
     }
 
-    public static void invokeScriptUpdate(ScriptEngine scriptEngine, Object entity, float partialTicks) {
-        if (scriptEngine == null || isScriptDisabled(scriptEngine)) return;
-        if (scriptEngine instanceof Invocable invocable) {
-            try {
-                invocable.invokeFunction("update", entity, partialTicks);
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no update function
-            } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "update(entity, partialTicks)", e);
-                return;
-            }
-            try {
-                invocable.invokeFunction("update", entity);
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no entity-only update function
-            } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "update(entity)", e);
-                return;
-            }
-            try {
-                invocable.invokeFunction("update", partialTicks);
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no partialTick-only update function
-            } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "update(partialTicks)", e);
-                return;
-            }
-            try {
-                invocable.invokeFunction("update");
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no zero-arg update function
-            } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "update()", e);
-                return;
-            }
-        }
-        try {
-            scriptEngine.eval("if (typeof update === 'function') update();");
-        } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "update() fallback", e);
-        }
-    }
-
-    public static void invokeScriptRender(ScriptEngine scriptEngine, Object entity, float partialTicks) {
-        if (scriptEngine == null || isScriptDisabled(scriptEngine)) return;
-        int pass = 0;
-        Object rendererObj = scriptEngine.get("renderer");
-        if (rendererObj instanceof ScriptModelRenderer r) {
-            pass = r.getCurrentPass();
-        }
-        if (scriptEngine instanceof Invocable invocable) {
-            try {
-                invocable.invokeFunction("render", entity, pass, partialTicks);
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no 3-arg render function
-            } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "render(entity, pass, partialTicks)", e);
-                return;
-            }
-            try {
-                invocable.invokeFunction("render", entity, partialTicks);
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no 2-arg render function
-            } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "render(entity, partialTicks)", e);
-                return;
-            }
-            try {
-                invocable.invokeFunction("render", entity);
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no entity-only render function
-            } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "render(entity)", e);
-                return;
-            }
-            try {
-                invocable.invokeFunction("render", partialTicks);
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no partialTick-only render function
-            } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "render(partialTicks)", e);
-                return;
-            }
-            try {
-                invocable.invokeFunction("render");
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no zero-arg render function
-            } catch (ScriptException e) {
-                disableBrokenScript(scriptEngine, "render()", e);
-                return;
-            }
-        }
-        try {
-            scriptEngine.eval("if (typeof render === 'function') render();");
-        } catch (ScriptException e) {
-            disableBrokenScript(scriptEngine, "render() fallback", e);
-        }
-    }
-
-    public void executeTrainScript(TrainEntity train, String script) {
-        if (engine == null || script == null || script.isEmpty()) {
-            return;
-        }
-
-        EntityScriptContext context = getOrCreateContext(train);
-        setupScriptContext(context, train, null);
-
-        try {
-            Bindings bindings = engine.createBindings();
-            bindings.putAll(context.variables);
-            engine.eval(script, bindings);
-        } catch (ScriptException e) {
-            RealTrainModUnofficial.LOGGER.error("Script execution error for vehicle '{}'", train.getVehicleId(), e);
-        }
-    }
-
+    /**
+     * RS ブロック (RTMU 独自のスクリプトブロック) 用。本家 RTM には無い機能。
+     * 関数呼び出しではなくソース全体を毎回 eval する。
+     */
     public boolean executeBlockScript(ServerLevel level, BlockPos pos, String script, boolean powered, TrainEntity train) {
         if (engine == null || script == null || script.isBlank()) {
             return false;
@@ -1464,43 +1278,6 @@ public class TrainScriptSystem {
             RealTrainModUnofficial.LOGGER.error("Script block execution error at {}", pos, e);
             return false;
         }
-    }
-
-    public void executeEventScript(Entity entity, String eventType, Object... parameters) {
-        EntityScriptContext context = getOrCreateContext(entity);
-        context.variables.put("eventType", eventType);
-        context.variables.put("eventParams", parameters);
-
-        // Event scripts would be loaded from model definition
-        // For now, this is a placeholder for future implementation
-    }
-
-    private EntityScriptContext getOrCreateContext(Entity entity) {
-        return entityContexts.computeIfAbsent(entity.getUUID(), k -> new EntityScriptContext());
-    }
-
-    private void setupScriptContext(EntityScriptContext context, TrainEntity train, Player player) {
-        context.variables.put("currentTrain", train);
-        context.variables.put("train", train);
-        context.variables.put("player", player);
-        context.variables.put("currentPlayer", player);
-        context.variables.put("world", train.level());
-        context.variables.put("level", train.level());
-        context.variables.put("x", train.getX());
-        context.variables.put("y", train.getY());
-        context.variables.put("z", train.getZ());
-        context.variables.put("yaw", train.getYRot());
-        context.variables.put("pitch", train.getXRot());
-        context.variables.put("trainDistance", train.getTrainDistance());
-        context.variables.put("vehicleId", train.getVehicleId());
-    }
-
-    public void removeContext(Entity entity) {
-        entityContexts.remove(entity.getUUID());
-    }
-
-    private static class EntityScriptContext {
-        final Map<String, Object> variables = new HashMap<>();
     }
 
     public static final class BogieCompat {
@@ -1538,12 +1315,17 @@ public class TrainScriptSystem {
         public final float wheelRotationR;
         // RTM 1.7.10 obfuscated world field (entity.field_70170_p)。lib_FormationFix 等が
         // entity.field_70170_p.field_72995_K(world.isRemote) を参照するため公開する。
-        public final com.portofino.realtrainmodunofficial.entity.TrainEntity.WorldCompat field_70170_p;
+        //★本物のシム (jp.ngt.mccompat.WorldCompat) を渡す。
+        //以前は TrainEntity の内部クラス WorldCompat を渡していたが、こちらは
+        //isClientSide / field_72995_K / field_72996_f しか持たない別物で、
+        //スクリプトが world.func_73045_a(id) 等を呼んだ瞬間に
+        //「is not a function」でそのスクリプトが丸ごと落ちていた (MFCP のトレーラ等)。
+        public final jp.ngt.mccompat.WorldCompat field_70170_p;
 
         public LegacyScriptExecutor(TrainEntity train) {
             this.train = train;
-            this.field_70170_p = train != null ? train.field_70170_p
-                : new com.portofino.realtrainmodunofficial.entity.TrainEntity.WorldCompat(null);
+            this.field_70170_p = train != null && train.level() != null
+                ? new jp.ngt.mccompat.WorldCompat(train.level()) : null;
             this.count = train == null ? 0L : Math.max(0L, (long) train.tickCount);
             this.field_70177_z = train == null ? 0.0F : train.getYRot();
             this.field_70125_A = train == null ? 0.0F : train.getXRot();
@@ -2500,8 +2282,6 @@ public class TrainScriptSystem {
         // emissive pass で、lightMode ごとの presentGroupNames をキャッシュ。
         // pass 2 の renderParts ごとに 3 コレクション確保していたのを排除する。
         // キー: ParsedGroupSet インスタンスの identity × lightMode int → Set<String>
-        private final java.util.IdentityHashMap<ParsedGroupSet, int[]> emissiveLightModeKeys = new java.util.IdentityHashMap<>();
-        private final java.util.IdentityHashMap<ParsedGroupSet, Set<String>[]> emissivePresentCache = new java.util.IdentityHashMap<>();
 
         // isEmissiveGroup のコンパイル済み regex (毎回コンパイルするコストを排除)
         private static final java.util.regex.Pattern DEST_N_PATTERN = java.util.regex.Pattern.compile("dest\\d+");
@@ -2703,7 +2483,6 @@ public class TrainScriptSystem {
                 // 擬似シャドウ(黒平板)を無効化。shadow完全一致のみ
                 if (x.equalsIgnoreCase("shadow")) continue;
                 if (currentPass >= 2 && isLightOffGroup(x)) continue;
-                if (shouldSuppressOerMseScriptHoodGroup(x)) continue;
                 normalized.add(x);
             }
             if (normalized.isEmpty()) return;
@@ -3637,7 +3416,6 @@ public class TrainScriptSystem {
                             if (n.equals("shadow") || n.startsWith("shadow_") || n.endsWith("_shadow")) continue;
                             if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) continue;
                             if (currentPass >= 2 && isLightOffGroup(n)) continue;
-                            if (shouldSuppressOerMseScriptHoodGroup(n)) continue;
                             filtered.add(g);
                         }
                         boolean legacy = isLegacyDisplaySelection(filtered);
@@ -3690,7 +3468,6 @@ public class TrainScriptSystem {
                             if (n.equals("shadow") || n.startsWith("shadow_") || n.endsWith("_shadow")) return false;
                             if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) return false;
                             if (currentPass >= 2 && isLightOffGroup(n)) return false;
-                            if (shouldSuppressOerMseScriptHoodGroup(n)) return false;
                             return true;
                         })
                         .collect(Collectors.toList());
@@ -3834,10 +3611,6 @@ public class TrainScriptSystem {
                 || lowerGroupName.endsWith("off")
                 || lowerGroupName.contains("_off_")
                 || lowerGroupName.contains("-off-");
-        }
-
-        private boolean shouldSuppressOerMseScriptHoodGroup(String lowerGroupName) {
-            return false;
         }
 
         private TrainEntity resolveCurrentTrainEntity() {
@@ -4104,9 +3877,6 @@ public class TrainScriptSystem {
             }
             // 擬似シャドウ group (完全一致のみ) は常に skip (ユーザー要望で車両の影は無効化)。
             if (normalized.equalsIgnoreCase("shadow")) {
-                return false;
-            }
-            if (shouldSuppressOerMseScriptHoodGroup(normalized)) {
                 return false;
             }
             // 角度曲げ変種は描かない(原点姿勢だと散乱する)

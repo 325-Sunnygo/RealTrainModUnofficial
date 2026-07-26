@@ -88,7 +88,10 @@ public class BogieRenderer {
         if (parentDef == null) {
             return 0.0D;
         }
-        return (RTM_BOGIE_RENDER_LIFT + BOGIE_VISUAL_LIFT) * parentDef.getModelScale();
+        //★親車体の縮尺は掛けない。本家は台車を<b>別のモデルセット</b>として描くので、
+        //車体側 ModelConfig の scale は台車に効かない (mo1600 は scale 0.1 の voxel 車体で、
+        //ここで掛けていたせいで台車だけ 1/10 の大きさになっていた)。
+        return RTM_BOGIE_RENDER_LIFT + BOGIE_VISUAL_LIFT;
     }
 
     public static void renderStandaloneBogie(PoseStack poseStack, VehicleDefinition.BogieDefinition bogieDef,
@@ -124,7 +127,7 @@ public class BogieRenderer {
             pitch,
             partialTicks,
             visualOffsetX,
-            visualOffsetY + (parentDef != null ? WORLD_BOGIE_RENDER_LIFT * parentDef.getModelScale() : WORLD_BOGIE_RENDER_LIFT),
+            visualOffsetY + WORLD_BOGIE_RENDER_LIFT,
             visualOffsetZ
         );
     }
@@ -150,7 +153,7 @@ public class BogieRenderer {
             if (Math.abs(pitch) > 0.001F) {
                 poseStack.mulPose(Axis.XP.rotationDegrees(-pitch));
             }
-            poseStack.scale(parentDef.getModelScale(), parentDef.getModelScale(), parentDef.getModelScale());
+            //台車は本家どおり<b>親の縮尺を継がない</b> (上の getStandaloneRenderLift の説明と同じ)。
             MqoModelLoader.renderModel(bogieModel, poseStack, buffer, packedLight);
         } finally {
             poseStack.popPose();
@@ -167,7 +170,10 @@ public class BogieRenderer {
             return null;
         }
         Map<String, String> textureOverrides = bogieDef.textureOverrides();
-        if (modelFile.toLowerCase(Locale.ROOT).endsWith(".class")) {
+        //本家組込の ModelBogie.class は移植済み ({@link ClassModelGeometry}) なのでそのまま読む。
+        //移植していない .class だけ従来どおり汎用台車へ差し替える。
+        if (modelFile.toLowerCase(Locale.ROOT).endsWith(".class")
+                && !com.portofino.realtrainmodunofficial.client.model.ClassModelGeometry.isSupported(modelFile)) {
             modelFile = DEFAULT_CLASS_BOGIE_MODEL;
             if (textureOverrides == null || textureOverrides.isEmpty()) {
                 textureOverrides = Map.of("default", "textures/train/bogie.png");

@@ -222,6 +222,22 @@ public abstract class RailMap {
     }
 
     /**
+     * スクリプト互換オーバーロード。
+     *
+     * <p>スクリプトの {@code world} は {@code entity.field_70170_p} =
+     * {@link jp.ngt.mccompat.WorldCompat} であり実 {@link Level} ではない。
+     * {@code Level} だけを取る形だと ClassCastException でスクリプトが丸ごと落ちる。
+     * {@code BlockUtil.setBlock/getBlock} が既に採っている「Object で受けて解く」規約に揃える。
+     * <pre>SuperRailBuilder3!server_SuperRailBuilder3.js:346  railMap.setRail(world, RTMRail.largeRailBase0, ...)</pre>
+     */
+    public void setRail(Object world, Block block, int x0, int y0, int z0, RailProperty prop) {
+        Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
+        if (level != null) {
+            this.setRail(level, block, x0, y0, z0, prop);
+        }
+    }
+
+    /**
      * ブロックの設置
      */
     public void setRail(Level world, Block block, int x0, int y0, int z0, RailProperty prop) {

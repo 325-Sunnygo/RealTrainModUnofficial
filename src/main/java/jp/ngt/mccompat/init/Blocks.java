@@ -66,6 +66,21 @@ public final class Blocks {
     private static final java.util.Map<Block, Integer> META = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** 色別ブロックを白色版(1.7.10 の基準ブロック)へ正規化。非色ブロックはそのまま返す。 */
+    /**
+     * func_149716_u = Block.hasTileEntity。
+     * <p>レシーバがバニラの {@code Block} でシムを挟めないため、スクリプト変換
+     * ({@code PackScriptSource.remapVanillaOnlyMethods}) がここへ回してくる。
+     */
+    public static boolean func_149716_u(Object block) {
+        if (block instanceof net.minecraft.world.level.block.EntityBlock) {
+            return true;
+        }
+        if (block instanceof Block b) {
+            return b.defaultBlockState().hasBlockEntity();
+        }
+        return false;
+    }
+
     public static Block canonical(Block block) {
         if (block == null) return null;
         Block b = CANON.get(block);

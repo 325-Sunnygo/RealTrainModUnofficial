@@ -98,6 +98,13 @@ public final class ModelLoader {
                 }
             }
         });
+        //本家 PolygonModel のコンストラクタは init() の直後に calcVertexNormals() を回す。
+        //★これが無いと face.vertexNormals が null のままで、スクリプト描画経路
+        //(drawModelGroup) が面法線だけで描く = 常にフラット陰影になる。
+        //文字入りモデル (ナンバープレート等) で「変な所が影になる」の正体がこれ。
+        for (GroupObject group : model.groupObjects) {
+            group.calcVertexNormals(VecAccuracy.MEDIUM);
+        }
         return model;
     }
 

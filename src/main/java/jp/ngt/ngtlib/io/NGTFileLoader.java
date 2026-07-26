@@ -69,10 +69,12 @@ public final class NGTFileLoader {
             //サフィックス一致 (パス表記ゆれ対策)。索引全走査なので結果は必ずキャッシュする
             //(見つからない要求を毎回走査すると、スクリプトが欠落アセットを繰り返し要求したとき
             // 索引サイズ×要求回数の走査になり描画が止まる)。
-            String leaf = key.contains("/") ? key.substring(key.lastIndexOf('/') + 1) : key;
+            //★ファイル名だけの一致は取らない (本家は完全パスでしか引かない)。同名ファイルを
+            //多数持つパックで別物を掴むため。サフィックス一致は assets/<domain>/ を基準にした
+            //完全パス解決なので残す。
             String suffix = "/" + key;
             for (Map.Entry<String, AssetRef> e : idx.entrySet()) {
-                if (e.getKey().endsWith(suffix) || e.getKey().equals(leaf)) {
+                if (e.getKey().endsWith(suffix)) {
                     ref = e.getValue();
                     break;
                 }

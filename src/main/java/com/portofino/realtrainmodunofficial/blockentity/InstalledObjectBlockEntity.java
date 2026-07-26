@@ -28,7 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rtm.electric.TileEntityInsulator {
+public class InstalledObjectBlockEntity extends BlockEntity
+        implements jp.ngt.rtm.electric.TileEntityInsulator, jp.ngt.ngtlib.block.TileEntityPlaceable {
     private static final int TICKET_GATE_OPEN_TICKS = 60;
     private static final int TICKET_GATE_MOVE_TICKS = 12;
     private String definitionId = "";
@@ -269,6 +270,11 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
             return null;
         }
         net.minecraft.world.phys.Vec3 wp = def.getWireAttachPos();
+        //★ここは<b>モデル座標のままの生の取付点</b>を返す。
+        //本家 TileEntityConnectorBase.updateWirePos に相当する変換
+        //(取付面/pitch/yaw/roll の回転 + オフセット加算) は
+        //InstalledObjectBlockEntityRenderer.wireEndpoint 側が既に忠実に行っている。
+        //ここでも変換すると<b>二重に掛かって</b>電線が明後日を向く。
         return wp == null ? null : new jp.ngt.ngtlib.math.Vec3(wp.x, wp.y, wp.z);
     }
 
@@ -320,9 +326,14 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         tag.putInt("BarMoveCount", barMoveCount);
         tag.putInt("LightCount", lightCount);
         tag.putInt("TickCountOnActive", tickCountOnActive);
-        tag.putDouble("OffsetX", offsetX);
-        tag.putDouble("OffsetY", offsetY);
-        tag.putDouble("OffsetZ", offsetZ);
+        //本家 TileEntityPlaceable:33 と同じキー名・型 (小文字 offsetX / float)。
+        //スクリプトが設置時に NBT へ書くのもこの名前:
+        //  NGTOBuilder2!server_wire_beam.js  nbt.func_74776_a("offsetX", pos[4]);  // setFloat
+        //RTMU は "OffsetX"(double) だったため、スクリプトが指定したオフセットが
+        //一切読まれず、ビームが本来の位置に乗らず傾いて見えていた。
+        tag.putFloat("offsetX", (float) offsetX);
+        tag.putFloat("offsetY", (float) offsetY);
+        tag.putFloat("offsetZ", (float) offsetZ);
         tag.putInt("SignalChannel", signalChannel);
         tag.putInt("SignalAspect", signalAspect);
         tag.putInt("SpeakerRange", speakerRange);
@@ -377,9 +388,10 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
         barMoveCount = tag.getInt("BarMoveCount");
         lightCount = tag.contains("LightCount") ? tag.getInt("LightCount") : -1;
         tickCountOnActive = tag.getInt("TickCountOnActive");
-        offsetX = tag.getDouble("OffsetX");
-        offsetY = tag.getDouble("OffsetY");
-        offsetZ = tag.getDouble("OffsetZ");
+        //本家キー (小文字 float) を優先し、旧 RTMU セーブ ("OffsetX" double) も読めるようにする。
+        offsetX = tag.contains("offsetX") ? tag.getFloat("offsetX") : tag.getDouble("OffsetX");
+        offsetY = tag.contains("offsetY") ? tag.getFloat("offsetY") : tag.getDouble("OffsetY");
+        offsetZ = tag.contains("offsetZ") ? tag.getFloat("offsetZ") : tag.getDouble("OffsetZ");
         signalChannel = tag.contains("SignalChannel") ? tag.getInt("SignalChannel") : -1;
         signalAspect = tag.contains("SignalAspect") ? tag.getInt("SignalAspect") : SignalAspect.STOP.getId();
         //旧セーブ互換: 信号機は現示 (SignalAspect) と electricity を単一状態にミラーする。
@@ -912,8 +924,36 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
      * The installed-object renderer already applies block yaw before the script runs,
      * so returning zero here avoids rotating scripted signals twice.
      */
+    @Override
     public float getRotation() {
-        return 0.0F;
+        //本家 TileEntityPlaceable.getRotation。NGTO Builder は
+        //  rotation = tile.getRotation() + yaw;  tile.setRotation(rotation, true);
+        //と<b>現在値に加算</b>する。0 固定だと設置ごとに向きが失われる。
+        return this.yaw;
+    }
+
+    @Override
+    public void setRotation(float rotation, boolean sync) {
+        this.yaw = rotation % 360.0F;
+        setChanged();
+        if (sync && level != null && !level.isClientSide()) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
+    @Override
+    public float getOffsetX() {
+        return (float) this.offsetX;
+    }
+
+    @Override
+    public float getOffsetY() {
+        return (float) this.offsetY;
+    }
+
+    @Override
+    public float getOffsetZ() {
+        return (float) this.offsetZ;
     }
 
     /**
@@ -1114,6 +1154,7 @@ public class InstalledObjectBlockEntity extends BlockEntity implements jp.ngt.rt
     // --- NGTO Builder の Wire ツール互換 ---
 
     /** Wire ツールが碍子の微調整オフセットを設定する (本家 TileEntityConnectorBase.setOffset)。 */
+    @Override
     public void setOffset(double x, double y, double z, boolean sync) {
         this.offsetX = x;
         this.offsetY = y;

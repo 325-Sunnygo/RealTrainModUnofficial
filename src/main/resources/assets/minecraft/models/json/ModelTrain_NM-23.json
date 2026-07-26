@@ -1,0 +1,37 @@
+{
+	"trainName": "NM-23",
+	"trainType": "CC",
+
+	"trainModel2": {
+		"modelFile": "nm-23.mqo",
+		"textures": [["default", "textures/train/nm-23/nm-23.png"]],
+		"rendererPath": "scripts/RenderNM-23.js"
+	},
+	"bogieModel2": {
+		"modelFile": "ModelBogie_ft1.obj",
+	"textures": [["default", "textures/train/ft1.png"]]
+	},
+
+	"buttonTexture": "textures/train/nm-23/button_nm-23.png",
+	"soundScriptPath": "scripts/sound_trailer.js",
+
+	"seatPos": [],
+	"playerPos": [
+		[0.8, 0.0, 9.187],
+		[-0.8, 0.0, -9.187]
+	],
+	"bogiePos": [
+		[0.0, 0.0, 7.125],
+		[0.0, 0.0, -7.125]
+	],
+	"customButtons": [
+		["CLOSE", "OPEN"],
+		["DOWN", "RAISE"]
+	],
+	"customButtonTips": ["cover state", "missile state"],
+	"doCulling": true,
+	"smoothing": true,
+	"accuracy": "MEDIUM",
+	"collisionParts": ["base", "front", "side"],
+	"tags": "ngt5479"
+}

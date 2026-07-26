@@ -77,4 +77,19 @@ public final class Point {
         }
         return this.rpRoot.checkRSInput(level) ? this.rmBranch : this.rmMain;
     }
+
+    /**
+     * スクリプト互換オーバーロード。
+     *
+     * <p>SRB3 の描画スクリプトは
+     * <pre>nearestPoint.getActiveRailMap(world)  // render_SuperRailBuilder3.js:2210</pre>
+     * と呼ぶが、この {@code world} は {@code entity.field_70170_p} = {@link jp.ngt.mccompat.WorldCompat}
+     * であり実 {@link Level} ではない。{@code Level} だけを取る形だと
+     * {@code ClassCastException: Cannot cast jp.ngt.mccompat.WorldCompat to net.minecraft.world.level.Level}
+     * で<b>描画スクリプト全体が落ち</b>、素のモデル描画へフォールバックする
+     * (= 補助線もカーソルも出ない)。ラッパーからも実 Level を取り出せるようにする。
+     */
+    public RailMap getActiveRailMap(Object levelLike) {
+        return getActiveRailMap(jp.ngt.ngtlib.block.BlockUtil.toLevel(levelLike));
+    }
 }

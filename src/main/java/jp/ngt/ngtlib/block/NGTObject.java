@@ -159,7 +159,7 @@ public class NGTObject {
         tag.putInt("OrigZ", this.origZ);
         ListTag list = new ListTag();
         for (BlockSet set : this.blockList) {
-            list.add(set.writeToNBT());
+            list.add(set.writeToVanillaNBT());
         }
         tag.put("BlocksData", list);
         return tag;

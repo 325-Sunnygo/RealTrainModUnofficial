@@ -76,11 +76,15 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         if (model == null) {
             return;
         }
+        //本家 preRenderBody: 室内灯 ON かつ周囲が暗いなら車体の通常描画をフルブライトで描く。
+        //★本家は preRenderBody/postRenderBody で<b>車体パスだけ</b>を挟む。台車・乗客・
+        //ライト効果には掛からないので、ここでも body 用の値を別に持つ。
+        final int interiorLightState = entity.getTrainStateData(
+            jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_InteriorLight.id);
+        final int bodyLight = TrainEntityRenderer.applyInteriorLighting(entity.level(),
+            entity.getX(), entity.getY(), entity.getZ(),
+            !def.getInteriorLights().isEmpty(), interiorLightState, packedLight);
 
-        boolean hasSeparateBogieModel = def.getBogies().stream()
-                .anyMatch(b -> b.modelFile() != null && !b.modelFile().isBlank()
-                        && !BogieRenderer.isDummyBogieModel(b.modelFile())
-                        && !b.modelFile().toLowerCase(Locale.ROOT).endsWith(".class"));
         ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_LOOKUP, tSec);
 
         //乗員を車体より先に描画する。車体は半透明バッチ (AlphaBlend) が深度を書くため、
@@ -101,19 +105,24 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             poseStack.mulPose(Axis.ZP.rotationDegrees(roll));
 
             poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
-            poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
+            //★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。本家は
+            //NGTOParts.render の中だけで glScalef(scale) するので、スクリプトが台車/ドアを
+            //置く glTranslatef はブロック単位のまま。ここで掛けると全部が中央に寄る。
+            if (!model.isVoxelModel()) {
+                poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
+            }
 
             //本家式スクリプト描画 (Nashorn): 成功したらベイクドパスはスキップ
             tSec = ClientRenderProfiler.sec();
             com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.Scripted scripted =
                     com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
             boolean scriptRendered = scripted != null && scripted.render(entity, partialTicks, poseStack, buffer,
-                    packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, model);
+                    bodyLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, model);
             ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_SCRIPTED, tSec);
 
             if (!scriptRendered) {
                 MqoModelLoader.GroupPredicate filter =
-                        groupName -> shouldRenderGroup(groupName, hasSeparateBogieModel);
+                        groupName -> shouldRenderGroup(groupName);
 
                 //★ ドアの開閉。
                 //
@@ -154,7 +163,14 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                 try {
                     //entity を渡す版を使う。渡さないとカリング (doCulling) も
                     //発光パスの点灯判定 (前照灯/尾灯/室内灯) も引けない。
-                    MqoModelLoader.renderModel(model, poseStack, buffer, packedLight, filter, doorTransform, entity);
+                    //本家 preRenderBody / postRenderBody と同じ位置で室内灯を挟む。
+                    com.portofino.realtrainmodunofficial.client.render.InteriorLighting.begin(
+                        def.getInteriorLights(), interiorLightState == 2, entity.level().getGameTime() * 50L);
+                    try {
+                        MqoModelLoader.renderModel(model, poseStack, buffer, bodyLight, filter, doorTransform, entity);
+                    } finally {
+                        com.portofino.realtrainmodunofficial.client.render.InteriorLighting.end();
+                    }
                 } finally {
                     com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(null);
                 }
@@ -217,7 +233,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
      * ヘルパーグループ (shadow/guide/atari/影ms/連結曲げ変種) の除外。
      * 台車グループは別台車モデルがある場合のみ非表示 (EntityBogie 側が描画)。
      */
-    private static boolean shouldRenderGroup(String groupName, boolean hasSeparateBogieModel) {
+    private static boolean shouldRenderGroup(String groupName) {
         if (groupName == null || groupName.isBlank()) {
             return true;
         }
@@ -241,11 +257,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         if (isAngleBendVariant(n)) {
             return false;
         }
-        if (hasSeparateBogieModel) {
-            if (n.contains("bogie") || n.contains("daisya") || n.contains("daisha")) {
-                return false;
-            }
-        }
+        //★本家は名前で台車グループを隠さない (TrainEntityRenderer と同じ理由)。
         return true;
     }
 

@@ -62,7 +62,8 @@ public final class WireScriptRenderers {
                         def.getId(), def.getScriptPath());
                 return INVALID;
             }
-            String source = new String(bytes, StandardCharsets.UTF_8);
+            //Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-8 だと構文ごと壊れる)
+            String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
             ScriptEngine se = ScriptUtil.doScript(
                     "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n"
                     + "var GL12 = GL11;\n"
@@ -70,7 +71,7 @@ public final class WireScriptRenderers {
                     //スクリプトは 1.12 の net.minecraft.util.math.BlockPos を import する。
                     //1.21 では core.BlockPos なので、あらかじめグローバルに束縛しておく。
                     + "var BlockPos = Java.type('net.minecraft.core.BlockPos');\n"
-                    + source);
+                    + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source));
             Object rcName = se.get("renderClass");
             if (rcName == null) {
                 RealTrainModUnofficial.LOGGER.warn("[wire] renderClass がありません: {}", def.getId());

@@ -53,7 +53,18 @@ public class PartsRenderer {
     protected static final float ANGLE = (float) (Math.PI * 2.0D / (double) DIV_NUM);
 
     protected ScriptEngine script;
-    protected ModelObject modelObject = new ModelObject(null);
+    /**
+     * 本家のフィールド名は {@code modelObj} (KaizPatchX PartsRenderer.java:39)。
+     * スクリプトは getter ではなく<b>リフレクションでフィールド名を直接</b>読む:
+     * <pre>
+     * // NGTOBuilder2!lib_NGTOBuilderUtilClient.js:294
+     * var modelObj = NGTUtil.getField(PartsRenderer.class, renderer, "modelObj");
+     * var model = modelObj.model;
+     * </pre>
+     * RTMU は {@code modelObject} という別名だったため getField が null を返し、
+     * Liner 等の描画スクリプトが「Cannot get property "model" of null」で落ちていた。
+     */
+    protected ModelObject modelObj = new ModelObject(null);
     protected Object modelSet;
     protected final java.util.List<Parts> partsList = new java.util.ArrayList<>();
     protected final java.util.Map<Integer, Object> dataMap = new java.util.HashMap<>();
@@ -103,16 +114,24 @@ public class PartsRenderer {
             jp.ngt.ngtlib.io.ScriptUtil.doScriptFunction(this.script, "render", entity, pass, partialTick);
         } catch (Throwable t) {
             this.scriptFailed = true;
-            if (!this.warnedScriptFail) {
-                this.warnedScriptFail = true;
+            //失敗の<b>種類ごと</b>に 1 回出す。以前は「このレンダラで 1 回だけ」だったため、
+            //起動直後に別の理由で 1 回出ると以後の失敗が全て無音になり、
+            //ClassCastException で描画スクリプトが丸ごと落ちていても気付けなかった。
+            Throwable cause = t.getCause() != null ? t.getCause() : t;
+            String key = pass + "|" + cause;
+            if (this.loggedScriptFailures.size() < 32 && this.loggedScriptFailures.add(key)) {
                 com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
-                    "Render script failed (falling back to plain model rendering): {}",
-                    String.valueOf(t.getCause() != null ? t.getCause() : t));
+                    "[RTMU] 描画スクリプトが落ちました (素モデル描画へフォールバック) pass={} script={}: {}",
+                    pass, this.scriptName == null ? "?" : this.scriptName, String.valueOf(cause));
             }
         }
     }
 
-    private boolean warnedScriptFail;
+    /** 既にログした失敗 (pass, 例外) の組。 */
+    private final java.util.Set<String> loggedScriptFailures = new java.util.HashSet<>();
+
+    /** ログ用のスクリプト名。どのパックが落ちたか判らないと追えない。 */
+    public String scriptName;
 
     /**
      * 直近の render() が失敗したかを読み取ってフラグを下ろす。
@@ -136,16 +155,16 @@ public class PartsRenderer {
     public void init(Object modelSet, Object modelObject) {
         this.modelSet = modelSet;
         if (modelObject instanceof ModelObject mo) {
-            this.modelObject = mo;
+            this.modelObj = mo;
         }
         if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "init", modelSet, this.modelObject);
+            ScriptUtil.doScriptIgnoreError(this.script, "init", modelSet, this.modelObj);
         }
         this.partsList.forEach(parts -> parts.init(this));
     }
 
     public ModelObject getModelObject() {
-        return this.modelObject;
+        return this.modelObj;
     }
 
     /**
@@ -153,7 +172,7 @@ public class PartsRenderer {
      * 解決するので、この名前で {@code renderer.modelObj} と書ける。
      */
     public ModelObject getModelObj() {
-        return this.modelObject;
+        return this.modelObj;
     }
 
     public Parts registerParts(Parts par1) {
@@ -164,6 +183,33 @@ public class PartsRenderer {
             this.targetsList.add(par1);
         }
         return par1;
+    }
+
+    /**
+     * 本家シグネチャ {@code getRendererWithScript(ResourceLocation par1, String... args)}
+     * (KaizPatchX PartsRenderer.java:440)。パック側の <b>kaizpatch ターゲット</b>がこの形で呼ぶ:
+     *
+     * <pre>
+     * // SR1-200-test.zip!.../__targets__/kaizpatch/scripts/hi03_lib/lib_RTMApiCompatClient.compat.js:38
+     * Packages.jp.ngt.rtm.render.PartsRenderer.getRendererWithScript.apply(..., [resource, ...args]);
+     * </pre>
+     *
+     * <p>RTMU には {@link #getRendererWithScript(ScriptEngine, String...)} しか無く、
+     * ResourceLocation を渡すこの呼び方は型が合わずに失敗していた。
+     */
+    public static PartsRenderer getRendererWithScript(Object resource, String... args)
+            throws ReflectiveOperationException {
+        if (resource instanceof ScriptEngine se) {
+            return getRendererWithScript(se, args);
+        }
+        String script = jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getScript(resource);
+        if (script == null || script.isBlank()) {
+            return null;
+        }
+        ScriptEngine se = jp.ngt.ngtlib.io.ScriptUtil.doScript(
+                com.portofino.realtrainmodunofficial.script.PackScriptSource.PRELUDE
+                        + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(script));
+        return getRendererWithScript(se, args);
     }
 
     /**

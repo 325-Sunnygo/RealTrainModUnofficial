@@ -52,6 +52,11 @@ public class CarItem extends Item {
             }
             return InteractionResult.sidedSuccess(level.isClientSide());
         }
+        //本家 ItemVehicle.onItemUse:69 は上面 (par7 == 1) 以外を無視する。
+        //側面/底面クリックで車が生成されるのは RTMU 独自の挙動だった。
+        if (context.getClickedFace() != net.minecraft.core.Direction.UP) {
+            return InteractionResult.PASS;
+        }
         if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
         }
@@ -62,10 +67,55 @@ public class CarItem extends Item {
         if (car == null) {
             return InteractionResult.FAIL;
         }
-        car.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, context.getPlayer() != null ? context.getPlayer().getYRot() : 0f, 0f);
+        //本家 ItemVehicle.onItemUse:88
+        //  vehicle.rotationYaw = MathHelper.wrapAngleTo180_float(-player.rotationYaw);
+        //RTMU は素の getYRot() を入れていたため、向きが本家と左右反転していた。
+        float yaw = context.getPlayer() != null
+                ? net.minecraft.util.Mth.wrapDegrees(-context.getPlayer().getYRot())
+                : 0.0F;
+        car.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, yaw, 0f);
         car.setVehicleId(selectedId);
+        //本家 ItemVehicle.onItemUse:90
+        //  vehicle.getResourceState().readFromNBT(this.getModelState(itemStack).writeToNBT());
+        //アイテム側で設定した DataMap をエンティティへ移送する。これが無いと
+        //モデル選択画面で入れた DataMap が生成時に消える (NGTO Builder 等の設定込み車両が壊れる)。
+        applyItemDataMap(car, stack);
         level.addFreshEntity(car);
+        //本家 ItemVehicle.onItemUse:95  クリエイティブ以外はアイテムを 1 個消費する。
+        if (context.getPlayer() != null && !context.getPlayer().getAbilities().instabuild) {
+            stack.shrink(1);
+        }
         return InteractionResult.sidedSuccess(false);
+    }
+
+    /**
+     * アイテム NBT の DataMap を車へ移送する (本家 ResourceState.readFromNBT 相当)。
+     * ブリッジが返す形式は {@code name=(type)value,name=(type)value}。
+     * 車の DataMap は文字列マップ ({@link CarEntity.DataMapCompat}) なので型注記は落として値だけ入れる。
+     */
+    private static void applyItemDataMap(CarEntity car, ItemStack stack) {
+        String dataMap = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedDataMap(stack);
+        if (dataMap == null || dataMap.isBlank()) {
+            return;
+        }
+        for (String entry : dataMap.split(",")) {
+            int eq = entry.indexOf('=');
+            if (eq <= 0) {
+                continue;
+            }
+            String key = entry.substring(0, eq).trim();
+            String value = entry.substring(eq + 1).trim();
+            //"(type)" の型注記を落とす
+            if (value.startsWith("(")) {
+                int close = value.indexOf(')');
+                if (close >= 0) {
+                    value = value.substring(close + 1);
+                }
+            }
+            if (!key.isEmpty()) {
+                car.setScriptDataValue(key, value);
+            }
+        }
     }
 
     @Override

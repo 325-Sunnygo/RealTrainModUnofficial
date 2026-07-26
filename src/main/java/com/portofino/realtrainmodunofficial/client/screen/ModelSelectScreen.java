@@ -376,8 +376,11 @@ public class ModelSelectScreen extends Screen {
             if (vehicleDef != null) {
                 Vec3 offset = vehicleDef.getModelOffset();
                 poseStack.translate(offset.x, offset.y, offset.z);
-                float modelScale = vehicleDef.getModelScale();
-                poseStack.scale(modelScale, modelScale, modelScale);
+                //ボクセルモデルは形状に scale が焼き込んであるので掛けない (在ワールドと同じ)。
+                if (model == null || !model.isVoxelModel()) {
+                    float modelScale = vehicleDef.getModelScale();
+                    poseStack.scale(modelScale, modelScale, modelScale);
+                }
             }
 
             boolean rendered = false;
@@ -401,7 +404,10 @@ public class ModelSelectScreen extends Screen {
 
             //本家 renderPartsInGui 相当: 台車も一緒に出す
             if (vehicleDef != null) {
-                boolean selfDrawsRunningGear = model.hasOwnWheelGroups();
+                //在ワールド (RtmBogieRenderer) と同じ判定にする: スクリプトで走り装置を
+                //動かす車両だけ、車体側に一本化する。
+                boolean selfDrawsRunningGear = model.hasOwnWheelGroups()
+                    && vehicleDef != null && vehicleDef.hasScript();
                 List<VehicleDefinition.BogieDefinition> bogies = vehicleDef.getBogies();
                 for (int i = 0; i < bogies.size(); i++) {
                     VehicleDefinition.BogieDefinition bogieDef = bogies.get(i);
@@ -428,7 +434,8 @@ public class ModelSelectScreen extends Screen {
         if (BogieRenderer.isDummyBogieModel(bogieDef.modelFile())) {
             return true;
         }
-        return selfDrawsRunningGear && bogieDef.modelFile().toLowerCase(Locale.ROOT).endsWith(".class");
+        //本家 RenderBogie と同じ: ダミー指定以外は必ず描く。
+        return false;
     }
 
     /** 車両 / 設置物 / レールのどれかとして id からモデルを引く。失敗は覚えて再探索しない。 */

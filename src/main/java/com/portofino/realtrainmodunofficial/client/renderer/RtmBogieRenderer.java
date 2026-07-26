@@ -67,20 +67,9 @@ public class RtmBogieRenderer extends EntityRenderer<EntityBogie> {
         //含まれ、車体スクリプトが車輪回転に合わせてロッドごと動かす。ところが別台車エンティティ
         //(この RtmBogieRenderer) も同じ位置に台車モデルの車輪を描くため、走行中に動輪・ロッドが
         //二重に見えていた (報告: D51・9600、台車 DT650・DT580 の「機関車本体」)。本家は動輪を
-        //車体側だけで描くので、<b>車体が自前の車輪グループを持つ車両はこの台車描画を丸ごと
-        //スキップ</b>して車体側に一本化する。
-        //
-        //以前はこの判定を「台車モデルが .class のときだけ」に限っていたため、DT650/DT580 のように
-        //実モデルファイル (.mqo/.obj) を持つ SL 台車では二重描画が残っていた。台車モデルの種別に
-        //依らず車体の車輪グループ有無で判定する。逆に、車体が車輪を持たない車両 (大多数の電車。
-        //300系新幹線のように body/yukashita/horo だけの車体を含む) では台車を通常どおり描くので、
-        //車体が宙に浮く問題は起きない。
-        com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel body =
-            com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadModelForVehicle(def);
-        if (body != null && body.hasOwnWheelGroups()) {
-            return;
-        }
-
+        //★本家 RenderBogie は台車モデルを<b>無条件に描く</b> (ダミーの時だけ missing model)。
+        //「車体が車輪グループを持つならスキップ」は RTMU 独自の推測で、既定車両の df200 の
+        //ように car body に飾りの wheel1 を持つだけの車両で台車が消えていた。本家に合わせて撤去。
         //★毎フレーム、補間済みの車体位置から弦上の bogiePos を求め、実レール(弧)上の最寄り点へ
         //スナップして描く。急カーブでは弦のままだと台車がレールから外れ、逆に per-tick でスナップ
         //すると高速時に台車が車体の毎フレーム補間へ追従しきれず次第に遅れて見える。描画フレーム

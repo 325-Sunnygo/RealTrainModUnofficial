@@ -156,7 +156,14 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 //以前ここを疑って本家同様 MultiBufferSource 経由へ戻したが、症状は変わらなかった。
                 //真因は車両側の発光パスが深度を書いていなかったこと (MqoModelLoader の
                 //renderNamedGroupsEmissive)。深度さえ書かれていれば描画順は問題にならない。
-                long variant = switchVariantKey(be);
+                //★焼き込みキーは本家 KaizPatchX の createStaticRenderKey <b>のみ</b>。
+                //  createRailPos (全 RailMap の 0.5m 刻み各点) + 各点の明るさ + モデル identity。
+                //
+                //  以前はここにトング位置 (switchVariantKey) を混ぜていた。可動部まで焼き込みに
+                //  入れていたためで、転てつのたびにレール全体を焼き直していた。可動部は
+                //  renderRailDynamic として焼き込みの外へ出した (本家 renderRail と同じ) ので、
+                //  <b>静的部の焼き込みはトング位置に依存しない</b>。本家もキーに入れていない。
+                long variant = staticRenderKey(be, model);
                 RailDefinition bakedDef = def;
                 //packedLight はこのメソッド内で再代入しているのでラムダに直接は渡せない
                 final int bakedLight = packedLight;
@@ -211,6 +218,26 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
      * {@code Point.getMovement()} は {@code moveCount / MAX_COUNT} で、レッドストーン入力に
      * 応じて 0 〜 1 を毎 tick 1 段ずつ動く。ここを見ないと転てつしてもメッシュが更新されない。
      */
+    /**
+     * 本家 KaizPatchX {@code createStaticRenderKey} 相当。レール形状 + 各点の明るさ + モデル。
+     * <p>失敗しても焼き込み自体は続けたいので 0 を返す (= 従来どおり variant だけで判定)。
+     */
+    private static int staticRenderKey(TileEntityLargeRailCore be,
+                                       com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model) {
+        try {
+            float[][] fa = jp.ngt.rtm.render.RailPartsRenderer.createRailPos(be);
+            if (fa == null) {
+                return 0;
+            }
+            int[] brightness = jp.ngt.rtm.render.RailPartsRenderer.getRailBrightness(
+                be.getLevel(), be.getBlockPos(), fa);
+            return jp.ngt.rtm.render.RailPartsRenderer.createStaticRenderKey(
+                fa, brightness, System.identityHashCode(model));
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
     private static long switchVariantKey(TileEntityLargeRailCore be) {
         long key = 1L;
         jp.ngt.rtm.rail.util.Point[] points = be.getSwitchPoints();

@@ -19,4 +19,20 @@ public final class EntityCompatUtil {
         }
         return null;
     }
+
+    /**
+     * func_110124_au = Entity.getUniqueID。
+     * <p>レシーバがバニラの Entity でシムを挟めないため、スクリプト変換がここへ回す。
+     * NGTO Builder 2 がプレイヤーごとの編集状態のキーに使う。
+     */
+    public static java.util.UUID func_110124_au(Object entity) {
+        return entity instanceof net.minecraft.world.entity.Entity e ? e.getUUID() : null;
+    }
+
+    /** func_71053_j = EntityPlayer.closeScreen (開いている画面を閉じる)。 */
+    public static void func_71053_j(Object player) {
+        if (player instanceof net.minecraft.world.entity.player.Player p) {
+            p.closeContainer();
+        }
+    }
 }

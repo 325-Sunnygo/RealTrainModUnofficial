@@ -110,6 +110,13 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     //boundingBox
     public jp.ngt.mccompat.AxisAlignedBB field_70121_D;
 
+    /**
+     * 本家 EntityVehicleBase:43 と同じく、車両 1 体につき 1 個の ScriptExecuter を永続保持する。
+     * 本家は execScript(this) が {@code onUpdate(entity, executer)} を呼び、毎 tick {@code count} を進める。
+     * スクリプトは {@code scriptExecuter.count} を経過 tick として読み、{@code execCommand} でコマンドを撃つ。
+     */
+    public final jp.ngt.rtm.modelpack.ScriptExecuter scriptExecuter = new jp.ngt.rtm.modelpack.ScriptExecuter();
+
     private final jp.ngt.rtm.modelpack.state.ResourceState resourceState =
             new jp.ngt.rtm.modelpack.state.ResourceState(this::getResourceName, this::getResourceSetForScript);
 
@@ -128,6 +135,10 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
 
     public EntityVehicleBase(EntityType<?> type, Level level) {
         super(type, level);
+        //本家 EntityVehicleBase:85  this.ignoreFrustumCheck = true;
+        //車両は自分の当たり判定より遥かに大きく描かれる (連結・台車・スクリプト描画) ため、
+        //視錐台カリングに任せると端から消える。
+        this.noCulling = true;
         this.noPhysics = true;
         //スクリプトは初回 tick 前 (スポーン直後の描画) にも参照する
         this.field_70170_p = new jp.ngt.mccompat.WorldCompat(level);

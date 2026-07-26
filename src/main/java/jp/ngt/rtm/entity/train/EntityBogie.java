@@ -87,6 +87,8 @@ public class EntityBogie extends Entity {
     public EntityBogie(EntityType<?> type, Level level) {
         super(type, level);
         this.noPhysics = true;
+        //本家 EntityBogie:89  this.ignoreFrustumCheck = true;
+        this.noCulling = true;
     }
 
     public EntityBogie(EntityType<?> type, Level level, byte id) {

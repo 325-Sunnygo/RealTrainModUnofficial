@@ -592,6 +592,11 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             this.tickSound();
             //立ち乗り: 床に立つローカルプレイヤーを車両の移動・旋回に追従させる (動く床)。
             com.portofino.realtrainmodunofficial.client.StandingRideClient.tick(this);
+            //★クライアントのスクリプトが flag=1 で書いた値をサーバーへ送る。
+            //本家の DataMap は双方向だが RTMU は server→client しか無かったため、
+            //描画スクリプトが操作を受けてサーバースクリプトが実処理するパック
+            //(NGTO Builder の Enter 敷設など) が一切動かなかった。
+            this.syncDataMapToServer();
         } else {
             //DataMap を書き換えるサーバースクリプトを先に回してから同期する。
             this.tickServerScript();
@@ -640,7 +645,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         //パンタ・ドア・方向幕を動かす。間引くとその進行が 4 倍遅くなり、カクついて見える
         //(SR1 のパンタ上げ下げ)。本家も毎 tick 呼んでいる。
         com.portofino.realtrainmodunofficial.script.TrainScriptSystem
-                .invokeServerScriptOnUpdate(this.serverScriptEngine, this);
+                .invokeServerScriptOnUpdate(this.serverScriptEngine, this, this.scriptExecuter);
     }
 
     private void ensureServerScriptLoaded() {
@@ -673,6 +678,18 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      * 送信量は {@code drainPendingSync} が空のとき何も送らないことで抑えられている
      * (=スクリプトが書いた時だけ流れる)。本家も set のたびに即送っている。
      */
+    /** クライアント → サーバー。スクリプトが flag=1 で書いた値を持ち主の車両へ反映させる。 */
+    private void syncDataMapToServer() {
+        java.util.Map<String, Object> pending = this.getResourceState().getDataMap().drainPendingSync();
+        if (pending.isEmpty()) {
+            return;
+        }
+        java.util.Map<String, String> encoded = new java.util.HashMap<>(pending.size());
+        pending.forEach((k, v) -> encoded.put(k, jp.ngt.rtm.modelpack.state.DataMap.encodeSyncedValue(v)));
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new com.portofino.realtrainmodunofficial.network.DataMapClientSyncPayload(this.getId(), encoded));
+    }
+
     private void syncDataMap() {
         java.util.Map<String, Object> pending = this.getResourceState().getDataMap().drainPendingSync();
         if (pending.isEmpty()) {

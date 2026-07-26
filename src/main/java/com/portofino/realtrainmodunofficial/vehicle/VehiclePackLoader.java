@@ -333,7 +333,22 @@ public class VehiclePackLoader {
             String buttonTexture = firstNonBlank(getString(obj, "buttonTexture"), getString(trainModel, "buttonTexture"));
             Map<String, String> tex = parseTextures(trainModel);
             Vec3 offset = parseVec3(trainModel, "offset", 1.0 / 16.0);
+            //本家 ModelObject.render / RenderVehicleBase は ModelConfig (=JSON のルート) の
+            //offset を <b>ブロック単位でそのまま</b> glTranslate する。trainModel2 側にしか
+            //offset を見ていなかったので、ルートに書くパックで車体の高さが合わなかった
+            //(mo1600 は "offset": [0, -1, 0] で、無視すると台車から 1 ブロック浮く)。
+            if (offset.equals(Vec3.ZERO)) {
+                offset = parseVec3(obj, "offset", 1.0);
+            }
             float scale = parseFloat(trainModel, "scale", 1.0F);
+            //.ngto (ボクセル) は本家が ModelConfig の scale をモデル自体に掛ける。
+            //その scale は JSON の<b>ルート</b>にあることが多い (mo1600 は 0.1)。
+            //MQO 系まで root を見に行くと、既存パックの見た目が変わる恐れがあるので
+            //ボクセルモデルのときだけ補う。1 ボクセル=1 ブロックで組んであるので、
+            //これが無いと 10 倍の大きさで出る。
+            if (scale == 1.0F && com.portofino.realtrainmodunofficial.client.model.NgtoModelGeometry.isNgto(modelFile)) {
+                scale = parseFloat(obj, "scale", 1.0F);
+            }
             String scriptPath = getString(trainModel, "rendererPath");
             if (scriptPath == null || scriptPath.isBlank()) {
                 scriptPath = null;

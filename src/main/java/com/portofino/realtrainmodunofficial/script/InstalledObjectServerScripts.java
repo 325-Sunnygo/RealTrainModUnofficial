@@ -32,7 +32,8 @@ public final class InstalledObjectServerScripts {
     private static final Map<String, ScriptEngine> ENGINES = new ConcurrentHashMap<>();
     private static final Set<String> INVALID = ConcurrentHashMap.newKeySet();
     /** onUpdate が落ちた定義は以後呼ばない (毎 tick 例外を投げ続けないため)。 */
-    private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
+    /** ログ済みの定義 ID (実行は止めない。本家に「失敗したら停止」は無い)。 */
+    private static final Set<String> LOGGED = ConcurrentHashMap.newKeySet();
 
     /**
      * スクリプトが 1.7.10 の名前で参照するクラスを、実クラスへ束縛する。
@@ -68,7 +69,7 @@ public final class InstalledObjectServerScripts {
     public static void clear() {
         ENGINES.clear();
         INVALID.clear();
-        FAILED.clear();
+        LOGGED.clear();
     }
 
     /**
@@ -80,7 +81,7 @@ public final class InstalledObjectServerScripts {
             return;
         }
         String id = def.getId();
-        if (INVALID.contains(id) || FAILED.contains(id)) {
+        if (INVALID.contains(id)) {
             return;
         }
         ScriptEngine se = ENGINES.get(id);
@@ -103,10 +104,14 @@ public final class InstalledObjectServerScripts {
             //onUpdate を持たないスクリプト (ライブラリだけ等) は対象外
             INVALID.add(id);
         } catch (Throwable t) {
-            //毎 tick 同じ例外を吐き続けても意味が無いので、その定義は諦めて 1 回だけ記録する
-            FAILED.add(id);
-            RealTrainModUnofficial.LOGGER.warn("[serverScript] {} の onUpdate が失敗しました。この設置物のスクリプトは停止します: {}",
-                    id, String.valueOf(t.getCause() != null ? t.getCause() : t));
+            //本家 ScriptUtil.doScriptIgnoreError と同じく、失敗しても<b>止めない</b>。
+            //以前はここで FAILED.add(id) して定義ごと永久停止させていたため、
+            //1 個の設置物が 1 tick こけただけで<b>同じ種類の設置物が全部</b>動かなくなっていた。
+            //ログだけ定義ごとに 1 回へ絞る (本家の printStackTrace は毎 tick 出て実用にならない)。
+            if (LOGGED.add(id)) {
+                RealTrainModUnofficial.LOGGER.warn("[serverScript] {} の onUpdate が失敗しました (実行は継続します): {}",
+                        id, String.valueOf(t.getCause() != null ? t.getCause() : t));
+            }
         }
     }
 
@@ -124,7 +129,10 @@ public final class InstalledObjectServerScripts {
             //SRB 系のスクリプトが設置物として来た場合もブリッジを効かせる
             //(SuperRailBuilderVersion を含まないスクリプトには何も足さない)。
             source = TrainScriptSystem.appendSuperRailBuilderOverrides(source);
-            ScriptEngine se = ScriptUtil.doScript(PRELUDE + source);
+            //★ //include の展開と FQN remap は全経路で共通 (PackScriptSource.prepare)。
+            //以前この経路だけ prepare() を通しておらず、include を使うレール/架線/設置物パックが
+            //「スクリプトはあるのに何も描かない」状態になっていた。
+            ScriptEngine se = ScriptUtil.doScript(PRELUDE + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source));
             se.put("__SRB__", new com.portofino.realtrainmodunofficial.script.SrbRailBridge());
             return se;
         } catch (Throwable t) {

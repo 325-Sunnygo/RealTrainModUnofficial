@@ -165,8 +165,17 @@ public class Face {
         float nx = ay * bz - az * by;
         float ny = az * bx - ax * bz;
         float nz = ax * by - ay * bx;
-        float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
-        if (len < 1.0e-7F) {
+        //★大きさで捨てない。先に最大成分で割ってから正規化する (細かい文字の三角形対策)。
+        float max = Math.max(Math.abs(nx), Math.max(Math.abs(ny), Math.abs(nz)));
+        if (!(max > 0.0F) || !Float.isFinite(max)) {
+            this.faceNormal = new Vertex(0.0F, 1.0F, 0.0F);
+            return;
+        }
+        nx /= max;
+        ny /= max;
+        nz /= max;
+        float len = (float) Math.sqrt((double) nx * nx + (double) ny * ny + (double) nz * nz);
+        if (!(len > 0.0F) || !Float.isFinite(len)) {
             this.faceNormal = new Vertex(0.0F, 1.0F, 0.0F);
         } else {
             this.faceNormal = new Vertex(nx / len, ny / len, nz / len);

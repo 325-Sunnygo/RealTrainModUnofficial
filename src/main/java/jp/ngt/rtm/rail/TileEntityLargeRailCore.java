@@ -29,6 +29,22 @@ import java.util.Objects;
  * (shouldRerenderRail フラグのみ維持)。レガシー railShape 互換パスは省略 (新規ワールド前提)。
  */
 public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
+
+    /**
+     * 本家 {@code sendPacket}: レールコアの状態をクライアントへ配る。
+     *
+     * <p>SRB3 は敷設の最後に必ずこれを呼ぶ:
+     * <pre>SuperRailBuilder3!server_SuperRailBuilder3.js  tile.sendPacket();</pre>
+     * RTMU に無かったため「敷設処理の最後で落ちる」= 見た目が更新されない/敷けないの原因になっていた。
+     * 1.21 では BlockEntity の更新配信がこれに当たる。
+     */
+    public void sendPacket() {
+        this.setChanged();
+        if (this.level != null && !this.level.isClientSide()) {
+            net.minecraft.world.level.block.state.BlockState st = this.getBlockState();
+            this.level.sendBlockUpdated(this.getBlockPos(), st, st, 3);
+        }
+    }
     public boolean breaking;
     protected boolean isCollidedTrain = false;
     public boolean colliding = false;

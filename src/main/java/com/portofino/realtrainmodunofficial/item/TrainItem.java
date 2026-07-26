@@ -154,10 +154,38 @@ public class TrainItem extends Item {
 
         jp.ngt.rtm.entity.train.EntityTrain train =
                 new jp.ngt.rtm.entity.train.EntityTrain(jp.ngt.rtm.entity.RTMEntities.TRAIN.get(), level);
+        //本家 ItemTrain.onItemUse:84-89 と同じ順序:
+        //  setPositionAndRotation → getResourceState().readFromNBT(アイテムの State)
+        //  → setModelName → spawnTrain → onModelChanged
+        //状態の取り込みは setModelName より<b>前</b>。順序を崩すとモデル差し替え時の
+        //後始末 (onModelChanged) が古い状態を見る。
         train.moveTo(posX, posY, posZ, yaw, pitch);
+
+        //アイテム側で設定した State (DataMap / 名前 / 色) をエンティティへ移送する。
+        //RTMU はここが丸ごと抜けており、モデル選択画面で入れた DataMap・名前・色が
+        //設置した瞬間に消えていた (本家 ItemTrain.onItemUse:86)。
+        String dataMap = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedDataMap(stack);
+        if (dataMap != null && !dataMap.isBlank()) {
+            //DataMap.setArg は本家 getArg 形式 "key=(Type)value,..." をそのまま取り込む
+            train.getResourceState().setArg(dataMap, true);
+        }
+        String customName = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedCustomName(stack);
+        if (customName != null && !customName.isBlank()) {
+            train.getResourceState().setName(customName);
+        }
+        train.getResourceState().color =
+                com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedColor(stack);
+
         train.setModelName(def.getId());
         train.spawnTrain(level);
-        // クールダウン付与（サーバー側。クライアントにも自動同期される）
+        //本家 ItemTrain.onItemUse:88  モデル確定後の後始末。
+        train.onModelChanged();
+        //本家 ItemTrain.onItemUse:89  --itemStack.stackSize (本家はクリエイティブでも消費する)
+        if (!player.getAbilities().instabuild) {
+            stack.shrink(1);
+        }
+        // クールダウン付与（RTMU 独自。本家はアイテム消費で連打を抑えているが、
+        // 消費が効かないクリエイティブでの多重生成を防ぐため残す）
         player.getCooldowns().addCooldown(this, SPAWN_COOLDOWN_TICKS);
         return InteractionResult.sidedSuccess(false);
     }

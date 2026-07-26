@@ -15,6 +15,7 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(SelectModelPayload.TYPE, SelectModelPayload.STREAM_CODEC, SelectModelPayload::handleOnServer);
         registrar.playToServer(ChangeEntityModelPayload.TYPE, ChangeEntityModelPayload.STREAM_CODEC, ChangeEntityModelPayload::handleOnServer);
         registrar.playToServer(TrainControlPayload.TYPE, TrainControlPayload.STREAM_CODEC, TrainControlPayload::handleOnServer);
+        registrar.playToServer(DataMapClientSyncPayload.TYPE, DataMapClientSyncPayload.STREAM_CODEC, DataMapClientSyncPayload::handleOnServer);
         registrar.playToClient(TrainSoundPayload.TYPE, TrainSoundPayload.STREAM_CODEC, TrainSoundPayload::handleOnClient);
         registrar.playToServer(MountTrainPayload.TYPE, MountTrainPayload.STREAM_CODEC, MountTrainPayload::handleOnServer);
         registrar.playToServer(RailPreviewAdjustPayload.TYPE, RailPreviewAdjustPayload.STREAM_CODEC, RailPreviewAdjustPayload::handleOnServer);

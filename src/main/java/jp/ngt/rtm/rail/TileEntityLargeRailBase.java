@@ -44,8 +44,22 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
     private net.minecraft.world.phys.shapes.VoxelShape cachedShape;
     private int cachedShapeVersion = -1;
 
+    /**
+     * 1.7.10 TileEntity の座標 SRG フィールド (xCoord / yCoord / zCoord)。
+     * <p>スクリプトが位置を読むのにこの名前を使う:
+     * <pre>SuperRailBuilder3!server_SuperRailBuilder3.js:1941  tileEntity.field_145851_c</pre>
+     * 1.21 の {@code worldPosition} は final なので、生成時に写しておく
+     * (BlockEntity の位置は生成後に変わらないため一致し続ける)。
+     */
+    public final int field_145851_c;
+    public final int field_145848_d;
+    public final int field_145849_e;
+
     public TileEntityLargeRailBase(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
+        this.field_145851_c = pos.getX();
+        this.field_145848_d = pos.getY();
+        this.field_145849_e = pos.getZ();
     }
 
     public TileEntityLargeRailBase(BlockPos pos, BlockState state) {
@@ -170,6 +184,13 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
      *
      * @param entity 列車、車止め、など
      */
+    /** スクリプト互換: WorldCompat / PlayerCompat をそのまま渡せる版。 */
+    public static RailMap getRailMapFromCoordinates(Object world, Object entity, double px, double py, double pz) {
+        Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
+        Entity e = jp.ngt.mccompat.EntityCompatUtil.unwrapEntity(entity);
+        return level == null ? null : getRailMapFromCoordinates(level, e, px, py, pz);
+    }
+
     public static RailMap getRailMapFromCoordinates(Level world, Entity entity, double px, double py, double pz) {
         TileEntityLargeRailBase rail = TileEntityLargeRailBase.getRailFromCoordinates(world, px, py, pz);
         if (rail != null) {

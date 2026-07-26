@@ -81,7 +81,7 @@ public final class RtmuRenderTypes extends RenderType {
     //  後から描くレールに突き抜かれる。書き込みマスクだけ既定へ戻したものを使う。
     private static final Function<ResourceLocation, RenderType> EMISSIVE_DEPTH_WRITE = Util.memoize(tex ->
         create("rtmu_emissive_depth",
-            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, true,
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, false,
             CompositeState.builder()
                 .setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_EMISSIVE_SHADER)
                 .setTextureState(new TextureStateShard(tex, false, false))
@@ -109,8 +109,86 @@ public final class RtmuRenderTypes extends RenderType {
                 .setCullState(NO_CULL)
                 .createCompositeState(true)));
 
+    //前照灯/尾灯パス (i>0) 用。本家 renderBodyLight と同じ「発光 + ブレンド + 深度書き込み」に
+    //<b>ポリゴンオフセット</b>を足したもの。
+    //
+    //本家は即時描画なので NORMAL → LIGHT_FRONT → LIGHT_BACK が必ずこの順に GPU へ行き、
+    //同じ深度でも後から描いた方が残る。1.21 はブレンド描画が RenderType 単位でまとめられるため、
+    //同じ頂点・同じ深度に複数のライトパスが重なると勝敗が定まらず、ポリゴンが重なったように見える。
+    //形は動かさず深度値だけずらして、確実に基本パスより手前にする。
+    private static final java.util.Map<String, Function<ResourceLocation, RenderType>> EMISSIVE_BLEND_BY_PASS =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * 前照灯/尾灯パス (i>0) 用。本家 renderBodyLight と同じ「発光 + ブレンド + 深度書き込み」。
+     *
+     * <p>★ポリゴンオフセットは掛けない。{@code glPolygonOffset(factor, units)} の実効量は
+     * {@code factor × そのポリゴンのウィンドウ空間の深度勾配} を含み、<b>視線角度で毎フレーム変わる</b>。
+     * 車内は床/天井/側壁が視線に対して浅い角度になるため勾配が大きく、カメラの微小な回転で
+     * 引き出し量が振れて内装がちらつく。本家にオフセットは存在しない。
+     *
+     * <p>★{@code sortOnUpload} は false。true だと flush のたびにカメラ距離で
+     * クアッドが並べ替わり、深度書き込み ON のこの型では勝敗が毎フレーム入れ替わる。
+     *
+     * <p>★カリングは<b>車両の doCulling を尊重</b>する。以前は NO_CULL 固定だったため、
+     * 片面指定のパックでも外板の裏面が内装と同じバッファに入り、重なる面数が倍になっていた。
+     */
+    private static Function<ResourceLocation, RenderType> emissiveBlendFactory(int legacyPass, boolean cull) {
+        return EMISSIVE_BLEND_BY_PASS.computeIfAbsent(legacyPass + "|" + cull, k -> Util.memoize(tex ->
+            create("rtmu_emissive_blend_" + legacyPass + (cull ? "_cull" : "_nocull"),
+                DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, false,
+                CompositeState.builder()
+                    .setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_EMISSIVE_SHADER)
+                    .setTextureState(new TextureStateShard(tex, false, false))
+                    .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                    .setOverlayState(OVERLAY)
+                    .setCullState(cull ? CULL : NO_CULL)
+                    .createCompositeState(true))));
+    }
+
+    //室内灯パス (RenderPass.LIGHT = i==0) 用。
+    //本家はここで GL 状態を一切変えない (通常ライティング・ブレンド無し・深度書き込みあり) が、
+    //描くのは<b>本体と完全に同じ面</b>を _light0 テクスチャで置き換えたもの。
+    //即時描画の本家は「後から描いた方が残る」ので問題にならないが、1.21 は RenderType 単位で
+    //まとめて描くため同一深度の勝敗が定まらず<b>ちらつく</b>。
+    //本家と同じく頂点は動かさず、深度値だけずらして確実に本体より手前にする。
+    private static final Function<ResourceLocation, RenderType> EMISSIVE_CUTOUT_LAYERED = Util.memoize(tex ->
+        create("rtmu_emissive_cutout_layered",
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, false,
+            CompositeState.builder()
+                .setShaderState(RENDERTYPE_ENTITY_CUTOUT_SHADER)
+                .setTextureState(new TextureStateShard(tex, false, false))
+                .setTransparencyState(NO_TRANSPARENCY)
+                .setLightmapState(LIGHTMAP)
+                .setOverlayState(OVERLAY)
+                .setCullState(CULL)
+                .createCompositeState(true)));
+
+    private static final Function<ResourceLocation, RenderType> EMISSIVE_CUTOUT_NO_CULL_LAYERED = Util.memoize(tex ->
+        create("rtmu_emissive_cutout_nocull_layered",
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, false,
+            CompositeState.builder()
+                .setShaderState(RENDERTYPE_ENTITY_CUTOUT_SHADER)
+                .setTextureState(new TextureStateShard(tex, false, false))
+                .setTransparencyState(NO_TRANSPARENCY)
+                .setLightmapState(LIGHTMAP)
+                .setOverlayState(OVERLAY)
+                .setCullState(NO_CULL)
+                .createCompositeState(true)));
+
+    /** 室内灯パス (i==0) 用。本家と同じ不透明描画に、深度だけのオフセットを足したもの。 */
+    public static RenderType emissiveCutoutLayered(ResourceLocation texture, boolean cull) {
+        return cull ? EMISSIVE_CUTOUT_LAYERED.apply(texture) : EMISSIVE_CUTOUT_NO_CULL_LAYERED.apply(texture);
+    }
+
+    /** 前照灯/尾灯パス (i>0) 用。発光 + ブレンド + 深度書き込み + ポリゴンオフセット。 */
+    public static RenderType emissiveBlendLayered(ResourceLocation texture, int legacyPass, boolean cull) {
+        return emissiveBlendFactory(legacyPass, cull).apply(texture);
+    }
+
     /** 半透明・両面・深度書き込みあり・提出順 (ソート無し) の RenderType。 */
     public static RenderType translucentNoSort(ResourceLocation texture) {
         return TRANSLUCENT_NO_SORT.apply(texture);
     }
+
 }

@@ -68,7 +68,26 @@ public class BlockSet {
         return new BlockSet(this.x, this.y, this.z, this.block, this.metadata, nbt, this.state);
     }
 
-    public CompoundTag writeToNBT() {
+    /**
+     * 本家 {@code BlockSet.writeToNBT}。
+     *
+     * <p>戻り値は<b>シムの {@link jp.ngt.mccompat.nbt.NBTTagCompound}</b>。
+     * スクリプトはこの戻り値を 1.7.10 の難読名で読む:
+     * <pre>
+     * // NGTOBuilder2!lib_NGTOBuilderUtil.js:147-149
+     * var nbt = rbs.blockSet.writeToNBT();
+     * if (nbt) rbs.yaw = nbt.func_74760_g("Yaw");   // getFloat
+     * </pre>
+     * バニラの {@code CompoundTag} をそのまま返すと
+     * {@code TypeError: nbt.func_74760_g is not a function} で
+     * ライン設置/地面設置のスクリプトが丸ごと落ちる。
+     */
+    public jp.ngt.mccompat.nbt.NBTTagCompound writeToNBT() {
+        return new jp.ngt.mccompat.nbt.NBTTagCompound(writeToVanillaNBT());
+    }
+
+    /** Java 側で実タグが要るとき用。 */
+    public CompoundTag writeToVanillaNBT() {
         CompoundTag tag = new CompoundTag();
         tag.putInt("X", this.x);
         tag.putInt("Y", this.y);

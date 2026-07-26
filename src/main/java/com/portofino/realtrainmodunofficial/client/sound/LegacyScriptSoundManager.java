@@ -321,45 +321,66 @@ public final class LegacyScriptSoundManager {
         }
         state.currentSoundId = soundId;
 
-        float volume = moving ? Mth.clamp(0.45F + speed * 7.5F, 0.35F, 1.35F) : 0.55F;
-        float pitch = shouldPitchJsonRunningSound(definition, speed)
-            ? Mth.clamp(0.65F + speed * 5.0F, 0.65F, 1.75F)
-            : 1.0F;
+        //本家 MovingSoundEntity は音量を速度で変えない (作成時の値のまま)。
+        float volume = 1.0F;
+        float pitch = runningSoundPitch(definition, speed);
         play(train, soundId.getNamespace(), soundId.getPath(), volume, pitch, true);
     }
 
+    /**
+     * 本家 {@code SoundUpdaterTrain.getSound} の移植。
+     * <pre>
+     * speed &gt; 0 なら acceleration = EnumNotch.getAcceleration(notch, speed)
+     *   speed &lt; maxSpeed[0] : acceleration &gt; 0 ? sound_S_A : sound_D_S
+     *   それ以外            : acceleration &gt; 0 ? sound_Acceleration : sound_Deceleration
+     * speed == 0 なら sound_Stop
+     * </pre>
+     * <p>加速判定は<b>ノッチと速度から決まる加速度</b>で、速度の増減を見る推測ではない。
+     * 音が無い項目は空のまま (本家は代替を探さない)。
+     */
     private static String selectJsonRunningSound(VehicleDefinition definition, Entity train,
-                                                 float speed, boolean moving, boolean accelerating) {
+                                                 float speed, boolean moving, boolean ignoredAccelerating) {
         if (!moving) {
             return definition.getSoundStop();
         }
-        float startSpeed = getFirstConfiguredMaxSpeed(definition);
-        if (speed < startSpeed) {
-            return accelerating
-                ? firstNonBlank(definition.getSoundStartAcceleration(), definition.getSoundAcceleration())
-                : firstNonBlank(definition.getSoundDecelerationStop(), definition.getSoundDeceleration(), definition.getSoundStop());
+        float acceleration = jp.ngt.rtm.entity.train.util.EnumNotch.getAcceleration(notchOf(train), speed);
+        if (speed < maxSpeedAt(definition, 0)) {
+            return acceleration > 0.0F ? definition.getSoundStartAcceleration() : definition.getSoundDecelerationStop();
         }
-        return accelerating
-            ? firstNonBlank(definition.getSoundAcceleration(), definition.getSoundStartAcceleration())
-            : firstNonBlank(definition.getSoundDeceleration(), definition.getSoundDecelerationStop(), definition.getSoundStop());
+        return acceleration > 0.0F ? definition.getSoundAcceleration() : definition.getSoundDeceleration();
     }
 
-    private static boolean shouldPitchJsonRunningSound(VehicleDefinition definition, float speed) {
-        float startSpeed = getFirstConfiguredMaxSpeed(definition);
-        return speed >= startSpeed;
+    /**
+     * 本家 {@code MovingSoundTrain.func_73660_a} のピッチ。
+     * {@code (speed - maxSpeed[0]) / (maxSpeed[4] - maxSpeed[0]) + 1.0}。
+     * 低速域 ({@code changePitch == false}) は 1.0 のまま。
+     */
+    private static float runningSoundPitch(VehicleDefinition definition, float speed) {
+        float low = maxSpeedAt(definition, 0);
+        if (speed < low) {
+            return 1.0F;
+        }
+        float high = maxSpeedAt(definition, 4);
+        float range = high - low;
+        if (!(range > 0.0F)) {
+            return 1.0F;
+        }
+        return (speed - low) / range + 1.0F;
     }
 
-    private static float getFirstConfiguredMaxSpeed(VehicleDefinition definition) {
-        if (definition == null || definition.getNotchMaxSpeeds().isEmpty()) {
-            return 0.06F;
+    /** JSON の maxSpeed[i]。本家は blocks/tick のまま速度と直接比較する。 */
+    private static float maxSpeedAt(VehicleDefinition definition, int index) {
+        if (definition == null) {
+            return 0.0F;
         }
-        for (Float speed : definition.getNotchMaxSpeeds()) {
-            if (speed != null && speed > 0.0F) {
-                return Math.max(0.005F, speed / 72.0F);
-            }
+        java.util.List<Float> speeds = definition.getNotchMaxSpeeds();
+        if (speeds == null || speeds.isEmpty()) {
+            return 0.0F;
         }
-        return 0.06F;
+        Float value = speeds.get(Math.min(index, speeds.size() - 1));
+        return value == null ? 0.0F : value;
     }
+
 
     private static String firstNonBlank(String... values) {
         for (String value : values) {

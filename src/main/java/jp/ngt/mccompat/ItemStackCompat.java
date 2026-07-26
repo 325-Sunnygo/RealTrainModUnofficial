@@ -24,8 +24,29 @@ public final class ItemStackCompat {
         return null;
     }
 
-    /** func_77973_b = getItem */
+    /**
+     * func_77973_b = getItem。
+     *
+     * <p><b>1.7.10 に 1 個しか無かったアイテムが RTMU で 2 個に分かれている場合は、
+     * 本家側の 1 個へ正規化して返す。</b> スクリプトは
+     * <pre>item.func_77973_b() !== RTMItem.itemLargeRail</pre>
+     * のように<b>厳密な同一性</b>で持ち物を判定するため、片方を持っているときだけ
+     * 判定が通り「敷設できたりできなかったり」する。
+     *
+     * <p>レールは {@code rail} (RTMU のモデル選択式 = RTMItem.itemLargeRail が指す方) と
+     * {@code item_large_rail} (本家忠実な {@link jp.ngt.rtm.item.ItemRail}) の 2 つがあり、
+     * スクリプトから見れば同じ「大型レール」なので同一に見せる。
+     */
     public net.minecraft.world.item.Item func_77973_b() {
+        net.minecraft.world.item.Item item = stack.getItem();
+        if (item instanceof jp.ngt.rtm.item.ItemRail && jp.ngt.rtm.RTMItem.itemLargeRail != null) {
+            return jp.ngt.rtm.RTMItem.itemLargeRail;
+        }
+        return item;
+    }
+
+    /** 正規化していない実アイテム (Java 側から使う)。 */
+    public net.minecraft.world.item.Item rawItem() {
         return stack.getItem();
     }
 

@@ -52,7 +52,8 @@ public final class MachineScriptRenderers {
                 RealTrainModUnofficial.LOGGER.warn("Machine script not found: {} ({})", def.getId(), def.getScriptPath());
                 return INVALID;
             }
-            String source = new String(bytes, StandardCharsets.UTF_8);
+            //Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-8 だと構文ごと壊れる)
+            String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
 
             // 機械/信号スクリプトも列車と同じフル・プレリュード + 互換リマップを使う。
             // 以前は GL11/GL12/MathHelper だけの最小プレリュードだったため、信号のブロック検知が

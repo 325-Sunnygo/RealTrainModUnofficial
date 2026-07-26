@@ -80,7 +80,10 @@ public final class RailScriptRenderers {
                 RealTrainModUnofficial.LOGGER.warn("Rail script not readable for {} ({})", def.getId(), def.getScriptPath());
                 return INVALID;
             }
-            ScriptEngine se = ScriptUtil.doScript(PRELUDE + source);
+            //★ //include の展開と FQN remap は全経路で共通 (PackScriptSource.prepare)。
+            //以前この経路だけ prepare() を通しておらず、include を使うレール/架線/設置物パックが
+            //「スクリプトはあるのに何も描かない」状態になっていた。
+            ScriptEngine se = ScriptUtil.doScript(PRELUDE + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source));
             Object rcName = se.get("renderClass");
             if (rcName == null) {
                 RealTrainModUnofficial.LOGGER.warn("Rail script has no renderClass: {}", def.getId());
@@ -297,9 +300,13 @@ public final class RailScriptRenderers {
                         //モデルは一切出ていなかった (ユーザー報告: 重ねても見た目が変わらない)。
                         this.renderer.currentRailIndex = 0;
                         this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
-                        //本家 RailPartsRendererBase.renderRail は static の直後に dynamic も呼ぶ
-                        //(Baru's Roof 等、renderRailDynamic に全部書くパック対策)。
-                        this.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+                        //★renderRailDynamic は<b>ここでは呼ばない</b>。
+                        //本家 RailPartsRenderer.renderRail は
+                        //    renderRailStatic(...)   → ディスプレイリストへ焼く
+                        //    renderRailDynamic(...)  → リストの外で毎フレーム実行 (キャッシュしない)
+                        //の順で、可動部を焼き込みに含めない。含めると「形が変わっていないのに
+                        //可動部のせいで毎フレーム焼き直す」ことになり、軽量化が効かなくなる。
+                        //下の共通ブロックで毎フレーム実行する。
                     }
                 } catch (Throwable t) {
                     RealTrainModUnofficial.LOGGER.warn("Rail script render failed at {}", pos, t);
@@ -314,6 +321,13 @@ public final class RailScriptRenderers {
 
             //分岐: レール本体は本家どおり renderRailDynamic (トング可動) が描く。
             //movement (転てつ状態) が変わらない限り記録を再利用する。
+            //★可動部は<b>全レール共通</b>で焼き込みの外。本家 renderRail と同じ順序
+            //(static → dynamic) で、dynamic はキャッシュに載せない。
+            //通常レールのスクリプトは renderRailDynamic を定義していないことが多く、その場合
+            //ScriptUtil 側で何も起きないので実質ゼロコスト。定義しているパック
+            //(Baru's Roof 等) は本家と同じく毎フレーム実行になる。
+            //分岐だけは転てつ状態 (dynKey) が変わらない限り記録を使い回す。
+            //ここはトングが 80tick かけて動く間だけ差が出る所で、本家より軽い側の逸脱。
             GLRecorder dyn = null;
             if (isSwitch) {
                 long dynKey = computeSwitchDynKey((TileEntityLargeRailSwitchCore) be);
@@ -321,18 +335,11 @@ public final class RailScriptRenderers {
                 if (cached != null && cached.key == dynKey) {
                     dyn = cached.rec;
                 } else {
-                    dyn = new GLRecorder();
-                    GLRecorder.activate(dyn);
-                    try {
-                        this.renderer.modelGroupNames = model.getOriginalGroupNames();
-                        this.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
-                    } catch (Throwable t) {
-                        RealTrainModUnofficial.LOGGER.warn("Rail dynamic script failed at {}", pos, t);
-                    } finally {
-                        GLRecorder.deactivate();
-                    }
+                    dyn = recordDynamic(be, model, partialTick, pos);
                     this.dynamicCache.put(pos, new DynEntry(dynKey, dyn));
                 }
+            } else {
+                dyn = recordDynamic(be, model, partialTick, pos);
             }
 
             boolean staticDrew = !rec.isEmpty();
@@ -369,6 +376,23 @@ public final class RailScriptRenderers {
         private final java.util.Map<BlockPos, DynEntry> dynamicCache = new java.util.concurrent.ConcurrentHashMap<>();
 
         private record DynEntry(long key, GLRecorder rec) {
+        }
+
+        /** 本家 renderRailDynamic 相当。焼き込みには載せず、その場で 1 フレーム分だけ記録する。 */
+        private GLRecorder recordDynamic(TileEntityLargeRailCore be,
+                                         com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model,
+                                         float partialTick, net.minecraft.core.BlockPos pos) {
+            GLRecorder dyn = new GLRecorder();
+            GLRecorder.activate(dyn);
+            try {
+                this.renderer.modelGroupNames = model.getOriginalGroupNames();
+                this.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
+            } catch (Throwable t) {
+                RealTrainModUnofficial.LOGGER.warn("Rail dynamic script failed at {}", pos, t);
+            } finally {
+                GLRecorder.deactivate();
+            }
+            return dyn;
         }
 
         private static long computeSwitchDynKey(TileEntityLargeRailSwitchCore be) {

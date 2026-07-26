@@ -85,6 +85,38 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         }
     }
 
+    /**
+     * 本家 {@code RenderVehicleBase.preRenderBody} の移植。
+     * <pre>
+     * useInteriorLighting = cfg.interiorLights != null &amp;&amp; getLightValue(vehicle) &lt; 7
+     * if (lightState &gt; 0 &amp;&amp; useInteriorLighting) GLHelper.setLightmapMaxBrightness();
+     * </pre>
+     * <p>つまり<b>室内灯 ON かつ周囲が暗いときは、車体の通常描画そのものがフルブライト</b>になる。
+     * 夜に外から見て車内が明るく見えるのはこれで、発光テクスチャ (***_light0.png) の働きではない。
+     * 発光パス側をフルブライトにすると車体が二重に見えるので、そちらではなくここで効かせる。
+     * <p>本家はさらに {@code enableCustomLighting} で室内灯の位置に GL 点光源を置くが、
+     * 1.21 は固定機能ライトが無いので lightmap 側だけ再現する。
+     */
+    public static int applyInteriorLighting(net.minecraft.world.level.Level level, double x, double y, double z,
+                                            boolean hasInteriorLights, int interiorLightState, int packedLight) {
+        if (level == null || !hasInteriorLights || interiorLightState <= 0) {
+            return packedLight;
+        }
+        if (ambientLightValue(level, x, y, z) >= 7) {
+            return packedLight;
+        }
+        return net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
+    }
+
+    /** 本家 {@code getLightValue}: 空 (時刻で減衰) とブロックの明るいほう。 */
+    private static int ambientLightValue(net.minecraft.world.level.Level level, double x, double y, double z) {
+        BlockPos pos = BlockPos.containing(x, y + 0.5D, z);
+        int skyBrightness = Mth.clamp(15 - level.getSkyDarken(), 0, 15);
+        int sky = level.getBrightness(net.minecraft.world.level.LightLayer.SKY, pos) * skyBrightness / 15;
+        int block = level.getBrightness(net.minecraft.world.level.LightLayer.BLOCK, pos);
+        return Math.max(sky, block);
+    }
+
     @Override
     public ResourceLocation getTextureLocation(TrainEntity entity) {
         return ResourceLocation.withDefaultNamespace("missingno");
@@ -163,7 +195,12 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             // Apply model offset and scale (TrainEntity Y がすでに body center に合わせて
             // RTM_VEHICLE_Y_OFFSET 分上げてあるので、ここでは +0.2 のような追加リフトをしない)
             poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
-            poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
+            //★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。本家は
+            //NGTOParts.render の中だけで glScalef(scale) するので、スクリプトが台車/ドアを
+            //置く glTranslatef はブロック単位のまま。ここで掛けると全部が中央に寄る。
+            if (!model.isVoxelModel()) {
+                poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
+            }
 
             Minecraft mc = Minecraft.getInstance();
             boolean ridingThisTrain = false;
@@ -182,8 +219,14 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             double rollsignThreshold = compatibilityHeavy ? 42.0D : 64.0D;
             double lightThreshold = compatibilityHeavy ? 64.0D : 96.0D;
             boolean nearTrain = cameraDistanceSq < nearThreshold * nearThreshold;
-            boolean renderInterior = ridingThisTrain || nearTrain;
-            boolean aggressiveDistanceCulling = !ridingThisTrain && cameraDistanceSq > aggressiveThreshold * aggressiveThreshold;
+            //★本家は内装を距離で間引かない。外から室内灯の光が見えるのは、窓の穴 (α=0) 越しに
+            //<b>室内の面そのもの</b>が見えているからで、内装を消すと光も消える。
+            //既定は本家どおり常に描き、軽量化設定で車両描画距離を有効にした時だけ従来の間引きを使う。
+            boolean distanceCulling =
+                com.portofino.realtrainmodunofficial.RtmuSettings.vehicleRenderDistance > 0;
+            boolean renderInterior = ridingThisTrain || !distanceCulling || nearTrain;
+            boolean aggressiveDistanceCulling = distanceCulling && !ridingThisTrain
+                && cameraDistanceSq > aggressiveThreshold * aggressiveThreshold;
             boolean renderRollsigns = ridingThisTrain || cameraDistanceSq < rollsignThreshold * rollsignThreshold;
             boolean renderLights = ridingThisTrain || cameraDistanceSq < lightThreshold * lightThreshold;
             int trainPackedLight = resolveTrainPackedLight(entity, packedLight);
@@ -193,8 +236,14 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             // but the pack was designed with a renderer script (e.g. SL packs with rod animation).
             // In that case, wheel/truck groups belong in the main model and must NOT be filtered out.
             boolean modelHasScript = modelScriptRunning || def.hasScript();
-            MqoModelLoader.GroupPredicate groupFilter =
-                groupName -> shouldRenderTrainGroup(groupName, renderInterior, aggressiveDistanceCulling, compatibilityHeavy, def, modelHasScript, modelScriptRunning);
+            //★ボクセルモデル (.ngto/.ngtz) + スクリプト稼働中は、ベイク側を一切描かない。
+            //本家 NGTZModel はパーツを自分のグリッド中央へ寄せて描き、位置決めはスクリプトの
+            //glTranslatef が行う。ここで別に描くと、台車やドアが<b>車両の中央</b>に出て、
+            //本体は二重になってチカチカする (NM_251)。
+            boolean voxelDrawnByScript = model.isVoxelModel() && modelScriptRunning;
+            MqoModelLoader.GroupPredicate groupFilter = voxelDrawnByScript
+                ? groupName -> false
+                : groupName -> shouldRenderTrainGroup(groupName, renderInterior, aggressiveDistanceCulling, compatibilityHeavy, def, modelHasScript, modelScriptRunning);
             //本家 BasicVehiclePartsRenderer と同じく、動かす部品は JSON の objects で決まる。
             //名前に "door" を含むか等の推測はしない (本家に無いし、扉/panel 等の命名で外れる)。
             java.util.Map<String, java.util.List<PartsStep>> leftChains = partsChains(def.getLeftDoors());
@@ -231,7 +280,17 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             }
             // 列車の実座標から取り直した lightmap を使用し、室内灯OFFの外装が夜に白く浮かないようにする。
             // 発光 pass は MqoModelLoader/TrainScriptSystem 側で室内灯ONの内装だけに制限する。
-            MqoModelLoader.renderModel(model, poseStack, buffer, trainPackedLight, groupFilter, doorTransform, entity);
+            //本家 preRenderBody/postRenderBody は<b>車体パスだけ</b>を挟む (台車・方向幕・
+            //ライト効果には掛からない)。室内灯によるフルブライトもここだけに効かせる。
+            int bodyLight = applyInteriorLighting(entity.level(), entity.getX(), entity.getY(), entity.getZ(),
+                !def.getInteriorLights().isEmpty(), entity.isInteriorLightOn() ? 1 : 0, trainPackedLight);
+            com.portofino.realtrainmodunofficial.client.render.InteriorLighting.begin(
+                def.getInteriorLights(), false, entity.level().getGameTime() * 50L);
+            try {
+                MqoModelLoader.renderModel(model, poseStack, buffer, bodyLight, groupFilter, doorTransform, entity);
+            } finally {
+                com.portofino.realtrainmodunofficial.client.render.InteriorLighting.end();
+            }
             // 台車は車体と同じ変換内で描画し、各台車ごとにレール高へ補正する。
             try {
                 renderBogiesInline(entity, def, model, poseStack, buffer, trainPackedLight, partialTicks);
@@ -628,20 +687,10 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         if (isAngleBendVariant(normalized)) {
             return false;
         }
-        // 台車/車輪グループ: 別台車モデルファイルがある場合のみ body MQO から非表示にする。
-        // 別ファイルがある場合は TrainBogieEntityRenderer が正しい位置に描画するため、
-        // body MQO で同じグループを描くと z-fighting / チカチカが発生する。
-        // 別ファイルがない場合は body MQO 側のグループが唯一の台車描画手段なので表示する。
-        boolean isBogieOrWheel = normalized.contains("bogie")
-            || normalized.contains("wheel")
-            || normalized.contains("daisya")
-            || normalized.contains("daisha")
-            || normalized.contains("sharin");
-        if (isBogieOrWheel) {
-            boolean hasSeparateBogieModel = def != null && def.getBogies().stream()
-                .anyMatch(b -> b.modelFile() != null && !b.modelFile().isBlank());
-            if (hasSeparateBogieModel && !scriptActuallyRunning) return false;
-        }
+        //★台車/車輪グループは<b>隠さない</b>。本家 ModelObject.render は名前でグループを
+        //出し分けない (台車は EntityBogie 側で別途描かれるだけ)。以前は「別台車モデルが
+        //あるなら車体側の台車を隠す」としていたが、.ngtz のように<b>台車をモデルに内蔵</b>した
+        //車両で台車が消えていた。
         // RTMパックには非表示にすべきヘルパーグループが含まれている:
         //   shadow    - 地面に張り付いたシャドウポリゴン(レールを隠す)
         //   *_guide   - モデルエディタ用ガイド(roll_guide, seat_guide_L/R など)
@@ -740,7 +789,8 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         // 蒸気機関車など、車体MQOが車輪・台車を自前で持ちスクリプトで描く車両は、
         // RTMの読み込めない ModelBogie.class が汎用台車に置換されて二重描画/散乱する。
         // 自前走り装置がある場合は .class 置換台車を描かない (本物のMQO台車を持つEMUは対象外)。
-        boolean selfDrawsRunningGear = bodyModel != null && bodyModel.hasOwnWheelGroups();
+        boolean selfDrawsRunningGear = bodyModel != null
+            && (bodyModel.hasOwnWheelGroups() || bodyModel.hasOwnBogieGroups());
         float baseYaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
         for (int i = 0; i < def.getBogies().size(); i++) {
             VehicleDefinition.BogieDefinition bogieDef = def.getBogies().get(i);
@@ -755,18 +805,18 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         }
     }
 
+    /**
+     * 本家 {@code RenderBogie} は台車モデルを<b>無条件に描く</b>。
+     * 描かないのは「モデルセットがダミー」= パック側が台車を無効にしている時だけなので、
+     * ここも {@code air}/{@code none} 等のダミー指定だけを見る。
+     * <p>以前あった「.class は描かない」「車体が走り装置を持つなら描かない」は RTMU 独自の
+     * 推測で、既定車両 (df200) や .ngtz 車両 (NM_251) で台車が消える原因になっていた。
+     */
     private static boolean shouldSkipInlineBogie(boolean selfDrawsRunningGear, VehicleDefinition.BogieDefinition bogieDef) {
         if (bogieDef == null || bogieDef.modelFile() == null || bogieDef.modelFile().isBlank()) {
             return true;
         }
-        if (BogieRenderer.isDummyBogieModel(bogieDef.modelFile())) {
-            return true;
-        }
-        // .class 台車(本家組込 ModelBogie 等)は、車体モデル/スクリプトが自前で台車(bogieF 等)を
-        // 描画・回転させる前提のもの。RTMU 標準台車(ft1)へ差し替えて BogieRenderer で描くと、
-        // 純正台車の回転が反映されず見た目が崩れるため、ここでは描かずスクリプト/車体側に任せる。
-        // (台車は車体固定位置で接線方向へ回転する＝本家RTMと同一挙動。)
-        return bogieDef.modelFile().toLowerCase(java.util.Locale.ROOT).endsWith(".class");
+        return BogieRenderer.isDummyBogieModel(bogieDef.modelFile());
     }
 
     private static boolean shouldUseCompatibilityRendering(VehicleDefinition def, MqoModelLoader.MqoModel model) {

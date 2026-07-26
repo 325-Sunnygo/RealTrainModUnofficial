@@ -163,9 +163,12 @@ public final class RailMeshCache {
         //伝播しておらず、真っ暗な状態で焼かれることがある。そこに variant 用の遅延が重なると
         //「読み込み済みのチャンクなのにレールだけ真っ黒のまま」になる (ユーザー報告)。
         //ライトは連続的に変わるものではないので、churn の心配も無い。
-        if (optionalBake && !lightChanged && (frameCounter - mesh.bakeFrame()) < REBAKE_MIN_FRAMES) {
-            optionalBake = false;
-        }
+        //★再焼き込みの間隔制限は撤去した (本家に無い)。
+        //これは「トング位置を焼き込みキーに入れていたせいで、量子化の境界で毎tick焼き直る」
+        //churn を隠すための独自処理だった。可動部を本家どおり renderRailDynamic として
+        //焼き込みの外へ出し、キーを本家の createStaticRenderKey (形+明るさ+モデル) だけに
+        //したので、キーが動くのは実際に見た目が変わった時だけになった。
+        //間隔制限を残すと「変わったのに数フレーム古いまま描く」だけの害になる。
         boolean needsBake = mustBake || optionalBake;
         if (needsBake) {
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {

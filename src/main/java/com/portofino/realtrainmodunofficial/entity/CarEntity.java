@@ -36,7 +36,10 @@ public final class CarEntity extends Entity {
     private com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry serverScript;
     private boolean attemptedServerScriptLoad;
     private final java.util.Map<String, String> scriptData = new java.util.HashMap<>();
+    /** サーバーが flag!=0 で書いた値。毎tick まとめてクライアントへ流す。 */
     private boolean scriptDataDirty;
+    /** 乗客同期を送った相手 (プレイヤー本人には通常届かないため自前で送る)。 */
+    private int lastPassengerSyncVehicleId = -1;
 
     // === RTM 1.7.10/1.12 互換フィールド (SRB3 等のスクリプトが直接読み書きする) ===
     /** RTM の yaw 名 (entity.field_70177_z) */
@@ -138,6 +141,11 @@ public final class CarEntity extends Entity {
 
     public CarEntity(EntityType<? extends CarEntity> entityType, Level level) {
         super(entityType, level);
+        //本家 EntityVehicleBase:85 の ignoreFrustumCheck = true 相当。
+        //SRB / NGTO Builder の描画スクリプトは<b>ワールド座標</b>にマーカーや補助線を描くが、
+        //描画されるのは「車が視錐台に入っているとき」だけ。車はプレイヤーの位置に居るため、
+        //前を向くと車がカメラ後方に外れて描画自体が呼ばれず、マーカーが丸ごと消える。
+        this.noCulling = true;
     }
 
     @Override
@@ -263,6 +271,7 @@ public final class CarEntity extends Entity {
             if (car == null) {
                 return;
             }
+            //サーバーが書いた値のクライアントへの配布は tick 側の CarScriptDataSyncPayload が行う。
             car.setScriptDataValue(key, value);
             if (syncType != 0 && car.level().isClientSide()) {
                 try {
@@ -301,60 +310,65 @@ public final class CarEntity extends Entity {
         this.setPos(x, y, z);
     }
     /**
-     * func_70078_a = mountEntity (1.7.10)。SRB3 は車をホストプレイヤーに乗せて追従させるが、
-     * 1.21 でプレイヤーの乗客にすると「スニークで振り落とされて編集終了」等の
-     * バニラ挙動を踏むため、実際には騎乗させずサーバー側 tick の追従
-     * (hostPlayerEntityId → setPos) で 1.12 の doFollowing と同じ動きにする。
+     * func_70078_a = mountEntity (1.7.10)。<b>この車が target に乗る</b> (target=null で降りる)。
+     *
+     * <p>SRB3 / NGTO Builder のサーバースクリプトは
+     * 「プレイヤーを降ろす → 車をプレイヤーに乗せる」で追従を実現しており、
+     * 本家 1.7.10 の {@code RTMApiCompat.doFollowing} が空実装なのはそのため。
+     * ここを騎乗させないと車の rider が翌 tick も残り、スクリプトが
+     * {@code isEndEdit = true} (編集終了) へ直行してツールが即死する。
      */
     public void func_70078_a(Object target) {
         if (target == null) {
             this.stopRiding();
+            return;
         }
-        //騎乗はしない (追従は tick 側で処理)
+        Entity e = jp.ngt.mccompat.EntityCompatUtil.unwrapEntity(target);
+        if (e == null) {
+            return;
+        }
+        //★必ず<b>自分と同じレベル</b>の実体へ乗る。
+        //スクリプトが持つラッパー (PlayerCompat) は、スクリプトエンジンが定義ごとに
+        //共有されている関係で<b>反対サイドのプレイヤー</b>を指していることがある。
+        //サーバーの車がクライアントの LocalPlayer に騎乗すると、その車は
+        //ServerLevel のtick対象から外れ (乗り物がサーバーに居ないため)、
+        //ClientLevel.tickPassenger だけで回るようになる = サーバー処理が完全に止まる。
+        if (e.level() != this.level()) {
+            Entity sameSide = this.level().getEntity(e.getId());
+            if (sameSide == null) {
+                RealTrainModUnofficial.LOGGER.warn(
+                    "[RTMU] 反対サイドのエンティティへの騎乗要求を無視しました: target={} targetLevel={} selfLevel={}",
+                    e.getClass().getSimpleName(), e.level().getClass().getSimpleName(),
+                    this.level().getClass().getSimpleName());
+                return;
+            }
+            e = sameSide;
+        }
+        //本家 1.7.10 では「車がプレイヤーに乗る」= プレイヤーは車の乗客ではあり得ない。
+        //スクリプトは dismountPlayer → startRiding の順で呼ぶが、降車が何らかの理由で
+        //効かないと<b>相互に乗った状態</b>になり、rider が毎tick残ってサーバースクリプトが
+        //「編集終了 (isEndEdit)」の枝から出られなくなる (= 敷設も終了も効かない)。
+        //ここで確実に切っておく。
+        this.ejectPassengers();
+        boolean ok = this.startRiding(e, true);
+        //★乗り物がプレイヤー本人の場合、そのプレイヤーには乗客同期が届かない。
+        //バニラは乗客の変化を ServerEntity:89 の broadcast で「その乗り物を追跡している
+        //<b>他の</b>プレイヤー」にだけ送るため、自分に何かが乗ったことを本人は知らない。
+        //結果クライアント側の車は騎乗せず、その場に取り残されて見える
+        //(本家 1.7.10 は騎乗だけで追従が成立するので doFollowing が空実装)。
+        //本人にも明示的に送って、クライアントでも positionRider が働くようにする。
+        if (ok && e instanceof net.minecraft.server.level.ServerPlayer sp) {
+            sp.connection.send(new net.minecraft.network.protocol.game.ClientboundSetPassengersPacket(sp));
+        }
     }
 
     /// 右クリックされた時の処理
     ///
     /// @param player 右クリックしたプレイヤー
     /// @param hand   メインハンドまたはオフハンド
-    /**
-     * スクリプト車両 (SRB3 等) の仮想 rider。
-     * 実際に乗車させると「車=プレイヤー+2 追従」と「プレイヤー=車の座席位置」が
-     * 相互参照して毎tick上昇するループになるため、乗車せず 1tick だけ
-     * field_70153_n に見せてスクリプトのホスト登録/終了判定を成立させる。
-     */
-    private Player pendingScriptRider;
-
-    /**
-     * プレイヤーに追従する「道具車」か (SRB3 / NGTO Builder)。
-     * これらは車=プレイヤー+2 追従とプレイヤー=座席位置が相互参照して毎tick上昇するため乗車させない。
-     * 判定は hostPlayerEntityId で追従する作りかどうか。普通の自動車 (MFCP 等) は該当しない。
-     */
-    private boolean isFollowToolCar() {
-        VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
-        if (def == null || !def.hasServerScript()) {
-            return false;
-        }
-        String path = def.getServerScriptPath();
-        if (path == null) {
-            return false;
-        }
-        String lower = path.toLowerCase(java.util.Locale.ROOT);
-        return lower.contains("superrailbuilder") || lower.contains("srb") || lower.contains("ngto");
-    }
-
     /// @return 処理の完了状態
     @Override
     public @NotNull InteractionResult interact(@NotNull Player player, @NotNull InteractionHand hand) {
-        //追従する道具車 (SRB3/NGTO Builder) だけ実乗車させない。
-        //以前は「サーバースクリプトを持つ車」を全部弾いていたため、
-        //運転用スクリプトを持つ普通の自動車 (MFCP 等) に乗れなかった。
-        if (isFollowToolCar()) {
-            if (!this.level().isClientSide) {
-                this.pendingScriptRider = player;
-            }
-            return InteractionResult.SUCCESS;
-        }
         if (this.canAddPassenger(player)) {
             player.startRiding(this);
             return InteractionResult.SUCCESS;
@@ -485,11 +499,6 @@ public final class CarEntity extends Entity {
             if (!passengers.isEmpty() && passengers.get(0) instanceof net.minecraft.world.entity.player.Player p) {
                 rider = p;
             }
-            //スクリプト車両の仮想 rider (1tick だけ見せる — 実乗車による上昇ループ回避)
-            if (rider == null && this.pendingScriptRider != null) {
-                rider = this.pendingScriptRider;
-                this.pendingScriptRider = null;
-            }
             this.field_70153_n = rider != null ? jp.ngt.mccompat.PlayerCompat.of(rider) : null;
             if (this.field_70153_n != null) {
                 this.field_70153_n.refresh();
@@ -500,6 +509,29 @@ public final class CarEntity extends Entity {
             if (this.field_70154_o != null) {
                 this.field_70154_o.refresh();
             }
+        }
+
+        //★乗り物がプレイヤー本人のとき、そのプレイヤーには乗客同期が届かない
+        //(ServerEntity:89 の broadcast は「乗り物を追跡している<b>他の</b>プレイヤー」宛)。
+        //騎乗した瞬間に 1 回送るだけだと、クライアントがまだ車を認識していない場合に
+        //取りこぼして車がその場に残る。騎乗している間は定期的に送り直して確実に合わせる。
+        if (!this.level().isClientSide()
+                && this.getVehicle() instanceof net.minecraft.server.level.ServerPlayer host) {
+            if (this.lastPassengerSyncVehicleId != host.getId() || this.tickCount % 20 == 0) {
+                this.lastPassengerSyncVehicleId = host.getId();
+                host.connection.send(
+                    new net.minecraft.network.protocol.game.ClientboundSetPassengersPacket(host));
+            }
+        } else if (!this.level().isClientSide()) {
+            this.lastPassengerSyncVehicleId = -1;
+        }
+
+        //★別レベルの乗り物に乗ってしまっている車を自己修復する。
+        //この状態になると、その車は自分のレベルのtickから外れて処理が止まる。
+        if (this.getVehicle() != null && this.getVehicle().level() != this.level()) {
+            RealTrainModUnofficial.LOGGER.warn("[RTMU] 別レベルの乗り物に騎乗していたため降車させました: self={} vehicle={}",
+                this.level().getClass().getSimpleName(), this.getVehicle().level().getClass().getSimpleName());
+            this.stopRiding();
         }
 
         // サーバ側で vehicle 紐付けスクリプト（SRB3 等）を毎tick実行する。
@@ -535,20 +567,8 @@ public final class CarEntity extends Entity {
                     this.scriptDrivesMotion = true;
                 }
             }
-            // ホストプレイヤー追従 (1.12 doFollowing 相当)。騎乗方式はスニークで
-            // 振り落とされるため使わず、サーバー側で位置を直接ミラーする。
-            // トラッキング範囲切れ (クライアントに描画されなくなる) の防止も兼ねる。
-            String hostIdS = getScriptDataValue("hostPlayerEntityId");
-            if (hostIdS != null && !hostIdS.isEmpty()) {
-                try {
-                    Entity host = this.level().getEntity((int) Double.parseDouble(hostIdS.trim()));
-                    //ホストがこの車に乗っている間は追従しない (相互参照で上昇し続けるため)
-                    if (host instanceof Player && host.getVehicle() != this) {
-                        this.setPos(host.getX(), host.getY() + 2.0D, host.getZ());
-                    }
-                } catch (Exception ignored) {
-                }
-            }
+            // ホストプレイヤー追従は本家どおり「車がプレイヤーに騎乗する」で行う
+            // (mc1710 の RTMApiCompat.doFollowing は空実装)。位置ミラーはしない。
             // サーバ→クライアント scriptData 同期。SRB3 の render(クライアント)は
             // hostPlayerEntityId 等のサーバ設定値を読んで GUI を起動するため必須。
             if (scriptDataDirty && !scriptData.isEmpty()) {
@@ -556,35 +576,6 @@ public final class CarEntity extends Entity {
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
                     this, new com.portofino.realtrainmodunofficial.network.CarScriptDataSyncPayload(
                         this.getId(), new java.util.HashMap<>(scriptData)));
-            }
-        }
-
-        // クライアント: SRB の追従車はホストプレイヤーの位置・旧位置を完全ミラー(+2Y)する。
-        // サーバ同期＋補間だとプレイヤーに遅れて、マーカー(車基準)とカーソル(プレイヤー基準)が
-        // ズレて荒ぶる。旧位置までコピーすることで car の描画補間位置 = player の描画補間位置 となり、
-        // マーカーとカーソルがフレーム単位で完全一致する。
-        if (this.level().isClientSide()) {
-            String hostId = getScriptDataValue("hostPlayerEntityId");
-            if (hostId != null && !hostId.isEmpty()) {
-                try {
-                    Entity host = this.level().getEntity((int) Double.parseDouble(hostId.trim()));
-                    if (host != null && host.getVehicle() != this) {
-                        this.setPos(host.getX(), host.getY() + 2.0D, host.getZ());
-                        this.xOld = host.xOld;
-                        this.yOld = host.yOld + 2.0D;
-                        this.zOld = host.zOld;
-                        this.xo = host.xo;
-                        this.yo = host.yo + 2.0D;
-                        this.zo = host.zo;
-                        // SRB はマーカーをワールド座標で描くため車の yaw は 0 固定。クライアントでも
-                        // 0 に固定し、補間で車が回転してマーカーが回って見える(荒ぶる)のを防ぐ。
-                        this.setYRot(0.0F);
-                        this.setXRot(0.0F);
-                        this.yRotO = 0.0F;
-                        this.xRotO = 0.0F;
-                    }
-                } catch (Exception ignored) {
-                }
             }
         }
 

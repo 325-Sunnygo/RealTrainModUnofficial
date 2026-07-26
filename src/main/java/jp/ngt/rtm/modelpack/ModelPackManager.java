@@ -31,6 +31,23 @@ public final class ModelPackManager {
         return getResource(domain, path);
     }
 
+    /**
+     * 本家は ResourceLocation を取る。スクリプトからは ResourceLocation / 文字列パスの
+     * どちらも渡ってくるため、Object 版で受けてパス文字列へ落とす。
+     */
+    public String getScript(Object resource) {
+        if (resource == null) {
+            return null;
+        }
+        if (resource instanceof String s) {
+            return getScript(s);
+        }
+        if (resource instanceof net.minecraft.resources.ResourceLocation rl) {
+            return getScript(rl.getPath());
+        }
+        return getScript(String.valueOf(resource));
+    }
+
     public String getScript(String path) {
         byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path);
         return bytes != null ? new String(bytes, java.nio.charset.StandardCharsets.UTF_8) : null;

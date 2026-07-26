@@ -54,7 +54,7 @@ public final class VehicleScriptRenderers {
     private static final String PRELUDE = com.portofino.realtrainmodunofficial.script.PackScriptSource.PRELUDE;
 
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
-    private static final Scripted INVALID = new Scripted(null, null, null);
+    private static final Scripted INVALID = new Scripted(null, null, null, "<invalid>");
 
     private VehicleScriptRenderers() {
     }
@@ -89,6 +89,7 @@ public final class VehicleScriptRenderers {
                 return INVALID;
             }
             renderer.setScript(se);
+            renderer.scriptName = def.getId() + " (" + def.getScriptPath() + ")";
             se.put("renderer", renderer);
 
             //無音終了 (ネイティブ/メモリ由来) の切り分け用。1 車両につき 1 回だけ出る。
@@ -103,7 +104,7 @@ public final class VehicleScriptRenderers {
             renderer.init(modelSet, modelObject);
             RealTrainModUnofficial.LOGGER.info("[RTMU] vehicle script init done: {}", def.getId());
 
-            return new Scripted(renderer, se, modelObject);
+            return new Scripted(renderer, se, modelObject, def.getId());
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init vehicle script renderer for {}", def.getId(), t);
             return INVALID;
@@ -171,7 +172,10 @@ public final class VehicleScriptRenderers {
         private final VehiclePartsRenderer renderer;
         private final ScriptEngine engine;
         private final ModelObject modelObject;
-        private boolean warnedRenderFail;
+        /** ログ用の車両 ID。どの車両のスクリプトが落ちたか判らないと追えない。 */
+        private final String defId;
+        /** 既にログした失敗メッセージ。<b>失敗の種類ごとに</b> 1 回出す (車両ごと 1 回ではない)。 */
+        private final java.util.Set<String> loggedFailures = new java.util.HashSet<>();
 
         //--- スクリプト描画結果のキャッシュ ---------------------------------------------
         //本家式マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED)。
@@ -205,7 +209,8 @@ public final class VehicleScriptRenderers {
         /** このモデルの素テクスチャパス集合 (小文字正規化)。復帰bindの判定に使う。 */
         private final java.util.Set<String> defaultTexPaths = new java.util.HashSet<>();
 
-        Scripted(VehiclePartsRenderer renderer, ScriptEngine engine, ModelObject modelObject) {
+        Scripted(VehiclePartsRenderer renderer, ScriptEngine engine, ModelObject modelObject, String defId) {
+            this.defId = defId;
             this.renderer = renderer;
             this.engine = engine;
             this.modelObject = modelObject;
@@ -342,8 +347,16 @@ public final class VehicleScriptRenderers {
             //  が先に深度を書くと、後から描いた室内灯/尾灯が窓越しの視線で深度テストに落ち、
             //  「外から見るとライトが消えている・乗ると点いている」珍現象になる。
             //  灯り→窓の順なら、窓ガラスの色が灯りの上にブレンドされる (本家の見た目と同じ)。
+            //★本家の描画順を GPU 上でも保証する。
+            //本家は即時描画なので NORMAL → LIGHT → TRANSPARENT が必ずその順で GPU へ行く。
+            //1.21 の MultiBufferSource は RenderType ごとにまとめて後で流すため、<b>提出順は
+            //描画順にならない</b>。半透明 (窓) は深度を書くので、それが発光より先に描かれると
+            //窓越しの視線で発光が深度テストに落ち、「中からは点いて見えるのに外から見えない」に
+            //なる。パスの区切りで明示的に flush して即時描画と同じ順序にする。
+            flushBatch(buffer);
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
                     bodyModel, graph, sink);
+            flushBatch(buffer);
             //★半透明パス (TRANSPARENT=1)。本家 RenderVehicleBase は毎フレーム pass0(不透明)+
             //  pass1(半透明) を回すが、RTMU は従来 pass1 を飛ばしていた。そのため:
             //  (a) 座席回転・ドア開閉・ドアライトのアニメ時計 (スクリプト内で
@@ -363,6 +376,28 @@ public final class VehicleScriptRenderers {
                 }
             }
             return true;
+        }
+
+        /** 本家の即時描画と同じ順序にするため、パスの区切りでバッファを吐き出す。 */
+        /**
+         * 車両描画の途中で {@code BufferSource.endBatch()} を呼ぶと、
+         * そのフレームでバッファに溜まっている<b>全ての</b>描画が강制的に流れる。
+         * 何がどれだけ溜まっているかはカメラの向きで変わるため、視点を動かすと
+         * 描画順が入れ替わってちらつく疑いがある。
+         *
+         * <p>「室内灯が窓越しに外から見えない」対策として、LIGHT を TRANSPARENT より先に
+         * GPU へ送るために必要。ちらつきの原因ではないことを実機で確認済み
+         * (無効化してもちらつきは消えなかった) なので有効のままにする。
+         */
+        private static final boolean FLUSH_BETWEEN_PASSES = true;
+
+        private static void flushBatch(MultiBufferSource buffer) {
+            if (!FLUSH_BETWEEN_PASSES) {
+                return;
+            }
+            if (buffer instanceof MultiBufferSource.BufferSource source) {
+                source.endBatch();
+            }
         }
 
         private static java.util.Set<String> exclusionPartsOf(Object entity) {
@@ -395,32 +430,32 @@ public final class VehicleScriptRenderers {
             if (!(entity instanceof EntityTrainBase train)) {
                 return;
             }
-            //発光 (Light) マテリアル or 旧式ライトグループ (head_light/room_light 等の別ジオメトリ) の
-            //どちらも無いパックは LIGHT パス自体が無意味。旧式 (223 系など) は発光テクスチャを持たず、
-            //スクリプトが LIGHT パスで別ジオメトリを描くので hasScriptLightGroups でも回す
-            //(でないと前照灯/室内灯が一切出ない)。素テクスチャの不透明描画は
-            //MqoModelLoader.renderLightGroupOpaque が担当 (ライト名グループ限定でガラスは塞がない)。
-            if (bodyModel == null || (!bodyModel.hasEmissiveBatches() && !bodyModel.hasScriptLightGroups())) {
+            //★本家 renderVehicleMain は `if (modelSet.modelObj.light)` で、<b>Light 材質が
+            //一つも無いパックは LIGHT パスごと実行しない</b>。
+            //以前はここで「グループ名に light を含む」パックも通し、さらに下の doRender を
+            //ライトモード非依存 (i==0 常時) にしていた。そのため<b>消灯なのに前照灯や室内灯が
+            //点いて見える</b> (183系/201系/EF65/ED75/多機能検測車/JRCT103・205 等の報告)。
+            //本家に無い経路なので撤去した。スクリプトはライト形状を pass0 でも描いており
+            //(render_light は pass==0 でも呼ばれる)、そちらは状態を見て出し分けている。
+            if (bodyModel == null || !bodyModel.hasEmissiveBatches()) {
                 return;
             }
             int dir = train.getTrainDirection();
             int mode = train.getTrainStateData(TrainState.TrainStateType.State_Light.id);
             boolean frontEmpty = train.getConnectedTrain(dir) == null;
             boolean backEmpty = train.getConnectedTrain(1 - dir) == null;
-            //旧式ライト (発光テクスチャ無し) は、スクリプトが pass2 (i==0) で head/tail/room を mode 別に
-            //全部描く。sub-pass を mode でゲートすると尾灯(mode2)で i==0 が飛び「点けると消える」に
-            //なるため、i==0 を常に回してスクリプトに委ねる。i==1,2 はこの種のスクリプトは描かない。
-            //発光テクスチャ持ち (新式) は従来どおり本家 sub-pass ロジック。
-            boolean scriptLights = !bodyModel.hasEmissiveBatches() && bodyModel.hasScriptLightGroups();
+            //本家 renderBodyLight の doRender。単行 (isSingleTrain かつ前後とも空) は進行方向で出し分ける。
+            jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = train.getConfig();
+            boolean single = cfg != null && cfg.isSingleTrain && frontEmpty && backEmpty;
 
             for (int i = 0; i < 3; i++) {
-                boolean doRender = scriptLights
-                    ? (i == 0)
-                    : switch (i) {
-                        case 0 -> mode == 0 || mode == 1;
-                        case 1 -> (mode == 1 && frontEmpty) || mode == 2;
-                        default -> (mode == 1 && !frontEmpty && backEmpty) || mode == 2;
-                    };
+                boolean doRender = switch (i) {
+                    case 0 -> mode == 0 || mode == 1;
+                    case 1 -> single ? (mode == 1 && dir == 0) || mode == 2
+                                     : (mode == 1 && frontEmpty) || mode == 2;
+                    default -> single ? (mode == 1 && dir == 1) || mode == 2
+                                      : (mode == 1 && !frontEmpty && backEmpty) || mode == 2;
+                };
                 if (!doRender) {
                     continue;
                 }
@@ -501,9 +536,12 @@ public final class VehicleScriptRenderers {
                 this.renderer.currentPass = pass;
                 this.renderer.render(entity, pass, partialTick);
             } catch (Throwable t) {
-                if (!this.warnedRenderFail) {
-                    this.warnedRenderFail = true;
-                    RealTrainModUnofficial.LOGGER.warn("Vehicle script render failed", t);
+                //以前は車両ごとに 1 回しかログしなかったため、起動直後の別要因で 1 回出ると
+                //以後の失敗が全て無音になっていた。失敗の種類 (メッセージ) ごとに 1 回出す。
+                String key = pass + "|" + String.valueOf(t);
+                if (this.loggedFailures.size() < 32 && this.loggedFailures.add(key)) {
+                    RealTrainModUnofficial.LOGGER.warn("[RTMU] スクリプト描画に失敗: {} (pass={})",
+                            this.defId, pass, t);
                 }
                 return null;
             } finally {
@@ -665,6 +703,12 @@ public final class VehicleScriptRenderers {
                     }
                 }
                 case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
+                case MULT_MATRIX -> {
+                    //glMultMatrix: 列優先 16 要素。JOML も列優先なのでそのまま流し込める。
+                    if (cmd.payload instanceof float[] m && m.length >= 16) {
+                        poseStack.last().pose().mul(new Matrix4f().set(m));
+                    }
+                }
                 case BRIGHTNESS -> light = cmd.a < 0 ? fullBright : (int) cmd.a;
                 case BIND_TEXTURE -> {
                     if (cmd.payload instanceof GLRecorder.TexBind tb) {
@@ -772,7 +816,7 @@ public final class VehicleScriptRenderers {
                             //同グループの面を差し替えテクスチャで描画 (UV は MQO のまま)
                             for (Object name : names) {
                                 drawModelGroup(bodyGraph, String.valueOf(name), poseStack, buffer,
-                                        light, packedOverlay, overrideTex, colR, colG, colB, colA);
+                                        light, packedOverlay, overrideTex, colR, colG, colB, colA, true);
                             }
                         } else if (model != null && legacyPass >= RenderPass.LIGHT.id) {
                             //発光パス: Light マテリアルの面だけを ***_light0/1/2.png で描き直す
@@ -801,8 +845,9 @@ public final class VehicleScriptRenderers {
                 }
                 case DRAW_MODEL_GROUP -> {
                     if (cmd.payload instanceof PolygonModel pm) {
+                        //a = 本家 renderPart(smoothing, ...) の平滑指定
                         drawModelGroup(pm, cmd.name, poseStack, buffer, light, packedOverlay, overrideTex,
-                                colR, colG, colB, colA);
+                                colR, colG, colB, colA, cmd.a != 0.0F);
                     }
                 }
                 case RENDER_BLOCK -> {
@@ -879,11 +924,8 @@ public final class VehicleScriptRenderers {
         float ax = v[b] - v[a], ay = v[b + 1] - v[a + 1], az = v[b + 2] - v[a + 2];
         float bx = v[c] - v[a], by = v[c + 1] - v[a + 1], bz = v[c + 2] - v[a + 2];
         Vector3f n = new Vector3f(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx);
-        if (n.lengthSquared() < 1.0e-8F) {
-            n.set(0.0F, 1.0F, 0.0F);
-        } else {
-            n.normalize();
-        }
+        //★大きさで捨てない (細かい文字の三角形が真上を向く)。
+        com.portofino.realtrainmodunofficial.client.model.FaceNormals.normalize(n);
         return n;
     }
 
@@ -917,9 +959,11 @@ public final class VehicleScriptRenderers {
         new java.util.WeakHashMap<>();
     private static final float[] FLAT_EMPTY = new float[0];
 
-    private static float[] flatGroupVerts(PolygonModel pm, String groupName) {
+    private static float[] flatGroupVerts(PolygonModel pm, String groupName, boolean smoothing) {
         java.util.Map<String, float[]> byName = FLAT_GROUP_CACHE.computeIfAbsent(pm, k -> new java.util.HashMap<>());
-        String key = groupName == null ? "" : groupName.toLowerCase(java.util.Locale.ROOT);
+        //平滑あり/なしで法線が変わるのでキーを分ける
+        String key = (smoothing ? "s|" : "f|")
+                + (groupName == null ? "" : groupName.toLowerCase(java.util.Locale.ROOT));
         float[] flat = byName.get(key);
         if (flat == null) {
             GroupObject group = null;
@@ -929,14 +973,14 @@ public final class VehicleScriptRenderers {
                     break;
                 }
             }
-            flat = buildFlatGroup(group);
+            flat = buildFlatGroup(group, smoothing);
             byName.put(key, flat);
         }
         return flat;
     }
 
     /** 旧 drawModelGroup の展開ロジックそのまま (四角形はそのまま/三角形は縮退クアッド/5角以上は扇状分割)。 */
-    private static float[] buildFlatGroup(GroupObject group) {
+    private static float[] buildFlatGroup(GroupObject group, boolean smoothing) {
         if (group == null || group.faces.isEmpty()) {
             return FLAT_EMPTY;
         }
@@ -957,8 +1001,21 @@ public final class VehicleScriptRenderers {
             for (int t = 0; t < (n == 4 ? 1 : n - 2); t++) {
                 int[] idx = n == 4 ? new int[]{0, 1, 2, 3} : new int[]{0, t + 1, t + 2, t + 2};
                 Vector3f normal = faceNormal(face, idx);
+                //★頂点法線があればそちらを使う (本家 NGTRenderHelper.addFace の smoothing=true 側)。
+                //無い場合だけ面法線 = フラット陰影。以前はここが常に面法線で、
+                //スクリプト描画の車両 (SL 等) だけスムージングが効かず、文字入りモデルの
+                //細かい面が facet ごとに段になっていた。
+                Vertex[] vertexNormals = smoothing ? face.vertexNormals : null;
                 for (int k = 0; k < 4; k++) {
                     Vertex vert = face.vertices[idx[k]];
+                    Vector3f vn = normal;
+                    if (vertexNormals != null && idx[k] < vertexNormals.length && vertexNormals[idx[k]] != null) {
+                        Vertex n0 = vertexNormals[idx[k]];
+                        vn = new Vector3f(n0.getX(), n0.getY(), n0.getZ());
+                        if (vn.lengthSquared() < 1.0e-8F) {
+                            vn = normal;
+                        }
+                    }
                     float u = 0.0F, vv = 0.0F;
                     if (face.uvs != null && idx[k] * 2 + 1 < face.uvs.length) {
                         u = face.uvs[idx[k] * 2];
@@ -969,9 +1026,9 @@ public final class VehicleScriptRenderers {
                     flat[w++] = vert.z;
                     flat[w++] = u;
                     flat[w++] = vv;
-                    flat[w++] = normal.x;
-                    flat[w++] = normal.y;
-                    flat[w++] = normal.z;
+                    flat[w++] = vn.x;
+                    flat[w++] = vn.y;
+                    flat[w++] = vn.z;
                 }
             }
         }
@@ -980,9 +1037,9 @@ public final class VehicleScriptRenderers {
 
     private static void drawModelGroup(PolygonModel pm, String groupName, PoseStack poseStack,
                                        MultiBufferSource buffer, int light, int overlay, ResourceLocation texture,
-                                       float colR, float colG, float colB, float colA) {
+                                       float colR, float colG, float colB, float colA, boolean smoothing) {
         long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
-        float[] flat = flatGroupVerts(pm, groupName);
+        float[] flat = flatGroupVerts(pm, groupName, smoothing);
         if (flat.length == 0) {
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_MODELGRP, secStart);
@@ -1006,22 +1063,21 @@ public final class VehicleScriptRenderers {
         int cg = (int) (colG * 255.0F);
         int cb = (int) (colB * 255.0F);
         int ca = (int) (colA * 255.0F);
-        //クアッド内の 4 頂点は同一法線 (buildFlatGroup が同じ値を 4 回書く) なので、
-        //法線の行列変換は面ごとに 1 回だけ行う (値は VertexWriter.setNormal と同一)。
-        for (int o = 0; o < flat.length; o += 32) {
-            float nx = flat[o + 5], ny = flat[o + 6], nz = flat[o + 7];
+        //★法線の行列変換は<b>頂点ごと</b>。以前は「クアッド内の 4 頂点は同一法線」を前提に
+        //面ごと 1 回で済ませていたが、buildFlatGroup がスムージング済みの頂点法線を書くように
+        //なったので 4 頂点は別々の値を持つ。面ごとにまとめると先頭頂点の法線で塗り潰され、
+        //フラット陰影に戻ってしまう。
+        for (int p = 0; p < flat.length; p += 8) {
+            float nx = flat[p + 5], ny = flat[p + 6], nz = flat[p + 7];
             float tnx = nm.m00() * nx + nm.m10() * ny + nm.m20() * nz;
             float tny = nm.m01() * nx + nm.m11() * ny + nm.m21() * nz;
             float tnz = nm.m02() * nx + nm.m12() * ny + nm.m22() * nz;
-            for (int k = 0; k < 4; k++) {
-                int p = o + k * 8;
-                VertexWriter.addVertex(vc, mat, flat[p], flat[p + 1], flat[p + 2])
-                        .setColor(cr, cg, cb, ca)
-                        .setUv(flat[p + 3], flat[p + 4])
-                        .setOverlay(overlay)
-                        .setLight(light)
-                        .setNormal(tnx, tny, tnz);
-            }
+            VertexWriter.addVertex(vc, mat, flat[p], flat[p + 1], flat[p + 2])
+                    .setColor(cr, cg, cb, ca)
+                    .setUv(flat[p + 3], flat[p + 4])
+                    .setOverlay(overlay)
+                    .setLight(light)
+                    .setNormal(tnx, tny, tnz);
         }
         com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_MODELGRP, secStart);
@@ -1034,11 +1090,8 @@ public final class VehicleScriptRenderers {
         float ax = v1.x - v0.x, ay = v1.y - v0.y, az = v1.z - v0.z;
         float bx = v2.x - v0.x, by = v2.y - v0.y, bz = v2.z - v0.z;
         Vector3f n = new Vector3f(ay * bz - az * by, az * bx - ax * bz, ax * by - ay * bx);
-        if (n.lengthSquared() < 1.0e-8F) {
-            n.set(0.0F, 1.0F, 0.0F);
-        } else {
-            n.normalize();
-        }
+        //★大きさで捨てない (細かい文字の三角形が真上を向く)。
+        com.portofino.realtrainmodunofficial.client.model.FaceNormals.normalize(n);
         return n;
     }
 }
