@@ -364,8 +364,27 @@ public final class GLRecorder {
         }
         //中身で比べるもの
         if (payload instanceof java.util.Set<?> set) {
-            //Set.hashCode は要素のハッシュの総和 = 中身依存
-            return set.hashCode();
+            //★Set.hashCode() を<b>そのまま使ってはいけない</b>。
+            //
+            //あれは要素ハッシュの<b>単純な総和</b>なので、差が打ち消し合うと別物が同じ値になる。
+            //踏切スクリプトが実際にこれを踏んだ:
+            //   左点灯 = {"light_l", "dirr"} / 右点灯 = {"light_r", "dirl"}
+            //どちらも末尾 1 文字だけ l↔r で違うため String.hashCode の差が +6 と −6 になり、
+            //総和が完全に一致する (実測で確認)。結果、警報灯が左右どちらに切り替わっても
+            //内容キーが変わらず、焼き込みキャッシュが「変化なし」と判断して絵が固まっていた。
+            //L/R を対で持つ命名は踏切・信号・改札に多く、偶然ではなく構造的に踏む衝突。
+            //
+            //順序非依存 (総和) は保ったまま、要素ごとに乗算とシフトで撹拌して線形性を壊す。
+            //これで「差が打ち消し合う」形の衝突は起きない。
+            int h = 0;
+            for (Object element : set) {
+                int e = element == null ? 0 : element.hashCode();
+                e *= 0x9E3779B1;
+                e ^= e >>> 15;
+                e *= 0x85EBCA6B;
+                h += e;
+            }
+            return 31 * h + set.size();
         }
         if (payload instanceof float[] fa) {
             return java.util.Arrays.hashCode(fa);

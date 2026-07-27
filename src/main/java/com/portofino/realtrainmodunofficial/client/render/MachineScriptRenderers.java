@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class MachineScriptRenderers {
 
+
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
     private static final Scripted INVALID = new Scripted(null, null, false);
 
