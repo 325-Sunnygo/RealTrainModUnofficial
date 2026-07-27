@@ -132,6 +132,7 @@ public final class RailDrawQueue {
         //設置物の焼き込みも同じ枠でスパイクを散らす (ObjectMeshCache)
         ObjectMeshCache.beginFrame();
         VehicleMeshCache.beginFrame();
+        RailScriptRenderers.beginFrame();
         flush();
         //★レールを描き終えた「あと」に車両の半透明を描く。
         //本家は Forge 描画パス 1 (地形半透明・パス0の TileEntity のあと) で

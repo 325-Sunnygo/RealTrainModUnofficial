@@ -490,6 +490,10 @@ public final class VehicleScriptRenderers {
             GLRecorder preLight0 = recordLight0IfNeeded(entity, partialTick, bodyModel);
             java.util.Set<String> coveredGroups = groupsDrawnBy(preLight0);
             MqoModelLoader.setLightCoveredGroups(coveredGroups);
+            //pass0 を焼けたか。発光パスの焼き込みはこれに<b>連動させる</b>。
+            //片方だけ GPU 変換にすると (A·B)·v と A·(B·v) が数 ULP ずれて同じ面の深度が
+            //一致せず、点灯時にちらつく。1 両の中では全パスを同じ経路に揃える。
+            boolean bodyBaked = false;
             try {
                 //★本家 RailPartsRenderer.renderRailStatic と同じ「内容キーが同じなら焼き直さない」。
                 //  pass0 は不透明しか出さないので、描く順番が変わっても結果が変わらない。
@@ -498,11 +502,11 @@ public final class VehicleScriptRenderers {
                 int bakeKey = 31 * (31 * (31 * normal.contentKey() + packedLight)
                         + (excluded == null ? 0 : excluded.hashCode()))
                         + (coveredGroups == null ? 0 : coveredGroups.hashCode());
-                boolean baked = VehicleMeshCache.draw(entity, poseStack, bakeKey,
+                bodyBaked = VehicleMeshCache.draw(entity, 0, poseStack, bakeKey,
                         //焼くときは単位行列で再生する (カメラ相対の pose で焼くと視点に付いてくる)。
                         buf -> replay(normal, new PoseStack(), buf, packedLight, packedOverlay,
                                 bodyModel, graph, RenderPass.NORMAL.id, excluded));
-                if (!baked) {
+                if (!bodyBaked) {
                     replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
                             RenderPass.NORMAL.id, excluded);
                 }
@@ -534,7 +538,7 @@ public final class VehicleScriptRenderers {
             //なる。パスの区切りで明示的に flush して即時描画と同じ順序にする。
             flushBatch(buffer);
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
-                    bodyModel, graph, sink, preLight0);
+                    bodyModel, graph, sink, preLight0, bodyBaked);
             flushBatch(buffer);
             //★半透明パス (TRANSPARENT=1)。本家 RenderVehicleBase は毎フレーム pass0(不透明)+
             //  pass1(半透明) を回すが、RTMU は従来 pass1 を飛ばしていた。そのため:
@@ -661,7 +665,7 @@ public final class VehicleScriptRenderers {
         private void renderBodyLight(Object entity, float partialTick, PoseStack poseStack,
                                      MultiBufferSource buffer, int packedLight, int packedOverlay,
                                      MqoModelLoader.MqoModel bodyModel, PolygonModel graph, List<CachedPass> sink,
-                                     GLRecorder preLight0) {
+                                     GLRecorder preLight0, boolean allowBake) {
             if (!(entity instanceof EntityTrainBase train)) {
                 return;
             }
@@ -709,7 +713,20 @@ public final class VehicleScriptRenderers {
                 if (rec == null || !rec.hasGeometry()) {
                     continue;
                 }
-                replay(rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, pass);
+                //★発光パスも焼く。焼いた VBO はその場で即座に描かれるので、
+                //  本家の pass0 → 発光 → 半透明 の順序はそのまま保たれる。
+                //  変換経路を pass0 と揃える意味もある (片方だけ GPU にすると数 ULP ずれて
+                //  同じ面の深度が一致せず、点灯時にちらつく)。
+                final GLRecorder lightRec = rec;
+                final int lightPass = pass;
+                int lightKey = 31 * (31 * lightRec.contentKey() + packedLight) + lightPass;
+                boolean lightBaked = allowBake
+                        && VehicleMeshCache.draw(entity, 1 + i, poseStack, lightKey,
+                                buf -> replay(lightRec, new PoseStack(), buf, packedLight, packedOverlay,
+                                        bodyModel, graph, lightPass));
+                if (!lightBaked) {
+                    replay(rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, pass);
+                }
                 if (sink != null) {
                     sink.add(new CachedPass(rec, pass, null));
                 }

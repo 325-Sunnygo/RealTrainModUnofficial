@@ -96,13 +96,68 @@ public final class ScriptUtil {
         }
     }
 
+    /**
+     * そのスクリプトに関数が定義されているか。
+     * <p>Nashorn は {@code function foo(){}} をグローバルに束縛するので、束縛を引けば分かる。
+     */
+    /**
+     * 関数の有無の記録。スクリプトは読み込み後に関数が増減しないので 1 回引けば足りる。
+     * <p>{@code ScriptEngine.get} は Nashorn のグローバル切替を伴うため、レール 1 本ごと
+     * 毎フレーム引くと馬鹿にならない。エンジンごとに弱参照で持つ。
+     */
+    private static final java.util.Map<ScriptEngine, java.util.Map<String, Boolean>> FUNCTION_CACHE =
+        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+    public static boolean hasFunction(ScriptEngine se, String func) {
+        if (se == null || func == null) {
+            return false;
+        }
+        java.util.Map<String, Boolean> perEngine = FUNCTION_CACHE.computeIfAbsent(
+            se, k -> new java.util.concurrent.ConcurrentHashMap<>());
+        Boolean known = perEngine.get(func);
+        if (known != null) {
+            return known;
+        }
+        boolean exists;
+        try {
+            exists = se.get(func) != null;
+        } catch (Throwable t) {
+            //引けないエンジンは「ある」ものとして従来どおり呼びに行く
+            exists = true;
+        }
+        perEngine.put(func, exists);
+        return exists;
+    }
+
+    /** 同じ失敗を何度もログに流さないための記録 (種類ごとに 1 回)。 */
+    private static final java.util.Set<String> LOGGED_FAILURES =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * 失敗しても続行するスクリプト呼び出し。
+     *
+     * <p>★<b>定義されていない関数は呼びに行かない</b>。以前はそのまま invokeFunction して
+     * {@code NoSuchMethodException} を発生させ、{@code RuntimeException} で包み直し、
+     * {@code printStackTrace()} で毎回スタックトレースを吐いていた。
+     * {@code renderRailDynamic} を定義していないレールパックでは<b>1 本 1 フレームにつき
+     * 例外 2 個とスタックトレース 1 本</b>になり、レールを数百本並べると描画時間の大半を
+     * そこで使っていた (例外の生成はスタックトレース収集を伴うため非常に高い)。
+     *
+     * <p>本当に失敗したときのログも<b>種類ごとに 1 回</b>に絞る。毎フレーム出ると
+     * それ自体が重く、ログも読めなくなる。
+     */
     public static Object doScriptIgnoreError(ScriptEngine se, String func, Object... args) {
+        if (!hasFunction(se, func)) {
+            return null;
+        }
         try {
             return doScriptFunction(se, func, args);
         } catch (Exception e) {
-            //本家は printStackTrace のみだが、本番ログで追えるよう NGTLog にも出す
-            NGTLog.debug("[ScriptUtil] %s failed: %s", func, String.valueOf(e.getCause() != null ? e.getCause() : e));
-            e.printStackTrace();
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            String key = func + "|" + cause;
+            if (LOGGED_FAILURES.size() < 256 && LOGGED_FAILURES.add(key)) {
+                NGTLog.debug("[ScriptUtil] %s failed: %s", func, String.valueOf(cause));
+            }
             return null;
         }
     }

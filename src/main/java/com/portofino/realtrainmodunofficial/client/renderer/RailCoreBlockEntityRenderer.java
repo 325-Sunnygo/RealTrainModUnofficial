@@ -122,7 +122,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
                 com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
             if (scripted != null) {
-                if (scripted.render(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
+                if (scripted.render(be, maps, partialTick, poseStack, buffer,
+                        packedLight, packedOverlay, model)) {
                     return;
                 }
             } else if (com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.renderPlain(

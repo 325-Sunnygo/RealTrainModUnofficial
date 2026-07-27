@@ -15,7 +15,8 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * 車両の<b>不透明パス (pass0)</b> の焼き込みキャッシュ。本家 RTM のディスプレイリスト方式の移植。
+ * 車両の<b>不透明パス (pass0) と発光パス</b>の焼き込みキャッシュ。
+ * 本家 RTM のディスプレイリスト方式の移植。
  *
  * <h2>本家の方式</h2>
  * <p>{@link ObjectMeshCache} と同じ。本家 {@code RailPartsRenderer.renderRailStatic} は
@@ -29,7 +30,18 @@ import java.util.function.Consumer;
  * 不透明は深度テストで前後が決まるので、<b>描く順番が変わっても結果が変わらない</b>。
  * だからバッファを介さずその場で直接描いてよい。
  *
- * <p>半透明 (窓) と発光は順番が結果を変えるので焼かない。本家が
+ * <p>発光パスも焼く。焼いた VBO は<b>その場で即座に描かれる</b>ので、
+ * 「pass0 → 発光 → 半透明」という本家の順序はむしろ正確に再現される
+ * (バッファ経由だと RenderType 単位でまとめられるため、コード側が flushBatch で
+ * 順序を作り直していた)。
+ *
+ * <p>発光パスを焼くもう一つの理由は<b>変換経路を揃える</b>ためである。焼いた頂点は
+ * {@code (ModelView × pose) × v} を GPU で計算するが、CPU 提出は {@code ModelView × (pose × v)}
+ * になる。float では数 ULP ずれるので、pass0 だけ焼いて発光を CPU に残すと、同じ面なのに
+ * 深度が一致せず点灯時にちらつく。これは {@code MqoModelLoader.PIN_CPU_TRANSFORM} が
+ * 立っている理由そのものなので、車両については両方 GPU 側へ揃える。
+ *
+ * <p>半透明 (窓) は順番が結果を変えるうえ後回しキューに乗るので焼かない。本家が
  * {@code renderRailStatic} / {@code renderRailDynamic} を分けているのと同じ考え方で、
  * <b>順序に依存しない部分だけ</b>を焼き込みに入れる。
  *
@@ -48,7 +60,9 @@ public final class VehicleMeshCache {
     /** 1 つの焼き込みで許す頂点数。 */
     private static final int MAX_VERTICES = 1 << 20;
     /** 1 フレームに焼く数の上限。編成が視界に入った瞬間のスパイクを散らす。 */
-    private static final int MAX_BAKES_PER_FRAME = 4;
+    private static final int MAX_BAKES_PER_FRAME = 8;
+    /** 1 両あたりの焼き込み枠。0 = 通常パス、1〜3 = 発光パス (前照灯/尾灯/室内灯)。 */
+    private static final int SLOTS = 4;
     /** 何フレーム連続で内容が変わったら「動いている車両」と見なして焼くのをやめるか。 */
     private static final int DYNAMIC_AFTER = 3;
     /** 動いていると判定した後、再挑戦するまでのフレーム数。 */
@@ -74,12 +88,16 @@ public final class VehicleMeshCache {
         }
     }
 
-    private static final Map<Object, Entry> CACHE =
+    private static final Map<Object, Entry[]> CACHE =
         new LinkedHashMap<>(32, 0.75F, true) {
             @Override
-            protected boolean removeEldestEntry(Map.Entry<Object, Entry> eldest) {
+            protected boolean removeEldestEntry(Map.Entry<Object, Entry[]> eldest) {
                 if (size() > MAX_ENTRIES) {
-                    eldest.getValue().close();
+                    for (Entry e : eldest.getValue()) {
+                        if (e != null) {
+                            e.close();
+                        }
+                    }
                     return true;
                 }
                 return false;
@@ -102,9 +120,9 @@ public final class VehicleMeshCache {
      * @param baker キーが変わったときだけ呼ばれる。<b>単位行列基準</b>で描くこと
      * @return true = 描画した (呼び出し元は replay しない)
      */
-    public static boolean draw(Object entity, PoseStack poseStack, int key,
+    public static boolean draw(Object entity, int slot, PoseStack poseStack, int key,
                                Consumer<MultiBufferSource> baker) {
-        if (entity == null || poseStack == null || baker == null) {
+        if (entity == null || poseStack == null || baker == null || slot < 0 || slot >= SLOTS) {
             return false;
         }
         //シェーダーパック使用中は直接描画を使わない (レール/設置物と同じ判断)。
@@ -112,7 +130,12 @@ public final class VehicleMeshCache {
             return false;
         }
 
-        Entry entry = CACHE.computeIfAbsent(entity, k -> new Entry());
+        Entry[] slots = CACHE.computeIfAbsent(entity, k -> new Entry[SLOTS]);
+        Entry entry = slots[slot];
+        if (entry == null) {
+            entry = new Entry();
+            slots[slot] = entry;
+        }
 
         if (entry.dynamic) {
             if (frameCounter - entry.retryAtFrame < 0) {
@@ -152,7 +175,10 @@ public final class VehicleMeshCache {
         } else {
             entry.churn = 0;
         }
-        com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(valid);
+        //台数の集計は通常パスだけで取る (発光パスまで数えると命中率が読めなくなる)。
+        if (slot == 0) {
+            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(valid);
+        }
 
         return drawSections(entry.sections, poseStack);
     }
@@ -231,8 +257,12 @@ public final class VehicleMeshCache {
 
     /** リソースリロード・シェーダー切替時などに全部捨てる。 */
     public static void clear() {
-        for (Entry e : CACHE.values()) {
-            e.close();
+        for (Entry[] slots : CACHE.values()) {
+            for (Entry e : slots) {
+                if (e != null) {
+                    e.close();
+                }
+            }
         }
         CACHE.clear();
     }

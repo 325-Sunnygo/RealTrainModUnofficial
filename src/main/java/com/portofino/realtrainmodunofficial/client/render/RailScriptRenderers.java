@@ -119,7 +119,32 @@ public final class RailScriptRenderers {
      * <p>
      * レール上を等間隔に拾って指紋にする。読むのは光配列だけなので毎フレームでも軽い。
      */
+    /** 描画フレーム番号。明るさ判定を毎フレームやらないために使う。 */
+    private static int frameCounter;
+    /** 明るさを調べ直す間隔 (フレーム)。 */
+    private static final int LIGHT_PROBE_INTERVAL = 10;
+
+    /** フレーム頭で 1 回。 */
+    public static void beginFrame() {
+        frameCounter++;
+    }
+
     private static boolean lightChanged(BlockPos pos, TileEntityLargeRailCore be, RailMap[] maps) {
+        //★毎フレームは調べない。
+        //
+        //ここは 1 本につきレール上を 9 点サンプリングして LevelRenderer.getLightColor を引く。
+        //getLightColor はブロック取得と光エンジン参照を伴うので 1 回が安くなく、レールを
+        //数十本描くと<b>これがレール描画時間の主費目</b>になる (焼き込みは効いていて bake=0
+        //なのに 1 本 0.1ms かかっていた原因)。
+        //
+        //光が変わるのは松明を置いた・日が暮れたといった稀な出来事で、数フレーム遅れて
+        //焼き直しても見えない。位置でずらして調べるフレームを散らすので、
+        //特定フレームに固まることもない。
+        int slot = Math.floorMod(pos.hashCode(), LIGHT_PROBE_INTERVAL);
+        if (LIGHT_SIGNATURES.containsKey(pos)
+                && Math.floorMod(frameCounter, LIGHT_PROBE_INTERVAL) != slot) {
+            return false;
+        }
         long signature = lightSignature(be, maps);
         Long previous = LIGHT_SIGNATURES.put(pos, signature);
         return previous == null || previous != signature;
@@ -359,7 +384,25 @@ public final class RailScriptRenderers {
                 }
             }
             if (dynDrew) {
-                replay(dyn, poseStack, buffer, packedLight, packedOverlay, model);
+                //★可動部 (トング) も焼き込みへ。
+                //
+                //本家 renderRail は renderRailDynamic を焼き込みの<b>外</b>で毎フレーム実行する。
+                //1.7.10 の即時描画ならそれで済むが、1.21 では「再生 = 全頂点を CPU で提出」
+                //になるため、ここがレール描画時間の 99% を占めていた
+                //(区間計測: script=2.60 のうち replay=2.57)。分岐の記録自体は dynKey で
+                //使い回せていたのに、頂点だけ毎フレーム流し直していた。
+                //
+                //記録の内容をキーに焼けば、トングが止まっている間は GPU に置いたまま描ける。
+                //実際に転てつが動いている間は内容が変わるので自動的に焼き込みから外れ、
+                //従来どおり CPU 再生になる (ObjectMeshCache が連続変化を見て判断する)。
+                final GLRecorder dynRec = dyn;
+                int dynBakeKey = 31 * dynRec.contentKey() + packedLight;
+                boolean dynBaked = ObjectMeshCache.draw(be, poseStack, dynBakeKey,
+                        buf -> replayForCapture(dynRec, new PoseStack(), buf,
+                                packedLight, packedOverlay, model));
+                if (!dynBaked) {
+                    replay(dyn, poseStack, buffer, packedLight, packedOverlay, model);
+                }
             }
             return true;
         }
@@ -382,6 +425,12 @@ public final class RailScriptRenderers {
         private GLRecorder recordDynamic(TileEntityLargeRailCore be,
                                          com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model,
                                          float partialTick, net.minecraft.core.BlockPos pos) {
+            //★スクリプトが renderRailDynamic を持たないパックでは記録ごと作らない。
+            //可動部を定義しないレールは多く、そこで毎フレーム GLRecorder を確保しても
+            //中身は必ず空になる。本家も「関数があるパックだけ毎フレーム実行」に等しい。
+            if (!jp.ngt.ngtlib.io.ScriptUtil.hasFunction(this.renderer.getScript(), "renderRailDynamic")) {
+                return null;
+            }
             GLRecorder dyn = new GLRecorder();
             GLRecorder.activate(dyn);
             try {

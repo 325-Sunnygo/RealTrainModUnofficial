@@ -378,6 +378,13 @@ public final class ClientRenderProfiler {
         long vertsPerFrame = displayFrames > 0 ? displayVertices / displayFrames : 0L;
         int setupPerFrame = displayFrames > 0 ? displayRailStateSetup / displayFrames : 0;
         int drawPerFrame = displayFrames > 0 ? displayRailVboDraw / displayFrames : 0;
+        //Nashorn の実行時間だけを切り出したもの。「レールが重い」と言われたときに
+        //スクリプトなのかそれ以外なのかを、ログだけで切り分けられるようにしておく。
+        double scriptMsPerFrame = displayFrames > 0
+            ? com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastScriptMillis() / displayFrames
+            : 0.0D;
+        sb.append(String.format(java.util.Locale.ROOT, " | script=%.2fms/f(%d)",
+            scriptMsPerFrame, com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastScriptCalls()));
         sb.append(String.format(java.util.Locale.ROOT,
             " | fps=%d verts/f=%d | railMesh merged=%d fallback=%d bake=%d state/f=%d vbo/f=%d",
             displayFrames, vertsPerFrame,
