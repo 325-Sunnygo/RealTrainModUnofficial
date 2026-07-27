@@ -216,9 +216,17 @@ public class BlockMarker extends BaseEntityBlock {
         RailProperty prop = this.hasRail(player, makeRail);
         if (prop != null) {
             int type = this.markerType;
-            int dis1 = RTMConfig.railGeneratingDistance;
+            //★敷設できる距離。本家は RTMConfig の固定値だが、RTMU は設定で変えられるようにする。
+            //  ここが `RTMConfig.railGeneratingDistance` (固定 64) のままだったため、
+            //  設定 railMarkerSearchRange をいくら伸ばしても敷設距離が変わらなかった。
+            //  マーカーブロックは com.portofino…MarkerBlock と jp.ngt.rtm.rail.BlockMarker の
+            //  2 つあり、実際に置かれるのは<b>こちら</b> (本家忠実移植・Phase 1) の方。
+            int dis1 = com.portofino.realtrainmodunofficial.Config.railMarkerSearchRange();
             int dis3 = dis1 * dis1;
-            int hei1 = RTMConfig.railGeneratingHeight;
+            int hei1 = com.portofino.realtrainmodunofficial.Config.railMarkerSearchHeight();
+            //本家互換フィールドも同じ値へ寄せる (スクリプトがリフレクションで読むため)。
+            RTMConfig.railGeneratingDistance = (short) Math.min(Short.MAX_VALUE, dis1);
+            RTMConfig.railGeneratingHeight = (short) Math.min(Short.MAX_VALUE, hei1);
             boolean isCreative = player == null || player.getAbilities().instabuild;
 
             if (type == 0 || type == 10) {

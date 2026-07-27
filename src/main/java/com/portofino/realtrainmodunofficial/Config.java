@@ -39,7 +39,8 @@ public class Config {
     //マーカー接続 (レール敷設) の探索範囲 = 一度に敷設できるレール長の上限。
     public static final ModConfigSpec.IntValue RAIL_MARKER_SEARCH_RANGE = BUILDER
             .comment("Horizontal search range (blocks) when connecting markers with a rail item.",
-                     "This is the maximum rail length you can place at once. (default 50)")
+                     "This is the maximum rail length you can place at once. (default 50)",
+                     "Upstream RTM used a fixed 64 (RTMConfig.railGeneratingDistance); this replaces it.")
             .defineInRange("railMarkerSearchRange", 50, 10, 1024);
 
     public static final ModConfigSpec.IntValue RAIL_MARKER_SEARCH_HEIGHT = BUILDER
