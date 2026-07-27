@@ -43,17 +43,30 @@ public final class GLRecorder {
         }
     }
 
+    /**
+     * 1 コマンド。
+     *
+     * <p>★フィールドは<b>使い回しのため</b> final ではない。記録は毎フレーム作り直されるので、
+     * ここを毎回 new すると 1 フレームに数千個のゴミが出る (設置物 150 個 + 全車両ぶん)。
+     * {@link GLRecorder#clear()} は配列を空にせず書き込み位置だけ戻し、次の記録は既存の
+     * インスタンスを上書きして使う。<b>読む側は記録が生きている間だけ参照すること</b>
+     * ({@link GLRecorder#getCommands()} が返すのは生きている範囲のビュー)。
+     */
     public static final class Cmd {
-        public final Op op;
-        public final float a, b, c, d;
-        public final String name;
-        public final Object payload;
+        public Op op;
+        public float a, b, c, d;
+        public String name;
+        public Object payload;
 
         Cmd(Op op, float a, float b, float c, float d, String name) {
             this(op, a, b, c, d, name, null);
         }
 
         Cmd(Op op, float a, float b, float c, float d, String name, Object payload) {
+            set(op, a, b, c, d, name, payload);
+        }
+
+        void set(Op op, float a, float b, float c, float d, String name, Object payload) {
             this.op = op;
             this.a = a;
             this.b = b;
@@ -80,16 +93,73 @@ public final class GLRecorder {
         ACTIVE.remove();
     }
 
-    public void clear() {
-        this.cmds.clear();
+    /**
+     * 記録と同時に集計しておく値。
+     *
+     * <p>以前は {@code contentKey()} / {@code hasGeometry()} / {@code hasTess()} が呼ばれるたびに
+     * コマンド列を頭から走査していた。焼き込みキャッシュを入れてからは<b>毎フレーム全車両・
+     * 全設置物ぶん</b>この走査が走るため、記録の直後に足していくほうが安い。
+     * 走査の結果と同じ値になるように、コマンドを積む唯一の入口 {@link #add} で更新する。
+     */
+    private int contentHash = 1;
+    private boolean geometry;
+    private boolean tess;
+
+    /** 生きているコマンド数 (cmds.size() ではない。使い回しのため配列は縮めない)。 */
+    private int size;
+
+    /** 別の記録から取り込むとき用。 */
+    private void add(Cmd cmd) {
+        addCmd(cmd.op, cmd.a, cmd.b, cmd.c, cmd.d, cmd.name, cmd.payload);
     }
 
+    /** payload 無し版。 */
+    private void addCmd(Op op, float a, float b, float c, float d, String name) {
+        addCmd(op, a, b, c, d, name, null);
+    }
+
+    /**
+     * コマンドを積む唯一の入口。集計もここでまとめる。
+     * <p>既存インスタンスがあれば上書きして使う (毎フレームの Cmd 生成を無くすため)。
+     */
+    private void addCmd(Op op, float a, float b, float c, float d, String name, Object payload) {
+        Cmd cmd;
+        if (this.size < this.cmds.size()) {
+            cmd = this.cmds.get(this.size);
+            cmd.set(op, a, b, c, d, name, payload);
+        } else {
+            cmd = new Cmd(op, a, b, c, d, name, payload);
+            this.cmds.add(cmd);
+        }
+        this.size++;
+        this.contentHash = 31 * this.contentHash + cmdKey(cmd);
+        switch (op) {
+            case RENDER_PARTS, RENDER_GROUPS, DRAW_MODEL_GROUP, RENDER_BLOCK -> this.geometry = true;
+            case DRAW_TESS -> {
+                this.geometry = true;
+                this.tess = true;
+            }
+            default -> {
+            }
+        }
+    }
+
+    public void clear() {
+        //★配列は空にしない。Cmd を使い回すために書き込み位置だけ戻す。
+        this.size = 0;
+        this.contentHash = 1;
+        this.geometry = false;
+        this.tess = false;
+        this.lightSignature = 0L;
+    }
+
+    /** 生きている範囲のビュー。記録が作り直されると中身が変わるので持ち越さないこと。 */
     public List<Cmd> getCommands() {
-        return this.cmds;
+        return this.size == this.cmds.size() ? this.cmds : this.cmds.subList(0, this.size);
     }
 
     public boolean isEmpty() {
-        return this.cmds.isEmpty();
+        return this.size == 0;
     }
 
     /**
@@ -104,16 +174,7 @@ public final class GLRecorder {
      * そのため「失敗したか」ではなく「何か描いたか」で判定する。
      */
     public boolean hasGeometry() {
-        for (Cmd cmd : this.cmds) {
-            switch (cmd.op) {
-                case RENDER_PARTS, RENDER_GROUPS, DRAW_TESS, DRAW_MODEL_GROUP, RENDER_BLOCK -> {
-                    return true;
-                }
-                default -> {
-                }
-            }
-        }
-        return false;
+        return this.geometry;
     }
 
     /**
@@ -122,20 +183,15 @@ public final class GLRecorder {
      * マテリアルを発見するために使う (VehicleScriptRenderers)。
      */
     public boolean hasTess() {
-        for (Cmd cmd : this.cmds) {
-            if (cmd.op == Op.DRAW_TESS) {
-                return true;
-            }
-        }
-        return false;
+        return this.tess;
     }
 
     public void push() {
-        this.cmds.add(new Cmd(Op.PUSH, 0, 0, 0, 0, null));
+        this.addCmd(Op.PUSH, 0, 0, 0, 0, null);
     }
 
     public void pop() {
-        this.cmds.add(new Cmd(Op.POP, 0, 0, 0, 0, null));
+        this.addCmd(Op.POP, 0, 0, 0, 0, null);
     }
 
     /**
@@ -147,7 +203,7 @@ public final class GLRecorder {
     }
 
     public void translate(float x, float y, float z) {
-        this.cmds.add(new Cmd(Op.TRANSLATE, finite(x), finite(y), finite(z), 0, null));
+        this.addCmd(Op.TRANSLATE, finite(x), finite(y), finite(z), 0, null);
     }
 
     public void rotate(float deg, float x, float y, float z) {
@@ -162,7 +218,7 @@ public final class GLRecorder {
             axis.normalize();
             quat = new org.joml.Quaternionf().rotationAxis(deg * ((float) Math.PI / 180.0F), axis);
         }
-        this.cmds.add(new Cmd(Op.ROTATE, deg, x, y, z, null, quat));
+        this.addCmd(Op.ROTATE, deg, x, y, z, null, quat);
     }
 
     /**
@@ -178,7 +234,7 @@ public final class GLRecorder {
                 return;
             }
         }
-        this.cmds.add(new Cmd(Op.MULT_MATRIX, 0, 0, 0, 0, null, matrix.clone()));
+        this.addCmd(Op.MULT_MATRIX, 0, 0, 0, 0, null, matrix.clone());
     }
 
     public void scale(float x, float y, float z) {
@@ -186,11 +242,11 @@ public final class GLRecorder {
         float sx = Float.isFinite(x) ? x : 1.0F;
         float sy = Float.isFinite(y) ? y : 1.0F;
         float sz = Float.isFinite(z) ? z : 1.0F;
-        this.cmds.add(new Cmd(Op.SCALE, sx, sy, sz, 0, null));
+        this.addCmd(Op.SCALE, sx, sy, sz, 0, null);
     }
 
     public void color(float r, float g, float b, float a) {
-        this.cmds.add(new Cmd(Op.COLOR, r, g, b, a, null));
+        this.addCmd(Op.COLOR, r, g, b, a, null);
     }
 
     /**
@@ -206,7 +262,7 @@ public final class GLRecorder {
 
     public void brightness(int packedLight) {
         this.lightSignature = this.lightSignature * 31L + packedLight;
-        this.cmds.add(new Cmd(Op.BRIGHTNESS, packedLight, 0, 0, 0, null));
+        this.addCmd(Op.BRIGHTNESS, packedLight, 0, 0, 0, null);
     }
 
     public void renderParts(String objName) {
@@ -214,37 +270,37 @@ public final class GLRecorder {
         //同一インスタンスでヒットさせるため、正規化 Set を記録時に確定させる (payload)
         java.util.Set<String> names = java.util.Set.of(
                 objName.trim().toLowerCase(java.util.Locale.ROOT));
-        this.cmds.add(new Cmd(Op.RENDER_PARTS, 0, 0, 0, 0, objName, names));
+        this.addCmd(Op.RENDER_PARTS, 0, 0, 0, 0, objName, names);
     }
 
     /**
      * 正規化済みグループ名 Set を一括描画 (デフォルトレール配置用)。
      */
     public void renderGroups(java.util.Set<String> normalizedNames) {
-        this.cmds.add(new Cmd(Op.RENDER_GROUPS, 0, 0, 0, 0, null, normalizedNames));
+        this.addCmd(Op.RENDER_GROUPS, 0, 0, 0, 0, null, normalizedNames);
     }
 
     /**
      * テクスチャ差し替え (null でデフォルトへ復帰)。
      */
     public void bindTexture(net.minecraft.resources.ResourceLocation texture) {
-        this.cmds.add(new Cmd(Op.BIND_TEXTURE, 0, 0, 0, 0, null, texture));
+        this.addCmd(Op.BIND_TEXTURE, 0, 0, 0, 0, null, texture);
     }
 
     /** bindTexture の元パス付き版。再生側が「素テクスチャへの復帰」を判定できる。 */
     public record TexBind(net.minecraft.resources.ResourceLocation location, String rawPath) {}
 
     public void bindTexture(net.minecraft.resources.ResourceLocation texture, String rawPath) {
-        this.cmds.add(new Cmd(Op.BIND_TEXTURE, 0, 0, 0, 0, null, new TexBind(texture, rawPath)));
+        this.addCmd(Op.BIND_TEXTURE, 0, 0, 0, 0, null, new TexBind(texture, rawPath));
     }
 
     public void drawTess(TessDraw draw) {
-        this.cmds.add(new Cmd(Op.DRAW_TESS, 0, 0, 0, 0, null, draw));
+        this.addCmd(Op.DRAW_TESS, 0, 0, 0, 0, null, draw);
     }
 
     /** バニラブロックのゴースト描画を記録 (プレビュー用)。 */
     public void renderBlock(Object blockState, float x, float y, float z) {
-        this.cmds.add(new Cmd(Op.RENDER_BLOCK, x, y, z, 0, null, blockState));
+        this.addCmd(Op.RENDER_BLOCK, x, y, z, 0, null, blockState);
     }
 
     /**
@@ -252,7 +308,9 @@ public final class GLRecorder {
      */
     public void appendFrom(GLRecorder other) {
         if (other != null && other != this) {
-            this.cmds.addAll(other.cmds);
+            for (Cmd cmd : other.getCommands()) {
+                add(cmd);
+            }
         }
     }
 
@@ -266,6 +324,63 @@ public final class GLRecorder {
      *                  a スロットに 1/0 で載せる。
      */
     public void drawModelGroup(Object model, String groupName, boolean smoothing) {
-        this.cmds.add(new Cmd(Op.DRAW_MODEL_GROUP, smoothing ? 1.0F : 0.0F, 0, 0, 0, groupName, model));
+        this.addCmd(Op.DRAW_MODEL_GROUP, smoothing ? 1.0F : 0.0F, 0, 0, 0, groupName, model);
+    }
+
+    /**
+     * 記録の<b>内容</b>から作る焼き直し判定キー。本家 {@code RailPartsRenderer.createStaticRenderKey}
+     * にあたるもの。
+     *
+     * <p>本家は「形状 + 明るさ + モデル識別」をハッシュした int を持ち、<b>再描画フラグが立っていても
+     * キーが同じなら焼き直さない</b>という作りになっている
+     * ({@code RailPartsRenderer.renderRailStatic} / {@code shouldRefreshDisplayList})。
+     * 設置物のスクリプトは点滅・スクロール・可動部を自前で進めるため、RTMU 側からは
+     * 入力を数え上げられない。そこで<b>スクリプトを走らせた結果 (この記録) そのもの</b>を
+     * キーにする。入力ではなく出力を見るので、どんなアニメでも取りこぼさない。
+     *
+     * <p>★payload の {@code Set} は<b>中身</b>でハッシュする。以前キャッシュ寿命を延ばす最適化が
+     * 車内の二重像を出したのは、スクリプトが使い回す同一インスタンスを {@code equals} で比べて
+     * 「中身が変わっても常に一致」していたため。中身のハッシュなら同じ穴に落ちない。
+     */
+    public int contentKey() {
+        return this.contentHash;
+    }
+
+    /** 1 コマンドぶんの内容ハッシュ。 */
+    private static int cmdKey(Cmd cmd) {
+        int key = cmd.op.ordinal();
+        key = 31 * key + Float.floatToIntBits(cmd.a);
+        key = 31 * key + Float.floatToIntBits(cmd.b);
+        key = 31 * key + Float.floatToIntBits(cmd.c);
+        key = 31 * key + Float.floatToIntBits(cmd.d);
+        key = 31 * key + (cmd.name == null ? 0 : cmd.name.hashCode());
+        key = 31 * key + payloadKey(cmd.payload);
+        return key;
+    }
+
+    private static int payloadKey(Object payload) {
+        if (payload == null) {
+            return 0;
+        }
+        //中身で比べるもの
+        if (payload instanceof java.util.Set<?> set) {
+            //Set.hashCode は要素のハッシュの総和 = 中身依存
+            return set.hashCode();
+        }
+        if (payload instanceof float[] fa) {
+            return java.util.Arrays.hashCode(fa);
+        }
+        if (payload instanceof TessDraw td) {
+            return 31 * td.mode + java.util.Arrays.hashCode(td.verts);
+        }
+        if (payload instanceof net.minecraft.resources.ResourceLocation
+                || payload instanceof TexBind
+                || payload instanceof org.joml.Quaternionf
+                || payload instanceof net.minecraft.world.level.block.state.BlockState) {
+            return payload.hashCode();
+        }
+        //モデルグラフ (DRAW_MODEL_GROUP の payload) は読み込み後は不変で、
+        //同じモデルには同じインスタンスが渡る。中身を歩くと重いので同一性で足りる。
+        return System.identityHashCode(payload);
     }
 }

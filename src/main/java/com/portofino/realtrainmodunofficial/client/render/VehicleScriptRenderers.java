@@ -141,6 +141,7 @@ public final class VehicleScriptRenderers {
     //  本家のパス 0 → パス 1 と同じ前後関係になる。発光パスは従来どおり
     //  その場で描く (発光→窓の順は「ライトが外から見えない」対策で必要)。
     private record DeferredTranslucent(GLRecorder rec, org.joml.Matrix4f pose, org.joml.Matrix3f normal,
+                                       org.joml.Matrix4f modelViewAtCapture,
                                        int packedLight, int packedOverlay,
                                        MqoModelLoader.MqoModel model, PolygonModel graph,
                                        java.util.Set<String> excluded, Object entity,
@@ -168,11 +169,25 @@ public final class VehicleScriptRenderers {
         if (!levelRenderActive) {
             return false;
         }
+        //★シェーダーパック使用中は後回しにしない (設定ではなく自動)。
+        //
+        //後回しにすると車両のガラスだけが AFTER_BLOCK_ENTITIES で描かれる。Iris ではこの段階に
+        //出したものが見当違いの位置へ飛ぶ (空に半透明の筋が浮く)。グローバル行列の差を
+        //打ち消しても直らなかったので、この経路自体を使わない。
+        //
+        //「車内からレールが見えない」ほうは、ガラスを<b>深度を書かない型</b>で描くことで
+        //解決している (MqoModelLoader の needsBlend 分岐 / RtmuRenderTypes.glassNoDepthWrite)。
+        //後から来るレールが深度テストに落ちなくなるので、後回しにしなくても線路が見える。
+        if (com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
+            return false;
+        }
         PoseStack.Pose pose = poseStack.last();
         TRANSLUCENT_QUEUE.add(new DeferredTranslucent(
             rec,
             new org.joml.Matrix4f(pose.pose()),
             new org.joml.Matrix3f(pose.normal()),
+            //積んだ時点のグローバル行列。再生時に違っていたら差を打ち消す (下の flush 参照)。
+            new org.joml.Matrix4f(com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix()),
             packedLight, packedOverlay, model, graph,
             excluded == null ? null : java.util.Set.copyOf(excluded),
             entity,
@@ -194,8 +209,21 @@ public final class VehicleScriptRenderers {
             net.minecraft.client.Minecraft.getInstance().renderBuffers().bufferSource();
         try {
             for (DeferredTranslucent d : TRANSLUCENT_QUEUE) {
+                //★積んだ時点と再生時でグローバルの ModelView が違うと、その差だけ位置がずれる。
+                //  最終的な変換は (再生時の MV) × pose なので、pose を
+                //    inverse(再生時の MV) × (積んだ時点の MV) × pose
+                //  にしておけば、その場で描いたときと数学的に同じになる。
+                //  バニラでは両者が一致するので単位行列 = 何も変わらない。
+                org.joml.Matrix4f mvNow = new org.joml.Matrix4f(
+                    com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix());
+                org.joml.Matrix4f corrected = new org.joml.Matrix4f(d.pose());
+                if (!mvNow.equals(d.modelViewAtCapture(), 1.0e-6F)) {
+                    corrected = mvNow.invert(new org.joml.Matrix4f())
+                        .mul(d.modelViewAtCapture())
+                        .mul(d.pose());
+                }
                 PoseStack ps = new PoseStack();
-                ps.last().pose().set(d.pose());
+                ps.last().pose().set(corrected);
                 ps.last().normal().set(d.normal());
                 activeDefaultTexPaths = d.defaultTexPaths();
                 com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer
@@ -308,6 +336,28 @@ public final class VehicleScriptRenderers {
         /** このモデルの素テクスチャパス集合 (小文字正規化)。復帰bindの判定に使う。 */
         private final java.util.Set<String> defaultTexPaths = new java.util.HashSet<>();
 
+        /**
+         * 使い回す記録の置き場。
+         *
+         * <p>1 両を描く間に通常パス・発光下地・発光パス…と複数の記録が<b>同時に生きる</b>ので、
+         * 1 本では足りない。{@code renderReal} の頭で番号を 0 に戻し、必要になった順に配る。
+         * 車両をまたぐと同じインスタンスが再利用される (前の車両のぶんは描き終わっている)。
+         *
+         * <p>★半透明パスだけはここから配らない。あれは後回しキューに積まれてフレーム後半まで
+         * 生き残るので、使い回すと次の車両の記録で中身が書き換わってしまう。
+         */
+        private final java.util.List<GLRecorder> scratch = new java.util.ArrayList<>();
+        private int scratchIndex;
+
+        private GLRecorder nextScratch() {
+            if (this.scratchIndex == this.scratch.size()) {
+                this.scratch.add(new GLRecorder());
+            }
+            GLRecorder rec = this.scratch.get(this.scratchIndex++);
+            rec.clear();
+            return rec;
+        }
+
         Scripted(VehiclePartsRenderer renderer, ScriptEngine engine, ModelObject modelObject, String defId) {
             this.defId = defId;
             this.renderer = renderer;
@@ -415,6 +465,8 @@ public final class VehicleScriptRenderers {
         private boolean renderReal(Object entity, float partialTick, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight, int packedOverlay,
                                    MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
+            //この車両ぶんの記録の配り直し (前の車両のぶんは描き終わっている)
+            this.scratchIndex = 0;
             //本家 RenderVehicleBase.doRender: 通常描画 (RenderPass.NORMAL) → 発光描画 (renderBodyLight)
             GLRecorder normal = record(entity, RenderPass.NORMAL.id, partialTick);
             //★ isEmpty ではなく hasGeometry で判定する。スクリプトが何も描かずに落ちると
@@ -439,8 +491,21 @@ public final class VehicleScriptRenderers {
             java.util.Set<String> coveredGroups = groupsDrawnBy(preLight0);
             MqoModelLoader.setLightCoveredGroups(coveredGroups);
             try {
-                replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
-                        RenderPass.NORMAL.id, excluded);
+                //★本家 RailPartsRenderer.renderRailStatic と同じ「内容キーが同じなら焼き直さない」。
+                //  pass0 は不透明しか出さないので、描く順番が変わっても結果が変わらない。
+                //  だから焼いた VBO をその場で直接描いてよい (VehicleMeshCache の説明を参照)。
+                //  スクリプトは毎フレーム実行したままなので、動くものは記録が変わり即座に焼き直る。
+                int bakeKey = 31 * (31 * (31 * normal.contentKey() + packedLight)
+                        + (excluded == null ? 0 : excluded.hashCode()))
+                        + (coveredGroups == null ? 0 : coveredGroups.hashCode());
+                boolean baked = VehicleMeshCache.draw(entity, poseStack, bakeKey,
+                        //焼くときは単位行列で再生する (カメラ相対の pose で焼くと視点に付いてくる)。
+                        buf -> replay(normal, new PoseStack(), buf, packedLight, packedOverlay,
+                                bodyModel, graph, RenderPass.NORMAL.id, excluded));
+                if (!baked) {
+                    replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
+                            RenderPass.NORMAL.id, excluded);
+                }
             } finally {
                 MqoModelLoader.setLightCoveredGroups(null);
             }
@@ -480,7 +545,8 @@ public final class VehicleScriptRenderers {
             //  ここで pass 1 を実行し replay する。下記 replay は legacyPass==TRANSPARENT のとき
             //  renderNamedGroups を translucent=true で呼び、window テクスチャ+ブレンドで描く。
             //  pass0 は opaque テクスチャ (窓の部分αは落ちる) なので二重描画にはならない。
-            GLRecorder transparent = record(entity, RenderPass.TRANSPARENT.id, partialTick);
+            //★後回しキューに積まれてフレーム後半まで生きるので、ここは使い回さない。
+            GLRecorder transparent = record(entity, RenderPass.TRANSPARENT.id, partialTick, true);
             if (transparent != null && transparent.hasGeometry()) {
                 //★ここでは描かず、レールを描き終えたあとへ回す (本家 Forge 描画パス 1 と同じ位置)。
                 //詳細は TRANSLUCENT_QUEUE のコメント。
@@ -706,8 +772,15 @@ public final class VehicleScriptRenderers {
 
         /** スクリプトの render(entity, pass, partialTick) を 1 パスぶん記録する。 */
         private GLRecorder record(Object entity, int pass, float partialTick) {
+            return record(entity, pass, partialTick, false);
+        }
+
+        /**
+         * @param fresh true = 使い回さず新しい記録を作る。フレーム後半まで持ち越すもの (半透明パス) 用
+         */
+        private GLRecorder record(Object entity, int pass, float partialTick, boolean fresh) {
             long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
-            GLRecorder rec = new GLRecorder();
+            GLRecorder rec = fresh ? new GLRecorder() : nextScratch();
             GLRecorder.activate(rec);
             try {
                 this.renderer.currentMatId = 0;
@@ -994,7 +1067,8 @@ public final class VehicleScriptRenderers {
                             //同グループの面を差し替えテクスチャで描画 (UV は MQO のまま)
                             for (Object name : names) {
                                 drawModelGroup(bodyGraph, String.valueOf(name), poseStack, buffer,
-                                        light, packedOverlay, overrideTex, colR, colG, colB, colA, true);
+                                        light, packedOverlay, overrideTex, colR, colG, colB, colA, true,
+                                        legacyPass);
                             }
                         } else if (model != null && legacyPass >= RenderPass.LIGHT.id) {
                             //発光パス: Light マテリアルの面だけを ***_light0/1/2.png で描き直す
@@ -1025,7 +1099,7 @@ public final class VehicleScriptRenderers {
                     if (cmd.payload instanceof PolygonModel pm) {
                         //a = 本家 renderPart(smoothing, ...) の平滑指定
                         drawModelGroup(pm, cmd.name, poseStack, buffer, light, packedOverlay, overrideTex,
-                                colR, colG, colB, colA, cmd.a != 0.0F);
+                                colR, colG, colB, colA, cmd.a != 0.0F, legacyPass);
                     }
                 }
                 case RENDER_BLOCK -> {
@@ -1216,6 +1290,14 @@ public final class VehicleScriptRenderers {
     private static void drawModelGroup(PolygonModel pm, String groupName, PoseStack poseStack,
                                        MultiBufferSource buffer, int light, int overlay, ResourceLocation texture,
                                        float colR, float colG, float colB, float colA, boolean smoothing) {
+        drawModelGroup(pm, groupName, poseStack, buffer, light, overlay, texture,
+                colR, colG, colB, colA, smoothing, RenderPass.NORMAL.id);
+    }
+
+    private static void drawModelGroup(PolygonModel pm, String groupName, PoseStack poseStack,
+                                       MultiBufferSource buffer, int light, int overlay, ResourceLocation texture,
+                                       float colR, float colG, float colB, float colA, boolean smoothing,
+                                       int legacyPass) {
         long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
         float[] flat = flatGroupVerts(pm, groupName, smoothing);
         if (flat.length == 0) {
@@ -1232,7 +1314,31 @@ public final class VehicleScriptRenderers {
             light = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
         }
         //本家はブレンド有効の即時描画 (モニタ/発光パーツ)
-        VertexConsumer vc = buffer.getBuffer(lightOverlay ? RenderType.eyes(tex) : RenderType.entityTranslucent(tex));
+        //
+        //★シェーダーパック使用中だけ、<b>不透明パスの不透明な描画</b>を entityCutout へ回す。
+        //
+        //ここは今まで中身に関係なく entityTranslucent で描いていた。バニラでは α=255 なら
+        //見た目が変わらないので問題にならない。ところが Iris のシェーダーパックは
+        //「半透明エンティティ」を専用のパスで前方描画するものが多く、そこでは法線を使った
+        //陰影も影も付けない実装がある。車体が丸ごとそこへ入っていたため、頂点法線を
+        //スムージングしても効き目が見えなかった (パックによって出たり出なかったりするのは、
+        //半透明パスにどれだけ光を入れるかがパックごとに違うため)。
+        //
+        //不透明パス (本家 pass0 = α==255 のみ) の不透明な描画に限って entityCutout にすると、
+        //パックの不透明エンティティ経路に入って法線と影が効く。本家の pass 分けとも一致する。
+        //バニラでは経路を変えない (今まで動いていたものに触らない)。
+        boolean opaqueForShader = legacyPass == RenderPass.NORMAL.id
+                && colA >= 1.0F
+                && !lightOverlay
+                && com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
+        //★シェーダー時は<b>三角形</b>で送る。Iris は四角形だと法線を面法線で上書きしてしまい、
+        //スムージングが消える (RtmuRenderTypes.entityCutoutTriangles の説明を参照)。
+        RenderType groupType = lightOverlay ? RenderType.eyes(tex)
+                : opaqueForShader
+                    ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
+                        .entityCutoutTriangles(tex)
+                : RenderType.entityTranslucent(tex);
+        VertexConsumer vc = buffer.getBuffer(groupType);
         PoseStack.Pose pose = poseStack.last();
         Matrix4f mat = pose.pose();
         org.joml.Matrix3f nm = pose.normal();
@@ -1245,20 +1351,39 @@ public final class VehicleScriptRenderers {
         //面ごと 1 回で済ませていたが、buildFlatGroup がスムージング済みの頂点法線を書くように
         //なったので 4 頂点は別々の値を持つ。面ごとにまとめると先頭頂点の法線で塗り潰され、
         //フラット陰影に戻ってしまう。
-        for (int p = 0; p < flat.length; p += 8) {
-            float nx = flat[p + 5], ny = flat[p + 6], nz = flat[p + 7];
-            float tnx = nm.m00() * nx + nm.m10() * ny + nm.m20() * nz;
-            float tny = nm.m01() * nx + nm.m11() * ny + nm.m21() * nz;
-            float tnz = nm.m02() * nx + nm.m12() * ny + nm.m22() * nz;
-            VertexWriter.addVertex(vc, mat, flat[p], flat[p + 1], flat[p + 2])
-                    .setColor(cr, cg, cb, ca)
-                    .setUv(flat[p + 3], flat[p + 4])
-                    .setOverlay(overlay)
-                    .setLight(light)
-                    .setNormal(tnx, tny, tnz);
+        if (opaqueForShader) {
+            //四角形 1 枚 = 三角形 2 枚 (0,1,2 / 0,2,3)。頂点の中身は四角形のときと同じもの。
+            for (int q = 0; q + 32 <= flat.length; q += 32) {
+                emitVertex(vc, mat, nm, flat, q, cr, cg, cb, ca, overlay, light);
+                emitVertex(vc, mat, nm, flat, q + 8, cr, cg, cb, ca, overlay, light);
+                emitVertex(vc, mat, nm, flat, q + 16, cr, cg, cb, ca, overlay, light);
+                emitVertex(vc, mat, nm, flat, q, cr, cg, cb, ca, overlay, light);
+                emitVertex(vc, mat, nm, flat, q + 16, cr, cg, cb, ca, overlay, light);
+                emitVertex(vc, mat, nm, flat, q + 24, cr, cg, cb, ca, overlay, light);
+            }
+        } else {
+            for (int p = 0; p < flat.length; p += 8) {
+                emitVertex(vc, mat, nm, flat, p, cr, cg, cb, ca, overlay, light);
+            }
         }
         com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_MODELGRP, secStart);
+    }
+
+    /** flat 配列の 1 頂点を提出する (四角形/三角形どちらの経路からも同じものを出す)。 */
+    private static void emitVertex(VertexConsumer vc, Matrix4f mat, org.joml.Matrix3f nm,
+                                   float[] flat, int p, int cr, int cg, int cb, int ca,
+                                   int overlay, int light) {
+        float nx = flat[p + 5], ny = flat[p + 6], nz = flat[p + 7];
+        float tnx = nm.m00() * nx + nm.m10() * ny + nm.m20() * nz;
+        float tny = nm.m01() * nx + nm.m11() * ny + nm.m21() * nz;
+        float tnz = nm.m02() * nx + nm.m12() * ny + nm.m22() * nz;
+        VertexWriter.addVertex(vc, mat, flat[p], flat[p + 1], flat[p + 2])
+                .setColor(cr, cg, cb, ca)
+                .setUv(flat[p + 3], flat[p + 4])
+                .setOverlay(overlay)
+                .setLight(light)
+                .setNormal(tnx, tny, tnz);
     }
 
     private static Vector3f faceNormal(Face face, int[] idx) {

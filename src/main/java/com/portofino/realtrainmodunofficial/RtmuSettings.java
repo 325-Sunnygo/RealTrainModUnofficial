@@ -41,6 +41,16 @@ public final class RtmuSettings {
      */
     public static int vehicleRenderDistance = 0;
 
+    /**
+     * シェーダーパック使用中も焼き込み (VBO) を使うか。<b>既定 false</b>。
+     *
+     * <p>true にするとレール/設置物がシェーダー使用中も焼き込み経路になって軽くなるが、
+     * Iris は自前の行列を持っているため描画が崩れることがある (列車のガラスが飛ぶ等)。
+     * 効果と副作用を実機で見比べられるように設定にしてある。
+     */
+    public static boolean shaderVbo = false;
+
+
     // ---- カメラ (撮り鉄カメラの装着レンズ。クライアントのみ・所持アイテムで切替) ----
 
     // ---- 乗客シミュレーション ----
@@ -130,6 +140,7 @@ public final class RtmuSettings {
             autoHeightLevel = clampLevel(parseInt(p.getProperty("autoHeightLevel", "1"), 1));
             railRenderDistance = clampRailRenderDistance(parseInt(p.getProperty("railRenderDistance", "128"), 128));
             vehicleRenderDistance = clampVehicleRenderDistance(parseInt(p.getProperty("vehicleRenderDistance", "0"), 0));
+            shaderVbo = Boolean.parseBoolean(p.getProperty("shaderVbo", "false"));
             maxPassengers = clampMaxPassengers(parseInt(p.getProperty("maxPassengers", "30"), 30));
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("RTMU: failed to load settings", e);
@@ -144,6 +155,7 @@ public final class RtmuSettings {
             p.setProperty("autoHeightLevel", Integer.toString(autoHeightLevel));
             p.setProperty("railRenderDistance", Integer.toString(railRenderDistance));
             p.setProperty("vehicleRenderDistance", Integer.toString(vehicleRenderDistance));
+            p.setProperty("shaderVbo", Boolean.toString(shaderVbo));
             p.setProperty("maxPassengers", Integer.toString(maxPassengers));
             try (OutputStream out = Files.newOutputStream(FILE)) {
                 p.store(out, "RTMU client settings");

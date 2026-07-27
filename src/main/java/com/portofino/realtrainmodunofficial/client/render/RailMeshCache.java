@@ -128,18 +128,16 @@ public final class RailMeshCache {
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
             return false;
         }
-        //★ Iris/Oculus のシェーダーパック使用中は統合メッシュ (VBO) を使わない。
+        //★ Iris/Oculus 使用中も統合メッシュ (VBO) を使う。
         //
-        //この経路は焼いた VBO を RenderSystem.getShader() で直接描く (RailDrawQueue)。
-        //シェーダーパックが有効だとコアシェーダーが Iris のものに差し替わっており、
-        //頂点フォーマットも uniform (特に modelView) も噛み合わない。結果、レールが
-        //ワールド座標ではなくビュー座標で描かれ、<b>視点を動かすとレールが画面に貼り付いて
-        //ついてくる</b> (ユーザー報告のバグ)。
-        //
-        //シェーダー使用中は逐次描画にフォールバックする。MultiBufferSource 経由なら
-        //Iris が正しく捕まえてくれる。軽量化は効かなくなるが、壊れるよりはよい。
-        if (com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
-            //焼き済みの VBO は使わないので解放する (空なら何もしない)。
+        //以前はここで諦めていた。理由は「レールが視点に貼り付いてついてくる」で、真因は
+        //drawWithShader に渡した行列を Iris の ExtendedShader が apply() で自前のものに
+        //上書きしてしまうこと。RailDrawQueue 側で<b>グローバルの ModelView に積んでから描く</b>
+        //ようにしたので、Iris が何を読んでもこのレールの pose が入っている。
+        //頂点フォーマットは MeshCapture が RenderType.format() で組むので Iris の拡張に追従する。
+        //ON/OFF が切り替わったときは RailDrawQueue が epoch を見て焼き直す。
+        //ただし既定ではシェーダー使用中に使わない (設定「シェーダー時も焼き込み」で有効化)。
+        if (!com.portofino.realtrainmodunofficial.client.render.RailDrawQueue.vboAllowed()) {
             if (!CACHE.isEmpty()) {
                 clear();
             }

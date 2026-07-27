@@ -48,7 +48,19 @@ public final class RailDrawQueue {
      *                  使い回されるので参照を持つとフレーム内で書き換わる)
      * @param normal    法線行列。null = 単位行列 (光源方向の補正が不要)
      */
-    private record Draw(VertexBuffer vbo, Matrix4f modelView, Matrix3f normal) {
+    private record Draw(VertexBuffer vbo, Matrix4f modelView, Matrix4f pose, Matrix3f normal) {
+    }
+
+    /**
+     * いま焼き込み (VBO) 経路を使ってよいか。
+     *
+     * <p>シェーダーパック使用中は既定で使わない。Iris は自前で行列を持っており、
+     * こちらが直接描くと他の描画 (列車のガラス等) に影響が出ることがあるため。
+     * RTMU 設定の「シェーダー時も焼き込み」を入れると使う。
+     */
+    public static boolean vboAllowed() {
+        return !com.portofino.realtrainmodunofficial.client.ShaderCompat.active()
+            || com.portofino.realtrainmodunofficial.RtmuSettings.shaderVbo;
     }
 
     private static final Map<RenderType, List<Draw>> QUEUE = new LinkedHashMap<>();
@@ -65,19 +77,19 @@ public final class RailDrawQueue {
         if (vbo == null || vbo.isInvalid() || renderType == null) {
             return false;
         }
-        //シェーダーパック使用中はこの経路を使わない (RailMeshCache 側で弾いているが二重に守る)。
-        //Iris がコアシェーダーを差し替えているため、VBO を直接描くと行列が噛み合わず
-        //レールが画面に貼り付いてしまう。
-        if (com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
+        if (!vboAllowed()) {
             return false;
         }
         PoseStack.Pose pose = poseStack.last();
         Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(pose.pose());
+        //Iris 経路では「グローバルの ModelView に積む」ため、pose 単体も持っておく。
+        Matrix4f localPose = new Matrix4f(pose.pose());
         //レールの pose は「カメラ相対の平行移動」だけで回転が無いことがほとんど。
         //その場合は光源方向の補正が要らないので、行列も uniform 転送も丸ごと省く。
         Matrix3f normalMatrix = pose.normal();
         Matrix3f normal = isIdentity(normalMatrix) ? null : new Matrix3f(normalMatrix);
-        QUEUE.computeIfAbsent(renderType, t -> new ArrayList<>()).add(new Draw(vbo, modelView, normal));
+        QUEUE.computeIfAbsent(renderType, t -> new ArrayList<>()).add(
+            new Draw(vbo, modelView, localPose, normal));
         return true;
     }
 
@@ -99,6 +111,15 @@ public final class RailDrawQueue {
         //エンティティ描画より前の段階で「いまワールドを描いている」印を付ける。
         //モデル選択画面のプレビューはこの外で描かれるので、そちらは遅延させない。
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SOLID_BLOCKS) {
+            //シェーダーパックの ON/OFF を 1 フレームに 1 回だけ引き直す (判定はリフレクション)。
+            //切り替わると頂点フォーマットが変わりうるので、焼いてあるものは全部捨てて焼き直す。
+            int prevEpoch = com.portofino.realtrainmodunofficial.client.ShaderCompat.epoch();
+            com.portofino.realtrainmodunofficial.client.ShaderCompat.refresh();
+            if (com.portofino.realtrainmodunofficial.client.ShaderCompat.epoch() != prevEpoch) {
+                RailMeshCache.clear();
+                ObjectMeshCache.clear();
+                VehicleMeshCache.clear();
+            }
             VehicleScriptRenderers.beginLevelRender();
             return;
         }
@@ -108,6 +129,9 @@ public final class RailDrawQueue {
         //レール焼き込みの「1フレーム上限」枠を毎フレームここでリセットする
         //(この段階はブロックエンティティ描画=drawBaked 呼び出しの直後・毎フレーム1回)。
         RailMeshCache.beginFrame();
+        //設置物の焼き込みも同じ枠でスパイクを散らす (ObjectMeshCache)
+        ObjectMeshCache.beginFrame();
+        VehicleMeshCache.beginFrame();
         flush();
         //★レールを描き終えた「あと」に車両の半透明を描く。
         //本家は Forge 描画パス 1 (地形半透明・パス0の TileEntity のあと) で
@@ -122,6 +146,7 @@ public final class RailDrawQueue {
             return;
         }
         Matrix4f projection = RenderSystem.getProjectionMatrix();
+        boolean shaderPack = com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
         Vector3f[] savedLights = null;
         //焼き込み VBO は drawWithShader で直接描く。この段階 (AFTER_BLOCK_ENTITIES) では
         //ライトマップ層 (Sampler2) が OFF のことがあり、頂点に焼いたライト座標が効かず
@@ -159,7 +184,31 @@ public final class RailDrawQueue {
                             savedLights = null;
                         }
                         draw.vbo().bind();
-                        draw.vbo().drawWithShader(draw.modelView(), projection, shader);
+                        if (shaderPack) {
+                            //★Iris 経路。
+                            //
+                            //drawWithShader(modelView, ...) は shader.MODEL_VIEW_MATRIX に値を入れて
+                            //apply() するが、Iris の ExtendedShader は apply() で<b>自前が捕まえた
+                            //グローバルの行列</b>を上書きしてしまう。結果、こちらが渡したレール 1 本ぶんの
+                            //平行移動が捨てられ、カメラ行列だけで描かれる = 視点に貼り付いてついてくる。
+                            //
+                            //ならば<b>グローバルの ModelView 自体に積んでから描く</b>。Iris が何を
+                            //読みに行っても、そこには既にこのレールの pose が入っている。
+                            //バニラ経路と数学的には同じ積 (ModelView × pose)。
+                            org.joml.Matrix4fStack mvStack = RenderSystem.getModelViewStack();
+                            mvStack.pushMatrix();
+                            mvStack.mul(draw.pose());
+                            RenderSystem.applyModelViewMatrix();
+                            try {
+                                draw.vbo().drawWithShader(
+                                    RenderSystem.getModelViewMatrix(), projection, shader);
+                            } finally {
+                                mvStack.popMatrix();
+                                RenderSystem.applyModelViewMatrix();
+                            }
+                        } else {
+                            draw.vbo().drawWithShader(draw.modelView(), projection, shader);
+                        }
                         ClientRenderProfiler.countRailVboDraw();
                     }
                     VertexBuffer.unbind();

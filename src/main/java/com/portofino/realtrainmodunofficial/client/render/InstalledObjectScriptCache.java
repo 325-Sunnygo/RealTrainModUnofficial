@@ -31,11 +31,16 @@ public final class InstalledObjectScriptCache {
     private static final Map<InstalledObjectBlockEntity, Cache> CACHES =
             Collections.synchronizedMap(new WeakHashMap<>());
 
+    /** 使い回す記録。中の Cmd ごと再利用されるので、毎フレームのゴミが出ない。 */
+    private static final ThreadLocal<GLRecorder> SCRATCH = ThreadLocal.withInitial(GLRecorder::new);
+
     private static final class Cache {
-        boolean valid;
+        /**
+         * スクリプトがジオメトリを出さない (baked が本体の) オブジェクト。
+         * <p>★以前ここには valid/sig/rec があったが、判定側が消えていて<b>一度も読まれておらず</b>、
+         * 記録と再生が丸ごと無駄になっていた。焼き込みは {@link ObjectMeshCache} が持つ。
+         */
         boolean noCache;
-        long sig;
-        GLRecorder rec;
     }
 
     private InstalledObjectScriptCache() {
@@ -52,10 +57,12 @@ public final class InstalledObjectScriptCache {
         //★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
         //シグネチャは RTMU が知っている状態しか見られず、スクリプトが自前で進める
         //アニメ (点滅・スクロール・可動部) を検出できないため、間引くと不定期にカクつく。
-        com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(false);
-        //ミス: GLRecorder を有効にして renderPreferScript を実行し、スクリプト部を記録。
+        //GLRecorder を有効にして renderPreferScript を実行し、スクリプト部を記録。
         //(記録中はスクリプトの GL 命令は記録先へ流れ buffer には出ない。baked は buffer へ直接出る。)
-        GLRecorder rec = new GLRecorder();
+        //★毎フレーム new しない。設置物 150 個 × 毎フレームだと記録の生成だけで効いてくる。
+        //使い方はこのメソッドの中で閉じている (焼き込みの baker も同期実行) ので使い回して安全。
+        GLRecorder rec = SCRATCH.get();
+        rec.clear();
         GLRecorder.activate(rec);
         try {
             MqoModelLoader.renderModelPreferScript(model, poseStack, buffer, packedLight, be);
@@ -63,7 +70,23 @@ public final class InstalledObjectScriptCache {
             GLRecorder.deactivate();
         }
         if (rec.hasGeometry()) {
-            VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model, null);
+            //★本家 RailPartsRenderer.renderRailStatic と同じ流れ:
+            //  内容キーが同じなら焼き直さず、GPU に置いた頂点をそのまま描く。
+            //  スクリプトは毎フレーム走らせたままなので点滅もスクロールも止まらない
+            //  (動けば記録が変わる → キーが変わる → その場で焼き直す)。
+            //  明るさは頂点に焼き込まれるので、本家が createStaticRenderKey に brightness を
+            //  混ぜているのと同じく packedLight もキーに含める。
+            int key = 31 * rec.contentKey() + packedLight;
+            boolean baked = ObjectMeshCache.draw(be, poseStack, key,
+                //焼くときは<b>単位行列</b>で再生する。カメラ相対の pose で焼くと
+                //カメラが動いた瞬間に設置物が付いてきてしまう。
+                buf -> VehicleScriptRenderers.replay(rec, new PoseStack(), buf,
+                    packedLight, packedOverlay, model, null));
+            if (!baked) {
+                //シェーダーパック使用中など、焼き込みを使えないときは従来どおり CPU で提出
+                com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(false);
+                VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model, null);
+            }
         } else {
             //スクリプトはジオメトリを出さない = baked が本体。以降キャッシュせず素通し。
             //このフレームは renderPreferScript が baked を既に描画済みなので追加描画は不要。

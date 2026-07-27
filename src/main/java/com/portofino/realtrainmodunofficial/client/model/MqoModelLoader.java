@@ -4619,11 +4619,31 @@ public final class MqoModelLoader {
                         boolean cullThisBatch = useCull;
                         //pass1 も深度は書く (本家 depthMask 既定 ON)。書かないと後で描くレールが透ける。
                         RenderType renderType;
-                        if (needsBlend) {
+                        //★シェーダーパック使用中は<b>不透明を三角形で</b>送る。
+                        //Iris の MixinBufferBuilder.fillExtendedData は、四角形かつワールド描画中のとき
+                        //面法線を計算して全頂点の法線に memPutInt で書き戻す。こちらが送った
+                        //スムージング済みの頂点法線が塗り潰され、丸みが消える (影は座標由来なので出る)。
+                        //三角形の枝は法線を読むだけで書き戻さないので、そちらへ逃がす。
+                        //半透明はソートを失うと窓の重なりが崩れるため四角形のまま。
+                        boolean useTriangles = !needsBlend
+                            && com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
+                        if (needsBlend && com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
+                            //★シェーダー時は深度を書かない。ガラスはレールより先に描かれるので、
+                            //深度を書くと後から来るレールが落ちて車内から線路が見えなくなる。
+                            //バニラは「ガラスを後回し」で解決しているが、その経路は Iris だと
+                            //ガラスが空へ飛ぶ (RtmuRenderTypes.glassNoDepthWrite の説明を参照)。
+                            renderType = cullThisBatch
+                                ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWriteCull(texture)
+                                : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWrite(texture);
+                        } else if (needsBlend) {
                             //半透明も doCulling に従う (本家厳密化)。深度書き込み無し・提出順は据え置き。
                             renderType = cullThisBatch
                                 ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthCull(texture)
                                 : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepth(texture);
+                        } else if (useTriangles) {
+                            renderType = cullThisBatch
+                                ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.entityCutoutTriangles(texture)
+                                : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.entityCutoutNoCullTriangles(texture);
                         } else {
                             renderType = cullThisBatch ? RenderType.entityCutout(texture)
                                 : RenderType.entityCutoutNoCull(texture);
@@ -4710,7 +4730,13 @@ public final class MqoModelLoader {
                         Matrix4f mat = pose.pose();
                         Matrix3f norm = pose.normal();
                         float[] normalOut = new float[3];
-                        for (int i = 0; i < vCount; i++) {
+                        //三角形で送るときは四角形 4 頂点を 6 頂点へ並べ替える (中身は同じ)。
+                        int submitCount = useTriangles ? (vCount / 4) * 6 : vCount;
+                        for (int vi = 0; vi < submitCount; vi++) {
+                            int i = useTriangles
+                                ? (vi / 6) * 4 + com.portofino.realtrainmodunofficial.client.render
+                                    .RtmuRenderTypes.TRI_ORDER[vi % 6]
+                                : vi;
                             int o = i * 8;
                             float x = vData[o], y = vData[o + 1], z = vData[o + 2];
                             float nx = vData[o + 3], ny = vData[o + 4], nz = vData[o + 5];

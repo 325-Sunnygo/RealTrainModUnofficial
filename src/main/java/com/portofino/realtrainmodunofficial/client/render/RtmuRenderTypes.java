@@ -236,4 +236,114 @@ public final class RtmuRenderTypes extends RenderType {
         return TRANSLUCENT_NO_SORT.apply(texture);
     }
 
+    /**
+     * 不透明エンティティを<b>三角形で</b>描く型。シェーダーパック使用時だけ使う。
+     *
+     * <h2>なぜ三角形なのか (Iris の実装を読んだ結果)</h2>
+     * <p>Iris の {@code MixinBufferBuilder.fillExtendedData} は、<b>四角形</b>で、かつワールド描画中
+     * ({@code ImmediateState.isRenderingLevel}) のとき、こうする:
+     * <pre>
+     *   NormalHelper.computeFaceNormal(this.normal, this.polygon);   //面法線を計算
+     *   int packed = NormI8.pack(normal.x, normal.y, normal.z, 0);
+     *   for (各頂点) MemoryUtil.memPutInt(ptr + normalOffset, packed); //★法線を上書き
+     * </pre>
+     * つまり<b>こちらが送った頂点ごとのスムージング済み法線が、面法線で塗り潰される</b>。
+     * 影は座標だけで決まるので普通に出るが、丸みだけ消える — 症状と一致する。
+     *
+     * <p>一方<b>三角形</b>の枝は、バッファに入っている法線を {@code memGetInt} で読んで
+     * {@code NormalHelper.computeTangentSmooth} に渡すだけで、<b>法線を書き戻さない</b>。
+     * つまり三角形で送ればスムージングが保たれる。
+     *
+     * <p>頂点数は 4 → 6 に増えるが、シェーダー使用時だけなので通常プレイには影響しない。
+     * ソートは行わない (不透明なので不要)。半透明はソートを失うと窓の重なりが崩れるため、
+     * この型には載せず従来どおり四角形で描く。
+     */
+    private static final Function<ResourceLocation, RenderType> ENTITY_CUTOUT_TRIANGLES = Util.memoize(tex ->
+        create("rtmu_entity_cutout_tri",
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.TRIANGLES, 1536, true, false,
+            CompositeState.builder()
+                .setShaderState(RENDERTYPE_ENTITY_CUTOUT_SHADER)
+                .setTextureState(new TextureStateShard(tex, false, false))
+                .setTransparencyState(NO_TRANSPARENCY)
+                .setLightmapState(LIGHTMAP)
+                .setOverlayState(OVERLAY)
+                .createCompositeState(true)));
+
+    /** {@link #ENTITY_CUTOUT_TRIANGLES} の両面版。 */
+    private static final Function<ResourceLocation, RenderType> ENTITY_CUTOUT_NO_CULL_TRIANGLES = Util.memoize(tex ->
+        create("rtmu_entity_cutout_nocull_tri",
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.TRIANGLES, 1536, true, false,
+            CompositeState.builder()
+                .setShaderState(RENDERTYPE_ENTITY_CUTOUT_SHADER)
+                .setTextureState(new TextureStateShard(tex, false, false))
+                .setTransparencyState(NO_TRANSPARENCY)
+                .setLightmapState(LIGHTMAP)
+                .setOverlayState(OVERLAY)
+                .setCullState(NO_CULL)
+                .createCompositeState(true)));
+
+    /** {@link #ENTITY_CUTOUT_TRIANGLES} 参照。シェーダー使用時の不透明描画用。 */
+    public static RenderType entityCutoutTriangles(ResourceLocation texture) {
+        return ENTITY_CUTOUT_TRIANGLES.apply(texture);
+    }
+
+    /** 上の両面版 (本家 doCulling=false 用)。 */
+    public static RenderType entityCutoutNoCullTriangles(ResourceLocation texture) {
+        return ENTITY_CUTOUT_NO_CULL_TRIANGLES.apply(texture);
+    }
+
+    /** 四角形 1 枚を三角形 2 枚に割るときの頂点順 (0,1,2 / 0,2,3)。 */
+    public static final int[] TRI_ORDER = {0, 1, 2, 0, 2, 3};
+
+    /**
+     * ガラスを<b>深度を書かずに</b>描く型。シェーダーパック使用時だけ使う。
+     *
+     * <h2>なぜ要るのか</h2>
+     * <p>1.21 はエンティティ → ブロックエンティティの順に描くので、車両のガラスはレールより先に描かれる。
+     * ガラスが深度を書くと、後から描くレールが深度テストに落ちて<b>車内から線路が見えなくなる</b>。
+     *
+     * <p>バニラでは「ガラスをレールの後へ回す」(VehicleScriptRenderers の後回しキュー) で解決している。
+     * これは本家 Forge の描画パス 1 と同じ前後関係で、ガラスの色もレールに乗る。
+     * ところが Iris 使用中に {@code AFTER_BLOCK_ENTITIES} で描くと、ガラスだけ見当違いの位置へ飛ぶ。
+     * グローバル行列の差を打ち消しても直らなかったので、シェーダー時は後回しを使わない。
+     *
+     * <p>代わりにこちら。<b>その場で描くが深度は書かない</b>ので、後から来るレールが素通しで描かれる。
+     * ガラスの色がレールに乗らない (レールがガラスの色に染まらない) 差はあるが、
+     * 「見えない」よりは軽い。飛ぶ経路を通らないので、飛びようがない。
+     */
+    private static final Function<ResourceLocation, RenderType> GLASS_NO_DEPTH_WRITE = Util.memoize(tex ->
+        create("rtmu_glass_no_depth_write",
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, false,
+            CompositeState.builder()
+                .setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+                .setTextureState(new TextureStateShard(tex, false, false))
+                .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                .setLightmapState(LIGHTMAP)
+                .setOverlayState(OVERLAY)
+                .setCullState(NO_CULL)
+                .setWriteMaskState(COLOR_WRITE)
+                .createCompositeState(true)));
+
+    private static final Function<ResourceLocation, RenderType> GLASS_NO_DEPTH_WRITE_CULL = Util.memoize(tex ->
+        create("rtmu_glass_no_depth_write_cull",
+            DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 1536, true, false,
+            CompositeState.builder()
+                .setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+                .setTextureState(new TextureStateShard(tex, false, false))
+                .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                .setLightmapState(LIGHTMAP)
+                .setOverlayState(OVERLAY)
+                .setCullState(CULL)
+                .setWriteMaskState(COLOR_WRITE)
+                .createCompositeState(true)));
+
+    /** {@link #GLASS_NO_DEPTH_WRITE} 参照。シェーダー使用時のガラス用 (両面)。 */
+    public static RenderType glassNoDepthWrite(ResourceLocation texture) {
+        return GLASS_NO_DEPTH_WRITE.apply(texture);
+    }
+
+    /** 上の片面版 (本家 doCulling=true 用)。 */
+    public static RenderType glassNoDepthWriteCull(ResourceLocation texture) {
+        return GLASS_NO_DEPTH_WRITE_CULL.apply(texture);
+    }
 }

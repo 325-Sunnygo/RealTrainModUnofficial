@@ -127,17 +127,13 @@ public final class MachineScriptRenderers {
         /** スクリプトが searchBlockAndMeta で真下のブロックから現示を決めるブロック検知型か。 */
         private final boolean blockDetection;
 
-        //設置オブジェクトごとのスクリプト描画キャッシュ。信号機/看板は状態が変わらない間
-        //Nashorn を再実行せず記録を再生する (172 個の毎フレーム実行が主なコストだった)。
-        private final java.util.Map<Object, Cache> caches =
-                java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+        /** 使い回す記録 (通常パス / 発光パス)。 */
+        private static final ThreadLocal<GLRecorder> SCRATCH0 = ThreadLocal.withInitial(GLRecorder::new);
+        private static final ThreadLocal<GLRecorder> SCRATCH2 = ThreadLocal.withInitial(GLRecorder::new);
 
-        private static final class Cache {
-            boolean valid;
-            boolean drew;
-            long sig;
-            GLRecorder rec;
-        }
+        //★焼き込みキャッシュは ObjectMeshCache が持つ (本家 te.glLists 相当)。
+        //以前ここに valid/sig/rec を持つ Cache があったが、判定側が消えていて<b>一度も
+        //読まれておらず</b>、毎フレーム「記録して即再生」する純オーバーヘッドになっていた。
 
         Scripted(TileEntityPartsRenderer renderer, ModelObject modelObject, boolean blockDetection) {
             this.renderer = renderer;
@@ -169,12 +165,12 @@ public final class MachineScriptRenderers {
         private boolean renderInner(InstalledObjectBlockEntity be, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
-            Cache c = this.caches.computeIfAbsent(be, k -> new Cache());
-            long sig = be.renderStateSignature();
             PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
 
-            //キャッシュヒット: 記録を再生するだけ (Nashorn 実行なし)。
             //★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
+            //信号の点滅・踏切の警報・改札の矢印はスクリプトが自前で進めるので、
+            //RTMU が知っている状態 (renderStateSignature) では動きを検出できない。
+            //間引くとアニメが止まるため、実行はそのまま。削るのは頂点提出のほう。
 
             //本家 ModelObject.render の 2 段構成をそのまま再現する:
             //  pass 0 = 通常テクスチャで本体
@@ -186,7 +182,9 @@ public final class MachineScriptRenderers {
             //自動改札の通行可矢印は「素テクスチャでは透明な UV 領域」なので何も出なかった。
             //legacyPass=2 で再生すれば replay が renderNamedGroupsEmissive へ回し、
             //本家どおり「Light テクスチャを持つマテリアルの面だけ」を _light0 で描く。
-            GLRecorder rec0 = new GLRecorder();
+            //★毎フレーム new しない (設置物と同じ理由)。rec0/rec2 は同時に生きるので 2 本持つ。
+            GLRecorder rec0 = SCRATCH0.get();
+            rec0.clear();
             GLRecorder.activate(rec0);
             try {
                 this.renderer.currentMatId = 0;
@@ -194,7 +192,8 @@ public final class MachineScriptRenderers {
             } finally {
                 GLRecorder.deactivate();
             }
-            GLRecorder rec2 = new GLRecorder();
+            GLRecorder rec2 = SCRATCH2.get();
+            rec2.clear();
             GLRecorder.activate(rec2);
             try {
                 //本家 GLHelper.setLightmapMaxBrightness 相当 (発光はフルブライト)
@@ -208,17 +207,34 @@ public final class MachineScriptRenderers {
             //  残って isEmpty()==false になり、「描画済み」と誤判定して素のモデル描画が
             //  スキップされ、設置物が透明になる。
             boolean drew = rec0.hasGeometry();
-            c.valid = true;
-            c.sig = sig;
-            c.drew = drew;
-            c.rec = drew ? rec0 : null;
             if (!drew) {
                 return false;
             }
-            VehicleScriptRenderers.replay(rec0, poseStack, buffer, packedLight, packedOverlay, model, graph);
-            if (rec2.hasGeometry()) {
-                VehicleScriptRenderers.replay(rec2, poseStack, buffer, packedLight, packedOverlay, model,
-                        graph, jp.ngt.rtm.render.RenderPass.LIGHT.id, null);
+
+            //★本家 RailPartsRenderer.renderRailStatic と同じ流れ:
+            //  内容キーが同じなら焼き直さず、GPU に置いた頂点をそのまま描く。
+            //  点滅すれば記録が変わる → キーが変わる → その場で焼き直すので止まらない。
+            //  明るさは頂点に焼き込まれるため、本家が createStaticRenderKey に brightness を
+            //  混ぜているのと同じく packedLight もキーに入れる。
+            //  pass0 と発光パス (pass2) は<b>同じ焼き込みに入れる</b>。片方だけ GPU 変換にすると
+            //  (A·B)·v と A·(B·v) が数 ULP ずれて同一面が z-fighting する。
+            int key = 31 * (31 * rec0.contentKey() + rec2.contentKey()) + packedLight;
+            boolean baked = ObjectMeshCache.draw(be, poseStack, key, buf -> {
+                //焼くときは単位行列で再生する (カメラ相対の pose で焼くと視点に付いてくる)。
+                PoseStack local = new PoseStack();
+                VehicleScriptRenderers.replay(rec0, local, buf, packedLight, packedOverlay, model, graph);
+                if (rec2.hasGeometry()) {
+                    VehicleScriptRenderers.replay(rec2, local, buf, packedLight, packedOverlay, model,
+                            graph, jp.ngt.rtm.render.RenderPass.LIGHT.id, null);
+                }
+            });
+            if (!baked) {
+                //シェーダーパック使用中など、焼き込みを使えないときは従来どおり CPU で提出
+                VehicleScriptRenderers.replay(rec0, poseStack, buffer, packedLight, packedOverlay, model, graph);
+                if (rec2.hasGeometry()) {
+                    VehicleScriptRenderers.replay(rec2, poseStack, buffer, packedLight, packedOverlay, model,
+                            graph, jp.ngt.rtm.render.RenderPass.LIGHT.id, null);
+                }
             }
             return true;
         }

@@ -33,11 +33,15 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         // 枕木・バラスト・レールの間隔は視点距離で変えない (ユーザー要望「視界でレールの間隔が
         // 変わる、変えないで」)。以前はカメラ距離で density / cap を下げて LOD していたが、
         // 近づくと枕木の数が変わって見えていた。距離非依存の固定密度・固定キャップにする。
-        double density = 2.0D;
-        int samples = Math.max(2, (int) Math.ceil(length * density));
-        if (length < 2.5D) {
-            samples = Math.min(samples, 12);
-        }
+        //★本家は切り捨て: int split = (int)(rm.getLength() * 2.0F);
+        //  (rtm_src RailPartsRendererBase.java:305 / :123)
+        //RTMU は Math.ceil にしていたため、長さ 10.7 なら本家 21 に対して 22 となり、
+        //枕木が 1 本多く入って間隔が本家とずれていた。切り捨てに揃える。
+        //短いレールの下限 (以前の length<2.5 で 12 本) も本家に無いので外す。
+        int split = (int) (length * 2.0D);
+        //0 だと以降の割り算が壊れるので 1 は確保する (本家はループ回数 1 で成立する形)
+        int samples = Math.max(1, split);
+        //暴走よけの上限。本家には無いが、極端に長いレールで描画が破綻しないように残す。
         return Math.min(samples, 768);
     }
 
