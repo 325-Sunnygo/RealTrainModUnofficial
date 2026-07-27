@@ -125,10 +125,6 @@ public final class VehicleMeshCache {
         if (entity == null || poseStack == null || baker == null || slot < 0 || slot >= SLOTS) {
             return false;
         }
-        //シェーダーパック使用中は直接描画を使わない (レール/設置物と同じ判断)。
-        if (!RailDrawQueue.vboAllowed()) {
-            return false;
-        }
 
         Entry[] slots = CACHE.computeIfAbsent(entity, k -> new Entry[SLOTS]);
         Entry entry = slots[slot];

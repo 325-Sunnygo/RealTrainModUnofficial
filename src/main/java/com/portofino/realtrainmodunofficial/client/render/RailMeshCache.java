@@ -136,14 +136,6 @@ public final class RailMeshCache {
         //ようにしたので、Iris が何を読んでもこのレールの pose が入っている。
         //頂点フォーマットは MeshCapture が RenderType.format() で組むので Iris の拡張に追従する。
         //ON/OFF が切り替わったときは RailDrawQueue が epoch を見て焼き直す。
-        //ただし既定ではシェーダー使用中に使わない (設定「シェーダー時も焼き込み」で有効化)。
-        if (!com.portofino.realtrainmodunofficial.client.render.RailDrawQueue.vboAllowed()) {
-            if (!CACHE.isEmpty()) {
-                clear();
-            }
-            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
-            return false;
-        }
         dropIfLevelChanged();
 
         RailMesh mesh = CACHE.get(pos);

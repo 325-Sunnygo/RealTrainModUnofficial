@@ -126,11 +126,6 @@ public final class ObjectMeshCache {
         if (be == null || poseStack == null || baker == null) {
             return false;
         }
-        //シェーダーパック使用中に焼き込みを使うかは設定次第 (既定 OFF)。
-        //ここで諦めておかないと、描けもしないのに焼くだけ焼いて捨てることになる。
-        if (!RailDrawQueue.vboAllowed()) {
-            return false;
-        }
 
         Entry entry = CACHE.computeIfAbsent(be, k -> new Entry());
 

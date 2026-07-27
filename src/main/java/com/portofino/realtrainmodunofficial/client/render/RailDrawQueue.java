@@ -51,17 +51,14 @@ public final class RailDrawQueue {
     private record Draw(VertexBuffer vbo, Matrix4f modelView, Matrix4f pose, Matrix3f normal) {
     }
 
-    /**
-     * いま焼き込み (VBO) 経路を使ってよいか。
-     *
-     * <p>シェーダーパック使用中は既定で使わない。Iris は自前で行列を持っており、
-     * こちらが直接描くと他の描画 (列車のガラス等) に影響が出ることがあるため。
-     * RTMU 設定の「シェーダー時も焼き込み」を入れると使う。
-     */
-    public static boolean vboAllowed() {
-        return !com.portofino.realtrainmodunofficial.client.ShaderCompat.active()
-            || com.portofino.realtrainmodunofficial.RtmuSettings.shaderVbo;
-    }
+    //★焼き込みは影 mod の有無に関係なく常に使う。
+    //
+    //以前はシェーダー使用中だけ焼き込みを止めていた。「ガラスが空へ飛ぶ」のを避けるためだが、
+    //真因は車両の半透明を後回しにするキューの方で、この経路とは無関係だった
+    //(止めても飛び続けた)。行列は flush() でグローバルの ModelView へ積んでから描くので、
+    //Iris が自前の行列を読んでもこちらの pose が入っている。
+    //止めたままだと影 mod を入れた瞬間に焼き込みが全部無効になり、レールも設置物も車両も
+    //毎フレーム CPU で頂点を流す状態に戻ってしまう。
 
     private static final Map<RenderType, List<Draw>> QUEUE = new LinkedHashMap<>();
 
@@ -75,9 +72,6 @@ public final class RailDrawQueue {
      */
     public static boolean enqueue(VertexBuffer vbo, RenderType renderType, PoseStack poseStack) {
         if (vbo == null || vbo.isInvalid() || renderType == null) {
-            return false;
-        }
-        if (!vboAllowed()) {
             return false;
         }
         PoseStack.Pose pose = poseStack.last();
