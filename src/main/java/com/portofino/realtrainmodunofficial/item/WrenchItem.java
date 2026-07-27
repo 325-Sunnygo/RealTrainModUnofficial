@@ -30,8 +30,16 @@ import java.util.List;
  */
 public class WrenchItem extends Item {
     /** Radius for finding a second marker when entering WrenchMode (reduced from 50 to avoid watchdog). */
-    private static final int WRENCH_SEARCH_DISTANCE = 64;
-    private static final int WRENCH_SEARCH_HEIGHT    = 32;
+    //★探索範囲は設定 (railMarkerSearchRange / Height) を見る。
+    //以前はここだけ 64/32 の決め打ちで、設定を伸ばしてもレンチ経路だけ 64 で頭打ちだった
+    //(マーカー右クリック経路は設定を見ていたので「変えても変わらない」に見える)。
+    private static int wrenchSearchDistance() {
+        return com.portofino.realtrainmodunofficial.Config.railMarkerSearchRange();
+    }
+
+    private static int wrenchSearchHeight() {
+        return com.portofino.realtrainmodunofficial.Config.railMarkerSearchHeight();
+    }
 
     public WrenchItem() {
         super(new Properties().stacksTo(1));
@@ -152,21 +160,21 @@ public class WrenchItem extends Item {
 
     /** 編集対象マーカーの最寄りにある別マーカーの位置を返す (緑線プレビューのペア)。 */
     private static BlockPos findNearestMarkerPos(Level level, BlockPos origin) {
-        BlockPos best = null;
-        double bestSq = Double.MAX_VALUE;
-        for (int dx = -WRENCH_SEARCH_DISTANCE; dx <= WRENCH_SEARCH_DISTANCE; dx++) {
-            for (int dy = -WRENCH_SEARCH_HEIGHT; dy <= WRENCH_SEARCH_HEIGHT; dy++) {
-                for (int dz = -WRENCH_SEARCH_DISTANCE; dz <= WRENCH_SEARCH_DISTANCE; dz++) {
-                    if (dx == 0 && dy == 0 && dz == 0) continue;
-                    BlockPos p = origin.offset(dx, dy, dz);
-                    if (level.getBlockEntity(p) instanceof MarkerBlockEntity) {
-                        double d = origin.distSqr(p);
-                        if (d < bestSq) { bestSq = d; best = p.immutable(); }
-                    }
-                }
+        BlockPos[] best = {null};
+        double[] bestSq = {Double.MAX_VALUE};
+        //★総当たりではなく範囲内チャンクの BlockEntity を走査する。
+        //設定を 1024 まで伸ばせるので、決め打ちの 3 重ループだと現実的な時間で終わらない。
+        forEachMarkerInRange(level, origin, (p, marker) -> {
+            if (p.equals(origin)) {
+                return;
             }
-        }
-        return best;
+            double d = origin.distSqr(p);
+            if (d < bestSq[0]) {
+                bestSq[0] = d;
+                best[0] = p.immutable();
+            }
+        });
+        return best[0];
     }
 
     private static boolean beginWrenchPreview(Level level, BlockPos clickedPos, MarkerBlockEntity marker, MarkerBlock markerBlock, ItemStack targetStack) {
@@ -343,23 +351,49 @@ public class WrenchItem extends Item {
         return false;
     }
 
-    /** Scans a small radius for other markers (WrenchMode only, SHIFT+click). */
-    private static List<RailPosition> findNearbyMarkers(Level level, BlockPos origin, RailPosition start) {
-        List<RailPosition> markers = new ArrayList<>();
+    /**
+     * 設定範囲内のマーカーを列挙する。
+     *
+     * <p>{@code MarkerBlock.searchAllMarkers} と同じ作り。範囲内チャンクの BlockEntity 一覧を
+     * 舐めるので、範囲を広げても探索コストがほとんど増えない。
+     */
+    private static void forEachMarkerInRange(Level level, BlockPos origin,
+                                             java.util.function.BiConsumer<BlockPos, MarkerBlockEntity> action) {
         int ox = origin.getX(), oy = origin.getY(), oz = origin.getZ();
-        for (int dx = -WRENCH_SEARCH_DISTANCE; dx <= WRENCH_SEARCH_DISTANCE; dx++) {
-            for (int dy = -WRENCH_SEARCH_HEIGHT; dy <= WRENCH_SEARCH_HEIGHT; dy++) {
-                for (int dz = -WRENCH_SEARCH_DISTANCE; dz <= WRENCH_SEARCH_DISTANCE; dz++) {
-                    BlockEntity be = level.getBlockEntity(new BlockPos(ox + dx, oy + dy, oz + dz));
-                    if (be instanceof MarkerBlockEntity marker) {
-                        RailPosition rp = marker.getMarkerRP();
-                        if (rp != null && (rp.blockX != start.blockX || rp.blockY != start.blockY || rp.blockZ != start.blockZ)) {
-                            markers.add(rp);
-                        }
+        int range = wrenchSearchDistance();
+        int height = wrenchSearchHeight();
+        int minCX = (ox - range) >> 4, maxCX = (ox + range) >> 4;
+        int minCZ = (oz - range) >> 4, maxCZ = (oz + range) >> 4;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                if (!level.hasChunk(cx, cz)) {
+                    continue;
+                }
+                for (BlockEntity be : level.getChunk(cx, cz).getBlockEntities().values()) {
+                    if (!(be instanceof MarkerBlockEntity marker)) {
+                        continue;
+                    }
+                    BlockPos p = be.getBlockPos();
+                    if (Math.abs(p.getX() - ox) <= range
+                            && Math.abs(p.getY() - oy) <= height
+                            && Math.abs(p.getZ() - oz) <= range) {
+                        action.accept(p, marker);
                     }
                 }
             }
         }
+    }
+
+    /** Scans a small radius for other markers (WrenchMode only, SHIFT+click). */
+    private static List<RailPosition> findNearbyMarkers(Level level, BlockPos origin, RailPosition start) {
+        List<RailPosition> markers = new ArrayList<>();
+        forEachMarkerInRange(level, origin, (p, marker) -> {
+            RailPosition rp = marker.getMarkerRP();
+            if (rp != null && (rp.blockX != start.blockX || rp.blockY != start.blockY
+                    || rp.blockZ != start.blockZ)) {
+                markers.add(rp);
+            }
+        });
         markers.sort((a, b) -> {
             double adx = a.posX - start.posX, ady = a.posY - start.posY, adz = a.posZ - start.posZ;
             double bdx = b.posX - start.posX, bdy = b.posY - start.posY, bdz = b.posZ - start.posZ;

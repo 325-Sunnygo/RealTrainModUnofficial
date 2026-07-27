@@ -143,12 +143,12 @@ public final class VehicleMeshCache {
 
         boolean valid = entry.hasKey && entry.key == key && isUsable(entry.sections);
         if (!valid) {
+            //★キーが変わったのに焼き直せないときは<b>古い絵を描かない</b>。
+            //  以前はここで前フレームのメッシュを描いて次へ回していたが、枠が空かない限り
+            //  古い絵のまま固まる。踏切のランプが「音は鳴るのに点滅しない」のはこれ。
+            //  焼けないフレームは CPU 経路へ落とす。1 フレームぶん重いだけで絵は必ず合う。
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
-                //枠待ち。焼き済みがあれば 1 フレーム古いものを描いて次へ回す。
-                //★枠待ちを churn に数えないこと (編成が長いほど誤判定して効かなくなる)。
-                if (!isUsable(entry.sections)) {
-                    return false;
-                }
+                return false;
             } else if (entry.hasKey && ++entry.churn >= DYNAMIC_AFTER) {
                 //走行中・ドア開閉中など、毎フレーム絵が変わる車両。焼くほうが高くつく。
                 entry.close();

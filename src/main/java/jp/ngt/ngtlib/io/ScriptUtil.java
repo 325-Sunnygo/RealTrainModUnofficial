@@ -101,32 +101,35 @@ public final class ScriptUtil {
      * <p>Nashorn は {@code function foo(){}} をグローバルに束縛するので、束縛を引けば分かる。
      */
     /**
-     * 関数の有無の記録。スクリプトは読み込み後に関数が増減しないので 1 回引けば足りる。
-     * <p>{@code ScriptEngine.get} は Nashorn のグローバル切替を伴うため、レール 1 本ごと
-     * 毎フレーム引くと馬鹿にならない。エンジンごとに弱参照で持つ。
+     * 関数の有無の記録 (エンジンごと)。
+     *
+     * <p>★<b>「無い」と断定するのは実際に呼んで {@code NoSuchMethodException} が出たときだけ</b>。
+     * 以前はここで {@code ScriptEngine.get(name) != null} を見て、null なら呼ばずに諦めていた。
+     * ところが Nashorn の {@code get} が引くのは ENGINE_SCOPE の束縛で、
+     * <b>関数が定義されていても引けないことがある</b> (スクリプトを別スコープで評価した場合など)。
+     * その結果、実在する関数を黙って呼ばなくなり、踏切のランプが止まる・
+     * スクリプトが進まないといった「例外も出ないのに動かない」状態を作っていた。
+     *
+     * <p>未確認のものは<b>あるものとして呼びに行く</b>。1 回だけ例外を踏むが、
+     * その結果を控えるので 2 回目以降は呼ばない。毎フレーム例外を投げていた元の問題は解消したまま。
      */
     private static final java.util.Map<ScriptEngine, java.util.Map<String, Boolean>> FUNCTION_CACHE =
         java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
+    private static java.util.Map<String, Boolean> tableOf(ScriptEngine se) {
+        return FUNCTION_CACHE.computeIfAbsent(se, k -> new java.util.concurrent.ConcurrentHashMap<>());
+    }
+
+    /**
+     * その関数を呼びに行く価値があるか。
+     * <p>過去に「無い」と確定したものだけ false。未確認は true (呼んで確かめる)。
+     */
     public static boolean hasFunction(ScriptEngine se, String func) {
         if (se == null || func == null) {
             return false;
         }
-        java.util.Map<String, Boolean> perEngine = FUNCTION_CACHE.computeIfAbsent(
-            se, k -> new java.util.concurrent.ConcurrentHashMap<>());
-        Boolean known = perEngine.get(func);
-        if (known != null) {
-            return known;
-        }
-        boolean exists;
-        try {
-            exists = se.get(func) != null;
-        } catch (Throwable t) {
-            //引けないエンジンは「ある」ものとして従来どおり呼びに行く
-            exists = true;
-        }
-        perEngine.put(func, exists);
-        return exists;
+        Boolean known = tableOf(se).get(func);
+        return known == null || known;
     }
 
     /** 同じ失敗を何度もログに流さないための記録 (種類ごとに 1 回)。 */
@@ -136,24 +139,35 @@ public final class ScriptUtil {
     /**
      * 失敗しても続行するスクリプト呼び出し。
      *
-     * <p>★<b>定義されていない関数は呼びに行かない</b>。以前はそのまま invokeFunction して
-     * {@code NoSuchMethodException} を発生させ、{@code RuntimeException} で包み直し、
-     * {@code printStackTrace()} で毎回スタックトレースを吐いていた。
-     * {@code renderRailDynamic} を定義していないレールパックでは<b>1 本 1 フレームにつき
-     * 例外 2 個とスタックトレース 1 本</b>になり、レールを数百本並べると描画時間の大半を
-     * そこで使っていた (例外の生成はスタックトレース収集を伴うため非常に高い)。
+     * <p>定義されていないと分かっている関数は呼ばない。以前はそのまま invokeFunction して
+     * {@code NoSuchMethodException} を発生させ {@code printStackTrace()} まで出していたため、
+     * {@code renderRailDynamic} を持たないレールパックではレール 1 本 1 フレームにつき
+     * 例外 2 個とスタックトレース 1 本になっていた (例外の生成はスタックトレース収集を伴うので高い)。
      *
-     * <p>本当に失敗したときのログも<b>種類ごとに 1 回</b>に絞る。毎フレーム出ると
-     * それ自体が重く、ログも読めなくなる。
+     * <p>ただし<b>呼ぶ前に諦めるのは「実際に無かった」と確認済みのものだけ</b>。
+     * {@link #hasFunction} の説明を参照。
      */
     public static Object doScriptIgnoreError(ScriptEngine se, String func, Object... args) {
-        if (!hasFunction(se, func)) {
+        if (se == null || func == null) {
+            return null;
+        }
+        java.util.Map<String, Boolean> table = tableOf(se);
+        if (Boolean.FALSE.equals(table.get(func))) {
             return null;
         }
         try {
-            return doScriptFunction(se, func, args);
+            Object result = doScriptFunction(se, func, args);
+            table.put(func, Boolean.TRUE);
+            return result;
         } catch (Exception e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
+            if (cause instanceof NoSuchMethodException) {
+                //ここで初めて「無い」と確定する。以後は呼ばない。
+                table.put(func, Boolean.FALSE);
+                return null;
+            }
+            //中身のエラーは関数が「ある」証拠。次も呼ぶ。ログは種類ごとに 1 回。
+            table.put(func, Boolean.TRUE);
             String key = func + "|" + cause;
             if (LOGGED_FAILURES.size() < 256 && LOGGED_FAILURES.add(key)) {
                 NGTLog.debug("[ScriptUtil] %s failed: %s", func, String.valueOf(cause));
