@@ -54,6 +54,14 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.WRENCH_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CROSSING_GATE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.MARKER_ITEM.get());
+                //neo mcte: タブに出すのは Neo Editor だけ。
+                //ミニチュアは MCTEU のものを使うため、ペインターは Neo Editor と役割が重なるため外した。
+                //★アイテムの登録自体は残してある (機能は消さない):
+                //  ・RTMItem.miniature を参照するパックスクリプトがある
+                //  ・エディタの Miniature フィルタがこのアイテムを渡す
+                //  ・既存ワールドに置かれた分が消えない
+                //  必要なら /give realtrainmodunofficial:miniature (または :painter) で出せる。
+                output.accept(RealTrainModUnofficialItems.EDITOR_ITEM.get());
                 //マーカー(斜め)/分岐マーカー(斜め)/スピーカー はユーザー要望で削除
                 //(本家は通常マーカーが8方位対応のため斜めバリアント不要)
                 output.accept(RealTrainModUnofficialItems.MARKER_SWITCH_ITEM.get());
@@ -134,6 +142,7 @@ public class RealTrainModUnofficial {
             event.register(com.portofino.realtrainmodunofficial.world.TrainChunkLoader.CONTROLLER));
 
         RealTrainModUnofficialBlocks.BLOCKS.register(modEventBus);
+        RealTrainModUnofficialMenus.MENUS.register(modEventBus);
         //mods フォルダの 1.7.10 建材 mod をスキャンし、ブロックテクスチャをフルキューブブロックとして
         //登録する (レジストリ凍結前に走らせる必要があるのでここで呼ぶ)。
         com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks.init(modEventBus);

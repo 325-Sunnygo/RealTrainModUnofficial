@@ -12,6 +12,18 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public final class RealTrainModUnofficialEntities {
     public static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(Registries.ENTITY_TYPE, RealTrainModUnofficial.MODID);
 
+    /** エディタの選択範囲 (neo mcte)。不可視・当たり判定なし。 */
+    public static final DeferredHolder<EntityType<?>, EntityType<com.portofino.realtrainmodunofficial.entity.EditorEntity>> EDITOR =
+        ENTITIES.register("editor",
+            () -> EntityType.Builder.<com.portofino.realtrainmodunofficial.entity.EditorEntity>of(
+                    com.portofino.realtrainmodunofficial.entity.EditorEntity::new, MobCategory.MISC)
+                .sized(0.1F, 0.1F)
+                .noSummon()
+                .fireImmune()
+                .clientTrackingRange(32)
+                .updateInterval(1)
+                .build("editor"));
+
     public static final DeferredHolder<EntityType<?>, EntityType<TrainEntity>> TRAIN =
         ENTITIES.register("train",
             () -> EntityType.Builder.<TrainEntity>of(TrainEntity::new, MobCategory.MISC)

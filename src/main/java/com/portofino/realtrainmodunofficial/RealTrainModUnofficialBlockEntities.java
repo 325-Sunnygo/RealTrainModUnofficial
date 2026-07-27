@@ -21,6 +21,13 @@ public class RealTrainModUnofficialBlockEntities {
         BLOCK_ENTITY_TYPES.register("legacy_marker", () -> BlockEntityType.Builder.of(MarkerBlockEntity::new,
             RealTrainModUnofficialBlocks.MARKER.get(), RealTrainModUnofficialBlocks.MARKER_SWITCH.get()).build(null));
 
+    /** 設置済みミニチュア (neo mcte)。 */
+    public static final net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>,
+        net.minecraft.world.level.block.entity.BlockEntityType<com.portofino.realtrainmodunofficial.blockentity.MiniatureBlockEntity>> MINIATURE =
+        BLOCK_ENTITY_TYPES.register("miniature", () -> net.minecraft.world.level.block.entity.BlockEntityType.Builder.of(
+            com.portofino.realtrainmodunofficial.blockentity.MiniatureBlockEntity::new,
+            RealTrainModUnofficialBlocks.MINIATURE.get()).build(null));
+
     /** レールコア: 起点ブロック1個。道床とは無関係。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LargeRailCoreBlockEntity>> LARGE_RAIL_CORE =
         BLOCK_ENTITY_TYPES.register("legacy_large_rail_core", () -> BlockEntityType.Builder.of(LargeRailCoreBlockEntity::new,

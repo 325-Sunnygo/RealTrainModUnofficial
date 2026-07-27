@@ -15,6 +15,22 @@ public final class ClientHooks {
     private ClientHooks() {
     }
 
+    /** エディタ画面 (neo mcte)。 */
+    public static void openEditorScreen() {
+        invokeClient("openEditorScreen", new Class<?>[]{});
+    }
+
+    /** ペインター設定画面 (neo mcte)。 */
+    public static void openPainterSettingsScreen(ItemStack stack, boolean offHand) {
+        invokeClient("openPainterSettingsScreen", new Class<?>[]{ItemStack.class, boolean.class}, stack, offHand);
+    }
+
+
+    /** ミニチュア設定画面 (neo mcte)。手を渡して、その手のスタックだけを対象にする。 */
+    public static void openMiniatureSettingsScreen(ItemStack stack, boolean offHand) {
+        invokeClient("openMiniatureSettingsScreen", new Class<?>[]{ItemStack.class, boolean.class}, stack, offHand);
+    }
+
     public static void openRailSelectScreen(Player player, ItemStack stack) {
         invokeClient("openRailSelectScreen", new Class<?>[]{Player.class, ItemStack.class}, player, stack);
     }

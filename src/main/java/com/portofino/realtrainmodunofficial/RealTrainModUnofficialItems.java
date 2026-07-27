@@ -60,6 +60,16 @@ public class RealTrainModUnofficialItems {
         "ic_card", IcCardItem::new
     );
     //MCTE 互換ミニチュア (最低限: ブロック範囲キャプチャ。NGTO Builder が使用)
+    /** ペインター (neo mcte)。 */
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.PainterItem> PAINTER_ITEM = ITEMS.register(
+        "painter", com.portofino.realtrainmodunofficial.item.PainterItem::new
+    );
+
+    /** エディタ (neo mcte)。 */
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.EditorItem> EDITOR_ITEM = ITEMS.register(
+        "editor", com.portofino.realtrainmodunofficial.item.EditorItem::new
+    );
+
     public static final DeferredItem<MiniatureItem> MINIATURE_ITEM = ITEMS.register(
         "miniature", MiniatureItem::new
     );

@@ -25,6 +25,18 @@ public final class RealTrainModUnofficialClientModEvents {
 
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        // エディタの選択範囲 (neo mcte)
+        event.registerEntityRenderer(
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficialEntities.EDITOR.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.EditorEntityRenderer::new
+        );
+
+        // 設置済みミニチュア (neo mcte)
+        event.registerBlockEntityRenderer(
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities.MINIATURE.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.MiniatureBlockEntityRenderer::new
+        );
+
         // レールコアのブロックエンティティレンダラーを登録（MQOモデル描画）
         // jp.ngt.rtm.rail の各コア BE に登録 (Phase 1 フリップ)
         event.registerBlockEntityRenderer(
@@ -142,5 +154,7 @@ public final class RealTrainModUnofficialClientModEvents {
             RealTrainModUnofficialItems.MARKER_SWITCH_ITEM.get()
         );
     }
+
+
 
 }

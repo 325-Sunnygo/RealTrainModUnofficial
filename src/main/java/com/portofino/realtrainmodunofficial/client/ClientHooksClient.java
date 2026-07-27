@@ -23,6 +23,26 @@ public final class ClientHooksClient {
     private ClientHooksClient() {
     }
 
+    public static void openEditorScreen() {
+        net.minecraft.client.Minecraft.getInstance().setScreen(
+            new com.portofino.realtrainmodunofficial.client.screen.EditorScreen());
+    }
+
+    public static void openPainterSettingsScreen(ItemStack stack, boolean offHand) {
+        net.minecraft.client.Minecraft.getInstance().setScreen(
+            new com.portofino.realtrainmodunofficial.client.screen.PainterSettingsScreen(
+                offHand ? net.minecraft.world.InteractionHand.OFF_HAND
+                        : net.minecraft.world.InteractionHand.MAIN_HAND, stack));
+    }
+
+
+    public static void openMiniatureSettingsScreen(ItemStack stack, boolean offHand) {
+        net.minecraft.client.Minecraft.getInstance().setScreen(
+            new com.portofino.realtrainmodunofficial.client.screen.MiniatureSettingsScreen(
+                offHand ? net.minecraft.world.InteractionHand.OFF_HAND
+                        : net.minecraft.world.InteractionHand.MAIN_HAND, stack));
+    }
+
     public static void openRailSelectScreen(Player player, ItemStack stack) {
         ClientItemHelper.openRailSelectScreen(player, stack);
     }

@@ -18,6 +18,10 @@ public class RealTrainModUnofficialBlocks {
 
     public static final DeferredBlock<CrossingGateBlock> CROSSING_GATE
         = BLOCKS.register("crossing_gate", () -> new CrossingGateBlock());
+
+    /** 設置済みミニチュア (neo mcte)。中身は MiniatureBlockEntity が丸ごと持つ。 */
+    public static final net.neoforged.neoforge.registries.DeferredBlock<com.portofino.realtrainmodunofficial.block.MiniatureBlock> MINIATURE
+        = BLOCKS.register("miniature", () -> new com.portofino.realtrainmodunofficial.block.MiniatureBlock());
     public static final DeferredBlock<MarkerBlock> MARKER
         = BLOCKS.register("legacy_marker", () -> new MarkerBlock(false));
     public static final DeferredBlock<MarkerBlock> MARKER_SWITCH
