@@ -1,0 +1,70 @@
+{
+	"trainName": "223-2000_T",
+	"trainType": "EC",
+
+	"trainModel2": {
+		"modelFile": "223.mqoz",
+		"textures": [["default", "textures/train/223/223.png", "AlphaBlend, Light, OneTex"]],
+		"rendererPath": "scripts/Render223.js"
+	},
+	"bogieModel2": {
+		"modelFile": "wdt59.mqoz",
+		"textures": [["default", "textures/train/223/wdt59.png"]]
+	},
+	"serverScriptPath": "scripts/server/223.js",
+
+	"buttonTexture": "textures/train/223/button_223-2000_T.png",
+	"rollsignNames": [
+		"新快速", "快速", "普通", "空き", "空き", "空き", 
+		"空き", "空き", "団体", "臨時", "試運転", "回送"
+	],
+
+	"sound_Horn": "rtm:sounds/train/rtm_223mh.ogg",
+	"sound_BrakeRelease": "rtm:sounds/train/rtm_223_release.ogg",
+	"sound_BrakeRelease2": "rtm:sounds/train/brakeR_w.ogg",
+	"soundScriptPath": "scripts/sound_223.js",
+	
+	"interiorLights": [
+		{
+			"pos": [0.0, 2.5, 9.0]
+		},
+		{
+			"pos": [0.0, 2.5, -9.0]
+		}
+	],
+
+	"seatPosF": [
+		[0.825, 0.05, 8.925, 2], 
+		[0.825, 0.05, 4.675, 2], [0.825, 0.05, 3.825, 2], [0.825, 0.05, 2.975, 2], [0.825, 0.05, 2.125, 2], 
+		[0.825, 0.05, -4.675, 2], [0.825, 0.05, -3.825, 2], [0.825, 0.05, -2.975, 2], [0.825, 0.05, -2.125, 2], 
+		[0.825, 0.05, -8.925, 2], 
+		[-0.825, 0.05, 8.925, 2], 
+		[-0.825, 0.05, 4.675, 2], [-0.825, 0.05, 3.825, 2], [-0.825, 0.05, 2.975, 2], [-0.825, 0.05, 2.125, 2], 
+		[-0.825, 0.05, -4.675, 2], [-0.825, 0.05, -3.825, 2], [-0.825, 0.05, -2.975, 2], [-0.825, 0.05, -2.125, 2], 
+		[-0.825, 0.05, -8.925, 2]
+	],
+
+	"trainDistance": 10.25,
+	"playerPos": [[0.8, 0.05, 8.975], [-0.8, 0.05, -8.975]],
+	"bogiePos": [[0.0, 0.0, 6.6], [0.0, 0.0, -6.6]],
+	"pantoPos": [[0.0, 6.8, 0.0, 0.0], [0.0, -6.8, 4.0, 5.0]],
+	"maxSpeed": [0.40, 0.84, 1.08, 1.39, 1.67],
+	"rolling": 0.4,
+	"smoothing": true,
+	"doCulling": true,
+	"rollSpeedCoefficient":0.125,
+	"rollVariationCoefficient":0.51,
+	"rollWidthCoefficient":1.0,
+	"tags": "ngt5479 223 JRW",
+	"customButtons": [
+		["敦賀", "近江塩津", "長浜", "米原", "野洲", "京都", "大阪", "西明石", "加古川", "姫路", "網干", "播州赤穂"],
+		["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
+	],
+	"collisionParts": [
+		"roof", "aircon", "floor", "uf_unit", "side_door", "side_win2", "side_win_b", "window", "back", "tdoor_b", "cover_b", "cover2_b",
+		"side_win_f", "window_f", "front", "tdoor_f", "cover_f", "cover2_f",
+		"side_door_223", "side_win_223",
+		"door_bl", "door_br", "door_fl", "door_fr",
+		"door_bl_223", "door_br_223", "door_fl_223", "door_fr_223"
+	]
+}

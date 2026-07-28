@@ -38,6 +38,27 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         this.category = category;
     }
 
+    /**
+     * 本家 KaizPatchX の {@code customIconTexture} 用の描画器。
+     * <p>実際に使われるのは、選択中のモデルが {@code customIconTexture} を持つときだけ
+     * ({@link com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel} が判定する)。
+     */
+    @Override
+    public void initializeClient(java.util.function.Consumer<
+            net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
+        consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {
+            private com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemRenderer renderer;
+
+            @Override
+            public net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                if (renderer == null) {
+                    renderer = new com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemRenderer();
+                }
+                return renderer;
+            }
+        });
+    }
+
     public InstalledObjectCategory getCategory() {
         return category;
     }

@@ -1,0 +1,394 @@
+<!doctype html>
+<!--
+  本家 WebCTC フロント (front/src/jsMain/kotlin/pages/MapView.kt ほか, Kotlin/JS + React + MUI) の
+  忠実レプリカ。レイアウト・配色・描画ジオメトリは本家コンポーネントの値をそのまま使用:
+    - Header: AppBar sticky #3d3d3d, 白角丸ロゴ (HeaderComponent.kt の SVG パス)
+    - 地図: svg background darkslategray, レール=白直線 (在線=赤), 信号=WSignalGroup の座標式,
+      編成=6x6 黄矩形 (ドア開=lightgray) + "速度km/h 名前 運転士" (8px bold white)
+    - 右: 30vw の半透明 Paper に編成リスト (クリックで追尾)
+    - 更新間隔: signals/formations 3 秒 (本家 interval = 3.seconds)
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebCTC</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:'Noto Sans JP',sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  /* Header (MUI AppBar #3d3d3d) */
+  header{position:sticky;top:0;background:#3d3d3d;display:flex;align-items:center;justify-content:space-between;
+         padding:8px 24px;box-shadow:0 2px 4px -1px rgba(0,0,0,.2),0 4px 5px 0 rgba(0,0,0,.14);z-index:10}
+  .logo-btn{background:none;border:none;padding:8px;cursor:pointer}
+  .logo{height:50px;padding:5px 15px;background:white;border-radius:10px;display:block}
+  .account-btn{background:none;border:none;color:white;cursor:pointer;padding:12px}
+  .account-btn svg{width:28px;height:28px;fill:currentColor}
+  /* Map + panel (MapView.kt) */
+  #main{flex:1;display:flex;flex-direction:row-reverse;position:relative;min-height:0}
+  #mapsvg{flex:1;background:darkslategray;touch-action:none;cursor:grab}
+  #mapsvg.drag{cursor:grabbing}
+  #panel{position:absolute;right:0;top:0;width:30vw;height:100%;border-radius:16px;padding:16px;pointer-events:none}
+  #paper{background:rgba(255,255,255,0.4);height:100%;overflow:auto;border-radius:4px;
+         box-shadow:0 2px 1px -1px rgba(0,0,0,.2),0 1px 1px 0 rgba(0,0,0,.14);pointer-events:auto}
+  ul#flist{list-style:none;margin:0;padding:0}
+  ul#flist li{padding:8px 16px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.12);font-size:14px}
+  ul#flist li:hover{background:rgba(0,0,0,.04)}
+  ul#flist li.selected{background:rgba(25,118,210,.18)}
+  ul#flist li .sub{font-size:12px;color:#333;opacity:.75}
+</style>
+</head>
+<body>
+<header>
+  <button class="logo-btn" onclick="location.href='/'">
+    <!-- 本家 HeaderComponent.kt のロゴ SVG (WebCTC ロゴ, fill=darkslategray) -->
+    <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190.058 51">
+      <path fill="darkslategray" d="M 176.8482360839844 51.00030136108398 C 161.1449890136719 51.00030136108398 151.6050109863281 41.16689682006836 151.6050109863281 26.12430191040039 C 151.6050109863281 9.833400726318359 162.9063415527344 0 178.0227355957031 0 L 190.0575256347656 0 L 190.0575256347656 7.485298156738281 L 178.3890075683594 7.485298156738281 C 168.3360290527344 7.485298156738281 161.0711975097656 13.79610061645508 161.0711975097656 25.68330001831055 C 161.0711975097656 36.54359817504883 167.4558410644531 43.5150032043457 178.3161315917969 43.5150032043457 L 190.0575256347656 43.5150032043457 L 190.0575256347656 51.00030136108398 L 176.8482360839844 51.00030136108398 Z M 128.3435974121094 51.00030136108398 L 128.3435974121094 7.485298156738281 L 114.2550048828125 7.485298156738281 L 114.2550048828125 0 L 151.6059265136719 0 L 151.6059265136719 7.485298156738281 L 137.3697204589844 7.485298156738281 L 137.3697204589844 51.00030136108398 L 128.3435974121094 51.00030136108398 Z M 101.0457153320313 51.00030136108398 C 85.342529296875 51.00030136108398 75.80252075195313 41.16689682006836 75.80252075195313 26.12430191040039 C 75.80252075195313 9.833400726318359 87.10382080078125 0 102.22021484375 0 L 114.2550048828125 0 L 114.2550048828125 7.485298156738281 L 102.5865173339844 7.485298156738281 C 92.53350830078125 7.485298156738281 85.26870727539063 13.79610061645508 85.26870727539063 25.68330001831055 C 85.26870727539063 36.54359817504883 91.6533203125 43.5150032043457 102.5136108398438 43.5150032043457 L 114.2550048828125 43.5150032043457 L 114.2550048828125 51.00030136108398 L 101.0457153320313 51.00030136108398 Z M 30.64410400390625 28.99170303344727 C 29.37692260742188 28.53719711303711 28.30230712890625 27.86580276489258 27.42031860351563 26.97659683227539 C 26.53921508789063 26.08829879760742 25.86422729492188 24.99029922485352 25.39532470703125 23.6807975769043 C 24.92730712890625 22.37219619750977 24.69329833984375 20.85750198364258 24.69329833984375 19.1348991394043 C 24.69329833984375 17.42670059204102 24.92730712890625 15.87329864501953 25.39532470703125 14.47560119628906 C 25.86422729492188 13.07699966430664 26.52572631835938 11.87910079956055 27.37982177734375 10.88010025024414 C 28.23391723632813 9.881099700927734 29.26980590820313 9.109798431396484 30.48931884765625 8.565299987792969 C 31.70880126953125 8.021697998046875 33.0687255859375 7.749000549316406 34.57080078125 7.749000549316406 C 36.05850219726563 7.749000549316406 37.3734130859375 7.980300903320313 38.51730346679688 8.441997528076172 C 39.66030883789063 8.902797698974609 40.617919921875 9.547199249267578 41.38922119140625 10.37339782714844 C 42.16140747070313 11.20050048828125 42.74639892578125 12.18510055541992 43.14602661132813 13.32899856567383 C 43.54562377929688 14.47200012207031 43.74542236328125 15.72570037841797 43.74542236328125 17.08919906616211 C 43.74542236328125 17.43390274047852 43.734619140625 17.88119888305664 43.71392822265625 18.43290328979492 C 43.69320678710938 18.98369979858398 43.66262817382813 19.50030136108398 43.6212158203125 19.98270034790039 L 29.81790161132813 19.98270034790039 C 29.81790161132813 20.90520095825195 29.95919799804688 21.71789932250977 30.2418212890625 22.42080307006836 C 30.52349853515625 23.12369918823242 30.92312622070313 23.71229934692383 31.43972778320313 24.18749618530273 C 31.956298828125 24.66270065307617 32.576416015625 25.02450180053711 33.30001831054688 25.27199935913086 C 34.022705078125 25.5203971862793 34.82550048828125 25.64459609985352 35.70660400390625 25.64459609985352 C 36.726318359375 25.64459609985352 37.81802368164063 25.56540298461914 38.98171997070313 25.40700149536133 C 40.14630126953125 25.24860000610352 41.35501098632813 24.99029922485352 42.60870361328125 24.63209915161133 L 42.60870361328125 28.64069747924805 C 42.0714111328125 28.79189682006836 41.48550415039063 28.92959976196289 40.85189819335938 29.05379867553711 C 40.21832275390625 29.17799758911133 39.57122802734375 29.28779983520508 38.90969848632813 29.38409805297852 C 38.24819946289063 29.48039627075195 37.58041381835938 29.55330276489258 36.90542602539063 29.60100173950195 C 36.23040771484375 29.64960098266602 35.57611083984375 29.67390060424805 34.9425048828125 29.67390060424805 C 33.3441162109375 29.67390060424805 31.91131591796875 29.44620132446289 30.64410400390625 28.99170303344727 Z M 31.34701538085938 12.78089904785156 C 30.5343017578125 13.62779998779297 30.05191040039063 14.822998046875 29.90072631835938 16.36650085449219 L 38.62081909179688 16.36650085449219 C 38.63430786132813 15.53939819335938 38.53082275390625 14.81940078735352 38.310302734375 14.20650100708008 C 38.08981323242188 13.59360122680664 37.791015625 13.08779907226563 37.412109375 12.68819808959961 C 37.033203125 12.28860092163086 36.59222412109375 11.99250030517578 36.089111328125 11.79899978637695 C 35.58599853515625 11.60639953613281 35.0460205078125 11.51009750366211 34.46731567382813 11.51009750366211 C 33.20010375976563 11.51009750366211 32.15969848632813 11.93399810791016 31.34701538085938 12.78089904785156 Z M 52.49612426757813 29.22929763793945 C 51.18032836914063 29.00249862670898 49.92391967773438 28.69559860229492 48.72512817382813 28.30949783325195 L 48.72512817382813 0 L 53.76690673828125 0 L 53.76690673828125 6.860698699951172 L 53.56082153320313 10.99349975585938 C 54.318603515625 10.01519775390625 55.20330810546875 9.230400085449219 56.2158203125 8.638198852539063 C 57.22830200195313 8.045097351074219 58.4442138671875 7.749000549316406 59.86260986328125 7.749000549316406 C 61.10281372070313 7.749000549316406 62.205322265625 7.997398376464844 63.16921997070313 8.493297576904297 C 64.13311767578125 8.989200592041016 64.943115234375 9.694797515869141 65.597412109375 10.61100006103516 C 66.251708984375 11.52719879150391 66.751220703125 12.6359977722168 67.09500122070313 13.93830108642578 C 67.43972778320313 15.23970031738281 67.61160278320313 16.70399856567383 67.61160278320313 18.32940292358398 C 67.61160278320313 20.25809860229492 67.33981323242188 21.92490005493164 66.79531860351563 23.32979965209961 C 66.251708984375 24.73469924926758 65.49392700195313 25.90289688110352 64.5228271484375 26.83259963989258 C 63.55172729492188 27.76230239868164 62.40420532226563 28.45080184936523 61.08212280273438 28.89899826049805 C 59.760009765625 29.3463020324707 58.32000732421875 29.57040023803711 56.76300048828125 29.57040023803711 C 55.23391723632813 29.57040023803711 53.81192016601563 29.45699691772461 52.49612426757813 29.22929763793945 Z M 56.23651123046875 13.10129928588867 C 55.4580078125 13.78979873657227 54.63540649414063 14.72669982910156 53.76690673828125 15.91109848022461 L 53.76690673828125 25.08659744262695 C 54.16650390625 25.23779678344727 54.6588134765625 25.36200332641602 55.24472045898438 25.45830154418945 C 55.8297119140625 25.55459976196289 56.42550659179688 25.60319900512695 57.0321044921875 25.60319900512695 C 57.831298828125 25.60319900512695 58.5576171875 25.43760299682617 59.2119140625 25.10729598999023 C 59.8662109375 24.77609634399414 60.42422485351563 24.30810165405273 60.88592529296875 23.70149612426758 C 61.34762573242188 23.09579849243164 61.70220947265625 22.35509872436523 61.94970703125 21.48029708862305 C 62.1981201171875 20.60550308227539 62.32232666015625 19.6245002746582 62.32232666015625 18.53549575805664 C 62.32232666015625 17.37900161743164 62.239501953125 16.39350128173828 62.07391357421875 15.5807991027832 C 61.9083251953125 14.76810073852539 61.67071533203125 14.10029983520508 61.36111450195313 13.57649993896484 C 61.051513671875 13.05270004272461 60.672607421875 12.67110061645508 60.22442626953125 12.42990112304688 C 59.777099609375 12.18869781494141 59.26409912109375 12.06809997558594 58.6854248046875 12.06809997558594 C 57.831298828125 12.06809997558594 57.0150146484375 12.41279983520508 56.23651123046875 13.10129928588867 Z M 14.42340087890625 29.19869613647461 L 11.75759887695313 20.87099838256836 L 10.7864990234375 17.48160171508789 L 9.8568115234375 20.95380020141602 L 7.232421875 29.19869613647461 L 1.5084228515625 29.19869613647461 L 0 2.190597534179688 L 4.48382568359375 2.190597534179688 L 5.124603271484375 19.5066032409668 L 5.29022216796875 24.23879623413086 L 6.508819580078125 20.02409744262695 L 9.484222412109375 10.41479873657227 L 12.68731689453125 10.41479873657227 L 15.82830810546875 20.60190200805664 L 16.8408203125 24.1973991394043 L 16.92361450195313 19.98270034790039 L 17.60580444335938 2.190597534179688 L 21.92401123046875 2.190597534179688 L 20.3948974609375 29.19869613647461 L 14.42340087890625 29.19869613647461 Z"/>
+    </svg>
+  </button>
+  <button class="account-btn" title="アカウント / サービス一覧 (/p/account)" onclick="location.href='/p/account'">
+    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z"/></svg>
+  </button>
+</header>
+
+<div id="main">
+  <svg id="mapsvg" xmlns="http://www.w3.org/2000/svg">
+    <g id="mtx">
+      <g id="grails" stroke="white"></g>
+      <g id="gsignals" stroke="lightgray" stroke-width="0.5"></g>
+      <g id="gformations"></g>
+      <g id="gwaypoints"></g>
+    </g>
+  </svg>
+  <div id="panel"><div id="paper"><ul id="flist"></ul><div id="wpEditor" style="display:none"></div></div></div>
+</div>
+
+<script>
+"use strict";
+const SVGNS = "http://www.w3.org/2000/svg";
+const interval = 3000; //本家 interval = 3.seconds
+
+let railList = [], signalList = [], formationList = [], waypointList = [];
+let targetingFormationId = null;
+let centeredOnce = false;
+
+//---------------- panzoom (本家は panzoom ライブラリ。挙動を再現: ドラッグ移動 + カーソル中心ホイールズーム) ----------------
+const mtx = document.getElementById('mtx');
+const svg = document.getElementById('mapsvg');
+let tx = 0, ty = 0, scale = 1;
+function applyTransform(){ mtx.setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`); }
+let dragging = false, lastX = 0, lastY = 0;
+svg.addEventListener('pointerdown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; svg.classList.add('drag'); svg.setPointerCapture(e.pointerId); });
+svg.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  tx += e.clientX - lastX; ty += e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  applyTransform();
+});
+svg.addEventListener('pointerup', () => { dragging = false; svg.classList.remove('drag'); });
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = svg.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.25 : 0.8;
+  const ns = Math.max(0.05, Math.min(64, scale * factor));
+  tx = mx - (mx - tx) * (ns / scale);
+  ty = my - (my - ty) * (ns / scale);
+  scale = ns;
+  applyTransform();
+  renderWaypoints(); //ラベルはズームに関わらず一定サイズ (本家 scale(2/scale))
+}, { passive: false });
+//本家 panzoom.smoothMoveTo 相当
+function smoothMoveTo(nx, ny){
+  const sx = tx, sy = ty, t0 = performance.now(), dur = 400;
+  function step(t){
+    const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+    tx = sx + (nx - sx) * e; ty = sy + (ny - sy) * e;
+    applyTransform();
+    if (p < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+function centerOn(x, z){
+  const rect = svg.getBoundingClientRect();
+  smoothMoveTo(-x * scale + rect.width / 2, -z * scale + rect.height / 2);
+}
+
+//---------------- WRail (Rail.kt): railMap ごとの直線。在線 = 赤、非開通 = 灰 ----------------
+function renderRails(){
+  const g = document.getElementById('grails');
+  g.textContent = '';
+  for (const rail of railList){
+    const gr = document.createElementNS(SVGNS, 'g');
+    if (rail.isTrainOnRail) gr.setAttribute('stroke', 'red');
+    for (const rm of rail.railMaps){
+      const line = document.createElementNS(SVGNS, 'line');
+      line.setAttribute('x1', rm.startRP.posX); line.setAttribute('y1', rm.startRP.posZ);
+      line.setAttribute('x2', rm.endRP.posX);   line.setAttribute('y2', rm.endRP.posZ);
+      if (rm.isNotActive) line.setAttribute('stroke', 'gray');
+      gr.appendChild(line);
+    }
+    g.appendChild(gr);
+  }
+}
+
+//---------------- WSignalGroup (Signal.kt): ジオメトリ式は本家のまま ----------------
+function getSignalColor(level){
+  switch(level){
+    case 0: return 'darkslategray';
+    case 1: return 'rgb(2045,0,0)';
+    case 2: return 'rgb(255,153,0)';
+    case 3: return 'rgb(255,204,0)';
+    case 4: return 'rgb(155,255,0)';
+    case 5: return 'rgb(51,204,0)';
+    default: return 'rgb(51,102,255)';
+  }
+}
+function renderSignals(){
+  const g = document.getElementById('gsignals');
+  g.textContent = '';
+  //本家: "x,z-rotation" でグループ化
+  const groups = new Map();
+  for (const s of signalList){
+    const key = `${s.pos.x},${s.pos.z}-${s.rotation}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(s);
+  }
+  for (const signals of groups.values()){
+    const sorted = signals.slice().sort((a, b) => a.pos.y - b.pos.y);
+    const base = sorted[0];
+    const rotation = base.rotation;
+    const cos = Math.cos((270 + rotation) * (Math.PI / 180));
+    const sin = Math.sin((270 + rotation) * (Math.PI / 180));
+    const bx = base.pos.x, bz = base.pos.z;
+    const n = sorted.length;
+
+    const l1 = document.createElementNS(SVGNS, 'line');
+    l1.setAttribute('x1', bx - (n - 1) * 3.5 * cos); l1.setAttribute('y1', bz + (n - 1) * 3.5 * sin);
+    l1.setAttribute('x2', bx + 4.0 * cos);           l1.setAttribute('y2', bz - 4.0 * sin);
+    g.appendChild(l1);
+    const l2 = document.createElementNS(SVGNS, 'line');
+    l2.setAttribute('x1', bx + 4.0 * cos + 1.5 * sin); l2.setAttribute('y1', bz + 1.5 * cos - 4.0 * sin);
+    l2.setAttribute('x2', bx + 4.0 * cos - 1.5 * sin); l2.setAttribute('y2', bz - 1.5 * cos - 4.0 * sin);
+    g.appendChild(l2);
+
+    sorted.forEach((signal, index) => {
+      const blockDirectionRotation = signal.blockDirection * 90;
+      const diff = (rotation - blockDirectionRotation + 360) % 360;
+      const isLeft = diff < 180 && diff !== 0 && n > 1;
+      const isRight = diff > 180 && diff !== 0 && n > 1;
+      const offsetCx = ((isLeft ? 3.0 : isRight ? -3.0 : 0.0)) * sin + (-index * 3.5 - (isLeft || isRight ? 1.0 : 0.0)) * cos;
+      const offsetCy = (isLeft ? 3.0 : isRight ? -3.0 : 0.0) * cos + (index * 3.5 + (isLeft || isRight ? 1.0 : 0.0)) * sin;
+      const cx = signal.pos.x + offsetCx, cy = signal.pos.z + offsetCy;
+      if (isLeft || isRight){
+        const pl = document.createElementNS(SVGNS, 'polyline');
+        pl.setAttribute('fill', 'none');
+        pl.setAttribute('points', [
+          `${cx},${cy}`,
+          `${cx + 3.0 * cos},${cy - 3.0 * sin}`,
+          `${cx + 3.0 * cos - (isLeft ? 3.0 : -3.0) * sin},${cy - 3.0 * sin - (isLeft ? 3.0 : -3.0) * cos}`
+        ].join(' '));
+        g.appendChild(pl);
+      }
+      const c = document.createElementNS(SVGNS, 'circle');
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', 1.5);
+      c.setAttribute('fill', getSignalColor(signal.signalLevel));
+      c.setAttribute('stroke', 'none');
+      g.appendChild(c);
+    });
+  }
+}
+
+//---------------- WFormation (Formation.kt) ----------------
+function renderFormations(){
+  const g = document.getElementById('gformations');
+  g.textContent = '';
+  for (const formation of formationList){
+    const controlCar = formation.controlCar;
+    if (!controlCar) continue;
+    const posX = controlCar.pos.x, posZ = controlCar.pos.z;
+    const doorState = controlCar.trainStateData[4] !== 0;
+
+    const rect = document.createElementNS(SVGNS, 'rect');
+    rect.setAttribute('x', posX - 3); rect.setAttribute('y', posZ - 3);
+    rect.setAttribute('width', 6); rect.setAttribute('height', 6);
+    rect.setAttribute('fill', doorState ? 'lightgray' : 'yellow');
+    rect.setAttribute('stroke', 'gray');
+    g.appendChild(rect);
+
+    const speed = Math.round(controlCar.speed * 72);
+    const name = controlCar.name === 'no_name' ? '' : controlCar.name;
+    const driver = controlCar.driver;
+    const text = document.createElementNS(SVGNS, 'text');
+    text.textContent = `${speed}km/h ${name} ${driver}`;
+    text.setAttribute('x', posX + 5); text.setAttribute('y', posZ + 3);
+    text.setAttribute('font-size', 8); text.setAttribute('font-weight', 'bold');
+    text.setAttribute('fill', 'white'); text.setAttribute('stroke', 'none');
+    g.appendChild(text);
+  }
+}
+
+//---------------- 編成リスト (WListFormation 相当) ----------------
+function renderFormationList(){
+  const ul = document.getElementById('flist');
+  ul.textContent = '';
+  for (const formation of formationList){
+    const controlCar = formation.controlCar;
+    if (!controlCar) continue;
+    const li = document.createElement('li');
+    if (formation.id === targetingFormationId) li.classList.add('selected');
+    const speed = Math.round(controlCar.speed * 72);
+    li.innerHTML = `<div>${controlCar.modelName}</div>`
+      + `<div class="sub">ID: ${formation.id} / ${speed}km/h`
+      + (controlCar.driver ? ` / ${controlCar.driver}` : '') + `</div>`;
+    li.onclick = () => {
+      targetingFormationId = targetingFormationId === formation.id ? null : formation.id;
+      renderFormationList();
+      followTarget();
+    };
+    ul.appendChild(li);
+  }
+}
+//本家 useEffect(targetingFormation): 対象編成の制御車へスムーズ移動
+function followTarget(){
+  if (targetingFormationId == null) return;
+  const f = formationList.find(f => f.id === targetingFormationId);
+  const pos = f && f.controlCar && f.controlCar.pos;
+  if (pos) centerOn(pos.x, pos.z);
+}
+
+//---------------- WWayPoint (WayPoint.kt): 範囲=黄色透過、ラベル=黒角丸+白太字 (ズームで一定サイズ) ----------------
+function renderWaypoints(){
+  const g = document.getElementById('gwaypoints');
+  g.textContent = '';
+  const labelScale = 2 / Math.min(scale, 4.0); //本家: scale = min(panzoom scale, 4.0)
+  for (const wp of waypointList){
+    const gw = document.createElementNS(SVGNS, 'g');
+    gw.setAttribute('pointer-events', 'none');
+    const range = wp.range || {};
+    if (range.radius != null){ //CircleRange
+      const c = document.createElementNS(SVGNS, 'circle');
+      const center = range.center || wp.pos;
+      c.setAttribute('cx', center.x); c.setAttribute('cy', center.z);
+      c.setAttribute('r', range.radius);
+      c.setAttribute('fill', 'yellow'); c.setAttribute('fill-opacity', '0.05');
+      c.setAttribute('stroke', 'none');
+      gw.appendChild(c);
+    } else if (range.width != null){ //RectangleRange
+      const r = document.createElementNS(SVGNS, 'rect');
+      r.setAttribute('x', range.minX); r.setAttribute('y', range.minZ);
+      r.setAttribute('width', range.width); r.setAttribute('height', range.height);
+      r.setAttribute('fill', 'yellow'); r.setAttribute('fill-opacity', '0.05');
+      r.setAttribute('stroke', 'none');
+      gw.appendChild(r);
+    }
+    const name = wp.displayName || '';
+    const gl = document.createElementNS(SVGNS, 'g');
+    gl.setAttribute('transform', `translate(${wp.pos.x} ${wp.pos.z}) scale(${labelScale})`);
+    const bg = document.createElementNS(SVGNS, 'rect');
+    bg.setAttribute('x', -2 - 4 * name.length); bg.setAttribute('y', -8);
+    bg.setAttribute('width', 8 * name.length + 4); bg.setAttribute('height', 10);
+    bg.setAttribute('fill', 'black'); bg.setAttribute('fill-opacity', '0.8');
+    bg.setAttribute('rx', 2); bg.setAttribute('ry', 2); bg.setAttribute('stroke', 'none');
+    gl.appendChild(bg);
+    const tx = document.createElementNS(SVGNS, 'text');
+    tx.textContent = name;
+    tx.setAttribute('fill', 'white'); tx.setAttribute('font-size', 8);
+    tx.setAttribute('font-weight', 'bold'); tx.setAttribute('text-anchor', 'middle');
+    tx.setAttribute('stroke', 'none');
+    gl.appendChild(tx);
+    gw.appendChild(gl);
+    g.appendChild(gw);
+  }
+}
+
+//---------------- WayPointEditor (/p/waypoint — 本家 WayPointEditor.kt) ----------------
+const isWaypointEditor = location.pathname.replace(/\/$/, '') === '/p/waypoint';
+function renderWaypointEditor(){
+  if (!isWaypointEditor) return;
+  document.getElementById('flist').style.display = 'none';
+  const box = document.getElementById('wpEditor');
+  box.style.display = 'block';
+  box.innerHTML = '<div style="padding:10px 14px;font-weight:bold">ウェイポイント編集</div>';
+  waypointList.forEach((wp, i) => {
+    const d = document.createElement('div');
+    d.style.cssText = 'border-top:1px solid rgba(0,0,0,.12);padding:8px 14px;font-size:13px';
+    d.innerHTML = `
+      <div style="font-weight:bold;margin-bottom:4px">${wp.identifyName || ('wp' + i)}</div>
+      <label>表示名 <input data-k="displayName" value="${wp.displayName || ''}" style="width:120px"></label>
+      <label> X <input data-k="x" value="${wp.pos ? wp.pos.x : 0}" style="width:60px"></label>
+      <label> Z <input data-k="z" value="${wp.pos ? wp.pos.z : 0}" style="width:60px"></label>
+      <label> 半径 <input data-k="r" value="${wp.range && wp.range.radius != null ? wp.range.radius : 100}" style="width:60px"></label>
+      <button data-a="save">保存</button> <button data-a="del">削除</button> <button data-a="jump">表示</button>`;
+    d.querySelectorAll('button').forEach(b => b.onclick = async () => {
+      if (b.dataset.a === 'del'){ waypointList.splice(i, 1); }
+      else if (b.dataset.a === 'jump'){ centerOn(wp.pos.x, wp.pos.z); return; }
+      else {
+        const get = k => d.querySelector(`input[data-k="${k}"]`).value;
+        wp.displayName = get('displayName');
+        wp.pos = { x: Number(get('x')) || 0, y: wp.pos ? wp.pos.y || 0 : 0, z: Number(get('z')) || 0 };
+        wp.range = { center: wp.pos, radius: Number(get('r')) || 100 };
+      }
+      await saveWaypoints();
+    });
+    box.appendChild(d);
+  });
+  const add = document.createElement('div');
+  add.style.cssText = 'padding:10px 14px;border-top:1px solid rgba(0,0,0,.12)';
+  add.innerHTML = '<button id="wpAdd">＋ 新規ウェイポイント (地図中心)</button>';
+  add.querySelector('#wpAdd').onclick = async () => {
+    const rect = svg.getBoundingClientRect();
+    const cx = (rect.width / 2 - tx) / scale, cz = (rect.height / 2 - ty) / scale;
+    waypointList.push({
+      identifyName: 'wp_' + Date.now(),
+      displayName: 'WayPoint',
+      pos: { x: Math.round(cx), y: 0, z: Math.round(cz) },
+      range: { center: { x: Math.round(cx), y: 0, z: Math.round(cz) }, radius: 100 }
+    });
+    await saveWaypoints();
+  };
+  box.appendChild(add);
+}
+async function saveWaypoints(){
+  try{
+    await fetch('/api/waypoints', { method: 'POST', body: JSON.stringify(waypointList) });
+  }catch(e){}
+  renderWaypoints(); renderWaypointEditor();
+}
+
+//---------------- データ取得 (本家: rails は ws / signals・formations は 3 秒) ----------------
+async function fetchRails(){
+  try{
+    railList = await fetch('/api/rails').then(r => r.json());
+    renderRails();
+    if (!centeredOnce && railList.length){
+      centeredOnce = true;
+      const rp = railList[0].railMaps[0].startRP;
+      centerOn(rp.posX, rp.posZ);
+    }
+  }catch(e){}
+}
+async function fetchSignals(){
+  try{ signalList = await fetch('/api/signals').then(r => r.json()); renderSignals(); }catch(e){}
+}
+async function fetchFormations(){
+  try{
+    formationList = await fetch('/api/formations').then(r => r.json());
+    renderFormations(); renderFormationList(); followTarget();
+  }catch(e){}
+}
+async function fetchWaypoints(){
+  try{
+    const data = await fetch('/api/waypoints').then(r => r.json());
+    waypointList = Array.isArray(data) ? data : [];
+    renderWaypoints(); renderWaypointEditor();
+  }catch(e){}
+}
+
+fetchRails(); fetchSignals(); fetchFormations(); fetchWaypoints();
+setInterval(fetchRails, 10000);          //本家は WebSocket 差分。ポーリングで代替
+setInterval(fetchSignals, interval);     //3 秒 (本家 interval)
+setInterval(fetchFormations, interval);  //3 秒 (本家 interval)
+</script>
+</body>
+</html>

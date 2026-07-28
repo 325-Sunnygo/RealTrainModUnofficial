@@ -1,0 +1,98 @@
+{
+	"name": "BeamGenerator",
+	"model": {
+		"modelFile": "beam_generator.mqoz",
+		"textures": [["default", "textures/machine/beam_generator.png", "Light"]],
+		"rendererPath": "scripts/RenderBeamGenerator.js"
+	},
+	"buttonTexture": "textures/machine/button_beam_generator.png",
+	"machineType": "Light",
+	"rotateByMetadata": true,
+	"brightness": [0, 15],
+	"useCustomColor": false,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479 beam",
+	"defaultValues": [
+		{
+			"type": "Hex",
+			"key": "insideColor",
+			"value": "0xB0B0B0",
+			"minmax": [0, 16777215]
+		},
+		{
+			"type": "Hex",
+			"key": "insideAlpha",
+			"value": "0xE0",
+			"minmax": [0, 255]
+		},
+		{
+			"type": "Hex",
+			"key": "outsideColor",
+			"value": "0x0000FF",
+			"minmax": [0, 16777215]
+		},
+		{
+			"type": "Hex",
+			"key": "outsideAlpha",
+			"value": "0xD0",
+			"minmax": [0, 255]
+		},
+		{
+			"type": "Double",
+			"key": "insideRadius",
+			"value": "0.25"
+		},
+		{
+			"type": "Double",
+			"key": "outsideRadius",
+			"value": "0.5"
+		},
+		{
+			"type": "Int",
+			"key": "repeat",
+			"value": "5"
+		},
+		{
+			"type": "Double",
+			"key": "length",
+			"value": "128.0"
+		},
+		{
+			"type": "Double",
+			"key": "section",
+			"value": "0.5"
+		},
+		{
+			"type": "Double",
+			"key": "centerNoiseX",
+			"value": "0.0"
+		},
+		{
+			"type": "Double",
+			"key": "centerNoiseY",
+			"value": "0.0"
+		},
+		{
+			"type": "Double",
+			"key": "radiusNoiseX",
+			"value": "0.0"
+		},
+		{
+			"type": "Double",
+			"key": "radiusNoiseY",
+			"value": "0.0"
+		},
+		{
+			"type": "Int",
+			"key": "fadeOutTime",
+			"value": "0"
+		},
+		{
+			"type": "Double",
+			"key": "speedX",
+			"value": "0.0"
+		}
+	]
+}

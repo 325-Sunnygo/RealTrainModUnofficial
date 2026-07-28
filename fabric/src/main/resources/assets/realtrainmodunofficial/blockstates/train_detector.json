@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "realtrainmodunofficial:block/train_detector"
+    },
+    "powered=true": {
+      "model": "realtrainmodunofficial:block/train_detector_on"
+    }
+  }
+}

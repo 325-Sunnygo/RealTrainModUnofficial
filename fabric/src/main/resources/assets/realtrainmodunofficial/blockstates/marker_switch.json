@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "facing=0": { "model": "realtrainmodunofficial:block/marker_f0" },
+    "facing=1": { "model": "realtrainmodunofficial:block/marker_f1" },
+    "facing=2": { "model": "realtrainmodunofficial:block/marker_f2" },
+    "facing=3": { "model": "realtrainmodunofficial:block/marker_f3" },
+    "facing=4": { "model": "realtrainmodunofficial:block/marker_f4" },
+    "facing=5": { "model": "realtrainmodunofficial:block/marker_f5" },
+    "facing=6": { "model": "realtrainmodunofficial:block/marker_f6" },
+    "facing=7": { "model": "realtrainmodunofficial:block/marker_f7" }
+  }
+}

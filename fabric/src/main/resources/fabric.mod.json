@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
+  "authors": [ "${mod_authors}" ],
+  "contact": {
+    "sources": "https://github.com/325-Sunnygo/RealTrainModUnofficial"
+  },
+  "license": "${mod_license}",
+  "environment": "*",
+  "entrypoints": {
+    "main": [ "com.portofino.realtrainmodunofficial.fabric.RtmuFabricInit" ],
+    "client": [ "com.portofino.realtrainmodunofficial.fabric.RtmuFabricClientInit" ]
+  },
+  "mixins": [ "realtrainmodunofficial.mixins.json" ],
+  "accessWidener": "realtrainmodunofficial.accesswidener",
+  "depends": {
+    "fabricloader": ">=${fabric_loader_version}",
+    "fabric-api": "*",
+    "minecraft": "~${minecraft_version}",
+    "java": ">=21"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "texture": "ngt_led01",
+	"backTexture": 0,
+  "height": 1.0,
+  "width": 3.0,
+  "depth": 0.5,
+  "frame": 1,
+  "animationCycle": 1,
+  "color" : 0
+}

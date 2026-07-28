@@ -1,0 +1,15 @@
+{
+  "name": "SteveCar",
+	"model": {
+      "modelFile": "SteveCar.ngto",
+      "textures": [["default", "textures/vehicle/cv33.png", ""]]
+  },
+	"buttonTexture": "textures/vehicle/button_SteveCar.png",
+	"vehicleType": "Car",
+	"size": [1.8, 1.3],
+	"playerPos": [[0.3571, 0.75, 1.0]],
+  "vibration":[0.01, 0.025],
+	"offset": [0.0, 0.0, 1.0],
+	"scale": 0.142857,
+  "tags": "ngt5479"
+}

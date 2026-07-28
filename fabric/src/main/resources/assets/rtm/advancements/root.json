@@ -1,0 +1,28 @@
+{
+    "display": {
+        "icon": {
+            "item": "rtm:item_train"
+        },
+        "title": {
+            "translate": "advancements.rtm.root.title"
+        },
+        "description": {
+            "translate": "advancements.rtm.root.description"
+        },
+        "background": "rtm:textures/blocks/fire_brick.png",
+        "show_toast": false,
+        "announce_to_chat": false
+    },
+    "criteria": {
+        "start_rtm": {
+            "trigger": "minecraft:inventory_changed",
+            "conditions": {
+                "items": [
+                    {
+                        "item": "minecraft:crafting_table"
+                    }
+                ]
+            }
+        }
+    }
+}

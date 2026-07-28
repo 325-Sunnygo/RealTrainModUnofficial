@@ -1,0 +1,23 @@
+{
+    "display": {
+        "icon": {
+            "item": "rtm:item_large_rail",
+            "data": 0
+        },
+        "title": {
+            "translate": "advancements.rtm.lay_rail.title"
+        },
+        "description": {
+            "translate": "advancements.rtm.lay_rail.description"
+        }
+    },
+    "parent": "rtm:get_rtm_workbench",
+    "criteria": {
+        "lay_rail": {
+            "trigger": "minecraft:placed_block",
+            "conditions": {
+                "block": "rtm:marker"
+            }
+        }
+    }
+}

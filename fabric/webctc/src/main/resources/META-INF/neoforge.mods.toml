@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="AGPL-3.0 (original WebCTC license)"
+issueTrackerURL="https://github.com/WebCTC/WebCTC"
+
+[[mods]]
+modId="webctc"
+version="1.21.1-1.0.0"
+displayName="RTMU-WebCTC_1.21.1"
+# 本家 WebCTC (1.7.10) の開発者をそのまま継承
+authors="Kaiz_JP, masa0300"
+description='''No more need to build a complicated circuit and IC. Let's make CTC more easily with WebCTC !
+(Unofficial 1.21.1 port for RTMU)'''
+
+[[dependencies.webctc]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.1.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.webctc]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.1]"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.webctc]]
+    modId="realtrainmodunofficial"
+    type="required"
+    versionRange="[1.0,)"
+    ordering="AFTER"
+    side="BOTH"

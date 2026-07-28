@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="GPL-3.0 (original ATSAssistMod license)"
+issueTrackerURL="https://github.com/kaiz-jp/ATSAssistMod"
+
+[[mods]]
+modId="atsassistmod"
+version="1.21.1-1.0.0"
+displayName="RTMU-ATSAssistMod_1.21.1"
+# 本家 ATSAssistMod (1.7.10) の開発者をそのまま継承
+authors="Kaiz_JP"
+description='''ATSAssistMod — ATS/ATC 保安装置アシスト (地上子・車上装置・速度照査)。
+(Unofficial 1.21.1 port for RTMU)'''
+
+[[dependencies.atsassistmod]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.1.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.atsassistmod]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.1]"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.atsassistmod]]
+    modId="realtrainmodunofficial"
+    type="required"
+    versionRange="[1.0,)"
+    ordering="AFTER"
+    side="BOTH"

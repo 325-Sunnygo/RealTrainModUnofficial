@@ -1,0 +1,49 @@
+{
+  "name": "Crusader",
+  "model": {
+      "modelFile": "crusader.mqo",
+      "textures": [["default", "textures/vehicle/crusader.png", ""]],
+      "rendererPath": "scripts/RenderTank.js"
+  },
+  "buttonTexture": "textures/vehicle/button_crusader.png",
+  "soundScriptPath": "scripts/sound_crusader.js",
+  "headLights": [
+    {
+      "type": 0,
+      "color": 16773328,
+      "pos": [0.6, 1.1043, 2.25],
+      "r": 0.5
+    },
+    {
+      "type": 0,
+      "color": 16773328,
+      "pos": [-0.6, 1.1043, 2.25],
+      "r": 0.5
+    },
+    {
+      "type": 1,
+      "color": 16773328,
+      "pos": [0.6, 1.1043, 2.25],
+      "r": 1.0
+    },
+    {
+      "type": 1,
+      "color": 16773328,
+      "pos": [-0.6, 1.1043, 2.25],
+      "r": 1.0
+    }
+  ],
+  "tailLights": [],
+  "vehicleType": "Car",
+  "size": [2.5, 2.3],
+  "playerPos": [[0.0, 1.8, 0.0]],
+  "vibration":[0.01, 0.025],
+  "useCustomColor": true,
+  "smoothing": true,
+  "doCulling": true,
+  "changeYawOnStopping": true,
+  "accuracy": "MEDIUM",
+  "tags": "ngt5479 Crusader Tank",
+  "serverScriptPath": "scripts/server/Tank.js",
+	"collisionParts": ["turret1", "turret2", "turret3", "body1", "body2", "body3", "body4", "body6", "wb1"]
+}

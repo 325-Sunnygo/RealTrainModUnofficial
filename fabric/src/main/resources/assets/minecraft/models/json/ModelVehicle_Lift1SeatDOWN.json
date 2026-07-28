@@ -1,0 +1,21 @@
+{
+	"name": "lift_1seat_down",
+	"model": {
+		"modelFile": "lift_1seat.mqoz",
+		"textures": [["default", "textures/vehicle/lift_chair.png", ""]],
+		"rendererPath": "scripts/RenderLift.js"
+	},
+	"buttonTexture": "textures/vehicle/button_lift_1seat_down.png",
+	"vehicleType": "Lift",
+	"size": [1.0, 1.0],
+	"playerPos": [[0.0, 0.48, 0.0]],
+	"vibration":[0.0, 0.0],
+	"gripPos": [0.0, 3.5, 0.0],
+	"useCustomColor": false,
+	"smoothing": true,
+	"doCulling": true,
+	"changeYawOnStopping": false,
+	"accuracy": "MEDIUM",
+	"collisionParts": ["seat1"],
+	"tags": "ngt5479"
+}

@@ -1,0 +1,6 @@
+{
+  "variants":{
+    "half=bottom": { "model": "rtm:half_brick_slab" },
+    "half=top": { "model": "rtm:upper_brick_slab" }
+  }
+}

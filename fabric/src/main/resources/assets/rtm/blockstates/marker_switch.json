@@ -1,0 +1,20 @@
+{
+  "variants":{
+    "meta=0":{"model":"rtm:marker0"},
+    "meta=1":{"model":"rtm:marker1"},
+    "meta=2":{"model":"rtm:marker2"},
+    "meta=3":{"model":"rtm:marker3"},
+    "meta=4":{"model":"rtm:marker20"},
+    "meta=5":{"model":"rtm:marker21"},
+    "meta=6":{"model":"rtm:marker22"},
+    "meta=7":{"model":"rtm:marker23"},
+    "meta=8":{"model":"rtm:marker0"},
+    "meta=9":{"model":"rtm:marker0"},
+    "meta=10":{"model":"rtm:marker0"},
+    "meta=11":{"model":"rtm:marker0"},
+    "meta=12":{"model":"rtm:marker0"},
+    "meta=13":{"model":"rtm:marker0"},
+    "meta=14":{"model":"rtm:marker0"},
+    "meta=15":{"model":"rtm:marker0"}
+  }
+}

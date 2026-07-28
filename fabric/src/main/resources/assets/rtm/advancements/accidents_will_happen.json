@@ -1,0 +1,34 @@
+{
+    "display": {
+        "icon": {
+            "item": "rtm:item_train",
+            "data": 0
+        },
+        "title": {
+            "translate": "advancements.rtm.accidents_will_happen.title"
+        },
+        "description": {
+            "translate": "advancements.rtm.accidents_will_happen.description"
+        },
+        "frame": "challenge"
+    },
+    "parent": "rtm:drive_train",
+    "criteria": {
+        "accidents_will_happen": {
+            "trigger": "minecraft:player_hurt_entity",
+            "conditions": {
+                "damage": {
+                       "blocked": true,
+                       "type": {
+                           "direct_entity": {
+                               "type": "diesel_car"
+                           }
+                       }
+                   },
+                   "entity": {
+                       "type": "player"
+                   }
+            }
+        }
+    }
+}

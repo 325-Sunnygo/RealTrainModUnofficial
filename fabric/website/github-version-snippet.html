@@ -1,0 +1,30 @@
+<!--
+  既存 index.html の「v0.0.0」を GitHub の最新リリースから自動更新するスニペット (任意)。
+
+  使い方:
+  1. index.html のバージョン表記に class="rtmu-version" を付ける (2箇所):
+
+       <dd>v0.0.0</dd>
+         ↓
+       <dd class="rtmu-version">v0.0.0</dd>
+
+       <h3>RealTrainMod Unofficial v0.0.0</h3>
+         ↓
+       <h3>RealTrainMod Unofficial <span class="rtmu-version">v0.0.0</span></h3>
+
+  2. 下の <script> を index.html の </body> の直前に貼る。
+
+  取得に失敗した場合は元の表記 (v0.0.0) のまま表示される。
+-->
+<script>
+  fetch("https://api.github.com/repos/325-Sunnygo/RealTrainModUnofficial/releases/latest")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (json) {
+      if (!json || !json.tag_name) return;
+      var v = "v" + String(json.tag_name).replace(/^v/i, "");
+      document.querySelectorAll(".rtmu-version").forEach(function (el) {
+        el.textContent = v;
+      });
+    })
+    .catch(function () { /* 失敗時は既存表記のまま */ });
+</script>

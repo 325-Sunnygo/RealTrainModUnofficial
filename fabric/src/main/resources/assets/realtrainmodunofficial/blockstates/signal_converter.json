@@ -1,0 +1,9 @@
+{
+  "variants": {
+    "type=0": { "model": "realtrainmodunofficial:block/signal_converter_0" },
+    "type=1": { "model": "realtrainmodunofficial:block/signal_converter_1" },
+    "type=2": { "model": "realtrainmodunofficial:block/signal_converter_2" },
+    "type=3": { "model": "realtrainmodunofficial:block/signal_converter_3" },
+    "type=4": { "model": "realtrainmodunofficial:block/signal_converter_4" }
+  }
+}

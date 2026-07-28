@@ -1,0 +1,20 @@
+{
+	"name": "EB20",
+	"model": {
+		"modelFile": "eb20.mqoz",
+		"textures": [["default", "textures/vehicle/eb20.png", ""]]
+	},
+	"buttonTexture": "textures/vehicle/button_eb20.png",
+	"vehicleType": "Trolley",
+	"size": [1.0, 1.0],
+	"playerPos": [[0.0, 0.5, 0.0]],
+	"vibration":[0.0, 0.01],
+	"connectionDistance":1.0,
+	"useCustomColor": true,
+	"smoothing": true,
+	"doCulling": true,
+	"changeYawOnStopping": false,
+	"accuracy": "MEDIUM",
+	"collisionParts": ["-all"],
+	"tags": "ngt5479"
+}

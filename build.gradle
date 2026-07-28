@@ -187,6 +187,11 @@ def modrinthModsDirs = modrinthProfilesRoot.isDirectory()
             .findAll { it.isDirectory() }
             .collect { new File(it, 'mods') }
             .findAll { it.isDirectory() && it.listFiles()?.any { f -> f.name.startsWith('realtrainmodunofficial') && f.name.endsWith('.jar') } }
+            //★Fabric 版のプロファイルへは配らない。jar 名が同じなので<b>上書きしてしまい</b>、
+            //  Fabric 側が「non-fabric mod」として無視 → ブロックもアイテムも 1 つも登録されず、
+            //  作成タブごと消える (それでいてクラッシュはしないので原因が分かりにくい)。
+            //  Fabric 版は RTMU-fabric-1.21.1/ から手で入れる。
+            .findAll { !it.parentFile.name.toLowerCase().contains('fabric') }
         : []
 
 tasks.register('copyJarToModrinthMods') {
@@ -291,3 +296,4 @@ idea {
         downloadJavadoc = true
     }
 }
+

@@ -32,7 +32,7 @@ public class RealTrainModUnofficial {
      * 報告者から送られるログの判別材料がこれなので、古い番号が残っていると
      * 「どのビルドで起きたか」を取り違える。
      */
-    public static final String BUILD_TAG = "1.0.12 (model-select rebuilt 本家-style + crisp 1:1 button textures; sign/signboard texture grid; pick-block copies installed objects; block-detection signal packs; driver seat lowered; select screens hide HUD/minimap)";
+    public static final String BUILD_TAG = "1.0.16 (Fabric 移植: キー衝突・描画段階・intermediary 名・設置物の当たり判定・可変光源; MOD 自身の規約は非表示)";
 
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
         DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);

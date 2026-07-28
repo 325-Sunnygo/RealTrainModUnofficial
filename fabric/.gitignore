@@ -1,0 +1,52 @@
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
+
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea
+
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+runs
+run-data
+
+repo
+
+*.mqo
+# 同梱デフォルトパックのモデルはビルドに必須なので例外
+!bundled_pack_src/**/*.mqo
+# 本家 RTM の内蔵モデル (assets/minecraft/models/*.mqo) も jar に同梱するのでビルドに必須。
+# これが無いとクローンしてビルドした jar からモデルが丸ごと欠落し、
+# レール/列車/信号機/踏切/蛍光灯などの選択欄が空になる。
+!src/main/resources/**/*.mqo
+.DS_Store
+.vscode
+backups
+dist
+
+vehicle_packs
+
+# 個人ローカルパスを含む変換ツール(GitHubへ出さない)
+tools/convert_bbmodel_to_rtmu_pack.py
+__pycache__
+*.pyc
+
+# build logs (may contain local paths)
+build_err.txt
+*.log
+
+# 乗客simは本体へ統合済み。旧サブプロジェクトはコミットしない
+passenger/

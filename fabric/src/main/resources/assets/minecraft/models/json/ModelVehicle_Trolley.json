@@ -1,0 +1,20 @@
+{
+	"name": "trolley",
+	"model": {
+		"modelFile": "trolley.mqoz",
+		"textures": [["default", "textures/vehicle/trolley.png", ""]]
+	},
+	"buttonTexture": "textures/vehicle/button_trolley.png",
+	"vehicleType": "Trolley",
+	"size": [1.0, 1.0],
+	"playerPos": [[0.0, 0.5, 0.0]],
+	"vibration":[0.0, 0.01],
+	"connectionDistance":0.75,
+	"useCustomColor": true,
+	"smoothing": true,
+	"doCulling": true,
+	"changeYawOnStopping": false,
+	"accuracy": "MEDIUM",
+	"collisionParts": ["-all"],
+	"tags": "ngt5479"
+}

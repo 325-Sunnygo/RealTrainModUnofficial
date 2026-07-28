@@ -1,0 +1,20 @@
+{
+  "variants":{
+    "meta=0":{"model":"rtm:steel_slab"},
+    "meta=1":{"model":"rtm:steel_slab"},
+    "meta=2":{"model":"rtm:steel_slab"},
+    "meta=3":{"model":"rtm:steel_slab"},
+    "meta=4":{"model":"rtm:steel_slab"},
+    "meta=5":{"model":"rtm:steel_slab"},
+    "meta=6":{"model":"rtm:steel_slab"},
+    "meta=7":{"model":"rtm:steel_slab"},
+    "meta=8":{"model":"rtm:steel_slab"},
+    "meta=9":{"model":"rtm:steel_slab"},
+    "meta=10":{"model":"rtm:steel_slab"},
+    "meta=11":{"model":"rtm:steel_slab"},
+    "meta=12":{"model":"rtm:steel_slab"},
+    "meta=13":{"model":"rtm:steel_slab"},
+    "meta=14":{"model":"rtm:steel_slab"},
+    "meta=15":{"model":"rtm:steel_slab"}
+  }
+}

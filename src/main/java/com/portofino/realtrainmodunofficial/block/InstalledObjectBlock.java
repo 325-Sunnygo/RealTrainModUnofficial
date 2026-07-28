@@ -79,20 +79,39 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     @Override
     public int getLightEmission(BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos) {
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
-            if (be.getCategory() == InstalledObjectCategory.LIGHT && be.isPowered()) {
-                return 15;
-            }
-            if (be.getCategory() == InstalledObjectCategory.SIGNBOARD) {
-                return be.getSignboardLightEmission();
-            }
-            //本家 BlockFluorescent.getLightValue: 蛍光灯は常時 15 (壊れた蛍光灯は 0/4/8/12 で明滅)。
-            //レッドストーン不要 (照明カテゴリと違い、置いただけで点く)。
-            if (be.getCategory() == InstalledObjectCategory.FLUORESCENT) {
-                return be.getFluorescentLightValue();
+            int emission = dynamicLightEmission(be);
+            if (emission > 0) {
+                return emission;
             }
         }
         return super.getLightEmission(state, level, pos);
     }
+
+    /**
+     * <b>置いた物ごとの明るさ</b> (0-15)。
+     *
+     * <p>NeoForge は {@code getLightEmission(state, level, pos)} から、
+     * Fabric は光源計算の mixin ({@code BlockLightEngineMixin}) から呼ぶ。
+     * 判定を 1 箇所に集めておかないと<b>両版で明るさが食い違う</b>。
+     */
+    public static int dynamicLightEmission(InstalledObjectBlockEntity be) {
+        if (be == null) {
+            return 0;
+        }
+        if (be.getCategory() == InstalledObjectCategory.LIGHT && be.isPowered()) {
+            return 15;
+        }
+        if (be.getCategory() == InstalledObjectCategory.SIGNBOARD) {
+            return be.getSignboardLightEmission();
+        }
+        //本家 BlockFluorescent.getLightValue: 蛍光灯は常時 15
+        //(壊れた蛍光灯は 0/4/8/12 で明滅)。レッドストーン不要。
+        if (be.getCategory() == InstalledObjectCategory.FLUORESCENT) {
+            return be.getFluorescentLightValue();
+        }
+        return 0;
+    }
+
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
@@ -105,14 +124,32 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         return RTM_SELECTION_SHAPE;
     }
 
+    /**
+     * <b>設置物は本家と同じく 1 ブロックぶんの当たり判定を持つ。</b>
+     *
+     * <p>本家 RTM の設置物は {@code BlockContainerCustom} を継承しており、
+     * 既定の当たり判定が {@code (0,0,0)-(1,1,1)} のまま使われている。
+     * 車止めに列車が突っ込めてしまう・信号機をすり抜けるといった報告はここが空だったため。
+     *
+     * <p>通り抜けるのは 2 つだけ:
+     * <ul>
+     *   <li><b>架線</b> — 電柱と電柱の間に張った線。線の下は歩ける必要がある
+     *       (選択判定 {@link #getShape} も同じ条件で空にしている)</li>
+     *   <li><b>開いている改札</b> — 閉じている間だけ塞ぐ (本家 BlockTurnstile と同じ)</li>
+     * </ul>
+     */
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity blockEntity
-            && blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE
-            && !blockEntity.isTicketGateOpen()) {
-            return RTM_SELECTION_SHAPE;
+        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity blockEntity) {
+            if (blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
+                return EMPTY_SHAPE;
+            }
+            if (blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE
+                && blockEntity.isTicketGateOpen()) {
+                return EMPTY_SHAPE;
+            }
         }
-        return EMPTY_SHAPE;
+        return RTM_SELECTION_SHAPE;
     }
 
     @Nullable

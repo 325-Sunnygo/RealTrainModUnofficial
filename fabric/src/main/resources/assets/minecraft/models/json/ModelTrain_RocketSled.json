@@ -1,0 +1,44 @@
+{
+  "trainName": "RocketSled",
+  "trainType": "CC",
+
+  "trainModel2": {
+      "modelFile": "ModelTrain_RocketSled.mqo",
+      "textures": [["default", "textures/train/rocket_sled.png", "AlphaBlend"]],
+      "rendererPath": "scripts/RenderRocketSled.js"
+  },
+  "bogieModel2": {
+      "modelFile": "ModelBogie_ft1.obj",
+      "textures": [["default", "textures/train/ft1.png"]]
+  },
+
+  "buttonTexture": "textures/train/button_RocketSled.png",
+  "soundScriptPath": "scripts/sound_trailer.js",
+  "sound_Horn": "",
+  
+  "customButtons": [
+    ["IGNITION_OFF", "IGNITION_ON"],
+    ["FIRE_OFF", "FIRE_ON"],
+    ["NF_0", "NF_1", "NF_2", "NF_3"],
+    ["No_FUNC"],
+    ["No_FUNC"],
+    ["No_FUNC"]
+  ],
+
+  "seatPos": [],
+  "playerPos": [
+    [0.8, 0.0, 9.187],
+    [-0.8, 0.0, -9.187]
+  ],
+  "bogiePos": [
+    [0.0, 0.0, 7.125],
+    [0.0, 0.0, -7.125]
+  ],
+  "maxSpeed": [0.0, 0.0, 0.0, 0.05, 10.0],
+  "accelerateion" : 0.02,
+  "doCulling": true,
+	"smoothing": true,
+  "accuracy": "MEDIUM",
+	"collisionParts": ["-all"],
+  "tags": "ngt5479"
+}

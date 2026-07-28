@@ -1,0 +1,141 @@
+plugins {
+    id 'fabric-loom' version '1.10.5'
+    id 'java-library'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+//1.21.1 は Java 21。手元に 21 が無くても foojay resolver が取ってくる。
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(21)
+}
+
+repositories {
+    mavenCentral()
+}
+
+loom {
+    //NeoForge のアクセス変換に相当するもの。開ける対象はファイル側のコメント参照。
+    accessWidenerPath = file('src/main/resources/realtrainmodunofficial.accesswidener')
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    //★Mojang マッピングを使う。
+    //RTMU のソースは NeoForge 版から持ってきたもので、クラス名・メソッド名は全て mojmap。
+    //yarn にすると数万箇所の改名が必要になるが、mojmap ならバニラ側は<b>一切書き換え不要</b>。
+    //直すのは net.neoforged.* だけで済む。
+    mappings loom.officialMojangMappings()
+
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    //スクリプトエンジンは本家 RTM/NGTLib と同じ標準 Nashorn 一本。
+    //NeoForge 21.1 は Nashorn をプラットフォームライブラリとして持っていたので参照だけで済んだが、
+    //Fabric は持たないので jar へ同梱する (include)。
+    implementation "org.openjdk.nashorn:nashorn-core:15.4"
+    include "org.openjdk.nashorn:nashorn-core:15.4"
+    //★ASM は<b>絶対に同梱しない</b>。
+    //Fabric Loader が Mixin 用に ASM 一式を持っており、jar へ入れると
+    //ローダー側と二重になって MixinExtras が VerifyError で落ちる
+    //(SugarWrapperImpl で MethodNodeEx が MethodVisitor に代入できない、と言われる)。
+    //Nashorn は ASM を要求するが、ローダーが載せているもので足りる。
+    //NeoForge 版も同じ理由で org/objectweb/** を jar から除外している。
+    compileOnly "org.ow2.asm:asm:9.7"
+    compileOnly "org.ow2.asm:asm-util:9.7"
+
+    //ATSAssistMod+ の IFTTT ルール保存に使う (本体へ統合済みの部分が参照する)。
+    implementation "com.fasterxml.jackson.core:jackson-databind:2.15.2"
+    include "com.fasterxml.jackson.core:jackson-databind:2.15.2"
+    implementation "com.fasterxml.jackson.core:jackson-core:2.15.2"
+    include "com.fasterxml.jackson.core:jackson-core:2.15.2"
+    implementation "com.fasterxml.jackson.core:jackson-annotations:2.15.2"
+    include "com.fasterxml.jackson.core:jackson-annotations:2.15.2"
+}
+
+//同梱デフォルトパック: bundled_pack_src/<PackName>/ を zip 化して jar に入れる。
+def buildE257DefaultPack = tasks.register('buildE257DefaultPack', Zip) {
+    from 'bundled_pack_src/E257_DefaultPack'
+    archiveFileName = 'E257_DefaultPack.zip'
+    destinationDirectory = layout.buildDirectory.dir('generated_bundled_packs')
+}
+
+tasks.named('jar', Jar).configure {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    dependsOn buildE257DefaultPack
+    //LGPL-3.0 §4(b): 頒布物には GNU GPL と本ライセンス文書のコピーを添付すること。
+    from('LICENSE') { rename { 'LICENSE_LGPL-3.0.txt' } }
+    from('COPYING') { rename { 'LICENSE_GPL-3.0.txt' } }
+    from(buildE257DefaultPack.flatMap { it.archiveFile }) {
+        into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
+    }
+    from('bundled_pack_src/E257_DefaultPack/Readme.txt') {
+        into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
+        rename { 'E257_DefaultPack_Readme.txt' }
+    }
+}
+
+//★同梱パックを <b>開発実行にも</b> 行き渡らせる。
+//jar タスクだけで足していると runClient / runServer では同梱パックが存在せず、
+//NGTFileLoader が「indexed 0 pack assets」になって<b>モデルが 1 つも出ない</b>。
+//本番と開発で挙動が変わると移植の検証にならないので、資源出力にも同じ物を置く。
+//
+//★processResources へ直接足さないこと。あちらは
+//  exclude 'assets/realtrainmodunofficial/bundled_packs/**' を持っており、
+//  この除外は<b>タスク全体</b>に効くので from で足しても同じ理由で捨てられる。
+//  そこで別タスクで後から置く。
+def installDevBundledPacks = tasks.register('installDevBundledPacks', Copy) {
+    dependsOn tasks.named('processResources')
+    from(buildE257DefaultPack.flatMap { it.archiveFile })
+    from('bundled_pack_src/E257_DefaultPack/Readme.txt') {
+        rename { 'E257_DefaultPack_Readme.txt' }
+    }
+    into layout.buildDirectory.dir('resources/main/assets/realtrainmodunofficial/bundled_packs/vehicle')
+}
+tasks.named('classes').configure { dependsOn installDevBundledPacks }
+
+tasks.withType(ProcessResources).configureEach {
+    //NeoForge 版と同じ除外 (重複モデルや車パックは同梱しない)。
+    exclude 'assets/rtm/models/**'
+    exclude 'assets/rtm/advancements/lay_rail.json'
+    exclude 'assets/rtm/advancements/drive_train.json'
+    exclude 'assets/rtm/textures/items/large_rail*.png'
+    exclude 'assets/rtm/textures/train/**'
+    exclude 'assets/realtrainmodunofficial/bundled_packs/**'
+    exclude 'assets/realtrainmodunofficial/vehicle_packs/**'
+    exclude 'assets/realtrainmodunofficial/models/car/**'
+    exclude 'assets/realtrainmodunofficial/textures/car/**'
+    exclude 'assets/realtrainmodunofficial/models/test-model.mqo'
+    //NeoForge 版の記述子は使わない。
+    exclude 'META-INF/neoforge.mods.toml'
+
+    var replaceProperties = [
+            minecraft_version    : minecraft_version,
+            fabric_loader_version: fabric_loader_version,
+            mod_id               : mod_id,
+            mod_name             : mod_name,
+            mod_license          : mod_license,
+            mod_version          : mod_version,
+            mod_authors          : mod_authors,
+            mod_description      : mod_description,
+    ]
+    inputs.properties replaceProperties
+    filesMatching(['fabric.mod.json']) {
+        expand replaceProperties
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+    it.options.encoding = 'UTF-8'
+    //移植中は警告が大量に出るので抑える (エラーだけ見たい)。
+    it.options.compilerArgs << '-nowarn'
+}
+
+//★NeoForge 版の jar を上書きしないよう、Modrinth プロファイルへの自動配置はしない。
+//同じ mods フォルダへ入れると二重ロードになる。動作確認は Fabric 専用プロファイルへ手で入れる。

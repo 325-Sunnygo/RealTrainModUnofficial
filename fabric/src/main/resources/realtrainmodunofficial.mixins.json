@@ -1,0 +1,33 @@
+{
+  "required": true,
+  "package": "com.portofino.polygondtrainmod.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BlockLightEngineMixin",
+    "LightEngineAccessor",
+    "DimensionDataStorageMixin",
+    "PackRepositoryMixin",
+    "PlayerMixin"
+  ],
+  "client": [
+    "CameraAnglesMixin",
+    "CameraMixin",
+    "GameRendererMixin",
+    "GuiLayerMixin",
+    "ItemInHandRendererMixin",
+    "KeyMappingAccessor",
+    "KeyMappingMixin",
+    "KeyboardHandlerMixin",
+    "MinecraftInteractionMixin",
+    "MinecraftScreenMixin",
+    "MouseHandlerMixin",
+    "SoundBufferAccessor",
+    "SoundBufferLibraryMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

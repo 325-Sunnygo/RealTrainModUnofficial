@@ -1,0 +1,26 @@
+{
+  "name": "ShieldMachine",
+  "model": {
+      "modelFile": "ShieldMachine.mqo",
+      "textures": [["default", "textures/vehicle/shield_machine.png", ""]],
+      "rendererPath": "scripts/RenderShieldMachine.js"
+  },
+  "buttonTexture": "textures/vehicle/button_ShieldMachine.png",
+  "vehicleType": "Car",
+  "size": [2.5, 4.0],
+  "playerPos": [[0.0, 2.5, 0.0]],
+  "vibration":[0.01, 0.025],
+  "useCustomColor": true,
+  "smoothing": true,
+  "doCulling": true,
+  "changeYawOnStopping": true,
+  "accuracy": "MEDIUM",
+  "tags": "ngt5479",
+  "serverScriptPath": "scripts/server/ShieldMachine.js",
+  "customButtons": [
+    ["STOP", "DRIVING"],
+    ["REGULAR", "REVERSE"]
+  ],
+  "customButtonTips": ["stop/drive", "reverse"],
+	"collisionParts": ["-all"]
+}

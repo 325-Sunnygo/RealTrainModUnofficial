@@ -1,0 +1,11 @@
+accessWidener	v2	named
+
+# NeoForge はアクセス変換でここを開けている。Fabric では access widener で同じことをする。
+# Screen.renderables: 画面のウィジェット一覧を走査する (ボタンの差し込み・当たり判定)
+accessible	field	net/minecraft/client/gui/screens/Screen	renderables	Ljava/util/List;
+# Player.closeContainer: 乗車時に開いている GUI を閉じる (jp.ngt.mccompat.EntityCompatUtil)
+accessible	method	net/minecraft/world/entity/player/Player	closeContainer	()V
+# ItemOverrides の引数なしコンストラクタ: バニラでは private、NeoForge はアクセス変換で開けている。
+# customIconTexture は「元のモデルを包んで overrides だけ差し替える」作りなので、
+# ここを継承できないと customIconTexture が丸ごと効かない (CustomIconItemModel.Wrapper)。
+accessible	method	net/minecraft/client/renderer/block/model/ItemOverrides	<init>	()V

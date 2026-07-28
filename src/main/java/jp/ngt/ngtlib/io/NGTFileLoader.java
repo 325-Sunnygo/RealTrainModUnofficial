@@ -92,6 +92,16 @@ public final class NGTFileLoader {
                 }
                 return bundled;
             }
+            //★TypeScript のパックへの配慮。定義 JSON が "scripts/Foo.js" のままでも、
+            //  同梱されているのが Foo.ts なら拾う。逆は起きない (.ts を書いた人は .ts を指す)。
+            String ts = com.portofino.realtrainmodunofficial.script.TypeScriptTranspiler
+                .toTypeScriptPath(key);
+            if (ts != null) {
+                byte[] alt = findAsset(ts);
+                if (alt != null) {
+                    return alt;
+                }
+            }
             MISSING_CACHE.add(key);
             return null;
         }

@@ -1,0 +1,27 @@
+{
+    "display": {
+        "icon": {
+            "item": "rtm:train_workbench",
+            "data": 0
+        },
+        "title": {
+            "translate": "advancements.rtm.get_rtm_workbench.title"
+        },
+        "description": {
+            "translate": "advancements.rtm.get_rtm_workbench.description"
+        }
+    },
+    "parent": "rtm:get_steel",
+    "criteria": {
+        "get_rtm_workbench": {
+            "trigger": "minecraft:inventory_changed",
+            "conditions": {
+                "items": [
+                    {
+                        "item": "rtm:train_workbench"
+                    }
+                ]
+            }
+        }
+    }
+}
