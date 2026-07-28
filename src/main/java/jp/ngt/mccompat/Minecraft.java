@@ -21,6 +21,36 @@ public final class Minecraft {
      */
     public final EntityRendererCompat field_71460_t = new EntityRendererCompat();
 
+    /**
+     * ingameGUI (SRG field_71456_v)。スクリプトがチャット欄の開閉を見るのに使う。
+     */
+    public final GuiIngameCompat field_71456_v = new GuiIngameCompat();
+
+    public static final class GuiIngameCompat {
+        private final GuiNewChatCompat chat = new GuiNewChatCompat();
+
+        /** getChatGUI */
+        public GuiNewChatCompat func_146158_b() {
+            return this.chat;
+        }
+    }
+
+    public static final class GuiNewChatCompat {
+        /**
+         * getChatOpen: チャット入力欄が開いているか。
+         * ★クライアント専用クラスに触るので必ず握り潰す。サーバーで呼ばれても落とさない。
+         */
+        public boolean func_146241_e() {
+            try {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                return mc != null
+                    && mc.screen instanceof net.minecraft.client.gui.screens.ChatScreen;
+            } catch (Throwable ignored) {
+                return false;
+            }
+        }
+    }
+
     public static final class EntityRendererCompat {
         /** 1.7.10 disableLightmap */
         public void func_78483_a(double partialTicks) {

@@ -49,9 +49,6 @@ public final class PackScriptSource {
             // importPackage(net.minecraft.util) 経由の裸 ResourceLocation を互換クラスへ束縛
             // (net.minecraft.util に実クラスを置くとバニラと split package でモジュール解決が落ちる)
             "var ResourceLocation = Java.type('jp.ngt.mccompat.ResourceLocation');\n" +
-            // importPackage(net.minecraft.client) だけで参照される Minecraft も同じ理由で束縛する。
-            // ★配布版は intermediary 名で動くのでパッケージ取り込み自体が効かない。
-            "var Minecraft = Java.type('jp.ngt.mccompat.Minecraft');\n" +
             // LWJGL2 入力 (SRB3/NGTO Builder)
             "var Keyboard = Java.type('jp.ngt.mccompat.input.Keyboard');\n" +
             "var Mouse = Java.type('jp.ngt.mccompat.input.Mouse');\n" +
@@ -182,7 +179,13 @@ public final class PackScriptSource {
             bindOpt("Item", net.minecraft.world.item.Item.class) +
             bindOpt("TileEntity", net.minecraft.world.level.block.entity.BlockEntity.class) +
             // 1.12 Forge の mod 存在チェック (rtm-ts の mc1122 ターゲットが class body で呼ぶ)
-            bindOpt("Loader", "net.minecraftforge.fml.common.Loader");
+            bindOpt("Loader", "net.minecraftforge.fml.common.Loader") +
+            // importPackage(net.minecraft.client) だけで参照される Minecraft。
+            // ★必ず bindOpt で束縛すること。このシムはクライアント専用クラスを引き込むので、
+            //   素の Java.type だとサーバーでプリリュードごと落ちてスクリプトが全滅する。
+            //   bindOpt なら失敗しても未定義になるだけで、他の束縛は生きる
+            //   (サーバー側スクリプトが Minecraft を使うこと自体が誤り)。
+            bindOpt("Minecraft", "jp.ngt.mccompat.Minecraft");
 
     /** GL 束縛込みの完全版 (描画を GLRecorder に記録する通常経路用)。 */
     /**
