@@ -49,7 +49,7 @@ public final class PackScriptSource {
             // importPackage(net.minecraft.util) 経由の裸 ResourceLocation を互換クラスへ束縛
             // (net.minecraft.util に実クラスを置くとバニラと split package でモジュール解決が落ちる)
             "var ResourceLocation = Java.type('jp.ngt.mccompat.ResourceLocation');\n" +
-            // importPackage(net.minecraft.client) 経由の裸 Minecraft も同じ理由で束縛する。
+            // importPackage(net.minecraft.client) だけで参照される Minecraft も同じ理由で束縛する。
             // ★配布版は intermediary 名で動くのでパッケージ取り込み自体が効かない。
             "var Minecraft = Java.type('jp.ngt.mccompat.Minecraft');\n" +
             // LWJGL2 入力 (SRB3/NGTO Builder)
