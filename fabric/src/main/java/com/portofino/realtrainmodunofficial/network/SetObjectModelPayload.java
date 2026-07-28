@@ -15,8 +15,6 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 /**
  * 設置済みの設置物のモデル/テクスチャを差し替える。
  * 本家 guiIdSelectTileEntityTexture (標識を素手で右クリック → テクスチャ選択) 用。
- * <p>
- * 標識は 1 テクスチャ = 1 定義なので、定義 ID を差し替えるとテクスチャが変わる。
  */
 public record SetObjectModelPayload(BlockPos pos, String definitionId) implements CustomPacketPayload {
 
@@ -48,7 +46,7 @@ public record SetObjectModelPayload(BlockPos pos, String definitionId) implement
                 return;
             }
             InstalledObjectDefinition definition = InstalledObjectRegistry.getById(payload.definitionId());
-            //カテゴリをまたぐ差し替えは許さない (標識のGUIから信号機に化けたりしないように)。
+            // カテゴリをまたぐ差し替えは許さない (標識のGUIから信号機に化けたりしないように)。
             if (definition == null || definition.getCategory() != be.getCategory()) {
                 return;
             }

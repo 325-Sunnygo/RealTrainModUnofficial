@@ -10,20 +10,15 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * {@code ScreenEvent.Opening} の発火点。
- *
- * <p>画面が開く<b>前</b>に横取りできる。RTMU はタイトル画面での警告表示や、
- * 同意前の画面遷移の制御に使っている。
- *
- * <p>★<b>差し替え (setNewScreen) にも対応すること。</b>
- * 取り消しだけ見ていたので、運転席で E を押したときに
- * 「インベントリを運転台 GUI に差し替える」処理が効かず、<b>素のインベントリが開いていた</b>。
+ * ScreenEvent.Opening の発火点。
+ * 画面が開く前に横取りできる。
+ * ★差し替え (setNewScreen) にも対応すること。
  */
 @Mixin(Minecraft.class)
 public class MinecraftScreenMixin {
 
     /**
-     * 差し替えのために自分で {@code setScreen} を呼び直す間だけ立てる。
+     * 差し替えのために自分で setScreen を呼び直す間だけ立てる。
      * これが無いと差し替え後の画面でもう一度イベントが飛び、条件次第で無限に潜る。
      */
     private static boolean rtmu$replacing;

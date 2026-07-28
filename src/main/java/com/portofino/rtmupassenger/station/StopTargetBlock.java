@@ -11,17 +11,14 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * 停止位置目標。<b>透明で当たり判定なし</b>のマーカー。プラットフォームのドアが来る位置に置くと、
+ * 停止位置目標。透明で当たり判定なしのマーカー。
  * 乗客はここへ歩いてきて、列車が停まりドアが開くまで待つ。
- * <p>
- * 描画は INVISIBLE (見えない)、衝突は無し (列車/プレイヤーは通り抜ける)。選択枠 (アウトライン)
- * だけ小さく出るので、狙って破壊できる。
  */
 public class StopTargetBlock extends Block {
 
     public static final MapCodec<StopTargetBlock> CODEC = simpleCodec(StopTargetBlock::new);
 
-    //中央あたりの薄いマーカー枠 (アウトライン用)。衝突には使わない。
+    // 中央あたりの薄いマーカー枠 (アウトライン用)。衝突には使わない。
     private static final VoxelShape OUTLINE = Shapes.box(0.3D, 0.0D, 0.3D, 0.7D, 0.5D, 0.7D);
 
     public StopTargetBlock(Properties properties) {

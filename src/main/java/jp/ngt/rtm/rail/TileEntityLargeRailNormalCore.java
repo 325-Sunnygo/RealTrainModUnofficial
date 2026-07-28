@@ -4,9 +4,7 @@ import jp.ngt.rtm.rail.util.RailMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 本家 jp.ngt.rtm.rail.TileEntityLargeRailNormalCore の忠実移植。
- */
+/** 本家 jp.ngt.rtm.rail.TileEntityLargeRailNormalCore の忠実移植。 */
 public class TileEntityLargeRailNormalCore extends TileEntityLargeRailCore {
 
     public TileEntityLargeRailNormalCore(BlockPos pos, BlockState state) {

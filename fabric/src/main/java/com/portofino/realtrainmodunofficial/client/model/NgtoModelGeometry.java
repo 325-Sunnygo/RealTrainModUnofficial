@@ -34,33 +34,13 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 
 /**
- * 本家の {@code .ngto} (NGTObject) 車両モデルを読む。
- *
- * <p>NGTO は<b>ポリゴンモデルではなくボクセル</b> (ブロックを並べた構造物) で、本家は
- * {@code NGTOModel} が「ブロックをそのまま描く」ことで車両にしている。RTMU は MQO と同じ
- * バッチ表現しか持たないので、ここでブロックの焼き済みモデル ({@link BakedModel}) から
- * 面を取り出してバッチ用の頂点配列へ変換する。テクスチャはブロックアトラス 1 枚で済む。
- *
- * <h2>ファイル形式</h2>
- * <pre>
- * 外側 NBT (非圧縮) { ByteData: byte[] }   ← ByteData 自体が gzip
- *   └ 内側 NBT { SizeX, SizeY, SizeZ, IdList[{Id, Set{Block, Meta}}], BData: byte[] }
- * </pre>
- * <ul>
- *   <li>{@code BData} は 1 セル 1 バイトのパレット番号。本家は書き出しで 128 を引くので
- *       読むときは {@code (b + 128) & 0xFF}</li>
- *   <li>セルの並びは {@code x * ySize * zSize + y * zSize + z} (本家 {@code getBlockSet})</li>
- *   <li>ブロック名は<b>1.7.10 の名前 + メタ</b> ({@code stained_hardened_clay} + 色番号 等)</li>
- * </ul>
- *
- * <h2>座標</h2>
- * 本家 {@code NGTOModel.renderAll} は {@code scale} を掛けてから
- * {@code translate(-xSize/2, 0, -zSize/2)}。ここでは<b>ボクセル単位</b> (1 ブロック = 1) で
- * 中心寄せまでやり、{@code scale} は描画側の {@code def.getModelScale()} に任せる。
+ * 本家の .ngto (NGTObject) 車両モデルを読む。
+ * NGTO はポリゴンモデルではなくボクセル (ブロックを並べた構造物) で、本家は
+ * NGTOModel が「ブロックをそのまま描く」ことで車両にしている。
  */
 public final class NgtoModelGeometry {
 
-    /** 1 頂点あたり x, y, z, nx, ny, nz, u, v。{@code MqoModelLoader.Batch} と同じ並び。 */
+    /** 1 頂点あたり x, y, z, nx, ny, nz, u, v。MqoModelLoader.Batch と同じ並び。 */
     public static final int STRIDE = 8;
 
     private NgtoModelGeometry() {
@@ -83,9 +63,8 @@ public final class NgtoModelGeometry {
     }
 
     /**
-     * {@code .ngtz} は「{@code .ngto} を並べた素の zip」(本家 {@code NGTZ})。
-     * エントリ名から {@code .ngto} を取った物がパーツ名で、スクリプトはこの名前で部分描画する。
-     * パーツごとに同じ変換 (各自のサイズで X/Z 中心寄せ) を掛ける。
+     * .ngtz は「.ngto を並べた素の zip」(本家 NGTZ)。
+     * エントリ名から .ngto を取った物がパーツ名で、スクリプトはこの名前で部分描画する。
      */
     public static List<Part> buildParts(byte[] fileBytes, String modelFile, float scale) {
         if (!isNgtz(modelFile)) {
@@ -153,10 +132,10 @@ public final class NgtoModelGeometry {
         }
         float offX = sizeX * 0.5F;
         float offZ = sizeZ * 0.5F;
-        //本家 NGTOParts.render は glScalef(scale) → glTranslatef(-x/2, 0, -z/2) の順。
-        //= 形状も中心寄せも scale 倍。ここで焼き込む (描画側では掛けない)。
+        // 本家 NGTOParts.render は glScalef(scale) → glTranslatef(-x/2, 0, -z/2) の順。
+        // = 形状も中心寄せも scale 倍。ここで焼き込む (描画側では掛けない)。
         float unit = scale > 0.0F ? scale : 1.0F;
-        //同じ BlockState の焼き済みモデルは使い回す (65000 ボクセル分の getBlockModel を避ける)
+        // 同じ BlockState の焼き済みモデルは使い回す (65000 ボクセル分の getBlockModel を避ける)
         Map<BlockState, BakedModel> models = new HashMap<>();
         Map<BlockState, Boolean> translucentCache = new HashMap<>();
 
@@ -178,10 +157,9 @@ public final class NgtoModelGeometry {
                             open = true;
                         } else {
                             BlockState neighbor = cells[index(nx, ny, nz, sizeY, sizeZ)];
-                            //★バニラ Block.shouldRenderFace と同じ判定にする。
-                            //  以前は「隣が塞いでいなければ描く」だけだったので、ガラス同士の
-                            //  接面など<b>同じ位置に 2 枚</b>出て z ファイティング (チカチカ) していた。
-                            //  本家 NGTOModel はバニラのブロック描画をそのまま使うのでこの問題が無い。
+                            // ★バニラ Block.shouldRenderFace と同じ判定にする。
+                            // 以前は「隣が塞いでいなければ描く」だけだったので、ガラス同士の
+                            // 接面など同じ位置に 2 枚出て z ファイティング (チカチカ) していた。
                             if (state.skipRendering(neighbor, dir)) {
                                 open = false;
                             } else if (!neighbor.canOcclude()) {
@@ -205,7 +183,7 @@ public final class NgtoModelGeometry {
                     FloatList sink = isTranslucent ? translucent : opaque;
                     float ox = x - offX;
                     float oz = z - offZ;
-                    //方向なしの面 (階段・柵など、culling されない部分)
+                    // 方向なしの面 (階段・柵など、culling されない部分)
                     appendQuads(sink, model.getQuads(state, null, random), ox, y, oz, unit);
                     for (Direction dir : Direction.values()) {
                         if (exposed[dir.ordinal()]) {
@@ -222,11 +200,11 @@ public final class NgtoModelGeometry {
     }
 
     private static int index(int x, int y, int z, int sizeY, int sizeZ) {
-        //本家 NGTObject.getBlockSet と同じ並び
+        // 本家 NGTObject.getBlockSet と同じ並び
         return x * sizeY * sizeZ + y * sizeZ + z;
     }
 
-    /** {@link BakedQuad} の頂点 (int 8 個/頂点) を展開して積む。 */
+    /** BakedQuad の頂点 (int 8 個/頂点) を展開して積む。 */
     private static void appendQuads(FloatList sink, List<BakedQuad> quads, float ox, float oy, float oz, float unit) {
         for (BakedQuad quad : quads) {
             int[] data = quad.getVertices();
@@ -275,7 +253,7 @@ public final class NgtoModelGeometry {
         }
     }
 
-    /** {@code BData} (1 バイト/セル・-128 オフセット) か {@code IData}/{@code Blocks} (int/セル)。 */
+    /** BData (1 バイト/セル・-128 オフセット) か IData/Blocks (int/セル)。 */
     private static int[] readCellIds(CompoundTag root, int expected) {
         if (root.contains("IData", Tag.TAG_INT_ARRAY)) {
             return root.getIntArray("IData");
@@ -289,7 +267,7 @@ public final class NgtoModelGeometry {
         byte[] raw = root.getByteArray("BData");
         int[] ids = new int[raw.length];
         for (int i = 0; i < raw.length; i++) {
-            //本家は書き出しで 128 を引いている
+            // 本家は書き出しで 128 を引いている
             ids[i] = (raw[i] + 128) & 0xFF;
         }
         if (ids.length < expected) {
@@ -313,11 +291,8 @@ public final class NgtoModelGeometry {
     }
 
     /**
-     * 1.7.10 のブロック名 + メタ を 1.21 の {@link BlockState} にする。
-     *
-     * <p>1.7.10 は「色違い = 同じブロックのメタ違い」だったので、色付き系は<b>メタが色番号</b>。
-     * 1.21 では色ごとに別ブロックなので引き直す。名前がそのまま 1.21 にあるものは
-     * (stone / glass / iron_block 等) レジストリから直接引く。
+     * 1.7.10 のブロック名 + メタ を 1.21 の BlockState にする。
+     * 1.7.10 は「色違い = 同じブロックのメタ違い」だったので、色付き系はメタが色番号。
      */
     private static final class LegacyBlocks {
         private static final Map<String, BlockState> CACHE = new HashMap<>();
@@ -339,8 +314,8 @@ public final class NgtoModelGeometry {
         private static BlockState resolve(String rawName, int meta) {
             String name = rawName.contains(":") ? rawName.substring(rawName.indexOf(':') + 1) : rawName;
             name = name.toLowerCase(Locale.ROOT);
-            //★空気を先に返す。byName は「AIR が返ってきたら未知」と見なすので、
-            //ここを通さないと<b>パレットの空気が石になり、車体が中身の詰まった塊になる</b>。
+            // ★空気を先に返す。byName は「AIR が返ってきたら未知」と見なすので、
+            // ここを通さないとパレットの空気が石になり、車体が中身の詰まった塊になる。
             if (name.equals("air") || name.equals("cave_air") || name.equals("void_air")) {
                 return Blocks.AIR.defaultBlockState();
             }
@@ -377,7 +352,7 @@ public final class NgtoModelGeometry {
                 RealTrainModUnofficial.LOGGER.warn("[NGTO] 未知のブロック {} (meta {}) → 石で代用", rawName, meta);
                 return Blocks.STONE.defaultBlockState();
             }
-            //階段は 1.7.10 のメタが 向き(0-3) + 上下反転(4)
+            // 階段は 1.7.10 のメタが 向き(0-3) + 上下反転(4)
             if (direct.getBlock() instanceof StairBlock) {
                 return applyStairMeta(direct, meta);
             }

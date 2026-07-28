@@ -1,15 +1,9 @@
 package net.minecraft.client.settings;
 
 /**
- * 1.7.10 の {@code net.minecraft.client.settings.KeyBinding} スタブ。
- *
- * <p>1.21 では {@code net.minecraft.client.KeyMapping} に置き換わり、{@code net.minecraft.client.settings}
- * パッケージ自体が存在しない (=モジュール衝突しない)。1.7.10 mod は
- * {@code new KeyBinding(desc, keyCode, category)} で生成するので、その 3 引数コンストラクタが無いと
- * ClientProxy.preInit が {@code NoSuchMethodError} で落ち、以降のブロック登録に到達しない。
- *
- * <p>キー入力自体は 1.21 のキーシステムに接続しない (mod のキーバインドは効かない) が、
- * 生成・登録・状態問い合わせが例外にならないことでブロック等の読み込みを通す。
+ * 1.7.10 の net.minecraft.client.settings.KeyBinding スタブ。
+ * 1.21 では net.minecraft.client.KeyMapping に置き換わり、net.minecraft.client.settings
+ * パッケージ自体が存在しない (=モジュール衝突しない)。
  */
 public class KeyBinding implements Comparable<KeyBinding> {
     private final String description;

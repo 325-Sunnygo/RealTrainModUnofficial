@@ -17,34 +17,20 @@ import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.util.Mth;
 
 /**
- * 本家 RTM が Java で持っている車両モデル ({@code *.class}) の移植。
- *
- * <p>本家は {@code jp.ngt.rtm.modelpack.model.RTMClassModels} に
- * {@code ModelBogie} / {@code ModelTrain_kiha600} / {@code ModelTrain_Minecart} を持ち、
- * モデルパックの {@code "modelFile": "ModelBogie.class"} からこれを引いている。
- * ファイルとして存在しないので、パックを探しに行っても<b>絶対に見つからない</b>。
- * 移植前の RTMU は「見つからない台車」を汎用台車へ差し替えるか描画自体を諦めていて、
- * kiha600 / minecart は車体が丸ごと出ず、ohmi220 や s300 は台車が消えていた。
- *
- * <p>1.7.10 の {@code ModelRenderer} は 1.21 の {@link ModelPart} と同じ「箱 + テクスチャ
- * オフセット」なので、箱の定義だけ移してバニラに焼かせ、出てきた頂点を掴んで
- * {@link MqoModelLoader} のバッチ表現へ流し込む。UV の割り付けはバニラに任せるので、
- * 手で写して間違える所が無い。
- *
- * <p>座標系: 本家 {@code MCModel.renderAll} は {@code glScalef(1, -1, -1)} を掛けてから
- * 1/16 スケールで箱を描く。1.21 の {@code ModelPart.Cube#compile} が既に 1/16 して
- * くれるので、ここで足すのは {@code (1, -1, -1)} (X 軸 180° 回転) と、車体側の
- * {@code glRotatef(90, 0, 1, 0)} だけ。行列式は正なので面の裏表は変わらない。
+ * 本家 RTM が Java で持っている車両モデル (*.class) の移植。
+ * 本家は jp.ngt.rtm.modelpack.model.RTMClassModels に
+ * ModelBogie / ModelTrain_kiha600 / ModelTrain_Minecart を持ち、
+ * モデルパックの "modelFile": "ModelBogie.class" からこれを引いている。
  */
 public final class ClassModelGeometry {
 
-    /** 1 頂点あたり x, y, z, nx, ny, nz, u, v。{@code MqoModelLoader.Batch} と同じ並び。 */
+    /** 1 頂点あたり x, y, z, nx, ny, nz, u, v。MqoModelLoader.Batch と同じ並び。 */
     public static final int STRIDE = 8;
 
     private ClassModelGeometry() {
     }
 
-    /** 移植済みの {@code *.class} モデルか。 */
+    /** 移植済みの *.class モデルか。 */
     public static boolean isSupported(String modelFile) {
         return builtinName(modelFile) != null;
     }
@@ -58,7 +44,7 @@ public final class ClassModelGeometry {
         return switch (name) {
             case "modelbogie.class" -> "textures/train/bogie.png";
             case "modeltrain_kiha600.class" -> "textures/train/kiha600/kiha600.png";
-            //バニラの minecart テクスチャ。本家もこれを使う。
+            // バニラの minecart テクスチャ。本家もこれを使う。
             case "modeltrain_minecart.class" -> "minecraft:textures/entity/minecart.png";
             default -> null;
         };
@@ -73,9 +59,7 @@ public final class ClassModelGeometry {
         return name.startsWith("modelbogie") ? "bogie" : "body";
     }
 
-    /**
-     * 四角形 (4 頂点/面) の頂点配列を組み立てる。未対応なら null。
-     */
+    /** 四角形 (4 頂点/面) の頂点配列を組み立てる。未対応なら null。 */
     public static float[] build(String modelFile) {
         String name = builtinName(modelFile);
         if (name == null) {
@@ -84,7 +68,7 @@ public final class ClassModelGeometry {
         return switch (name) {
             case "modelbogie.class" -> capture(bakeBogie(), 1.0F, false);
             case "modeltrain_kiha600.class" -> capture(bakeKiha600(), 1.0F, true);
-            //本家 ModelTrain_Minecart は 0.1875 スケール = 1/16 の 3 倍。
+            // 本家 ModelTrain_Minecart は 0.1875 スケール = 1/16 の 3 倍。
             case "modeltrain_minecart.class" -> capture(MinecartModel.createBodyLayer().bakeRoot(), 3.0F, true);
             default -> null;
         };
@@ -104,14 +88,13 @@ public final class ClassModelGeometry {
     }
 
     /**
-     * バニラに焼かせた {@link ModelPart} を描かせて頂点を掴む。
-     *
+     * バニラに焼かせた ModelPart を描かせて頂点を掴む。
      * @param extraScale 追加スケール (minecart の 3 倍など)
-     * @param rotateY90  車体側の {@code glRotatef(90, 0, 1, 0)} 相当を掛けるか
+     * @param rotateY90  車体側の glRotatef(90, 0, 1, 0) 相当を掛けるか
      */
     private static float[] capture(ModelPart root, float extraScale, boolean rotateY90) {
         PoseStack pose = new PoseStack();
-        //本家 MCModel.renderAll の glScalef(1, -1, -1)。X 軸 180° 回転と同じで裏表は反転しない。
+        // 本家 MCModel.renderAll の glScalef(1, -1, -1)。X 軸 180° 回転と同じで裏表は反転しない。
         pose.scale(extraScale, -extraScale, -extraScale);
         if (rotateY90) {
             pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(90.0F));
@@ -124,7 +107,7 @@ public final class ClassModelGeometry {
     private static ModelPart bakeKiha600() {
         MeshDefinition mesh = new MeshDefinition();
         PartDefinition root = mesh.getRoot();
-        //本家 ModelTrain_kiha600.init()。テクスチャは 1024x1024。
+        // 本家 ModelTrain_kiha600.init。テクスチャは 1024x1024。
         addBox(root, "yukasita", 0, 208, -158.0F, 0.0F, -21.0F, 316, 16, 42);
         addBox(root, "yukasita2", 0, 351, -157.0F, 0.0F, -20.0F, 314, 10, 40);
         addBox(root, "yuka", 0, 266, -159.0F, -41.0F, -22.0F, 318, 41, 44);
@@ -138,7 +121,7 @@ public final class ClassModelGeometry {
     private static ModelPart bakeBogie() {
         MeshDefinition mesh = new MeshDefinition();
         PartDefinition root = mesh.getRoot();
-        //本家 ModelBogie.init()。全 44 箱・回転は全てゼロ・テクスチャは 256x256。
+        // 本家 ModelBogie.init。全 44 箱・回転は全てゼロ・テクスチャは 256x256。
         int[] i = {0};
         for (float[] b : BOGIE_BOXES) {
             root.addOrReplaceChild("p" + i[0]++,
@@ -206,8 +189,8 @@ public final class ClassModelGeometry {
     };
 
     /**
-     * {@link ModelPart#render} が投げてくる頂点を掴むだけの {@link VertexConsumer}。
-     * <p>{@code Cube#compile} は 1 面 4 頂点を順に流すので、そのまま四角形として溜まる。
+     * ModelPart#render が投げてくる頂点を掴むだけの VertexConsumer。
+     * Cube#compile は 1 面 4 頂点を順に流すので、そのまま四角形として溜まる。
      */
     private static final class Capture implements VertexConsumer {
         private final List<float[]> vertices = new ArrayList<>();
@@ -268,7 +251,7 @@ public final class ClassModelGeometry {
         }
 
         float[] toArray() {
-            //4 頂点 1 面。端数が出たら面として成立しないので切り捨てる。
+            // 4 頂点 1 面。端数が出たら面として成立しないので切り捨てる。
             int faces = this.vertices.size() / 4;
             float[] out = new float[faces * 4 * STRIDE];
             for (int i = 0; i < faces * 4; i++) {

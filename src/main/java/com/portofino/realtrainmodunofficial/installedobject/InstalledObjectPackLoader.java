@@ -73,7 +73,7 @@ public final class InstalledObjectPackLoader {
         InstalledObjectRegistry.setDefinitions(LOADED);
         long connectors = LOADED.stream().filter(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT
                 || d.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT).count();
-        //カテゴリ別の内訳。「看板の選択画面が空」等の切り分けがログだけでできるようにしておく。
+        // カテゴリ別の内訳。「看板の選択画面が空」等の切り分けがログだけでできるようにしておく。
         java.util.Map<InstalledObjectCategory, Long> byCategory = LOADED.stream()
                 .collect(java.util.stream.Collectors.groupingBy(InstalledObjectDefinition::getCategory,
                         java.util.stream.Collectors.counting()));
@@ -92,7 +92,7 @@ public final class InstalledObjectPackLoader {
                     loadPack(input, path.getFileName().toString());
                 }
             }
-            //RTM-Official-Assets (コネクタ Input01/Output01 等の本家デフォルトモデルを含む)
+            // RTM-Official-Assets (コネクタ Input01/Output01 等の本家デフォルトモデルを含む)
             for (Path path : BundledPackStore.listBundledPacks("official")) {
                 try (InputStream input = Files.newInputStream(path)) {
                     loadPack(input, path.getFileName().toString());
@@ -124,7 +124,7 @@ public final class InstalledObjectPackLoader {
                         }
                     });
             }
-            //標識 (RRS) は JSON を持たず textures/rrs/*.png 自体が選択肢になる。
+            // 標識 (RRS) は JSON を持たず textures/rrs/*.png 自体が選択肢になる。
             Path rrsDir = modFile.findResource("assets", "minecraft", "textures", "rrs");
             if (rrsDir != null && Files.isDirectory(rrsDir)) {
                 try (var stream = Files.list(rrsDir)) {
@@ -181,8 +181,8 @@ public final class InstalledObjectPackLoader {
         if (!fileName.endsWith(".zip") && !fileName.endsWith(".jar")) {
             return false;
         }
-        //mods/ に置かれた自分自身の jar をパックとして読み直さない。
-        //読み直すと jar 同梱の本家定義が二重登録される (BundledPackStore.isOwnModJar 参照)。
+        // mods/ に置かれた自分自身の jar をパックとして読み直さない。
+        // 読み直すと jar 同梱の本家定義が二重登録される (BundledPackStore.isOwnModJar 参照)。
         return !BundledPackStore.isOwnModJar(path);
     }
 
@@ -279,32 +279,27 @@ public final class InstalledObjectPackLoader {
     }
 
     // ---- 標識 (本家 RRS) ----
-    //
-    //本家の標識だけは他の設置物と違って JSON を持たない。ResourceType RRS は
-    //setCustomLoading(true) で textures/rrs/ 以下の png を総なめして「テクスチャそのもの」を
-    //選択肢にする。ここでも同じく、パック/JAR に入っている textures/rrs/*.png を1枚1定義として登録する。
+    // 本家の標識だけは他の設置物と違って JSON を持たない。
 
     private static boolean isRrsTexture(String path) {
         String lower = normalize(path).toLowerCase(Locale.ROOT);
         return lower.endsWith(".png") && lower.contains("textures/rrs/");
     }
 
-    /**
-     * @param path 例: "assets/minecraft/textures/rrs/rrs_01.png"
-     */
+    /** @param path 例: "assets/minecraft/textures/rrs/rrs_01.png" */
     private static void registerRailroadSign(String path, String packName) {
         String normalized = normalize(path);
         int index = normalized.toLowerCase(Locale.ROOT).indexOf("textures/rrs/");
         if (index < 0) {
             return;
         }
-        //パックテクスチャの解決は "textures/..." からの相対パスで行う (MqoModelLoader.resolvePackTexture)。
+        // パックテクスチャの解決は "textures/..." からの相対パスで行う (MqoModelLoader.resolvePackTexture)。
         String texture = normalized.substring(index);
         String name = leaf(texture).replace(".png", "");
         String id = InstalledObjectCategory.RAILROAD_SIGN.name().toLowerCase(Locale.ROOT) + ":" + packName + ":" + name;
         LOADED.add(new InstalledObjectDefinition(
             id, name, packName, InstalledObjectCategory.RAILROAD_SIGN,
-            //モデルは無い。板とポールは BER が直接描く (本家 RenderRailroadSign と同じ)。
+            // モデルは無い。板とポールは BER が直接描く (本家 RenderRailroadSign と同じ)。
             "", "", texture, Map.of(),
             Vec3.ZERO, 1.0F, false,
             1.0F, 1.0F, 0.125F, texture, "", "",
@@ -352,8 +347,8 @@ public final class InstalledObjectPackLoader {
             || file.startsWith("modelconnector_")
             || file.startsWith("modelwire_")
             || file.startsWith("modelcrossing_")
-            //本家 ModelOrnament_ (蛍光灯/架線柱)。ornamentType が Lamp/Pole 以外のもの
-            //(足場/階段/パイプ/植物) は categoryFor が null を返して捨てる。
+            // 本家 ModelOrnament_ (蛍光灯/架線柱)。ornamentType が Lamp/Pole 以外のもの
+            // (足場/階段/パイプ/植物) は categoryFor が null を返して捨てる。
             || file.startsWith("modelornament_")
             || file.startsWith("signboard_")
         );
@@ -380,7 +375,7 @@ public final class InstalledObjectPackLoader {
 
             InstalledObjectCategory category = categoryFor(obj, lower);
             if (category == null) {
-                //未対応の飾り(足場/階段/パイプ/植物)。登録しない。
+                // 未対応の飾り(足場/階段/パイプ/植物)。登録しない。
                 return;
             }
             JsonObject model = getObject(obj, "model");
@@ -400,9 +395,9 @@ public final class InstalledObjectPackLoader {
             );
             Vec3 offset = parseVec3(model, "offset", 1.0 / 16.0);
             float scale = parseFloat(model, "scale", 1.0F);
-            //本家 ModelConfig.smoothing の既定値は false (JSON で明示された時だけスムージング)。
-            //実パックはほぼ全モデルで明示指定しており、未指定モデルを true にすると本家より
-            //滑らかになってしまうため本家に合わせる。
+            // 本家 ModelConfig.smoothing の既定値は false (JSON で明示された時だけスムージング)。
+            // 実パックはほぼ全モデルで明示指定しており、未指定モデルを true にすると本家より
+            // 滑らかになってしまうため本家に合わせる。
             boolean smoothing = getBoolean(obj, "smoothing", false);
             Map<String, String> textures = new HashMap<>(parseTextures(model));
             if (category == InstalledObjectCategory.SIGNAL) {
@@ -447,23 +442,21 @@ public final class InstalledObjectPackLoader {
                 float deflection = parseFloat(obj, "deflectionCoefficient", 0.0F);
                 def.setWireParams(sectionLength, deflection);
             }
-            //本家 KaizPatchX の customIconTexture。持ち物欄でのアイテムの絵を差し替える。
-            //架線柱のように「1 つのアイテムで中身を選ぶ」物を見分けるための機能で、
-            //本家では ModelOrnament_LinePole01〜/SignalPole01 が使っている。
+            // 本家 KaizPatchX の customIconTexture。持ち物欄でのアイテムの絵を差し替える。
+            // 架線柱のように「1 つのアイテムで中身を選ぶ」物を見分けるための機能で、
+            // 本家では ModelOrnament_LinePole01〜/SignalPole01 が使っている。
             def.setCustomIconTexture(firstNonBlank(getString(obj, "customIconTexture"),
                 model == null ? null : getString(model, "customIconTexture")));
             def.setWireAttachPos(parseVec3(obj, "wirePos", 1.0));
-            //本家 connectorType ("Relay"/"Input"/"Output")。NGTO Builder がリレー碍子判定に使う。
+            // 本家 connectorType ("Relay"/"Input"/"Output")。NGTO Builder がリレー碍子判定に使う。
             def.setSubType(firstNonBlank(getString(obj, "connectorType"), getString(obj, "ConnectorType")));
-            //本家 MachineConfig.rotateByMetadata。true の照明はクリック面 (meta) で回して置く。
+            // 本家 MachineConfig.rotateByMetadata。true の照明はクリック面 (meta) で回して置く。
             def.setRotateByMetadata(getBoolean(obj, "rotateByMetadata", false));
-            //本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate が回るスクリプト
-            //(列車検知器は全ての処理をここに書く)。
+            // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate が回るスクリプト
+            // (列車検知器は全ての処理をここに書く)。
             def.setServerScriptPath(getString(obj, "serverScriptPath"));
-            //本家 ModelConfig.doCulling (既定 false = 両面描画)。本家 ModelObject.render は
-            //車両も設置オブジェクトも同じ経路で !doCulling のとき GL_CULL_FACE を切る。
-            //未移植だったため設置オブジェクトが常に片面になり、片面モデリングの架線・踏切が
-            //裏側から消えていた。
+            // 本家 ModelConfig.doCulling (既定 false = 両面描画)。
+            // 車両も設置オブジェクトも同じ経路で !doCulling のとき GL_CULL_FACE を切る。
             def.setDoCulling(getBoolean(obj, "doCulling", false));
             LOADED.add(def);
         } catch (Exception e) {
@@ -479,10 +472,10 @@ public final class InstalledObjectPackLoader {
         String name = file.replace(".json", "");
         String id = InstalledObjectCategory.SIGNBOARD.name().toLowerCase(Locale.ROOT) + ":" + packName + ":" + name;
         int frame = (int) getDouble(obj, "frame", 1.0);
-        //本家 SignboardConfig.backTexture は初期化子が無く init() でも補正されないので、
-        //キーが無いときの既定は 0 (= 表と同じテクスチャを裏にも貼る)。1 にすると
-        //backTexture を書いていない設定 (ngt_b01/b02/b03/c01/test01) でテクスチャが
-        //左半分だけ引き伸ばされてしまう。
+        // 本家 SignboardConfig.backTexture は初期化子が無く init でも補正されないので、
+        // キーが無いときの既定は 0 (= 表と同じテクスチャを裏にも貼る)。1 にすると
+        // backTexture を書いていない設定 (ngt_b01/b02/b03/c01/test01) でテクスチャが
+        // 左半分だけ引き伸ばされてしまう。
         int backTexture = (int) getDouble(obj, "backTexture", 0.0);
         InstalledObjectDefinition def = new InstalledObjectDefinition(
             id,
@@ -507,7 +500,7 @@ public final class InstalledObjectPackLoader {
             frame,
             backTexture
         );
-        //本家 SignboardConfig: アニメ周期 / 板の側面色 / 発光量。
+        // 本家 SignboardConfig: アニメ周期 / 板の側面色 / 発光量。
         def.setSignboardParams(
             (int) getDouble(obj, "animationCycle", 1.0),
             (int) getDouble(obj, "color", 0.0),
@@ -533,7 +526,6 @@ public final class InstalledObjectPackLoader {
 
     /**
      * JSON から設置物カテゴリを決める。
-     *
      * @return null = 対応していない種類 (足場/階段/パイプ/植物など)。呼び出し側は登録せず捨てる。
      */
     private static InstalledObjectCategory categoryFor(JsonObject obj, String lowerFile) {
@@ -575,7 +567,7 @@ public final class InstalledObjectPackLoader {
         String hay = lowerFile + " " + name + " " + machineType;
 
         // 明示プレフィックスを最優先。
-        //本家 ModelConnector_*.json の connectorType: "Input"/"Output" (入出力コネクタ)
+        // 本家 ModelConnector_*.json の connectorType: "Input"/"Output" (入出力コネクタ)
         String connectorType = firstNonBlank(getString(obj, "connectorType"), getString(obj, "ConnectorType"));
         if (connectorType != null && !connectorType.isBlank()) {
             if (connectorType.equalsIgnoreCase("Input")) {
@@ -591,9 +583,8 @@ public final class InstalledObjectPackLoader {
         if (lowerFile.startsWith("modelwire_")) {
             return InstalledObjectCategory.WIRE;
         }
-        //本家 ModelOrnament_*.json は ornamentType (Lamp/Pole/Stair/Scaffold/Pipe/Plant) で種類が決まる。
-        //移植済みは Lamp(蛍光灯) と Pole(架線柱) だけなので、それ以外は null で捨てる。
-        //捨てないと汎用フォールバックの INSULATOR に落ちて、碍子の選択欄が植物や足場で埋まる。
+        // 本家 ModelOrnament_*.json は ornamentType (Lamp/Pole/Stair/Scaffold/Pipe/Plant) で種類が決まる。
+        // 移植済みは Lamp(蛍光灯) と Pole(架線柱) だけなので、それ以外は null で捨てる。
         if (lowerFile.startsWith("modelornament_")) {
             if (ornamentType.equals("lamp") || containsAny(lowerFile, "fluorescent", "蛍光灯")) {
                 return InstalledObjectCategory.FLUORESCENT;
@@ -601,7 +592,7 @@ public final class InstalledObjectPackLoader {
             if (ornamentType.equals("pole") || containsAny(lowerFile, "pole", "架線柱")) {
                 return InstalledObjectCategory.OVERHEAD_LINE_POLE;
             }
-            //本家 ModelOrnament_Pipe01 / Pipe01_Connectable (ornamentType="Pipe")
+            // 本家 ModelOrnament_Pipe01 / Pipe01_Connectable (ornamentType="Pipe")
             if (ornamentType.equals("pipe") || containsAny(lowerFile, "pipe", "パイプ")) {
                 return InstalledObjectCategory.PIPE;
             }
@@ -609,11 +600,7 @@ public final class InstalledObjectPackLoader {
         }
         // 踏切は改札より先に判定する(CrossingGate を "gate" で改札に誤分類しないため)。
         // 本家 RTM は machineType="Gate" (RTMResource.MACHINE_GATE = MACHINE.getSubType("Gate"),
-        // 既定 "CrossingGate01L") をすべて踏切カテゴリに入れる。名前やファイル名に "crossing" を
-        // 含まない踏切系設置物 (hi03 Train Melodies の ModelMachine_hi03ECDM-* など、machineType が
-        // 素の "Gate" でメロディ音を鳴らす音響ブロック) が、キーワード判定を素通りして modelmachine_
-        // フォールバックの LIGHT に落ち、踏切の選択画面に出てこなくなっていた。machineType の完全一致で
-        // 拾えば本家と同じく踏切に並ぶ。改札(Turnstile)や券売機は machineType が別なので誤取り込みしない。
+        // 既定 "CrossingGate01L") をすべて踏切カテゴリに入れる。
         if (lowerFile.startsWith("modelcrossing_") || looksLikeCrossing
                 || machineType.equals("gate")
                 || containsAny(hay, "crossing", "fumikiri", "踏切", "toryanse")) {
@@ -627,16 +614,16 @@ public final class InstalledObjectPackLoader {
         if (looksLikeSpeaker || containsAny(hay, "speaker", "スピーカ")) {
             return InstalledObjectCategory.SPEAKER;
         }
-        //本家 ModelMachine_BumpingPost_Type2.json: machineType="BumpingPost" (車止め)
+        // 本家 ModelMachine_BumpingPost_Type2.json: machineType="BumpingPost" (車止め)
         if (machineType.equals("bumpingpost") || containsAny(hay, "bumpingpost", "bumping_post", "車止め")) {
             return InstalledObjectCategory.BUMPING_POST;
         }
-        //本家 ModelMachine_Point01M/A.json: machineType="Point" (転轍機)。
-        //"point" は一般語すぎるので machineType の完全一致かファイル名プレフィックスでしか拾わない。
+        // 本家 ModelMachine_Point01M/A.json: machineType="Point" (転轍機)。
+        // "point" は一般語すぎるので machineType の完全一致かファイル名プレフィックスでしか拾わない。
         if (machineType.equals("point") || lowerFile.startsWith("modelmachine_point") || hay.contains("転轍")) {
             return InstalledObjectCategory.POINT;
         }
-        //本家 ModelMachine_Vendor01/02.json: machineType="Vendor" (券売機)
+        // 本家 ModelMachine_Vendor01/02.json: machineType="Vendor" (券売機)
         if (machineType.equals("vendor") || containsAny(hay, "ticketvendor", "ticket_vendor", "券売")) {
             return InstalledObjectCategory.TICKET_VENDOR;
         }
@@ -647,14 +634,14 @@ public final class InstalledObjectPackLoader {
         if (containsAny(hay, "signboard", "sign_board", "billboard", "看板")) {
             return InstalledObjectCategory.SIGNBOARD;
         }
-        //本家 ATC 地上子: ModelMachine_ATC_01/02.json の machineType は "Antenna_Send" (検知器の送信側)。
-        //レールに signal を書き込む。検知器 (Antenna_Receive) と紛れないよう先に判定する。
+        // 本家 ATC 地上子: ModelMachine_ATC_01/02.json の machineType は "Antenna_Send" (検知器の送信側)。
+        // レールに signal を書き込む。検知器 (Antenna_Receive) と紛れないよう先に判定する。
         if (machineType.equals("antenna_send") || lowerFile.startsWith("modelmachine_atc")
                 || containsAny(hay, "antenna_send", "地上子")) {
             return InstalledObjectCategory.ATC;
         }
-        //本家 列車検知器: ModelMachine_TrainDetector_01.json の machineType は "Antenna_Receive"。
-        //照明の受け皿より先に判定しないと、検知器が照明カテゴリに落ちて選択に出てこない。
+        // 本家 列車検知器: ModelMachine_TrainDetector_01.json の machineType は "Antenna_Receive"。
+        // 照明の受け皿より先に判定しないと、検知器が照明カテゴリに落ちて選択に出てこない。
         if (containsAny(hay, "antenna_receive", "traindetector", "train_detector", "列車検知", "電車検知")) {
             return InstalledObjectCategory.TRAIN_DETECTOR;
         }

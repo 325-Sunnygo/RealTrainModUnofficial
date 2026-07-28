@@ -8,17 +8,13 @@ import jp.ngt.rtm.entity.train.EntityTrainBase;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.util.BogieController (KaizPatchX) の忠実移植。
- */
+/** 本家 jp.ngt.rtm.entity.train.util.BogieController (KaizPatchX) の忠実移植。 */
 public class BogieController {
     private final EntityBogie[] bogies = new EntityBogie[2];
 
-    //===== 車体サスペンション (RTMU オリジナル機能) =====
-    //台車はレールへ正確に追従させたまま、車体の Y だけを空気ばね風のばね-ダンパーに通す。
-    //継ぎ目・勾配の折れ目で車体がわずかに沈んで揺り戻す「生きている」上下動を出す。
-    //ピッチ (前後傾) は付けない — 大きく傾けると車体が地形にめり込んで黒くチラつくため、
-    //ピッチは常にレール実測値どおりにする。可動域も地面へ埋まらないようクランプする。
+    // ===== 車体サスペンション (RTMU オリジナル機能) =====
+    // 台車はレールへ正確に追従させたまま、車体の Y だけを空気ばね風のばね-ダンパーに通す。
+    // 継ぎ目・勾配の折れ目で車体がわずかに沈んで揺り戻す「生きている」上下動を出す。
     private boolean suspInit;
     private double suspY;
     private double suspYVel;
@@ -43,9 +39,7 @@ public class BogieController {
 
     /**
      * レール継ぎ目 (レール core 境界) 通過時の「ガタン」(RTMU オリジナル)。
-     * レール形状は継ぎ目でも連続なので自然な段差入力が無い。台車が継ぎ目を踏んだ瞬間に
-     * サスペンションへ下向きの速度を小さく与え、車体がコトンと沈んで揺り戻す。
-     * 速度に比例 (停車中は無し)。ピッチは付けない (車体を傾けて地形へめり込ませないため)。
+     * レール形状は継ぎ目でも連続なので自然な段差入力が無い。
      */
     public void onRailJoint(EntityBogie bogie, float speed) {
         if (!this.suspInit) {
@@ -152,11 +146,9 @@ public class BogieController {
         }
     }
 
-    /**
-     * 台車2つを元に車体位置を更新
-     */
+    /** 台車2つを元に車体位置を更新 */
     private void updateTrainPos(EntityTrainBase train, float lf, float lb) {
-        //車体長分の先頭側台車の位置
+        // 車体長分の先頭側台車の位置
         double d0 = Math.abs(lf) / (Math.abs(lf - lb));
         double[] fp = this.getBogie(0).getPosBuf();
         double[] bp = this.getBogie(1).getPosBuf();
@@ -172,7 +164,7 @@ public class BogieController {
         float pitch = Mth.wrapDegrees((float) NGTMath.toDegrees(Math.atan2(y0, Math.sqrt(x0 * x0 + z0 * z0))));
         float roll = (this.getBogie(0).rotationRoll + -(this.getBogie(1).rotationRoll)) * 0.5F;
 
-        //カント分車体をずらす
+        // カント分車体をずらす
         Vec3 vec = new Vec3(0.0D, EntityTrainBase.TRAIN_HEIGHT, 0.0D);
         vec = vec.rotateAroundZ(-roll);
         vec = vec.rotateAroundY(yaw);
@@ -180,9 +172,9 @@ public class BogieController {
         y += vec.getY() - EntityTrainBase.TRAIN_HEIGHT;
         z += vec.getZ();
 
-        //車体サスペンション (RTMU独自の「沈んで揺り戻す」上下動) は<b>坂で列車が沈んで戻るを
-        //繰り返して見える</b>と報告されたため無効化。車体 Y は台車中点の理想値をそのまま使い、
-        //レールにぴったり乗せる (上下振動なし)。※フィールド/onRailJoint は将来の再利用のため残置。
+        // 車体サスペンション (RTMU独自の「沈んで揺り戻す」上下動) は坂で列車が沈んで戻るを
+        // 繰り返して見えると報告されたため無効化。車体 Y は台車中点の理想値をそのまま使い、
+        // レールにぴったり乗せる (上下振動なし)。※フィールド/onRailJoint は将来の再利用のため残置。
 
         train.setPositionAndRotationDirect(x, y, z, yaw, pitch);
         train.updateRoll(roll);
@@ -192,7 +184,7 @@ public class BogieController {
     }
 
     /**
-     * 車体位置を元に台車位置を更新<br>
+     * 車体位置を元に台車位置を更新
      * 台車位置を再計算することで、車体とのずれを解消する
      */
     public void updateBogiePos(EntityTrainBase train, int bogieIndex, UpdateFlag flag) {
@@ -204,17 +196,11 @@ public class BogieController {
     }
 
     public enum UpdateFlag {
-        /**
-         * 全Rotationを更新
-         */
+        /** 全Rotationを更新 */
         ALL,
-        /**
-         * Yawのみ更新、転車台で使用
-         */
+        /** Yawのみ更新、転車台で使用 */
         YAW,
-        /**
-         * Rotation更新なし
-         */
+        /** Rotation更新なし */
         NONE
     }
 }

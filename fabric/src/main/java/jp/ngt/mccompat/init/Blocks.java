@@ -34,7 +34,6 @@ public final class Blocks {
     public static final Block field_150410_aZ = net.minecraft.world.level.block.Blocks.GLASS_PANE;
 
     // ---- レッドストーン出力系 (列車検知器のサーバースクリプトが置く) ----
-    //
     // 1.7.10 は「1 ブロック + メタで 16 色」だったので、色付きブロックは白色版を
     // 代表として置き、メタは WorldCompat.func_147465_d が色に読み替える。
 
@@ -54,7 +53,7 @@ public final class Blocks {
     public static final Block field_150442_at = net.minecraft.world.level.block.Blocks.LEVER;
 
     // ---- 1.7.10 メタ互換: 1.21 の色別ブロック → (白色版=基準ブロック, 色メタ 0-15) ----
-    // 信号機のブロック検知スクリプト (searchBlockAndMeta) が色ガラス/羊毛/テラコッタの<b>メタ</b>を
+    // 信号機のブロック検知スクリプト (searchBlockAndMeta) が色ガラス/羊毛/テラコッタのメタを
     // 灯火状態として読むが、1.21 は色ごとに別ブロックでメタが無い。そこで getBlock (func_147439_a) は
     // 色別ブロックを白色版へ正規化し、getMetadata (func_72805_g) は色番号(0-15)を返すことで
     // 1.7.10 の「1ブロック+メタ16色」を再現する。[[rtmu-api-sweep-complete]] の受け皿方式。
@@ -68,8 +67,8 @@ public final class Blocks {
     /** 色別ブロックを白色版(1.7.10 の基準ブロック)へ正規化。非色ブロックはそのまま返す。 */
     /**
      * func_149716_u = Block.hasTileEntity。
-     * <p>レシーバがバニラの {@code Block} でシムを挟めないため、スクリプト変換
-     * ({@code PackScriptSource.remapVanillaOnlyMethods}) がここへ回してくる。
+     * レシーバがバニラの Block でシムを挟めないため、スクリプト変換
+     * (PackScriptSource.remapVanillaOnlyMethods) がここへ回してくる。
      */
     public static boolean func_149716_u(Object block) {
         if (block instanceof net.minecraft.world.level.block.EntityBlock) {

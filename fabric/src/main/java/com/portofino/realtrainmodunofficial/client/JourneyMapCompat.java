@@ -4,11 +4,10 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
- * JourneyMap のミニマップを<b>選択画面を開いている間だけ一時的に無効化</b>するソフト依存ヘルパー。
- * <p>
- * JourneyMap のミニマップは {@code RenderGuiEvent.Pre} で自前のリスナーが無条件に描画しており、
- * {@code hideGui} も NeoForge のイベントキャンセルも無視するため、RTMU 側からは
- * {@code MiniMapProperties.enabled} (ミニマップのオン/オフ) をリフレクションで一時的に false に
+ * JourneyMap のミニマップを選択画面を開いている間だけ一時的に無効化するソフト依存ヘルパー。
+ * JourneyMap のミニマップは RenderGuiEvent.Pre で自前のリスナーが無条件に描画しており、
+ * hideGui も NeoForge のイベントキャンセルも無視するため、RTMU 側からは
+ * MiniMapProperties.enabled (ミニマップのオン/オフ) をリフレクションで一時的に false に
  * するしか消す方法が無い。JourneyMap 未導入時や API 変更時は静かに無効化する (try/catch)。
  */
 public final class JourneyMapCompat {

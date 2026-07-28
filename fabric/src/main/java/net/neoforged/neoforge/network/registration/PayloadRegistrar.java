@@ -11,10 +11,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * シム: NeoForge の playToClient/playToServer を Fabric Networking API v1 へ写像。
- * - 型登録: PayloadTypeRegistry.playS2C()/playC2S()
- * - 受信: ServerPlayNetworking (C2S)。S2C 受信はクライアント専用クラスのため
- *   ClientPayloadBridge (client パッケージ) 経由で登録し、専用サーバーでの
- *   クラスロードを避ける。
+ * - 型登録: PayloadTypeRegistry.playS2C/playC2S
+ * - 受信: ServerPlayNetworking (C2S)。
  */
 public class PayloadRegistrar {
 
@@ -72,7 +70,7 @@ public class PayloadRegistrar {
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
             PlayPayloadHandler<T> handler) {
         playToClient(type, codec, handler);
-        //playToClient で S2C 登録済み。C2S 側の型登録と受信を追加
+        // playToClient で S2C 登録済み。C2S 側の型登録と受信を追加
         PayloadTypeRegistry.playC2S().register(type, codec);
         ServerPlayNetworking.registerGlobalReceiver(type, (payload, context) ->
             handler.handle(payload, new IPayloadContext() {

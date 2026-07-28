@@ -25,20 +25,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.List;
 
 /**
- * ペインター (neo mcte)。本家 MCTE {@code ItemPainter} の移植。
- *
- * <p>クリックした所を中心に、設定した形と大きさでブロックを塗る。
- * エディタで範囲を取るほどでもない細かい修正のための道具。
- *
- * <p>操作:
- * <ul>
- *   <li>ブロックを右クリック: 塗る</li>
- *   <li>スニーク + 右クリック: 消す (空気で塗る)</li>
- *   <li>何もない所を右クリック: 設定画面</li>
- * </ul>
- *
- * <p>設定はスタックの NBT に持つ。本家 {@code PainterSetting} と同じ考え方で、
- * ペインターを複数持てばそれぞれ別の設定にできる。
+ * ペインター (neo mcte)。本家 MCTE ItemPainter の移植。
+ * クリックした所を中心に、設定した形と大きさでブロックを塗る。
  */
 public class PainterItem extends Item {
 
@@ -121,7 +109,7 @@ public class PainterItem extends Item {
             }
         }
         if (changed > 0) {
-            //ペインターの履歴はプレイヤー単位。エディタとは別に戻せる。
+            // ペインターの履歴はプレイヤー単位。エディタとは別に戻せる。
             UndoHistory.push(player.getUUID(), snapshot);
         }
         return InteractionResult.CONSUME;
@@ -137,7 +125,7 @@ public class PainterItem extends Item {
                     return b.defaultBlockState();
                 }
             } catch (Exception ignored) {
-                //不正な指定はオフハンドへ落とす
+                // 不正な指定はオフハンドへ落とす
             }
         }
         ItemStack off = player.getOffhandItem();

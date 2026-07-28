@@ -18,11 +18,8 @@ import java.util.List;
 
 /**
  * 旧ワールド変換の入り口。
- *
- * <ul>
- *   <li>起動時: {@code .minecraft/rtmu_convert/} に置かれた旧ワールドを {@code saves/} へ変換する</li>
- *   <li>ワールドを開いたとき: 変換済みワールドなら RTM オブジェクトを置き直す</li>
- * </ul>
+ * 起動時: .minecraft/rtmu_convert/ に置かれた旧ワールドを saves/ へ変換する
+ * ワールドを開いたとき: 変換済みワールドなら RTM オブジェクトを置き直す
  */
 public final class ConvertEvents {
 

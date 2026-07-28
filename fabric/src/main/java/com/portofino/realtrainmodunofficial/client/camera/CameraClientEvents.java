@@ -17,12 +17,10 @@ import net.neoforged.neoforge.client.event.ViewportEvent;
 
 /**
  * カメラモードのフック一式。
- * <ul>
- *   <li>焦点距離に応じた FOV (望遠)</li>
- *   <li>手とバニラ HUD を隠す (ファインダーに余計なものを出さない)</li>
- *   <li>ワールド描画後・GUI 描画前に ボケ / 流し撮り を掛け、そこで撮影する</li>
- *   <li>ファインダー (グリッド / アスペクトガイド / 水平器 / 設定表示) を描く</li>
- * </ul>
+ * 焦点距離に応じた FOV (望遠)
+ * 手とバニラ HUD を隠す (ファインダーに余計なものを出さない)
+ * ワールド描画後・GUI 描画前に ボケ / 流し撮り を掛け、そこで撮影する
+ * ファインダー (グリッド / アスペクトガイド / 水平器 / 設定表示) を描く
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class CameraClientEvents {
@@ -41,9 +39,9 @@ public final class CameraClientEvents {
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
-        //方向幕/種別幕のアニメーション GIF のフレーム送り (毎 tick)
+        // 方向幕/種別幕のアニメーション GIF のフレーム送り (毎 tick)
         com.portofino.realtrainmodunofficial.client.model.GifTextures.tick();
-        //カメラを持っていない / 死んだ / ワールドを出た → 自動で閉じる
+        // カメラを持っていない / 死んだ / ワールドを出た → 自動で閉じる
         RtmCamera cam = RtmCamera.INSTANCE;
         if (cam.isActive() && (mc.level == null || mc.player == null || !holdingCamera(mc))) {
             cam.close();
@@ -92,8 +90,8 @@ public final class CameraClientEvents {
 
     @SubscribeEvent
     public static void onRenderGuiLayer(RenderGuiLayerEvent.Pre event) {
-        //ファインダー中はバニラ HUD (ホットバー/体力/十字/エフェクト) を全部消す。
-        //チャットだけは残す (撮影完了メッセージを出すため)。
+        // ファインダー中はバニラ HUD (ホットバー/体力/十字/エフェクト) を全部消す。
+        // チャットだけは残す (撮影完了メッセージを出すため)。
         if (!RtmCamera.INSTANCE.isActive()) {
             return;
         }
@@ -133,7 +131,7 @@ public final class CameraClientEvents {
         int w = g.guiWidth();
         int h = g.guiHeight();
 
-        //アスペクトガイド (その外側を黒く落とす) を先に出し、その内側にグリッドを引く
+        // アスペクトガイド (その外側を黒く落とす) を先に出し、その内側にグリッドを引く
         int[] frame = {0, 0, w, h};
         CameraState.AspectGuide guide = cam.state().getAspectGuide();
         if (guide != CameraState.AspectGuide.OFF && guide.ratio > 0.0F) {
@@ -148,7 +146,7 @@ public final class CameraClientEvents {
         }
         drawInfo(g, mc.font, cam, frame);
 
-        //撮影フラッシュ
+        // 撮影フラッシュ
         float flash = cam.getFlash();
         if (flash > 0.0F) {
             int a = (int) (flash * 200.0F) << 24;
@@ -209,7 +207,7 @@ public final class CameraClientEvents {
                 }
             }
             case GOLDEN -> {
-                //対角線 (被写体を対角に乗せる構図)
+                // 対角線 (被写体を対角に乗せる構図)
                 drawLine(g, x0, y0, x1, y1);
                 drawLine(g, x1, y0, x0, y1);
             }
@@ -237,7 +235,7 @@ public final class CameraClientEvents {
         boolean locked = cam.state().getFocusMode() == CameraState.FocusMode.AF_C
             && cam.getFocusTarget().endsWith("●");
         int col = locked ? COL_FOCUS : 0xC0FFFFFF;
-        //四隅のカギ括弧
+        // 四隅のカギ括弧
         for (int sx = -1; sx <= 1; sx += 2) {
             for (int sy = -1; sy <= 1; sy += 2) {
                 int px = cx + sx * r;
@@ -256,14 +254,14 @@ public final class CameraClientEvents {
         int cx = (f[0] + f[2]) / 2;
         int cy = (f[1] + f[3]) / 2;
         float pitch = mc.player.getXRot();
-        //水平からのズレを ±30度で ±60px にマップ
+        // 水平からのズレを ±30度で ±60px にマップ
         int off = (int) (Mth.clamp(pitch, -30.0F, 30.0F) * 2.0F);
         boolean levelOk = Math.abs(pitch) < 0.75F;
         int col = levelOk ? COL_FOCUS : 0x90FFFFFF;
-        //目盛り (真の水平)
+        // 目盛り (真の水平)
         g.fill(cx - 70, cy - 1, cx - 30, cy + 1, 0x50FFFFFF);
         g.fill(cx + 30, cy - 1, cx + 70, cy + 1, 0x50FFFFFF);
-        //現在の傾き
+        // 現在の傾き
         g.fill(cx - 70, cy + off - 1, cx - 30, cy + off + 1, col);
         g.fill(cx + 30, cy + off - 1, cx + 70, cy + off + 1, col);
     }
@@ -274,13 +272,13 @@ public final class CameraClientEvents {
         int y = f[1] + 8;
         int line = 11;
 
-        //焦点距離 / F値 / シャッター (実機の表示に寄せる)
+        // 焦点距離 / F値 / シャッター (実機の表示に寄せる)
         String main = String.format("§f%dmm  §fF%s  §f1/%d",
             Math.round(s.getFocalMm()), fmtF(s.getFStop()), s.getShutterDenominator());
         g.drawString(font, main, x, y, COL_TEXT, true);
         y += line + 2;
 
-        //2 行目: ピント
+        // 2 行目: ピント
         String focus = String.format("§7%s §f%.1fm", s.getFocusMode().label, s.getFocusDistance());
         if (!cam.getFocusTarget().isEmpty()) {
             focus += " §a" + cam.getFocusTarget();
@@ -288,7 +286,7 @@ public final class CameraClientEvents {
         g.drawString(font, focus, x, y, COL_ACCENT, true);
         y += line;
 
-        //3 行目: 流し撮りが効いているときだけ出す
+        // 3 行目: 流し撮りが効いているときだけ出す
         if (s.getMotionBlend() > 0.01F) {
             g.drawString(font, "§e流し撮り", x, y, COL_TEXT, true);
             y += line;
@@ -298,7 +296,7 @@ public final class CameraClientEvents {
             y += line;
         }
 
-        //操作ヒント (右下、控えめに)
+        // 操作ヒント (右下、控えめに)
         String[] hints = {
             "Z/X ズーム (ホイールも)",
             "F/G 絞り",

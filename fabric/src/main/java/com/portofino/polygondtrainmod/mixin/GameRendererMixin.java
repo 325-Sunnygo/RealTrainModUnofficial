@@ -10,14 +10,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * {@code ViewportEvent.ComputeFov} の発火点。
- *
- * <p>RTMU のカメラはレンズ交換で画角を変える。NeoForge はこのイベントで書き換えていた。
+ * ViewportEvent.ComputeFov の発火点。
+ * RTMU のカメラはレンズ交換で画角を変える。NeoForge はこのイベントで書き換えていた。
  */
 @Mixin(GameRenderer.class)
 public class GameRendererMixin {
 
-    //★getFov が返すのは double。Float で受けると ClassCastException で落ちる。
+    // ★getFov が返すのは double。Float で受けると ClassCastException で落ちる。
     @Inject(method = "getFov", at = @At("RETURN"), cancellable = true)
     private void rtmu$computeFov(Camera camera, float partialTick, boolean useConfigured,
                                  CallbackInfoReturnable<Double> cir) {

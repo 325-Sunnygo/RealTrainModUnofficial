@@ -10,7 +10,6 @@ import java.util.List;
 /**
  * 本家 jp.ngt.ngtlib.renderer.NGTRenderHelper のスクリプト互換。
  * renderCustomModel 系はグループ名を GLRecorder に記録し、再生側が本体モデルから描く。
- * addFace/addQuadGui 系は NGTTessellator へ頂点を積む。
  */
 @SuppressWarnings("unused")
 public final class NGTRenderHelper {
@@ -32,7 +31,7 @@ public final class NGTRenderHelper {
         renderNames(null, false, args != null && args.length > 0 ? args[0] : null);
     }
 
-    /** 本家 renderCustomModelExcept: 指定グループ<b>以外</b>を描画。 */
+    /** 本家 renderCustomModelExcept: 指定グループ以外を描画。 */
     public static void renderCustomModelExcept(Object... args) {
         renderNames(collectNames(args, 3), true, args != null && args.length > 0 ? args[0] : null);
     }
@@ -43,7 +42,7 @@ public final class NGTRenderHelper {
      */
     public static void renderCustomModelEveryParts(Object... args) {
         boolean except = args != null && args.length > 2 && Boolean.TRUE.equals(toBoolean(args[2]));
-        //(…, except, smoothing, parts...) と (…, except, smoothing, mode, parts...) の両方がある
+        // (…, except, smoothing, parts...) と (…, except, smoothing, mode, parts...) の両方がある
         int from = args != null && args.length > 4 && args[4] instanceof Number ? 5 : 4;
         renderNames(collectNames(args, from), except, args != null && args.length > 0 ? args[0] : null);
     }

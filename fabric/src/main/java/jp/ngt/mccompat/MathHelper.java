@@ -19,9 +19,7 @@ public final class MathHelper {
         return Mth.wrapDegrees(value);
     }
 
-    /**
-     * 1.12 SRG: wrapDegrees
-     */
+    /** 1.12 SRG: wrapDegrees */
     public static float func_76142_g(float value) {
         return Mth.wrapDegrees(value);
     }
@@ -80,7 +78,7 @@ public final class MathHelper {
 
     // ---- 1.7.10 難読化名エイリアス ----
     // 一部のパックスクリプト (SL の Render_DT580.js 等) は逆コンパイル名ではなく MCP 難読化名
-    // (func_*) で MathHelper を呼ぶ。これらが無いと render() が例外→素モデル全描画にフォール
+    // (func_*) で MathHelper を呼ぶ。これらが無いと render が例外→素モデル全描画にフォール
     // バックし、スクリプトが隠すはずの部品まで出て「動くと二重に見える」不具合になっていた。
     public static float func_76134_b(float rad) { return cos(rad); }           // cos
     public static float func_76126_a(float rad) { return sin(rad); }           // sin

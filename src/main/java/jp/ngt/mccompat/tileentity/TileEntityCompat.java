@@ -5,22 +5,16 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 /**
- * 1.7.10 の {@code TileEntity} の NBT 読み書きを 1.21 へ橋渡しする<b>静的ヘルパー</b>。
- *
- * <p>{@code WorldCompat.func_147438_o} は素の {@link BlockEntity} を返す (スクリプトが
- * 実クラスのメソッドを直接呼ぶため)。したがってラッパーでは包めないので、
- * {@code PackScriptSource.remapVanillaOnlyMethods} が
- * {@code tile.func_145839_a(nbt)} をここへの静的呼び出しへ書き換える。
- *
- * <p>1.21 の NBT 入出力は {@link HolderLookup.Provider} を要求するので、レベルから引いて補う。
+ * 1.7.10 の TileEntity の NBT 読み書きを 1.21 へ橋渡しする静的ヘルパー。
+ * WorldCompat.func_147438_o は素の BlockEntity を返す (スクリプトが
+ * 実クラスのメソッドを直接呼ぶため)。
  */
 public final class TileEntityCompat {
 
     /**
      * field_145850_b = TileEntity.worldObj。
-     * レシーバがバニラ {@code BlockEntity} でフィールドを足せないため、
-     * {@code PackScriptSource.remapFieldAccess} がここへ回してくる。
-     * <pre>NGTO Builder.zip!.../Wire/server_Wire.js:209  tileEntity.field_145850_b</pre>
+     * レシーバがバニラ BlockEntity でフィールドを足せないため、
+     * PackScriptSource.remapFieldAccess がここへ回してくる。
      */
     public static jp.ngt.mccompat.WorldCompat field_145850_b(Object tile) {
         if (tile instanceof net.minecraft.world.level.block.entity.BlockEntity be && be.getLevel() != null) {

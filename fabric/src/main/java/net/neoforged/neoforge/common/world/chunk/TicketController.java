@@ -8,10 +8,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * シム: NeoForge のチケット式強制ロードをバニラの {@code setChunkForced} で近似する。
- *
- * <p>所有者別のチケット管理は持たない。複数の列車が同じチャンクを掴んでいるときに
- * 片方が離すと巻き込みで解除される可能性がある (TODO: 所有者カウントを持たせる)。
+ * シム: NeoForge のチケット式強制ロードをバニラの setChunkForced で近似する。
+ * 所有者別のチケット管理は持たない。
  */
 public class TicketController {
 

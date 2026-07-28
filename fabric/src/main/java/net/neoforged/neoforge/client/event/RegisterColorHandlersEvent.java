@@ -2,9 +2,7 @@ package net.neoforged.neoforge.client.event;
 
 import net.neoforged.bus.api.Event;
 
-/**
- * シム: ColorProviderRegistry (Fabric) へ委譲する。型は呼び出し側の移植時に確定させる。
- */
+/** シム: ColorProviderRegistry (Fabric) へ委譲する。型は呼び出し側の移植時に確定させる。 */
 public abstract class RegisterColorHandlersEvent extends Event {
 
     public static class Block extends RegisterColorHandlersEvent {

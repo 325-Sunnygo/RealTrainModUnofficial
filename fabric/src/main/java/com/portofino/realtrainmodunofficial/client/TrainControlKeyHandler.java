@@ -30,7 +30,7 @@ public final class TrainControlKeyHandler {
     private static boolean shiftWasDown;
     private static int powerHoldTicks = -1;
     private static int brakeHoldTicks = -1;
-    //jp.ngt 列車の W/S 長押しノッチ用
+    // jp.ngt 列車の W/S 長押しノッチ用
     private static int rtmPowerHoldTicks = -1;
     private static int rtmBrakeHoldTicks = -1;
 
@@ -46,7 +46,7 @@ public final class TrainControlKeyHandler {
         if (mc.player == null || mc.screen != null) {
             return;
         }
-        //フリーカメラ中は WASD がカメラ移動に使われるため、運転キー (マスコン/ドア/降車) を無効化
+        // フリーカメラ中は WASD がカメラ移動に使われるため、運転キー (マスコン/ドア/降車) を無効化
         if (FreeCameraController.isActive()) {
             return;
         }
@@ -97,7 +97,7 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "mascon_neutral", 0), new CustomPacketPayload[0]);
         }
 
-        //矢印キー単独でドア開閉 (← = 左ドア, → = 右ドア)
+        // 矢印キー単独でドア開閉 (← = 左ドア, → = 右ドア)
         if (event.getKey() == GLFW.GLFW_KEY_LEFT) {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "toggle_door_left", 0));
             doorLeftChordDown = true;
@@ -108,7 +108,7 @@ public final class TrainControlKeyHandler {
             doorRightChordDown = true;
             return;
         }
-        //↑↓ でレバーサ (前後切り替え)。↑=前進側, ↓=後進側。
+        // ↑↓ でレバーサ (前後切り替え)。↑=前進側, ↓=後進側。
         if (event.getKey() == GLFW.GLFW_KEY_UP) {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "reverser_up", 0));
             return;
@@ -136,9 +136,7 @@ public final class TrainControlKeyHandler {
         }
     }
 
-    /**
-     * 本家: 運転席乗車中にインベントリキー → 運転台 GUI (通常インベントリを差し替え)。
-     */
+    /** 本家: 運転席乗車中にインベントリキー → 運転台 GUI (通常インベントリを差し替え)。 */
     @SubscribeEvent
     public static void onScreenOpening(net.neoforged.neoforge.client.event.ScreenEvent.Opening event) {
         Minecraft mc = Minecraft.getInstance();
@@ -154,9 +152,7 @@ public final class TrainControlKeyHandler {
         }
     }
 
-    /**
-     * jp.ngt.rtm.entity.train.EntityTrainBase 用のキー処理 (Phase 2 先行版)。
-     */
+    /** jp.ngt.rtm.entity.train.EntityTrainBase 用のキー処理 (Phase 2 先行版)。 */
     private static void handleRtmTrainKeys(Minecraft mc, jp.ngt.rtm.entity.train.EntityTrainBase train,
                                            InputEvent.Key event) {
         int id = train.getId();
@@ -164,7 +160,7 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "dismount", 0));
             return;
         }
-        //客席 (座席オフセット搭乗) は降車のみ — マスコン/ドア等の運転操作は不可
+        // 客席 (座席オフセット搭乗) は降車のみ — マスコン/ドア等の運転操作は不可
         if (train.hasSeat(mc.player)) {
             return;
         }
@@ -192,7 +188,7 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "play_horn", 0));
             return;
         }
-        //矢印キー単独でドア開閉 (← = 左ドア, → = 右ドア)
+        // 矢印キー単独でドア開閉 (← = 左ドア, → = 右ドア)
         if (event.getKey() == GLFW.GLFW_KEY_LEFT) {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "toggle_door_left", 0));
             return;
@@ -201,7 +197,7 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "toggle_door_right", 0));
             return;
         }
-        //↑↓ でレバーサ (前後切り替え)。↑=前進側, ↓=後進側。
+        // ↑↓ でレバーサ (前後切り替え)。↑=前進側, ↓=後進側。
         if (event.getKey() == GLFW.GLFW_KEY_UP) {
             PacketDistributor.sendToServer(new TrainControlPayload(id, "reverser_up", 0));
             return;
@@ -211,11 +207,11 @@ public final class TrainControlKeyHandler {
         }
     }
 
-    //座席乗車中の視点追従 (followSeatRotation) は削除した。
-    //本家 (KaizPatchX EntityFloor.updateRiderPosition) は 1.7.10 バニラの
-    //「乗員が車両の回転に追従する」挙動をわざわざ打ち消しており、
-    //座席の視点は運転席と同じく完全フリーが正 (視点が座った角度に
-    //引っ張られてがくがくする副作用もあった)。
+    // 座席乗車中の視点追従 (followSeatRotation) は削除した。
+    // 本家 (KaizPatchX EntityFloor.updateRiderPosition) は 1.7.10 バニラの
+    // 「乗員が車両の回転に追従する」挙動をわざわざ打ち消しており、
+    // 座席の視点は運転席と同じく完全フリーが正 (視点が座った角度に
+    // 引っ張られてがくがくする副作用もあった)。
 
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
@@ -237,7 +233,7 @@ public final class TrainControlKeyHandler {
             return;
         }
 
-        //フリーカメラ中は運転操作 (ノッチ長押し・ドア・降車) を止める
+        // フリーカメラ中は運転操作 (ノッチ長押し・ドア・降車) を止める
         if (FreeCameraController.isActive()) {
             doorLeftChordDown = false;
             doorRightChordDown = false;
@@ -247,16 +243,8 @@ public final class TrainControlKeyHandler {
             return;
         }
 
-        //jp.ngt 本家忠実列車: ノッチの<b>長押しリピートだけ</b>をここで出す。
-        //
-        //★1 回の押下で 2 段進んでいた原因:
-        //  ここは W/S (バニラの前後移動キー) を直接見て「押した瞬間にも 1 段」送っていた。
-        //  一方 onKeyInput → handleRtmTrainKeys も POWER_OFF/BRAKE_OFF の押下で 1 段送る。
-        //  既定値が POWER_OFF=S / BRAKE_OFF=W と<b>移動キーと同じ</b>なので、1 回押すと
-        //  両方から送られて 2 段進んでいた。
-        //
-        //  初回の 1 段は onKeyInput が担当し、ここはリピートのみ (shouldSendRepeat) にする。
-        //  監視するキーも移動キーではなくキーバインド自身にして、リバインドしてもズレないようにする。
+        // jp.ngt 本家忠実列車: ノッチの長押しリピートだけをここで出す。
+        // ★1 回の押下で 2 段進んでいた原因:
         if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain
                 && !rtmTrain.hasSeat(mc.player)) {
             boolean powerHeld = TrainControlKeyMappings.POWER_OFF.isDown();
@@ -319,7 +307,7 @@ public final class TrainControlKeyHandler {
             PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), "mascon_neutral", 0), new CustomPacketPayload[0]);
         }
 
-        //矢印キー単独でドア開閉 (← = 左ドア, → = 右ドア)。押しっぱなしで連打しないようラッチ。
+        // 矢印キー単独でドア開閉 (← = 左ドア, → = 右ドア)。押しっぱなしで連打しないようラッチ。
         boolean leftArrowDown = GLFW.glfwGetKey(mc.getWindow().getWindow(), GLFW.GLFW_KEY_LEFT) == GLFW.GLFW_PRESS;
         boolean rightArrowDown = GLFW.glfwGetKey(mc.getWindow().getWindow(), GLFW.GLFW_KEY_RIGHT) == GLFW.GLFW_PRESS;
         if (leftArrowDown) {
@@ -401,9 +389,9 @@ public final class TrainControlKeyHandler {
     }
 
     private static void resetHoldState() {
-        //注意: rtmPowerHoldTicks/rtmBrakeHoldTicks はここでリセットしない。
-        //このメソッドはレガシー列車が null の tick (= jp.ngt 列車搭乗中) にも
-        //毎 tick 呼ばれるため、リセットすると W/S 長押しカウンタが進まなくなる。
+        // 注意: rtmPowerHoldTicks/rtmBrakeHoldTicks はここでリセットしない。
+        // このメソッドはレガシー列車が null の tick (= jp.ngt 列車搭乗中) にも
+        // 毎 tick 呼ばれるため、リセットすると W/S 長押しカウンタが進まなくなる。
         powerHoldTicks = -1;
         brakeHoldTicks = -1;
     }

@@ -5,9 +5,7 @@ import net.neoforged.bus.api.Event;
 
 /**
  * シム: クライアントのログイン/ログアウト。
- *
- * <p>Fabric 側の対応物は {@code ClientPlayConnectionEvents.JOIN / DISCONNECT}。
- * エントリポイントから post する (配線は {@code RtmuFabricClientInit})。
+ * Fabric 側の対応物は ClientPlayConnectionEvents.JOIN / DISCONNECT。
  */
 public class ClientPlayerNetworkEvent extends Event {
 

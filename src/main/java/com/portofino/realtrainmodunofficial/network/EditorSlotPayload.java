@@ -12,10 +12,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * エディタのスロットへ手持ちのブロックを入れる (neo mcte)。
- *
- * <p>MCTEU の画面はスロットをコンテナではなく<b>自前描画</b>していて、クリックで
+ * MCTEU の画面はスロットをコンテナではなく自前描画していて、クリックで
  * 手持ちのアイテムを写す方式。こちらもそれに合わせる。
- * アイテムは消費しない (見本として登録するだけ)。
  */
 public record EditorSlotPayload(int slot, boolean clear) implements CustomPacketPayload {
 
@@ -53,7 +51,7 @@ public record EditorSlotPayload(int slot, boolean clear) implements CustomPacket
                 editor.setItem(slot, ItemStack.EMPTY);
                 return;
             }
-            //手持ち (メイン優先、無ければオフハンド) のブロックを 1 個だけ写す。消費しない。
+            // 手持ち (メイン優先、無ければオフハンド) のブロックを 1 個だけ写す。消費しない。
             ItemStack src = player.getMainHandItem();
             if (!(src.getItem() instanceof net.minecraft.world.item.BlockItem)) {
                 src = player.getOffhandItem();

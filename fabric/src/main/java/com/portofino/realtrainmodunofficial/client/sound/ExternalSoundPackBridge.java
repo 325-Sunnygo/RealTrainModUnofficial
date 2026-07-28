@@ -53,11 +53,8 @@ public final class ExternalSoundPackBridge {
 
     /**
      * 生成サウンドパックを作り直す (パック同意状態が変わった後などに呼ぶ)。
-     * <p>生成パックはリソースパックとして扱われるため、ファイルを作り直すだけでは
-     * {@code SoundManager} には反映されない。呼び出し後に必ず
-     * {@link net.minecraft.client.Minecraft#reloadResourcePacks()} でリソースを再読込すること。
-     * これをしないと、タイトル画面で README 同意したパックの走行音等が
-     * 「パックには入っているのに次回起動まで鳴らない」状態になる。
+     * 生成パックはリソースパックとして扱われるため、ファイルを作り直すだけでは
+     * SoundManager には反映されない。
      */
     public static void rebuild() {
         rebuildGeneratedPack();
@@ -91,7 +88,7 @@ public final class ExternalSoundPackBridge {
             Map<String, JsonObject> mergedSoundDefs = new HashMap<>();
             for (Path candidate : collectCandidatePacks()) {
                 try {
-                    //README 同意ゲート: 未同意/拒否のパックの音は取り込まない (zip のみ対象)。
+                    // README 同意ゲート: 未同意/拒否のパックの音は取り込まない (zip のみ対象)。
                     if (!Files.isDirectory(candidate)
                             && !com.portofino.realtrainmodunofficial.pack.PackConsent.isAllowed(candidate)) {
                         continue;
@@ -105,11 +102,9 @@ public final class ExternalSoundPackBridge {
                 }
             }
             writeMergedSoundsJson(mergedSoundDefs);
-            //中身が空でも pack.mcmeta を書いて<b>有効なパックとして常に返す</b>。こうしておくと、
-            //起動時に同意済みの音パックが 1 つも無くても pack が登録され、後からタイトル画面で
-            //README 同意 → {@link #rebuild()} + reloadResourcePacks したときに新しい音を足せる。
-            //(以前は空だと pack ごと削除して null=未登録にしていたため、その状況では同意しても
-            // 再読込で音が復活しなかった。)
+            // 中身が空でも pack.mcmeta を書いて有効なパックとして常に返す。
+            // 起動時に同意済みの音パックが 1 つも無くても pack が登録され、後からタイトル画面で
+            // README 同意 → #rebuild + reloadResourcePacks したときに新しい音を足せる。
             writePackMeta();
             return GENERATED_PACK_ROOT;
         } catch (Exception e) {
@@ -281,11 +276,7 @@ public final class ExternalSoundPackBridge {
 
     /**
      * ResourceLocation のパスに使えない文字 (空白・大文字・記号) を安全化する。
-     * 1.21 のリソースパスは [a-z0-9/._-] のみ許可。本家 1.7.10 は緩く、hi03 Train Melodies の
-     * "Amairo no kami no otome.ogg" のように<b>空白・大文字入りのサウンド名</b>を持つパックがあり、
-     * そのままだと ResourceLocation 生成が例外→無音 (踏切ならデフォルトのベル音にフォールバック) になる。
-     * <b>生成側 (このパック) と再生側 (CrossingGateSoundManager / LegacyScriptSoundManager) で必ず同じ変換</b>を
-     * 使うこと。そろっていないと参照先がずれて鳴らない。
+     * 1.21 のリソースパスは [a-z0-9/._-] のみ許可。
      */
     public static String sanitizeSoundPath(String s) {
         if (s == null) {
@@ -330,9 +321,8 @@ public final class ExternalSoundPackBridge {
     }
 
     /**
-     * レガシー音の可聴距離 (ブロック)。MC 既定の 16 は列車には短すぎて
+     * レガシー音の可聴距離 (ブロック)。
      * 「音がすぐ消える」ため、45 ブロックかけて線形に減衰させる。
-     * 実際の減衰終端は max(音量,1)×この値 (音量は {@link LegacyScriptSoundManager} 側で 1.0 に制限)。
      */
     private static final int LEGACY_ATTENUATION_DISTANCE = 45;
 
@@ -390,7 +380,7 @@ public final class ExternalSoundPackBridge {
             return soundEntry;
         }
         if (soundEntry.isJsonPrimitive() && soundEntry.getAsJsonPrimitive().isString()) {
-            //文字列参照はオブジェクト形式へ変換し、可聴距離 45 を付与する
+            // 文字列参照はオブジェクト形式へ変換し、可聴距離 45 を付与する
             return soundReferenceWithRange(namespacedSoundPath(namespace, soundEntry.getAsString()));
         }
         if (!soundEntry.isJsonObject()) {
@@ -423,7 +413,7 @@ public final class ExternalSoundPackBridge {
 
     /**
      * 生成パックに含まれるレガシー音の名前空間 (sound_mugenlib, rtm 等)。
-     * {@link LegacyStereoDownmix} が「どの音をモノラル化するか」の判定に使う。
+     * LegacyStereoDownmix が「どの音をモノラル化するか」の判定に使う。
      */
     private static final java.util.Set<String> GENERATED_NAMESPACES = java.util.concurrent.ConcurrentHashMap.newKeySet();
 

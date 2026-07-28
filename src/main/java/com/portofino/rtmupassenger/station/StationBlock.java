@@ -56,8 +56,8 @@ public class StationBlock extends BaseEntityBlock {
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
                                                Player player, BlockHitResult hit) {
-        //右クリック: 駅を登録し、現在のタグを添えて設定 GUI をクライアントで開く
-        //(旧: Shift+右クリックで 1 個ずつ切替 → GUI で複数タグを ON/OFF に変更)。
+        // 右クリック: 駅を登録し、現在のタグを添えて設定 GUI をクライアントで開く
+        // (旧: Shift+右クリックで 1 個ずつ切替 → GUI で複数タグを ON/OFF に変更)。
         if (!level.isClientSide && level instanceof net.minecraft.server.level.ServerLevel sl
                 && level.getBlockEntity(pos) instanceof StationBlockEntity
                 && player instanceof net.minecraft.server.level.ServerPlayer sp) {

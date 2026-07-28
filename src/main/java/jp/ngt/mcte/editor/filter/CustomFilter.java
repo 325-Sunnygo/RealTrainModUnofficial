@@ -14,17 +14,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * スクリプトで書いた独自フィルタ (neo mcte)。本家 MCTE {@code EditFilterCustom} の移植。
- *
- * <p>{@code <ゲームフォルダ>/mcte/filter/*.js} を読み、本家と同じ 3 つの関数を呼ぶ。
- * <ul>
- *   <li>{@code getFilterName()} — 一覧に出す名前</li>
- *   <li>{@code initFilter(cfg)} — パラメータ宣言 (省略可)</li>
- *   <li>{@code edit(editor, filter)} — 実処理</li>
- * </ul>
- * {@code editor} は {@link ScriptEditor}。範囲外は触れず、Undo も自動で積まれる。
- *
- * <p>スクリプトは<b>サーバ側で実行</b>する。マルチではサーバに置いたものが正。
+ * スクリプトで書いた独自フィルタ (neo mcte)。本家 MCTE EditFilterCustom の移植。
+ * <ゲームフォルダ>/mcte/filter/*.js を読み、本家と同じ 3 つの関数を呼ぶ。
  */
 public class CustomFilter extends EditFilter {
 
@@ -37,7 +28,7 @@ public class CustomFilter extends EditFilter {
         this.fileName = fileName;
     }
 
-    /** {@code <ゲームフォルダ>/mcte/filter} を読み込む。読めないものは飛ばす。 */
+    /** <ゲームフォルダ>/mcte/filter を読み込む。読めないものは飛ばす。 */
     public static List<EditFilter> loadAll() {
         List<EditFilter> out = new ArrayList<>();
         Path dir = FMLPaths.GAMEDIR.get().resolve("mcte").resolve("filter");
@@ -82,7 +73,7 @@ public class CustomFilter extends EditFilter {
         try {
             ScriptUtil.doScriptIgnoreError(engine, "initFilter", new Object[]{cfg});
         } catch (Exception ignored) {
-            //initFilter を持たないスクリプトもある (本家も省略可)
+            // initFilter を持たないスクリプトもある (本家も省略可)
         }
     }
 

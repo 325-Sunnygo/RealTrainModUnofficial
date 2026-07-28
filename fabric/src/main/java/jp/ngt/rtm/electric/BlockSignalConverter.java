@@ -20,7 +20,6 @@ import net.minecraft.world.phys.BlockHitResult;
 /**
  * 本家 jp.ngt.rtm.electric.BlockSignalConverter の移植。
  * 右クリックでタイプ切替 (RSIn/RSOut/Increment/Decrement/Wireless)。
- * ワイヤーで配線網に接続して使用する。
  */
 public class BlockSignalConverter extends BaseEntityBlock {
     public static final MapCodec<BlockSignalConverter> CODEC = simpleCodec(p -> new BlockSignalConverter(p));
@@ -61,9 +60,7 @@ public class BlockSignalConverter extends BaseEntityBlock {
                 TileEntitySignalConverter::tick);
     }
 
-    /**
-     * 本家: 右クリックでタイプ切替
-     */
+    /** 本家: 右クリックでタイプ切替 */
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
         if (!level.isClientSide) {
@@ -101,7 +98,7 @@ public class BlockSignalConverter extends BaseEntityBlock {
 
     @Override
     protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block block, BlockPos fromPos, boolean isMoving) {
-        //RSIn の即時反応 (tick でも監視しているが応答性向上)
+        // RSIn の即時反応 (tick でも監視しているが応答性向上)
         if (!level.isClientSide && state.getValue(TYPE) == SignalConverterType.RSIn.id
                 && level.getBlockEntity(pos) instanceof TileEntitySignalConverter converter) {
             TileEntitySignalConverter.tick(level, pos, state, converter);

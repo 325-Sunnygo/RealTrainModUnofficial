@@ -8,17 +8,15 @@ import java.util.WeakHashMap;
 /**
  * 1.7.10 スクリプト互換のプレイヤーラッパー。
  * SRB3/NGTO Builder 等のパックスクリプトは entity.field_70153_n (rider) や
- * MCWrapperClient.getPlayer() で得たプレイヤーの SRG フィールド
+ * MCWrapperClient.getPlayer で得たプレイヤーの SRG フィールド
  * (field_71071_by = inventory 等) を直接読むため、実 Player を包んで公開する。
- * 同一プレイヤーには常に同一インスタンスを返す (スクリプトの === 比較用)。
- * フィールド値は {@link #refresh()} で更新される (CarEntity の tick / MCWrapperClient から呼ぶ)。
  */
 public final class PlayerCompat {
     private static final Map<Player, PlayerCompat> CACHE = new WeakHashMap<>();
 
     public final Player player;
 
-    // === SRG フィールド (refresh() で更新) ===
+    // === SRG フィールド (refresh で更新) ===
     public double field_70165_t;//posX
     public double field_70163_u;//posY
     public double field_70161_v;//posZ
@@ -35,12 +33,12 @@ public final class PlayerCompat {
     /** 空プレイヤー (player=null)。field_71439_g を絶対 null にしないための null-object。 */
     private PlayerCompat() {
         this.player = null;
-        //refresh() は呼ばない。field_71071_by は空のまま = func_70448_g() が null を返す。
+        // refresh は呼ばない。field_71071_by は空のまま = func_70448_g が null を返す。
     }
 
     /**
      * mc.player が null の瞬間 (ワールド遷移・特定の描画パス等) 用の共有インスタンス。
-     * スクリプトが {@code getMinecraft().field_71439_g.field_71071_by.func_70448_g()} を
+     * スクリプトが getMinecraft.field_71439_g.field_71071_by.func_70448_g を
      * ノーガードで呼んでも (hi03 ATS 地上子 / Baru's Roof 等)、null 手ぶら扱いで落ちない。
      */
     public static final PlayerCompat EMPTY = new PlayerCompat();
@@ -57,9 +55,7 @@ public final class PlayerCompat {
         return c;
     }
 
-    /**
-     * ラッパー/実体どちらからでも実 Player を取り出す。
-     */
+    /** ラッパー/実体どちらからでも実 Player を取り出す。 */
     public static Player unwrap(Object obj) {
         if (obj instanceof PlayerCompat c) {
             return c.player;
@@ -139,8 +135,7 @@ public final class PlayerCompat {
 
         /**
          * func_70448_g = getCurrentItem (今持っているアイテム)。手ぶらなら null。
-         *
-         * <p>Baru's Roof の照明スクリプトは「設置物アイテムを持っている間だけ
+         * Baru's Roof の照明スクリプトは「設置物アイテムを持っている間だけ
          * 目印を描く」ために使う。無いと毎フレーム TypeError で落ちていた。
          */
         public ItemStackCompat func_70448_g() {

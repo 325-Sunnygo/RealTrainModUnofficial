@@ -1,7 +1,7 @@
 package jp.ngt.mccompat;
 
 /**
- * パックスクリプト互換: 1.12 SRG の Minecraft.func_71410_x().func_110434_K() 系。
+ * パックスクリプト互換: 1.12 SRG の Minecraft.func_71410_x.func_110434_K 系。
  * (RTMCore.VERSION に "1.7.10" を含むため通常は旧パスが使われるが、保険として提供)
  */
 public final class Minecraft {
@@ -9,16 +9,15 @@ public final class Minecraft {
     private static final TextureManagerCompat TEXTURE_MANAGER = new TextureManagerCompat();
     private static final LanguageManagerCompat LANGUAGE_MANAGER = new LanguageManagerCompat();
 
-    /** currentScreen (SRG)。refresh() で更新。null なら GUI 非表示。 */
+    /** currentScreen (SRG)。refresh で更新。null なら GUI 非表示。 */
     public Object field_71462_r;
-    /** thePlayer (SRG)。refresh() で更新 (PlayerCompat ラッパー)。 */
+    /** thePlayer (SRG)。refresh で更新 (PlayerCompat ラッパー)。 */
     public PlayerCompat field_71439_g;
-    /** theWorld (SRG)。refresh() で更新。 */
+    /** theWorld (SRG)。refresh で更新。 */
     public WorldCompat field_71441_e;
     /**
-     * entityRenderer (SRG)。500 系等の ForceLighting が
-     * {@code func_78483_a(0.0)} (disableLightmap) / {@code func_78463_b(0.0)} (enableLightmap) を呼ぶ。
-     * disable は no-op (直後の setLightmapMaxBrightness が全灯にする)、enable は環境光へ復帰。
+     * entityRenderer (SRG)。
+     * func_78483_a(0.0) (disableLightmap) / func_78463_b(0.0) (enableLightmap) を呼ぶ。
      */
     public final EntityRendererCompat field_71460_t = new EntityRendererCompat();
 
@@ -48,9 +47,7 @@ public final class Minecraft {
     private Minecraft() {
     }
 
-    /**
-     * getMinecraft
-     */
+    /** getMinecraft */
     public static Minecraft func_71410_x() {
         return INSTANCE;
     }
@@ -67,10 +64,8 @@ public final class Minecraft {
         try {
             net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
             INSTANCE.field_71462_r = mc.screen;
-            //field_71439_g (thePlayer) は<b>絶対に null にしない</b>。mc.player が null の瞬間でも
-            //空プレイヤー (PlayerCompat.EMPTY) を入れる。パックの描画スクリプトは
-            //getMinecraft().field_71439_g.field_71071_by.func_70448_g() をノーガードで呼ぶため、
-            //null だと TypeError で毎フレーム落ちてスクリプトごと無効化されていた (hi03 ATS 地上子等)。
+            // field_71439_g (thePlayer) は絶対に null にしない。
+            // 空プレイヤー (PlayerCompat.EMPTY) を入れる。
             if (mc.player != null) {
                 INSTANCE.field_71439_g = PlayerCompat.of(mc.player);
                 INSTANCE.field_71439_g.refresh();
@@ -84,9 +79,7 @@ public final class Minecraft {
         }
     }
 
-    /**
-     * func_135016_M = getLanguageManager
-     */
+    /** func_135016_M = getLanguageManager */
     public LanguageManagerCompat func_135016_M() {
         return LANGUAGE_MANAGER;
     }
@@ -109,17 +102,13 @@ public final class Minecraft {
         }
     }
 
-    /**
-     * getTextureManager
-     */
+    /** getTextureManager */
     public TextureManagerCompat func_110434_K() {
         return TEXTURE_MANAGER;
     }
 
     public static final class TextureManagerCompat {
-        /**
-         * register (name, DynamicTexture) → ResourceLocation
-         */
+        /** register (name, DynamicTexture) → ResourceLocation */
         public Object func_110578_a(String name, Object dynamicTexture) {
             if (dynamicTexture instanceof DynamicTexture dyn && dyn.image != null) {
                 int handle = TextureUtil.func_110996_a();
@@ -129,9 +118,7 @@ public final class Minecraft {
             return null;
         }
 
-        /**
-         * bindTexture
-         */
+        /** bindTexture */
         public void func_110577_a(Object rl) {
             jp.ngt.ngtlib.util.NGTUtilClient.bindTexture(rl);
         }

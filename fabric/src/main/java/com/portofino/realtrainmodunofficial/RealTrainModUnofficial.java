@@ -24,13 +24,8 @@ public class RealTrainModUnofficial {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     /**
-     * ビルド刻印。同じバージョン番号を再利用してビルドし直しているため、
-     * サーバー/クライアントに<b>どのビルド</b>が入っているかはこれでしか判別できない。
-     * 起動ログに出る。ビルドを更新するたびに日付+連番を上げること。
-     * <p>
-     * <b>ここのバージョンは gradle.properties の mod_version と必ず合わせること。</b>
-     * 報告者から送られるログの判別材料がこれなので、古い番号が残っていると
-     * 「どのビルドで起きたか」を取り違える。
+     * ビルド刻印。
+     * サーバー/クライアントにどのビルドが入っているかはこれでしか判別できない。
      */
     public static final String BUILD_TAG = "1.0.16 (Fabric 移植: キー衝突・描画段階・intermediary 名・設置物の当たり判定・可変光源; MOD 自身の規約は非表示)";
 
@@ -44,7 +39,7 @@ public class RealTrainModUnofficial {
             .displayItems((parameters, output) -> {
                 output.accept(RealTrainModUnofficialItems.TRAIN_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CAR_ITEM.get());
-                //本家 itemMotorman (運転士): 列車に使うと乗車して信号/ダイヤ/マクロで自動運転
+                // 本家 itemMotorman (運転士): 列車に使うと乗車して信号/ダイヤ/マクロで自動運転
                 output.accept(RealTrainModUnofficialItems.MOTORMAN_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.IC_CARD_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.RAIL_ITEM.get());
@@ -53,16 +48,12 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.WRENCH_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CROSSING_GATE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.MARKER_ITEM.get());
-                //neo mcte: タブに出すのは Neo Editor だけ。
-                //ミニチュアは MCTEU のものを使うため、ペインターは Neo Editor と役割が重なるため外した。
-                //★アイテムの登録自体は残してある (機能は消さない):
-                //  ・RTMItem.miniature を参照するパックスクリプトがある
-                //  ・エディタの Miniature フィルタがこのアイテムを渡す
-                //  ・既存ワールドに置かれた分が消えない
-                //  必要なら /give realtrainmodunofficial:miniature (または :painter) で出せる。
+                // neo mcte: タブに出すのは Neo Editor だけ。
+                // ミニチュアは MCTEU のものを使うため、ペインターは Neo Editor と役割が重なるため外した。
+                // ★アイテムの登録自体は残してある (機能は消さない):
                 output.accept(RealTrainModUnofficialItems.EDITOR_ITEM.get());
-                //マーカー(斜め)/分岐マーカー(斜め)/スピーカー はユーザー要望で削除
-                //(本家は通常マーカーが8方位対応のため斜めバリアント不要)
+                // マーカー(斜め)/分岐マーカー(斜め)/スピーカー はユーザー要望で削除
+                // (本家は通常マーカーが8方位対応のため斜めバリアント不要)
                 output.accept(RealTrainModUnofficialItems.MARKER_SWITCH_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.LIGHT_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.SIGNBOARD_ITEM.get());
@@ -71,21 +62,21 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.SIGNAL_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TRAIN_DETECTOR_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.ATC_ITEM.get());
-                //架線柱: 本家モデル (LinePole01/02/Frame01/SignalPole01) を同梱したので再追加。
-                //以前は選択できるモデルが1つも無かったためタブから外していた。
+                // 架線柱: 本家モデル (LinePole01/02/Frame01/SignalPole01) を同梱したので再追加。
+                // 以前は選択できるモデルが1つも無かったためタブから外していた。
                 output.accept(RealTrainModUnofficialItems.OVERHEAD_LINE_POLE_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_GATE_ITEM.get());
-                //入力コネクタ/出力コネクタ/信号変換器 はユーザー要望で削除
-                //(信号機とワイヤーのみ残す。登録は既存ワールド互換のため残置)
-                //ミニチュアもユーザー要望でタブから削除 (登録は残置 — NGTO Builder は
-                //コマンド入手や既存アイテムで引き続き使用可能)
-                //SignalControllerMod (masa300) 移植
+                // 入力コネクタ/出力コネクタ/信号変換器 はユーザー要望で削除
+                // (信号機とワイヤーのみ残す。登録は既存ワールド互換のため残置)
+                // ミニチュアもユーザー要望でタブから削除 (登録は残置 — NGTO Builder は
+                // コマンド入手や既存アイテムで引き続き使用可能)
+                // SignalControllerMod (masa300) 移植
                 output.accept(RealTrainModUnofficialItems.SIGNAL_CONTROLLER_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_0.get());
                 output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_1.get());
-                //スピーカー: 本家仕様化 (スピーカーごとの音登録+可聴範囲) に伴い再追加
+                // スピーカー: 本家仕様化 (スピーカーごとの音登録+可聴範囲) に伴い再追加
                 output.accept(RealTrainModUnofficialItems.SPEAKER_ITEM.get());
-                //本家 ItemInstalledObject から移植した設置物
+                // 本家 ItemInstalledObject から移植した設置物
                 output.accept(RealTrainModUnofficialItems.FLUORESCENT_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.RAILROAD_SIGN_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.BUMPING_POST_ITEM.get());
@@ -94,17 +85,17 @@ public class RealTrainModUnofficial {
                 output.accept(RealTrainModUnofficialItems.TICKET_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.TICKET_BOOK_ITEM.get());
                 output.accept(RealTrainModUnofficialItems.CAMERA_ITEM.get());
-                //リモコン: ブロック2つを無線レッドストーンでペアリング
+                // リモコン: ブロック2つを無線レッドストーンでペアリング
                 output.accept(RealTrainModUnofficialItems.REMOTE_ITEM.get());
-                //乗客シミュレーション (統合): 駅ブロック / 停止位置目標
+                // 乗客シミュレーション (統合): 駅ブロック / 停止位置目標
                 output.accept(com.portofino.rtmupassenger.PassengerMod.STATION_ITEM.get());
                 output.accept(com.portofino.rtmupassenger.PassengerMod.STOP_TARGET_ITEM.get());
             }).build());
 
     /**
      * mods フォルダの 1.7.10 建材 mod からかき集めたブロックを全部並べる専用タブ。
-     * 中身は {@link com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks#TAB_ITEMS}
-     * (コンストラクタの init() で構築)。空でもタブ自体は出す (レンガアイコン)。
+     * 中身は com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks#TAB_ITEMS
+     * (コンストラクタの init で構築)。空でもタブ自体は出す (レンガアイコン)。
      */
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXTERNAL_BUILDING_TAB =
         CREATIVE_MODE_TABS.register("external_building_tab", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
@@ -119,7 +110,7 @@ public class RealTrainModUnofficial {
             }).build());
 
     public RealTrainModUnofficial(IEventBus modEventBus, ModContainer modContainer, Dist dist) {
-        //どのビルドが動いているかの唯一の証拠 (バージョン番号は再利用しているため)。
+        // どのビルドが動いているかの唯一の証拠 (バージョン番号は再利用しているため)。
         LOGGER.info("[RTMU] {}", BUILD_TAG);
         // 軽量化: 既定のログレベルは INFO に固定する(描画には無関係)。
         // 以前はバグ追跡のため DEBUG を強制していたが、毎tick/毎フレームの DEBUG ログが
@@ -133,18 +124,18 @@ public class RealTrainModUnofficial {
             LOGGER.warn("Failed to set log level for rtmu: {}", t.toString());
         }
 
-        //★シムのバスは型消去で引数型を取れないので、イベント型を明示する形だけを使う。
+        // ★シムのバスは型消去で引数型を取れないので、イベント型を明示する形だけを使う。
         modEventBus.addListener(FMLCommonSetupEvent.class, this::commonSetup);
         modEventBus.addListener(RegisterPayloadHandlersEvent.class, this::registerNetwork);
-        //本家 RTM のチャンクローダー (列車の State_ChunkLoader) 用チケットコントローラ
+        // 本家 RTM のチャンクローダー (列車の State_ChunkLoader) 用チケットコントローラ
         modEventBus.addListener(net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent.class,
             event ->
             event.register(com.portofino.realtrainmodunofficial.world.TrainChunkLoader.CONTROLLER));
 
         RealTrainModUnofficialBlocks.BLOCKS.register(modEventBus);
         RealTrainModUnofficialMenus.MENUS.register(modEventBus);
-        //mods フォルダの 1.7.10 建材 mod をスキャンし、ブロックテクスチャをフルキューブブロックとして
-        //登録する (レジストリ凍結前に走らせる必要があるのでここで呼ぶ)。
+        // mods フォルダの 1.7.10 建材 mod をスキャンし、ブロックテクスチャをフルキューブブロックとして
+        // 登録する (レジストリ凍結前に走らせる必要があるのでここで呼ぶ)。
         com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks.init(modEventBus);
         // jp.ngt.rtm.rail: 本家忠実移植のレール/マーカー (Phase 1)
         jp.ngt.rtm.rail.RTMRailBlocks.REGISTER.register(modEventBus);
@@ -158,9 +149,9 @@ public class RealTrainModUnofficial {
         RealTrainModUnofficialBlockEntities.BLOCK_ENTITY_TYPES.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         RealTrainModUnofficialComponents.REGISTRAR.register(modEventBus);
-        //乗客シミュレーション (旧・別 jar rtmupassenger を統合)。本体の名前空間で登録する。
+        // 乗客シミュレーション (旧・別 jar rtmupassenger を統合)。本体の名前空間で登録する。
         com.portofino.rtmupassenger.PassengerMod.register(modEventBus);
-        //WebCTC は別 mod (RTMU-WebCTC_1.21.1, webctc サブプロジェクト) へ分離した。
+        // WebCTC は別 mod (RTMU-WebCTC_1.21.1, webctc サブプロジェクト) へ分離した。
         // スピーカー音源マッピングをサーバー起動時にロードし、プレイヤー接続時に同期する。
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
             net.neoforged.neoforge.event.server.ServerStartingEvent.class, e ->
@@ -184,8 +175,8 @@ public class RealTrainModUnofficial {
             com.portofino.realtrainmodunofficial.rail.RailPackLoader.load();
             com.portofino.realtrainmodunofficial.vehicle.VehiclePackLoader.load();
             com.portofino.realtrainmodunofficial.installedobject.InstalledObjectPackLoader.load();
-            //本家同様、前提パックが足りなければここで落とす (黙って崩れた見た目で動かさない)。
-            //全パックのロード後に検証する — スクリプトは全パック横断の索引まで見て解決するため。
+            // 本家同様、前提パックが足りなければここで落とす (黙って崩れた見た目で動かさない)。
+            // 全パックのロード後に検証する — スクリプトは全パック横断の索引まで見て解決するため。
             com.portofino.realtrainmodunofficial.pack.PackPrerequisiteCheck.verify();
             com.portofino.realtrainmodunofficial.script.TrainScriptSystem.getInstance().initialize();
         });

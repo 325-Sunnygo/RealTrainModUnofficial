@@ -11,7 +11,6 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * 道床(バラスト)ブロックのブロックエンティティ。
  * 対応するレールコア(LargeRailCore)の位置を保持し、道床を壊すとレールも撤去できるようにする。
- * また列車設置時のレール検出 (getRailMapAt) で道床からレールコアを引けるようにする。
  */
 public class BallastBlockEntity extends BlockEntity {
     private BlockPos corePos;

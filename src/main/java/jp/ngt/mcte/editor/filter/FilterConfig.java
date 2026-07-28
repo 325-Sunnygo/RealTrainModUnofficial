@@ -6,11 +6,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * フィルタのパラメータ一式 (neo mcte)。本家 MCTE {@code Config} + {@code CfgParameter} の移植。
- *
- * <p>フィルタは {@code initConfig} で「どんなパラメータを持つか」を宣言するだけでよく、
- * 入力 UI はこの宣言から自動で組まれる。フィルタを足すときに GUI を書かなくて済むのが
- * 本家のこの設計の狙いで、neo mcte で「便利機能を足す」ときにもそのまま効く。
+ * フィルタのパラメータ一式 (neo mcte)。本家 MCTE Config + CfgParameter の移植。
+ * フィルタは initConfig で「どんなパラメータを持つか」を宣言するだけでよく、
+ * 入力 UI はこの宣言から自動で組まれる。
  */
 public class FilterConfig {
 
@@ -55,7 +53,7 @@ public class FilterConfig {
                     default -> value = s;
                 }
             } catch (Exception ignored) {
-                //不正な入力は無視して前の値を残す (本家も入力途中で壊れないようにしている)
+                // 不正な入力は無視して前の値を残す (本家も入力途中で壊れないようにしている)
             }
         }
 

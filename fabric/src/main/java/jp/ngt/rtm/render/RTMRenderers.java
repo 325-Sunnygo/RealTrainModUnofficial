@@ -7,21 +7,10 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import jp.ngt.rtm.modelpack.ModelPackManager;
 
 /**
- * 本家 {@code jp.ngt.rtm.render.RTMRenderers} の受け皿。
- *
- * <p>1.7.10 (KaizPatchX) では {@code getRendererWithScript} は
- * {@link PartsRenderer#getRendererWithScript} にあり、{@code RTMRenderers} というクラスは
- * 1.12.2 で分離されたものだが、パック側の <b>mc1710 ターゲット</b>がこの名前で呼んでくる:
- *
- * <pre>
- * // SR1-200-test.zip!.../__targets__/mc1710/scripts/hi03_lib/lib_RTMApiCompatClient.compat.js:94
- * Packages.jp.ngt.rtm.render.RTMRenderers.getRendererWithScript.apply(
- *     Packages.jp.ngt.rtm.render.RTMRenderers, [resource, ...args]);
- * </pre>
- *
- * <p>この名前が無いと Nashorn は例外を投げず<b>無音で JavaPackage を返す</b>ため
- * (未解決 FQN の既知の落とし穴)、呼び出しが静かに壊れる。実体は本家同様
- * {@link PartsRenderer#getRendererWithScript} へ委譲する。
+ * 本家 jp.ngt.rtm.render.RTMRenderers の受け皿。
+ * 1.7.10 (KaizPatchX) では getRendererWithScript は
+ * PartsRenderer#getRendererWithScript にあり、RTMRenderers というクラスは
+ * 1.12.2 で分離されたものだが、パック側の mc1710 ターゲットがこの名前で呼んでくる:
  */
 public final class RTMRenderers {
 
@@ -29,9 +18,8 @@ public final class RTMRenderers {
     }
 
     /**
-     * 本家 {@code getRendererWithScript(ResourceLocation par1, String... args)}。
-     * リソースからスクリプトを読み、その {@code renderClass} で PartsRenderer を生成する。
-     *
+     * 本家 getRendererWithScript(ResourceLocation par1, String... args)。
+     * リソースからスクリプトを読み、その renderClass で PartsRenderer を生成する。
      * @param resource スクリプトのリソース (ResourceLocation 相当。文字列パスも受ける)
      */
     public static PartsRenderer getRendererWithScript(Object resource, String... args) {

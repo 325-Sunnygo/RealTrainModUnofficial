@@ -7,10 +7,6 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 本家 jp.ngt.rtm.modelpack.state.DataMap のスクリプト互換移植。
  * set 系の第3引数は本家では同期フラグ (0:なし, 1:server→client)。
- *
- * <p>flag=1 の書き込みは {@link #drainPendingSync()} に溜まり、EntityTrainBase が
- * 定期的にクライアントへ配信する (DataMapSyncPayload)。ATSA の HUD や WebCTC が
- * サーバー側で書いた値をクライアントで読めるのはこの仕組みによる。
  */
 public class DataMap {
     /** server→client 同期する。 */
@@ -25,7 +21,7 @@ public class DataMap {
     private Object entity;
 
     /**
-     * 同期対象か。<b>フラグはビット和</b>なので {@code == SYNC_FLAG} で見てはいけない。
+     * 同期対象か。フラグはビット和なので == SYNC_FLAG で見てはいけない。
      * SYNC|SAVE (=3) で書くスクリプトが同期されなくなる。
      */
     private boolean shouldSync(int flag) {
@@ -207,7 +203,7 @@ public class DataMap {
     }
 
     /**
-     * 本家 getArg: 全エントリを {@code key=(Type)value,key2=(Type)value2} 形式で出す。
+     * 本家 getArg: 全エントリを key=(Type)value,key2=(Type)value2 形式で出す。
      * モデル選択 GUI や設置物アイテムの NBT 引数に使われる。
      */
     public String getArg() {
@@ -238,7 +234,7 @@ public class DataMap {
         }
     }
 
-    /** 本家 convertArg: {@code key=(Type)value,...} を {key, Type, value} の配列へ分解する。 */
+    /** 本家 convertArg: key=(Type)value,... を {key, Type, value} の配列へ分解する。 */
     public static String[][] convertArg(String arg) {
         if (arg == null || arg.isEmpty()) {
             return new String[0][0];
@@ -363,7 +359,7 @@ public class DataMap {
         } catch (NumberFormatException e) {
             flag = SAVE_FLAG;
         }
-        //クライアントで受けた値をまた送り返さないよう、同期ビットは落とす
+        // クライアントで受けた値をまた送り返さないよう、同期ビットは落とす
         if (onClient) {
             flag &= ~SYNC_FLAG;
         }

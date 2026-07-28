@@ -25,18 +25,12 @@ import java.util.Objects;
 /**
  * 本家 jp.ngt.rtm.rail.TileEntityLargeRailCore (KaizPatchX) の忠実移植。
  * NBT 形式は本家準拠: Property / SubRails / StartRP / EndRP / fixRTMRailMapVersion。
- * 1.21 適合: DisplayList (GL) キャッシュは BER 側で管理するため保持しない
- * (shouldRerenderRail フラグのみ維持)。レガシー railShape 互換パスは省略 (新規ワールド前提)。
  */
 public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase implements jp.ngt.mccompat.LoadAwareBlockEntity {
 
     /**
-     * 本家 {@code sendPacket}: レールコアの状態をクライアントへ配る。
-     *
-     * <p>SRB3 は敷設の最後に必ずこれを呼ぶ:
-     * <pre>SuperRailBuilder3!server_SuperRailBuilder3.js  tile.sendPacket();</pre>
-     * RTMU に無かったため「敷設処理の最後で落ちる」= 見た目が更新されない/敷けないの原因になっていた。
-     * 1.21 では BlockEntity の更新配信がこれに当たる。
+     * 本家 sendPacket: レールコアの状態をクライアントへ配る。
+     * SRB3 は敷設の最後に必ずこれを呼ぶ:
      */
     public void sendPacket() {
         this.setChanged();
@@ -58,14 +52,12 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
 
     private AABB renderAABB;
 
-    /**
-     * レールを再描画するかどうか(明るさ変更等)
-     */
+    /** レールを再描画するかどうか(明るさ変更等) */
     public boolean shouldRerenderRail;
     // see RailMapBasic.fixRTMRailMapVersion
     protected int fixRTMRailMapVersion;
 
-    //WebCTC (別mod) 用: ロード済みレールコアの一覧。weak なのでチャンクアンロードで自然に消える。
+    // WebCTC (別mod) 用: ロード済みレールコアの一覧。weak なのでチャンクアンロードで自然に消える。
     private static final java.util.Set<TileEntityLargeRailCore> LOADED_CORES =
             java.util.Collections.synchronizedSet(
                     java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>()));
@@ -80,7 +72,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
     }
 
     public void onLoad() {
-        //NeoForge 拡張の onLoad はバニラに無いので super 呼び出しは不要
+        // NeoForge 拡張の onLoad はバニラに無いので super 呼び出しは不要
         LOADED_CORES.add(this);
     }
 
@@ -163,13 +155,9 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
     // ===== 当たり判定 (レール曲線をサンプリングして焼く) =====
 
     /**
-     * 列 (x, z) → その列の {@link #COLLISION_SPLIT}×{@link #COLLISION_SPLIT} マスごとの
-     * レール面の高さ (<b>絶対 Y</b>)。
-     * <p>
-     * Y を含めない「列」で持つのが要点。レール面はカントや勾配でブロック境界をまたぐので、
-     * ブロック単位で持つと面が隣のブロックに落ちた列でグリッドが引けず床が抜ける。
-     * 列で持てば、各レールブロックは「絶対 Y − 自分の Y」を [厚み, 1.0] に丸めるだけでよく、
-     * 面が自分より上ならブロックいっぱい、下なら薄板になる (勾配で積まれたブロックも正しい)。
+     * 列 (x, z) → その列の #COLLISION_SPLIT×#COLLISION_SPLIT マスごとの
+     * レール面の高さ (絶対 Y)。
+     * Y を含めない「列」で持つのが要点。
      */
     private java.util.Map<Long, float[]> collisionGrids;
 
@@ -188,7 +176,6 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
 
     /**
      * このレールの当たり判定グリッドを引く。無ければ作る。
-     *
      * @return 指定ブロックの列のマスごとのレール面 (絶対 Y)。レールが通っていなければ null。
      */
     public float[] getCollisionGrid(BlockPos pos) {
@@ -206,16 +193,8 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
 
     /**
      * レール曲線を直接サンプリングして、ブロックごとの高さグリッドを焼く。
-     * <p>
-     * 従来は {@code TileEntityLargeRailBase.getBlockHeights} が「ブロックの 4 隅から
+     * 従来は TileEntityLargeRailBase.getBlockHeights が「ブロックの 4 隅から
      * 最も近い曲線上の点」を探して高さを決め、それをブロック内で双線形補間していた。
-     * これは曲線が近くを何度も通る場所 (分岐・急曲線・レールの端) で誤った点を拾い、
-     * 当たり判定が実際のレール面から浮いたり沈んだりする。
-     * <p>
-     * ここでは逆に<b>曲線の側から</b>面を撒く。レール中心線に沿って進みながら、
-     * 各点で道床幅ぶん左右に張り出した面 (カントで傾く) をサンプリングし、
-     * 落ちたマスに高さを書き込む。当たり判定はレール面の定義そのものになるので、
-     * 「一番近い点」を推測する必要がなくなる。
      */
     private java.util.Map<Long, float[]> buildCollisionGrids() {
         java.util.Map<Long, float[]> grids = new java.util.HashMap<>();
@@ -223,9 +202,9 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         if (rms == null) {
             return grids;
         }
-        //道床の外縁まで撒く。createRailList が置くレールブロックは中心から ±(ballastWidth>>1)。
+        // 道床の外縁まで撒く。createRailList が置くレールブロックは中心から ±(ballastWidth>>1)。
         double halfWidth = (this.getProperty().getBallastWidth() >> 1) + 0.5D;
-        //マスの取りこぼしが出ない程度に細かく撒く (マスは 1/COLLISION_SPLIT ブロック)。
+        // マスの取りこぼしが出ない程度に細かく撒く (マスは 1/COLLISION_SPLIT ブロック)。
         double step = 1.0D / (COLLISION_SPLIT * 2);
 
         for (RailMap rm : rms) {
@@ -240,11 +219,11 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
                 double height = rm.getRailHeight(split, i);
                 float yaw = rm.getRailYaw(split, i);
                 float cant = rm.getCant(split, i);
-                //レール方向の法線 (yaw + 90°) 方向へ張り出す
+                // レール方向の法線 (yaw + 90°) 方向へ張り出す
                 double rad = Math.toRadians(yaw + 90.0F);
                 double dx = Math.sin(rad);
                 double dz = Math.cos(rad);
-                //カントによる左右の高低差。getBlockHeights と同じ符号 (中心から距離 w で sin(cant) * w)
+                // カントによる左右の高低差。getBlockHeights と同じ符号 (中心から距離 w で sin(cant) * w)
                 double cantSlope = jp.ngt.ngtlib.math.NGTMath.sin(cant);
 
                 for (double w = -halfWidth; w <= halfWidth + 1.0E-6D; w += step) {
@@ -271,8 +250,8 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
             }
         }
 
-        //撒き漏らしたマス (ブロックの角など) を、そのブロックの最大値で埋める。
-        //穴が残ると床が抜けて見えるので、レール面のあるブロックは必ず全面を塞ぐ。
+        // 撒き漏らしたマス (ブロックの角など) を、そのブロックの最大値で埋める。
+        // 穴が残ると床が抜けて見えるので、レール面のあるブロックは必ず全面を塞ぐ。
         for (float[] grid : grids.values()) {
             float max = Float.NaN;
             for (float v : grid) {
@@ -292,9 +271,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         return grids;
     }
 
-    /**
-     * レール情報の読み込みが完了してるかどうか(=RailPositionが存在する)
-     */
+    /** レール情報の読み込みが完了してるかどうか(=RailPositionが存在する) */
     public boolean isLoaded() {
         return (this.railPositions != null && this.railPositions.length > 0 && Arrays.stream(this.railPositions).allMatch(Objects::nonNull));
     }
@@ -376,9 +353,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         }
     }
 
-    /**
-     * 本家 updateEntity 相当。Block 側の BlockEntityTicker から毎 tick 呼ばれる。
-     */
+    /** 本家 updateEntity 相当。Block 側の BlockEntityTicker から毎 tick 呼ばれる。 */
     public void tick() {
         if (this.level != null && !this.level.isClientSide) {
             this.isCollidedTrain = this.colliding;
@@ -418,7 +393,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
     }
 
     /**
-     * レールの描画用AABBを取得<br>
+     * レールの描画用AABBを取得
      * 呼び出しは最初の1回のみ
      */
     protected AABB getRenderAABB() {
@@ -430,9 +405,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         return aabb;
     }
 
-    /**
-     * {XMin, YMin, ZMin, XMax, YMax, ZMax}
-     */
+    /** {XMin, YMin, ZMin, XMax, YMax, ZMax} */
     public int[] getRailSize() {
         int startX = this.railPositions[0].blockX;
         int startY = this.railPositions[0].blockY;
@@ -450,34 +423,27 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         return new int[]{minX, minY, minZ, maxX, maxY, maxZ};
     }
 
-    /**
-     * レール形状の説明を取得(アイテム表示用)
-     */
+    /** レール形状の説明を取得(アイテム表示用) */
     public abstract String getRailShapeName();
 
     // ================= Remaster 暫定互換 API (旧レンダラ用、Phase 4 で削除予定) =================
 
-    /**
-     * @deprecated Remaster 独自。property.railModel を返す。
-     */
+    /** @deprecated Remaster 独自。property.railModel を返す。 */
     @Deprecated
     public String getRailDefinitionId() {
         return this.getProperty().railModel;
     }
 
     /**
-     * 本家 TileEntityLargeRailCore.getResourceState()。
-     *
-     * <p>レールのスクリプトは {@code shouldRenderObject} の中でこれを呼び、
+     * 本家 TileEntityLargeRailCore.getResourceState。
+     * レールのスクリプトは shouldRenderObject の中でこれを呼び、
      * レールの名前 (ResourceName) や設定を見て「このオブジェクトを描くか」を決める。
-     * 未実装だったため<b>スクリプトが毎フレーム落ちて</b> shouldRenderObject が使えず、
-     * 端のトリミングや枕木の間引きが効かなくなっていた (ログに 1224 件の失敗)。
      */
     public ResourceStateCompat getResourceState() {
         return new ResourceStateCompat(this);
     }
 
-    /** func_174877_v = getPos() (1.12 の SRG 名)。パックのスクリプトが呼ぶ。 */
+    /** func_174877_v = getPos (1.12 の SRG 名)。パックのスクリプトが呼ぶ。 */
     public net.minecraft.core.BlockPos func_174877_v() {
         return this.getBlockPos();
     }
@@ -504,7 +470,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         }
     }
 
-    /** 本家 ModelSetRail 相当。スクリプトは getConfig() から幅や名前を読む。 */
+    /** 本家 ModelSetRail 相当。スクリプトは getConfig から幅や名前を読む。 */
     public static final class ModelSetRailCompat {
         private final TileEntityLargeRailCore rail;
 
@@ -545,41 +511,31 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         }
     }
 
-    /**
-     * @deprecated Remaster 独自。
-     */
+    /** @deprecated Remaster 独自。 */
     @Deprecated
     public AABB getCachedRenderBounds() {
         return this.getRenderBoundingBox();
     }
 
-    /**
-     * @deprecated Remaster 独自。分岐の Point 配列 (非分岐は null)。
-     */
+    /** @deprecated Remaster 独自。分岐の Point 配列 (非分岐は null)。 */
     @Deprecated
     public jp.ngt.rtm.rail.util.Point[] getSwitchPoints() {
         return null;
     }
 
-    /**
-     * @deprecated Remaster 独自。開通中セグメント index。
-     */
+    /** @deprecated Remaster 独自。開通中セグメント index。 */
     @Deprecated
     public int getActiveSegmentIndex() {
         return 0;
     }
 
-    /**
-     * @deprecated Remaster 独自。
-     */
+    /** @deprecated Remaster 独自。 */
     @Deprecated
     public int getPreviousSegmentIndex() {
         return 0;
     }
 
-    /**
-     * @deprecated Remaster 独自。切替アニメーション進行度 0-1。
-     */
+    /** @deprecated Remaster 独自。切替アニメーション進行度 0-1。 */
     @Deprecated
     public float getSwitchProgress(float partialTick) {
         return 1.0F;

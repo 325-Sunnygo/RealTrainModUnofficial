@@ -1,10 +1,8 @@
 package com.portofino.rtmupassenger.station;
 
 /**
- * 駅のタグ。時刻に応じた「出発需要 (origin)」「到着需要 (dest)」を持ち、
+ * 駅のタグ。
  * 乗客の湧き数と行き先抽選の重みを決める (通勤・通学・買い物・観光のシミュレーション)。
- * <p>例: 住宅街は朝に出発需要が高く (通勤で出る)、夕方に到着需要が高い (帰宅)。
- * オフィス街はその逆。時刻は MC の dayTime から取る (dayTime 0 = 朝 6 時)。
  */
 public enum StationTag {
     RESIDENTIAL("住宅街"),
@@ -34,7 +32,7 @@ public enum StationTag {
         return switch (this) {
             case RESIDENTIAL -> 0.20F + 1.6F * g(h, 7.5F, 1.5F) + 0.3F * g(h, 13.0F, 3.0F);
             case OFFICE -> 0.15F + 1.4F * g(h, 18.0F, 1.5F);
-            //工業地帯: 早朝出勤・夕方退勤 (オフィスより 1 時間早い二交代のイメージ)。
+            // 工業地帯: 早朝出勤・夕方退勤 (オフィスより 1 時間早い二交代のイメージ)。
             case INDUSTRIAL -> 0.15F + 1.3F * g(h, 17.0F, 1.5F) + 0.4F * g(h, 6.0F, 1.0F);
             case EDUCATION -> 0.10F + 1.2F * g(h, 16.0F, 1.5F);
             case COMMERCIAL -> 0.20F + 0.8F * g(h, 15.0F, 3.0F);
@@ -47,7 +45,7 @@ public enum StationTag {
         return switch (this) {
             case RESIDENTIAL -> 0.20F + 1.6F * g(h, 18.5F, 2.0F);
             case OFFICE -> 0.15F + 1.6F * g(h, 8.5F, 1.5F);
-            //工業地帯: 早朝に出勤者が到着 (オフィスより早い)。
+            // 工業地帯: 早朝に出勤者が到着 (オフィスより早い)。
             case INDUSTRIAL -> 0.15F + 1.5F * g(h, 7.0F, 1.0F);
             case EDUCATION -> 0.10F + 1.4F * g(h, 8.0F, 1.0F);
             case COMMERCIAL -> 0.20F + 1.0F * g(h, 14.0F, 3.0F) + 0.4F * g(h, 19.0F, 2.0F);

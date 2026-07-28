@@ -4,16 +4,8 @@ import net.minecraft.world.phys.AABB;
 
 /**
  * 1.7.10 net.minecraft.util.AxisAlignedBB のスクリプト互換ラッパー。
- *
- * <p>列車検知器のサーバースクリプトは自分の当たり判定を縦に広げてから
+ * 列車検知器のサーバースクリプトは自分の当たり判定を縦に広げてから
  * その中の列車を探す:
- * <pre>
- *   var aabb = entity.field_70121_D.func_72314_b(0, 2, 0);
- *   world.func_72839_b(entity, aabb).forEach(function(e){ ... });
- * </pre>
- *
- * <p>1.21 の {@link AABB} は不変で名前も違う (inflate) ため、SRG 名を持つ
- * 薄いラッパーを被せて公開する。
  */
 @SuppressWarnings("unused")
 public final class AxisAlignedBB {
@@ -49,10 +41,9 @@ public final class AxisAlignedBB {
     }
 
     /**
-     * func_72330_a = 1.7.10 {@code AxisAlignedBB.getBoundingBox(minX,minY,minZ,maxX,maxY,maxZ)} の静的ファクトリ。
-     * <p>ATS 地上子の server_ATS_Beacon.js が列車検知の当たり判定を作るのに
-     * {@code AxisAlignedBB.func_72330_a(...)} を呼ぶ。これが無いと検知 AABB を作れず列車検知が丸ごと失敗し、
-     * ATS-P が一切起動しなかった。
+     * func_72330_a = 1.7.10 AxisAlignedBB.getBoundingBox(minX,minY,minZ,maxX,maxY,maxZ) の静的ファクトリ。
+     * ATS 地上子の server_ATS_Beacon.js が列車検知の当たり判定を作るのに
+     * AxisAlignedBB.func_72330_a(...) を呼ぶ。
      */
     public static AxisAlignedBB func_72330_a(double minX, double minY, double minZ,
                                              double maxX, double maxY, double maxZ) {

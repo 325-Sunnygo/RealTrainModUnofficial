@@ -72,9 +72,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         Vec3 center = blockEntity.getRenderCenter();
         double cameraDistanceSq = cameraPos.distanceToSqr(center);
-        // ワイヤー: wireStart/wireEnd があればケーブル(ジオメトリ)を描く。category==WIRE は本家どおり
-        // ケーブルのみ(中間の設置物モデルは出さない)。それ以外 — NGTO Builder の Wire ツールが碍子/ポールに
-        // 張った配線 — はケーブルを描いた上で本体モデルも続けて描く。
+        // ワイヤー: wireStart/wireEnd があればケーブル(ジオメトリ)を描く。
+        // ケーブルのみ(中間の設置物モデルは出さない)。
         if (blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
             renderWire(blockEntity, definition, poseStack, buffer, cameraDistanceSq, cameraPos, packedLight, packedOverlay);
             if (blockEntity.getCategory() == InstalledObjectCategory.WIRE) {
@@ -105,14 +104,9 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     if (blockEntity.getCategory() == InstalledObjectCategory.FLUORESCENT
                             || blockEntity.getCategory() == InstalledObjectCategory.OVERHEAD_LINE_POLE
                             || blockEntity.getCategory() == InstalledObjectCategory.PIPE) {
-                        //本家 RenderOrnament: 飾り物はブロック中心を原点にするだけで回転しない。
-                        //
-                        //蛍光灯: 取付方向 (0..7) に応じた ±0.4375 の寄せと Y90度回転は
-                        //  RenderFluorescent.js が entity.getDir() を見て自分で行う。
-                        //  ここで面回転や yaw を掛けると二重に回って壁にめり込む。
-                        //架線柱: RenderConnectablePole.js が隣の柱を見て partXP / partXN / partZP /
-                        //  partZN を<b>ワールド軸で</b>出し分ける。ここで回すと (yaw=0 でも
-                        //  180-yaw で 180度回ってしまう) 腕が実際の接続方向と逆を向く。
+                        // 本家 RenderOrnament: 飾り物はブロック中心を原点にするだけで回転しない。
+                        // 蛍光灯: 取付方向 (0..7) に応じた ±0.4375 の寄せと Y90度回転は
+                        // RenderFluorescent.js が entity.getDir を見て自分で行う。
                         poseStack.translate(0.5D, 0.5D, 0.5D);
                         Vec3 renderOffset = blockEntity.getRenderOffset();
                         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
@@ -121,10 +115,9 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
                     } else if (blockEntity.getCategory() == InstalledObjectCategory.LIGHT
                             && definition.isRotateByMetadata() && blockEntity.getMountFace() >= 0) {
-                        //本家 RenderMachine (rotateByMetadata=true の照明 = サーチライト等) の移植:
-                        //ブロック垂直中心 (+0.5) を軸に meta(クリック面 0-5) で回し、-0.5 で戻してから
-                        //プレイヤー向き (getYaw) を掛ける。汎用の getMountFace 分岐 (碍子の面回転) とは別物。
-                        //持ち上げ/横倒しハックを使わないので面から浮かない。
+                        // 本家 RenderMachine (rotateByMetadata=true の照明 = サーチライト等) の移植:
+                        // ブロック垂直中心 (+0.5) を軸に meta(クリック面 0-5) で回し、-0.5 で戻してから
+                        // プレイヤー向き (getYaw) を掛ける。汎用の getMountFace 分岐 (碍子の面回転) とは別物。
                         poseStack.translate(0.5D, 0.0D, 0.5D);
                         Vec3 renderOffset = blockEntity.getRenderOffset();
                         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
@@ -132,8 +125,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         poseStack.translate(0.0D, 0.5D, 0.0D);
                         applyLightMetadataRotation(poseStack, blockEntity.getMountFace());
                         poseStack.translate(0.0D, -0.5D, 0.0D);
-                        //本家 getRotation() = round(180 - playerYaw)。RTMU の yaw は playerYaw なので
-                        //YP(180 - yaw) が本家 rotate(getRotation()) と一致する。meta==0 は本家同様に反転。
+                        // 本家 getRotation = round(180 - playerYaw)。RTMU の yaw は playerYaw なので
+                        // YP(180 - yaw) が本家 rotate(getRotation) と一致する。meta==0 は本家同様に反転。
                         float lightYaw = 180.0F - blockEntity.getYaw();
                         if (blockEntity.getMountFace() == 0) {
                             lightYaw = -lightYaw;
@@ -142,9 +135,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
                         poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
                     } else if (blockEntity.getMountFace() >= 0) {
-                        //本家 RenderElectricalWiring (碍子/コネクタ) 準拠:
-                        //ブロック中心 (+0.5,+0.5,+0.5) を基準に、クリック面 (meta 0-5) で回転。
-                        //持ち上げ/横倒しハックは使わない。
+                        // 本家 RenderElectricalWiring (碍子/コネクタ) 準拠:
+                        // ブロック中心 (+0.5,+0.5,+0.5) を基準に、クリック面 (meta 0-5) で回転。
                         poseStack.translate(0.5D, 0.5D, 0.5D);
                         Vec3 renderOffset = blockEntity.getRenderOffset();
                         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
@@ -160,7 +152,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
                         // 壁挿し碍子は横倒し(mountPitch)にする。0なら通常の縦置き。
                         // 列車検知器ではレールの勾配(mountPitch)とカント(mountRoll)になる。
-                        // どちらも yaw の後なのでモデル局所の回転 (= レールに沿った傾き)。
                         if (blockEntity.getMountPitch() != 0.0F) {
                             poseStack.mulPose(Axis.XP.rotationDegrees(blockEntity.getMountPitch()));
                         }
@@ -170,12 +161,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
                         poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
                     }
-                    //踏切/改札: 本家式スクリプト描画 (MachinePartsRenderer + Nashorn)。成功時は旧近似パスをスキップ。
-                    //改札は本家 RenderTurnstile01.js が getMovingCount(entity)>0 で扉を回す (開閉アニメ)。
-                    //蛍光灯 (RenderFluorescent.js / OrnamentPartsRenderer): pass2 で発光管を描く。
-                    //架線柱 (RenderConnectablePole.js): 隣の柱とつながる腕を出す。
-                    //転轍機 (RenderPoint01.js): getMovingCount でレバーを ±30 度回す。
-                    //どれも本家スクリプトが向き・部品の出し分けを全部やるので、この経路に載せる必要がある。
+                    // 踏切/改札: 本家式スクリプト描画 (MachinePartsRenderer + Nashorn)。成功時は旧近似パスをスキップ。
+                    // 改札は本家 RenderTurnstile01.js が getMovingCount(entity)>0 で扉を回す (開閉アニメ)。
                     boolean machineScriptCategory = blockEntity.getCategory() == InstalledObjectCategory.CROSSING
                             || blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE
                             || blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
@@ -187,7 +174,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     // これらのブロック検知信号パックは json の machineType が "Light" のため SIGNAL でなく
                     // LIGHT に分類され、本来スクリプト経路に載らず素モデルで全レンズが描かれていた(=複数点灯)。
                     // → LIGHT でも「ブロック検知スクリプト(searchBlockAndMeta)」のときだけスクリプト経路に載せる。
-                    // 通常の照明ランプ(検知しない)は従来どおり素モデル描画のまま。
                     com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.Scripted machineScripted =
                         (hasMachineScript && (machineScriptCategory
                             || blockEntity.getCategory() == InstalledObjectCategory.LIGHT))
@@ -199,19 +185,14 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                                     && machineScripted.isBlockDetection()));
                     if (useMachineScript
                                 && machineScripted.render(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay, model)) {
-                            //警報灯/現示灯の発光オーバーレイ (スクリプトの pass2 は diffuse で減光する
-                            //ことがあるため、ここで確実に全光量の発光を重ねる)。
-                            //信号はスクリプトが点灯パーツを描いても素のテクスチャ (消灯レンズ) のままなので、
-                            //点灯用テクスチャを貼った現示灯をここで重ねる。
-                            // ブロック検知型の信号 (searchBlockAndMeta でスクリプトが現示を全制御) は
-                            // RTMU の点灯 overlay を掛けない。掛けると内蔵の信号状態で別のレンズも光り、
-                            // 現示と無関係に複数レンズが点灯してしまう (ユーザー報告)。踏切と通常信号は従来どおり。
+                            // 警報灯/現示灯の発光オーバーレイ (スクリプトの pass2 は diffuse で減光する
+                            // ことがあるため、ここで確実に全光量の発光を重ねる)。
+                            // 信号はスクリプトが点灯パーツを描いても素のテクスチャ (消灯レンズ) のままなので、
+                            // 点灯用テクスチャを貼った現示灯をここで重ねる。
                             boolean scriptDrivenSignal = blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
                                     && machineScripted.isBlockDetection();
-                            //★踏切には overlay を掛けない。本家の踏切ランプはスクリプトの pass 2 が
-                            //Light テクスチャで光らせる (MachineScriptRenderers が本家どおり再生する)。
-                            //RTMU の overlay は灯具の筐体・警報器ごと赤く塗っていた (ユーザー報告)。
-                            //信号 (非ブロック検知) は現示を RTMU 側が持つため従来どおり overlay。
+                            // ★踏切には overlay を掛けない。
+                            // Light テクスチャで光らせる (MachineScriptRenderers が本家どおり再生する)。
                             if (blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
                                     && !scriptDrivenSignal) {
                                 renderActiveLights(blockEntity, definition, poseStack, buffer, packedOverlay);
@@ -228,21 +209,11 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     MqoModelLoader.GroupTransform transform = customCrossingGateRendering
                         ? (stack, groupName) -> applyCrossingGateTransform(stack, blockEntity, groupName)
                         : null;
-                    //★改札もスクリプト経路を通す。
-                    //以前は「スクリプト経路だと扉の開閉 transform が渡らず開きっぱなしになる」として
-                    //改札だけ除外していたが、本家の RenderTurnstile01.js は扉を<b>自分で</b>開閉する
-                    //(getMovingCount>0 で doorL/doorR を ±90 度回す)。RTMU の
-                    //MachinePartsRenderer.getMovingCount も本家どおり isTicketGateOpen()?0:1 を返す。
-                    //除外していたせいでスクリプトが一度も走らず、通行可の矢印 (sign_F/sign_B を
-                    //pass 2 で描く) が出ていなかった。
-                    //★スクリプトを実行するかどうかを RTMU の都合で決めない (本家準拠)。
-                    //本家 RenderMachine は頂点数やバッチ数に関係なく必ず
-                    //  modelObj.render(tile, cfg, pass, partialTick)
-                    //を呼び、ModelObject.render は Light テクスチャがあれば発光パスも必ず描く。
-                    //RTMU はここで「重いモデル (頂点12000以上/バッチ64以上) はスクリプトを切る」
-                    //compatibilityHeavy と、遠距離の veryFar でスクリプトごと落としていた。
-                    //改札はパーツが多いため常に切られ、扉の開閉も通行可の矢印 (sign_F/sign_B を
-                    //pass 2 で描く) も一度も実行されていなかった。
+                    // ★改札もスクリプト経路を通す。
+                    // 以前は「スクリプト経路だと扉の開閉 transform が渡らず開きっぱなしになる」として
+                    // 改札だけ除外していたが、本家の RenderTurnstile01.js は扉を自分で開閉する
+                    // (getMovingCount>0 で doorL/doorR を ±90 度回す)。
+                    // ★スクリプトを実行するかどうかを RTMU の都合で決めない (本家準拠)。
                     boolean takeScriptPath = !customCrossingGateRendering
                         && definition.getScriptPath() != null && !definition.getScriptPath().isBlank();
                     if (takeScriptPath) {
@@ -308,7 +279,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                 definition.getTextureOverrides(), definition.getScriptPath(), definition.isSmoothing())
             : null;
 
-        //どの経路で描いているかを定義ごとに 1 回だけ出す (架線柱が本家と違う見た目になる問題の切り分け用)
+        // どの経路で描いているかを定義ごとに 1 回だけ出す (架線柱が本家と違う見た目になる問題の切り分け用)
         logWireRouteOnce(definition, hasScript, wireScript, model);
 
         if (model != null && renderKnownScriptWireModel(blockEntity, definition, model, from, to,
@@ -316,16 +287,11 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             return;
         }
 
-        //★ 本家式: パックの rendererPath (WirePartsRenderer) をそのまま実行する。
-        //架線柱パックは描画を renderWireStatic/renderWireDynamic に書いており、それを
-        //呼ばずに自前の近似 (モデルを線に沿って等間隔で並べる) で描いていたため、
-        //Baru's Pole のような作り込んだパックが本家と違う見た目になっていた。
-        //スクリプトが何も描けなかったときは false が返るので、従来描画にそのまま落ちる。
-        //★model == null でもスクリプトを走らせること。BasicWireBlack / SimpleCatenary の
-        //modelFile は "Model_none.mqo" (モデル無し) で、架線の見た目は全てスクリプトの
-        //tessellator が描く。model != null を条件にしていたため、これらが下の
-        //renderBasicWireCable (黒いたるみ線 1 本) に落ち、本家のトロリ線+ハンガー付き
-        //架線とまったく違う見た目になっていた。
+        // ★ 本家式: パックの rendererPath (WirePartsRenderer) をそのまま実行する。
+        // 架線柱パックは描画を renderWireStatic/renderWireDynamic に書いており、それを
+        // 呼ばずに自前の近似 (モデルを線に沿って等間隔で並べる) で描いていたため、
+        // Baru's Pole のような作り込んだパックが本家と違う見た目になっていた。
+        // ★model == null でもスクリプトを走らせること。
         if (hasScript) {
             com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.Scripted scripted =
                 com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.get(definition);
@@ -387,10 +353,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
     /**
      * 架線柱パックが本家と違う見た目になる問題の切り分け用。
-     *
-     * <p>本家式スクリプト描画 ({@link com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers})
+     * 本家式スクリプト描画 (com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers)
      * が動いていれば "Wire script renderer initialized" が出るはずだが、ログに一度も現れない。
-     * scriptPath が空なのか、モデルが読めていないのか、条件で弾かれているのかを確定させる。
      */
     private static void logWireRouteOnce(InstalledObjectDefinition definition, boolean hasScript,
                                          String wireScript, MqoModelLoader.MqoModel model) {
@@ -427,17 +391,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             if (endpointDef != null) {
                 Vec3 wp = endpointDef.getWireAttachPos();
 
-                //★ 面に取り付けた碍子 (通常の架線柱はこれ)。
-                //
-                //本家 TileEntityConnectorBase.updateWirePos + RenderElectricalWiring.renderAllWire:
-                //  接続点 = ブロック中心 (+0.5,+0.5,+0.5) + 「取付面で回した wirePos」
-                //碍子モデル本体も renderConnector が同じ中心・同じ面回転で描く。つまり
-                //<b>モデルと接続点は必ず同じ座標系</b>になる。
-                //
-                //RTMU はここが食い違っていた: モデルは中心 (0.5,0.5,0.5) + 面回転で描くのに、
-                //接続点だけ<b>底面 (0.5,0.0,0.5)</b> を基準にして、しかも面回転ではなく
-                //180-yaw で回していた。そのため電線が碍子から 0.5 ブロックずれ、向きも合わず、
-                //宙に浮いたり明後日の方向へ張られたりしていた (Baru's Pole)。
+                // ★ 面に取り付けた碍子 (通常の架線柱はこれ)。
+                // 本家 TileEntityConnectorBase.updateWirePos + RenderElectricalWiring.renderAllWire:
                 if (endpoint.getMountFace() >= 0) {
                     jp.ngt.ngtlib.math.Vec3 rotated = rotateWirePosByMountFace(
                         new jp.ngt.ngtlib.math.Vec3(wp.x, wp.y, wp.z), endpoint.getMountFace());
@@ -447,7 +402,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         .add(rotated.getX(), rotated.getY(), rotated.getZ());
                 }
 
-                //地面置き (取付面なし)。モデルは底面中央 + (180-yaw) で描かれるので接続点も同じに。
+                // 地面置き (取付面なし)。モデルは底面中央 + (180-yaw) で描かれるので接続点も同じに。
                 Vec3 tilted = rotateX(new Vec3(wp.x, wp.y, wp.z), endpoint.getMountPitch());
                 Vec3 rotated = rotateY(tilted, 180.0D - endpoint.getYaw());
                 return Vec3.atLowerCornerOf(pos)
@@ -461,11 +416,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
     /**
      * 本家 TileEntityConnectorBase.updateWirePos の忠実移植。
-     *
-     * <p>取付面 (0=下 1=上 2=北 3=南 4=西 5=東) に応じて wirePos を回す。
-     * {@link #applyHonkeMountFaceRotation} が碍子モデルに掛ける GL 回転と対になっており、
-     * X の符号が逆なのは NGTLib の Vec3.rotateAroundX が glRotatef と逆手系のため
-     * (本家自身がこの組で書いている)。
+     * 取付面 (0=下 1=上 2=北 3=南 4=西 5=東) に応じて wirePos を回す。
      */
     private static jp.ngt.ngtlib.math.Vec3 rotateWirePosByMountFace(jp.ngt.ngtlib.math.Vec3 vec, int face) {
         switch (face) {
@@ -592,10 +543,10 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         }
 
         // 本家Wire51の描画スクリプト(renderWire.js 等)を忠実移植:
-        //   rate = length / baseLength;            // wire=10, bracket=3, bracketD=4
-        //   rotate(yaw,'Y'); rotate(-pitch,'X');   // applyZWireOrientation
-        //   glScalef(1, 1, rate);                  // +Z(線方向)のみを電線長へ伸ばす
-        //   wire.render();                         // 1回だけ(タイルしない)
+        // rate = length / baseLength;            // wire=10, bracket=3, bracketD=4
+        // rotate(yaw,'Y'); rotate(-pitch,'X');   // applyZWireOrientation
+        // glScalef(1, 1, rate);                  // +Z(線方向)のみを電線長へ伸ばす
+        // wire.render;                         // 1回だけ(タイルしない)
         // Catenary1 は +Z 軸長 1000(×0.01=10ブロック)で作られているため、Z を rate 倍すれば
         // 碍子から碍子へ正しい太さ・たるみ(Y方向 -0.81)で張られる。
         float rate = (float) (length / baseLength);
@@ -615,8 +566,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
     private static void applyZWireOrientation(PoseStack poseStack, Vec3 from, Vec3 d) {
         double xz = Math.sqrt(d.x * d.x + d.z * d.z);
         // 本家Wire51スクリプト(renderWire/renderBeam/renderBracket)準拠:
-        //   yaw = vec.getYaw(); pit = -vec.getPitch();
-        //   rotate(yaw,'Y'); rotate(pit,'X');
+        // yaw = vec.getYaw; pit = -vec.getPitch;
+        // rotate(yaw,'Y'); rotate(pit,'X');
         // モデルは +Z 軸が線方向に作られている(Catenary1 dZ=1000≒10ブロック)。
         float yaw = (float) Math.toDegrees(Math.atan2(d.x, d.z));
         float pitch = (float) Math.toDegrees(Math.atan2(d.y, xz));
@@ -642,7 +593,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
     /**
      * 本家RTM の基本ワイヤー(RenderBasicWire.js renderWireDynamic)を忠実再現したケーブル描画。
      * XZ面リボン(ワイヤー色)と Y面リボン(黒)の十字を、たるみ式 fh=((j-8)/16)^2-0.25)*1.5 で描く。
-     * 1本の TRIANGLE_STRIP(leash) に縮退頂点で2リボンをつないで描画する。
      */
     private void renderBasicWireCable(Vec3 from, Vec3 to, int packedLight, PoseStack poseStack, MultiBufferSource buffer) {
         double x = to.x - from.x;
@@ -763,8 +713,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
     /**
      * 改札(TICKET_GATE)の扉(doorL/doorR)を、閉時にヒンジ周りで回して通路を塞ぐ。
-     * 本家RTM: モデル静止位置=開、閉(canThrough=false)で扉を回転。RTMUは barMoveCount を
-     * 開度(0=閉, 90=開)として使い、closedness=1-(barMoveCount/90) で扉を閉じる。
+     * 本家RTM: モデル静止位置=開、閉(canThrough=false)で扉を回転。
      */
 
     /** group(s) のモデル座標 AABB {minX,minY,minZ,maxX,maxY,maxZ}。取得できなければ null。 */
@@ -846,9 +795,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             : definition.getScriptPath().toLowerCase(java.util.Locale.ROOT);
     }
 
-    /**
-     * 本家 GuiChangeOffset の微調整 (scale → roll → pitch → yaw、本家 RenderSignal と同順)
-     */
+    /** 本家 GuiChangeOffset の微調整 (scale → roll → pitch → yaw、本家 RenderSignal と同順) */
     private static void applyAdjustments(PoseStack poseStack, InstalledObjectBlockEntity be) {
         float scale = be.getAdjustScale();
         if (scale != 1.0F) {
@@ -871,12 +818,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
      */
     /**
      * 本家 RenderMachine の rotateByMetadata 面回転 (meta = クリック面 0-5)。ブロック垂直中心を軸に回す。
-     * 碍子/コネクタの {@link #applyHonkeMountFaceRotation} (RenderElectricalWiring) とは別物で、
+     * 碍子/コネクタの #applyHonkeMountFaceRotation (RenderElectricalWiring) とは別物で、
      * 照明 (サーチライト/回転灯/灯台灯) 専用。GL11.glRotatef の符号をそのまま Axis.*.rotationDegrees へ移植。
-     * <pre>
-     *   0=下面: Z 180 / 1=上面: なし / 2=北: X -90 / 3=南: X +90 / 4=西: Z +90 / 5=東: Z -90
-     * </pre>
-     * (本家は case 0 が break せず case 1 に落ちるが、case 1 は何もしないので Z 180 のみが効く)
      */
     private static void applyLightMetadataRotation(PoseStack poseStack, int face) {
         switch (face) {
@@ -940,22 +883,12 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
     /**
      * 本家 RenderSignBoard の移植。
-     * <p>
-     * 本家の看板は「板1枚」ではなく <b>厚みのある箱</b> (width x height x depth) で、
+     * 本家の看板は「板1枚」ではなく 厚みのある箱 (width x height x depth) で、
      * ブロック中心を原点に置き、設置面 (mountFace) の側へ寄せて描く。
-     * <ul>
-     *   <li>backTexture=0 … 表も裏も同じテクスチャ (裏は左右反転)</li>
-     *   <li>backTexture=1 … テクスチャの左半分が表、右半分が裏</li>
-     *   <li>backTexture=2 … 表はテクスチャ、裏は単色 (color)</li>
-     * </ul>
-     * 側面 4 面は color から 0x101010 引いた色で塗る (本家準拠の「縁」)。
      */
     /**
-     * 本家 RenderRailroadSign の移植。標識は 6 種のうち唯一 MQO モデルを持たず、
+     * 本家 RenderRailroadSign の移植。
      * ポール (直径 1/8・高さ 1.5 の円柱) の上に、選んだテクスチャを貼った板を立てるだけ。
-     * <p>
-     * 本家と同じく、真上にブロックがあるときは板を下げてポールを下へ伸ばし、
-     * 天井から吊り下げた形にする。
      */
     private void renderRailroadSign(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
                                     PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
@@ -964,10 +897,10 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             ? null
             : MqoModelLoader.resolvePackTexture(definition.getPackName(), signTexture);
 
-        //本家 RenderRailroadSign.flipVertical: 真上が空でなければ吊り下げ。
+        // 本家 RenderRailroadSign.flipVertical: 真上が空でなければ吊り下げ。
         boolean hanging = blockEntity.getLevel() != null
             && !blockEntity.getLevel().isEmptyBlock(blockEntity.getBlockPos().above());
-        //本家: f0 = 1.25 (立てる) / -0.25 (吊る)
+        // 本家: f0 = 1.25 (立てる) / -0.25 (吊る)
         float plateY = hanging ? -0.25F : 1.25F;
         final float w = 0.25F;      //板の半径 (本家 w)
         final float d = 0.0675F;    //板の Z 方向オフセット (本家 d)
@@ -983,24 +916,19 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         poseStack.translate(0.0F, plateY, 0.0F);
         poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
         PoseStack.Pose pose = poseStack.last();
-        //★ VertexConsumer は「使う直前に」取る。MultiBufferSource は別の RenderType を
-        //要求された時点で<b>前のバッファを閉じる</b>ので、先に取っておくと後で書き込んだ瞬間に
-        //IllegalStateException: Not building! で落ちる (標識を置くとクラッシュしていた原因)。
+        // ★ VertexConsumer は「使う直前に」取る。MultiBufferSource は別の RenderType を
+        // 要求された時点で前のバッファを閉じるので、先に取っておくと後で書き込んだ瞬間に
+        // IllegalStateException: Not building! で落ちる (標識を置くとクラッシュしていた原因)。
         if (texture != null) {
             VertexConsumer plate = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
-            //表: テクスチャそのまま
+            // 表: テクスチャそのまま
             signVertex(plate, pose, w, -w, d, 1.0F, 1.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
             signVertex(plate, pose, w, w, d, 1.0F, 0.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
             signVertex(plate, pose, -w, w, d, 0.0F, 0.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
             signVertex(plate, pose, -w, -w, d, 0.0F, 1.0F, packedLight, packedOverlay, 0xFFFFFF, 0.0F, 0.0F, 1.0F);
 
-            //裏: 本家は<b>同じテクスチャを貼ったまま</b>色 0 (黒) で塗る。テクスチャ付きなので
-            //透明部分はそのまま抜ける。ここを白ベタ (SolidTexture) にしていたため、三角や丸の
-            //標識の背景に<b>黒い四角</b>が残っていた。
-            //
-            //さらに本家は面カリングが効いていて表裏のどちらか片方しか描かれないが、こちらは
-            //NoCull で両面描くため、表と裏が<b>まったく同じ Z</b> にあると Z ファイティングを
-            //起こして<b>チラつく</b>。裏面をわずかに後ろへ下げて重なりを解消する。
+            // 裏: 本家は同じテクスチャを貼ったまま色 0 (黒) で塗る。
+            // 透明部分はそのまま抜ける。
             final float backD = d - 0.002F;
             signVertex(plate, pose, -w, -w, backD, 0.0F, 1.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
             signVertex(plate, pose, -w, w, backD, 0.0F, 0.0F, packedLight, packedOverlay, 0x000000, 0.0F, 0.0F, -1.0F);
@@ -1010,12 +938,12 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         poseStack.popPose();
 
         // ---- ポール ----
-        //本家: 吊り下げのときはポールの根元を 0.5 下げる (板から天井まで届かせる)。
+        // 本家: 吊り下げのときはポールの根元を 0.5 下げる (板から天井まで届かせる)。
         if (hanging) {
             poseStack.translate(0.0F, -0.5F, 0.0F);
         }
-        //本家 NGTRenderer.renderPole(tessellator, 0.0625F, 1.5F, false) + 色 0x404040
-        //板を描き終えてからバッファを取る (先に取ると板の描画でこのバッファが閉じられてしまう)。
+        // 本家 NGTRenderer.renderPole(tessellator, 0.0625F, 1.5F, false) + 色 0x404040
+        // 板を描き終えてからバッファを取る (先に取ると板の描画でこのバッファが閉じられてしまう)。
         VertexConsumer solid = buffer.getBuffer(RenderType.entityCutoutNoCull(SolidTexture.white()));
         renderPole(solid, poseStack.last(), 0.0625F, 1.5F, 0x404040, packedLight, packedOverlay);
         poseStack.popPose();
@@ -1036,7 +964,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             float z0 = (float) (Math.sin(a0) * radius);
             float x1 = (float) (Math.cos(a1) * radius);
             float z1 = (float) (Math.sin(a1) * radius);
-            //法線は面の中央方向 (外向き)
+            // 法線は面の中央方向 (外向き)
             float nx = (float) Math.cos((a0 + a1) * 0.5D);
             float nz = (float) Math.sin((a0 + a1) * 0.5D);
             signVertex(consumer, pose, x0, 0.0F, z0, 0.0F, 1.0F, packedLight, packedOverlay, color, nx, 0.0F, nz);
@@ -1066,7 +994,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         int dir = blockEntity.getSignDirection();
         int mountFace = blockEntity.getMountFace();
 
-        //本家: frame>1 ならカウンタで V をずらしてコマ送りする。
+        // 本家: frame>1 ならカウンタで V をずらしてコマ送りする。
         float minV = 0.0F;
         float maxV = 1.0F;
         if (frame > 1) {
@@ -1085,7 +1013,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
         PoseStack.Pose pose = poseStack.last();
         VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(texture));
-        //本家: backTexture==1 はテクスチャを左右に割って表/裏に貼る。
+        // 本家: backTexture==1 はテクスチャを左右に割って表/裏に貼る。
         float frontMaxU = backTex == 1 ? 0.5F : 1.0F;
         float backMinU = backTex == 1 ? 0.5F : 0.0F;
 
@@ -1112,7 +1040,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             signVertex(solid, pose, halfWidth, halfHeight, -halfDepth, 1.0F, 0.0F, packedLight, packedOverlay, color, 0.0F, 0.0F, -1.0F);
             signVertex(solid, pose, halfWidth, -halfHeight, -halfDepth, 1.0F, 1.0F, packedLight, packedOverlay, color, 0.0F, 0.0F, -1.0F);
         }
-        //本家: 縁は板の色より少し暗くする。
+        // 本家: 縁は板の色より少し暗くする。
         int edgeColor = Math.max(0, color - 0x101010);
         // 上面
         signQuad(solid, pose, packedLight, packedOverlay, edgeColor, 0.0F, 1.0F, 0.0F,
@@ -1139,19 +1067,19 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
     /**
      * 本家 RenderSignBoard の meta/dir 分岐そのまま: 板を設置面へ寄せる。
-     * meta は設置時にクリックした面 (Direction.ordinal(): DOWN=0, UP=1, N=2, S=3, W=4, E=5)。
+     * meta は設置時にクリックした面 (Direction.ordinal: DOWN=0, UP=1, N=2, S=3, W=4, E=5)。
      */
     private static void applySignboardMountOffset(PoseStack poseStack, int meta, int dir,
                                                   float halfWidth, float halfHeight, float halfDepth) {
         if (meta < 0) {
-            //旧データ (設置面なし)。中心のまま置く。
+            // 旧データ (設置面なし)。中心のまま置く。
             return;
         }
         if (meta == 0) {
-            //天井から吊るす
+            // 天井から吊るす
             poseStack.translate(0.0F, 0.5F - halfHeight, 0.0F);
         } else if (meta == 1) {
-            //床から立てる
+            // 床から立てる
             poseStack.translate(0.0F, halfHeight - 0.5F, 0.0F);
         } else if ((dir == 1 && meta == 4) || (dir == 3 && meta == 5)
             || (dir == 0 && meta == 3) || (dir == 2 && meta == 2)) {
@@ -1164,9 +1092,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         }
     }
 
-    /**
-     * 本家: 板に貼り付けた文字を描く。表と裏の振り分けは backTexture による。
-     */
+    /** 本家: 板に貼り付けた文字を描く。表と裏の振り分けは backTexture による。 */
     private static void renderSignboardTexts(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
                                              PoseStack poseStack, MultiBufferSource buffer,
                                              float halfWidth, float halfHeight, float halfDepth,
@@ -1176,15 +1102,10 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             return;
         }
         String ttSetting = blockEntity.getSignTtSetting();
-        //板の面より僅かに手前に出して Z ファイティングを避ける (本家も +0.01)。
+        // 板の面より僅かに手前に出して Z ファイティングを避ける (本家も +0.01)。
         float z = halfDepth + 0.01F;
-        //backTexture==1 は「テクスチャの左半分=表、右半分=裏」。エディタのキャンバスは
-        //幅 width*2 (表と裏を横に並べたもの) なので、表/裏の境目は posU == width。
-        //
-        //※本家 RenderSignBoard はここを width/2 で判定していたが、それだと表の右半分に
-        //  置いた文字が裏面送りになり、裏面側の座標変換 (posU - 1.5*width) で板の外へ出て
-        //  しまう。本家のエディタ座標系と裏面の式のどちらとも噛み合わないので、本家のバグ
-        //  とみなして width で判定している。
+        // backTexture==1 は「テクスチャの左半分=表、右半分=裏」。
+        // 幅 width*2 (表と裏を横に並べたもの) なので、表/裏の境目は posU == width。
         float backThreshold = definition.getWidth();
 
         for (SignboardText text : texts) {
@@ -1198,7 +1119,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
             boolean onFront = backTex != 1 || text.posU < backThreshold;
             if (onFront) {
-                //posU は板の左端から、posV は板の上端から。
+                // posU は板の左端から、posV は板の上端から。
                 frame.image().render(poseStack.last(), consumer,
                     text.posU - halfWidth, halfHeight - text.posV, z, w, h,
                     frame.minU(), 0.0F, frame.maxU(), 1.0F, packedLight, packedOverlay);
@@ -1268,7 +1189,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         // 踏切の警報灯と名前が衝突していて、どの現示でも赤く塗られていた)。
         String lightTexture = definition.getEmissiveTexture();
         boolean useLightTexture = blockEntity.isSignal() && lightTexture != null && !lightTexture.isBlank();
-        //テクスチャ差し替えマップは毎フレーム作らず定義ごとに使い回す (モデルキャッシュのキーにも使われる)。
+        // テクスチャ差し替えマップは毎フレーム作らず定義ごとに使い回す (モデルキャッシュのキーにも使われる)。
         MqoModelLoader.MqoModel emissiveModel = MqoModelLoader.loadModelFromPack(
             definition.getPackName(),
             definition.getModelFile(),
@@ -1358,7 +1279,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
      * グループ名 → 比較用に正規化した名前 (小文字化 + "_"/"-" 除去) のキャッシュ。
      * groupMatches は「毎フレーム × 設置物 × バッチ数 × 定義パーツ数」呼ばれるため、
      * ここで文字列を作ると使い捨ての String が大量に出る (GC 負荷)。
-     * グループ名は有限個なので 1 度だけ正規化して使い回す。判定結果は従来と同一。
      */
     private static final Map<String, String> COMPACT_GROUP_NAMES = new ConcurrentHashMap<>();
 
@@ -1368,7 +1288,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             return cached;
         }
         String compact = name.toLowerCase(java.util.Locale.ROOT).replace("_", "").replace("-", "");
-        //グループ名は有限 (モデルのパーツ名 + 定義のパーツ名) なので上限を切らずに保持できる。
+        // グループ名は有限 (モデルのパーツ名 + 定義のパーツ名) なので上限を切らずに保持できる。
         COMPACT_GROUP_NAMES.put(name, compact);
         return compact;
     }
@@ -1377,17 +1297,14 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         if (candidate == null || expected == null) {
             return false;
         }
-        //小文字化だけの一致も compact 同士の一致に含まれる ("_"/"-" を落としても
-        //同名なら等しい) ため、正規化 1 回で従来と同じ判定になる。
+        // 小文字化だけの一致も compact 同士の一致に含まれる ("_"/"-" を落としても
+        // 同名なら等しい) ため、正規化 1 回で従来と同じ判定になる。
         return compactGroupName(candidate).equals(compactGroupName(expected));
     }
 
     /**
      * 本家 BasicSignalPartsRenderer の点灯パーツ選択。
      * S(n) を昇順に見て、最初に「現示 <= n」となるエントリ *だけ* を点灯する。
-     * (3灯式は S(1)/S(3)/S(5) しか持たないので、現示 2 (警戒) や 4 (減速) を
-     * 完全一致で引くと何も点かない。本家は直上の現示灯を点ける。)
-     * 現示は本家同様 6 (高速進行) で頭打ち。
      */
     private static List<String> selectSignalLightGroups(Map<Integer, List<String>> lights, int signal) {
         if (lights == null || lights.isEmpty() || signal <= 0) {
@@ -1422,8 +1339,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
     private static int[] signalColorForGroup(String group) {
         String lower = group == null ? "" : group.toLowerCase();
-        //α255 = 完全発光。半透明だと暗い下地 (夜間の世界光) と混ざって
-        //「信号/踏切の光が暗い」見た目になるため不透明でフルブライト描画する
+        // α255 = 完全発光。半透明だと暗い下地 (夜間の世界光) と混ざって
+        // 「信号/踏切の光が暗い」見た目になるため不透明でフルブライト描画する
         if (CROSSING_LIGHT_LEFT.contains(lower) || CROSSING_LIGHT_RIGHT.contains(lower)
             || CROSSING_LIGHT_LEFT_LEGACY.contains(lower) || CROSSING_LIGHT_RIGHT_LEGACY.contains(lower)
             || CROSSING_LIGHT_COMMON_LEGACY.contains(lower)) {

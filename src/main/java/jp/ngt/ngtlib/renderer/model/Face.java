@@ -12,9 +12,7 @@ public class Face {
             {1.0F, 1.0F, -1.0F}};
 
     public final Vertex[] vertices;
-    /**
-     * 頂点順の u,v (長さ vertices.length*2)。UV 無しは null。
-     */
+    /** 頂点順の u,v (長さ vertices.length*2)。UV 無しは null。 */
     public final float[] uvs;
     public final int materialId;
     public Vertex faceNormal;
@@ -35,9 +33,8 @@ public class Face {
     }
 
     /**
-     * 本家 textureCoordinates。RTMU は UV を float[] で持つので、
-     * スクリプトが {@code face.textureCoordinates[i].getU()} と書けるようビューを返す。
-     * Nashorn はフィールド名アクセスを getter に解決するため、これで本家と同じ書き方が通る。
+     * 本家 textureCoordinates。
+     * スクリプトが face.textureCoordinates[i].getU と書けるようビューを返す。
      */
     public TextureCoordinate[] getTextureCoordinates() {
         if (this.texCoordView == null) {
@@ -88,7 +85,7 @@ public class Face {
                     if (other == this || other.faceNormal == null) {
                         continue;
                     }
-                    //法線同士の角がスムージング角以内なら足す (cos 比較)
+                    // 法線同士の角がスムージング角以内なら足す (cos 比較)
                     float dot = base.getX() * other.faceNormal.getX()
                             + base.getY() * other.faceNormal.getY()
                             + base.getZ() * other.faceNormal.getZ();
@@ -126,7 +123,7 @@ public class Face {
             int index = i > 0 ? size - i : 0;
             Vertex mirrored;
             if (mirrorVertex != null && mirrorVertex.containsKey(src)) {
-                //元で共有していた頂点は反転後も共有させる
+                // 元で共有していた頂点は反転後も共有させる
                 mirrored = mirrorVertex.get(src);
             } else {
                 float x = src.getX() * MIRROR_PATTERN[type][0];
@@ -165,7 +162,7 @@ public class Face {
         float nx = ay * bz - az * by;
         float ny = az * bx - ax * bz;
         float nz = ax * by - ay * bx;
-        //★大きさで捨てない。先に最大成分で割ってから正規化する (細かい文字の三角形対策)。
+        // ★大きさで捨てない。先に最大成分で割ってから正規化する (細かい文字の三角形対策)。
         float max = Math.max(Math.abs(nx), Math.max(Math.abs(ny), Math.abs(nz)));
         if (!(max > 0.0F) || !Float.isFinite(max)) {
             this.faceNormal = new Vertex(0.0F, 1.0F, 0.0F);

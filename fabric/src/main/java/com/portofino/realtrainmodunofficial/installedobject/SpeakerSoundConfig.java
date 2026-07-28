@@ -14,10 +14,6 @@ import java.nio.file.Path;
  * スピーカーの「音源ID(1〜64) → ogg 音名」マッピングを保持する。
  * 本家 RTM の rtm/speaker_sounds.json と同じ「String 配列」形式で
  * config/realtrainmodunofficial/speaker_sounds.json に永続化する。
- *
- * <p>マッピングは全スピーカー共通（ワールド非依存）。サーバーが正本を持ち、
- * 変更時に保存 + 全クライアントへ同期する。クライアントは同期された値を保持して
- * 描画/プレビューに使う。</p>
  */
 public final class SpeakerSoundConfig {
     public static final int MAX_SOUND_ID = 64;

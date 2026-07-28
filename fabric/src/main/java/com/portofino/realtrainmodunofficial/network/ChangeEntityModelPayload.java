@@ -12,10 +12,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 設置済みエンティティのモデル差し替え (本家 GuiSelectModel → PacketSelectModel 相当)。
- * <p>
- * 本家は列車をシフト右クリックすると {@code guiIdSelectEntityModel} が開き、決定すると
- * そのエンティティの modelName / DataMap / 名前 / 色 が書き換わる。アイテム側の
- * {@link SelectModelPayload} と違い、<b>対象はワールドに居るエンティティ</b>。
+ * 本家は列車をシフト右クリックすると guiIdSelectEntityModel が開き、決定すると
+ * そのエンティティの modelName / DataMap / 名前 / 色 が書き換わる。
  */
 public record ChangeEntityModelPayload(int entityId, String modelId, String dataMapValue,
                                        String customName, int color)
@@ -54,7 +52,7 @@ public record ChangeEntityModelPayload(int entityId, String modelId, String data
             if (!(entity instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> vehicle)) {
                 return;
             }
-            //本家と同じ範囲チェック (GUI を開いた相手から離れていないか)
+            // 本家と同じ範囲チェック (GUI を開いた相手から離れていないか)
             if (player.distanceToSqr(vehicle) > 64.0D * 64.0D) {
                 return;
             }
@@ -72,7 +70,7 @@ public record ChangeEntityModelPayload(int entityId, String modelId, String data
                 }
             }
 
-            //モデルが変わると座席位置 (slotPos) も変わるので、床を作り直させる。
+            // モデルが変わると座席位置 (slotPos) も変わるので、床を作り直させる。
             vehicle.onModelChanged();
         });
     }

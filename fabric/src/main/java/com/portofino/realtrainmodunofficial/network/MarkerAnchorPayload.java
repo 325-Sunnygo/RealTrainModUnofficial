@@ -39,7 +39,7 @@ public record MarkerAnchorPayload(BlockPos markerPos, CompoundTag railPositionTa
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            //編集対象マーカーが近距離にあることを確認 (不正パケット対策)
+            // 編集対象マーカーが近距離にあることを確認 (不正パケット対策)
             if (player.distanceToSqr(payload.markerPos().getX(), payload.markerPos().getY(), payload.markerPos().getZ()) > 256.0D * 256.0D) {
                 return;
             }
@@ -52,9 +52,9 @@ public record MarkerAnchorPayload(BlockPos markerPos, CompoundTag railPositionTa
             }
             marker.setMarkerRP(rp);
             marker.setChanged();
-            //本家 PacketMarkerRPClient: RP 適用後は updateRailMap のみ。
-            //makeRailMap (マーカー再アクティベート) を呼ぶと RailPosition が
-            //初期値で作り直されてクライアントへ同期され、編集した形状が巻き戻る。
+            // 本家 PacketMarkerRPClient: RP 適用後は updateRailMap のみ。
+            // makeRailMap (マーカー再アクティベート) を呼ぶと RailPosition が
+            // 初期値で作り直されてクライアントへ同期され、編集した形状が巻き戻る。
             TileEntityMarker core = marker.getCoreMarker();
             if (core == null) {
                 core = marker;

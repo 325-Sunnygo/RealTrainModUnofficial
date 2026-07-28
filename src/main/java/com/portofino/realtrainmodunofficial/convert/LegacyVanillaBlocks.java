@@ -17,17 +17,7 @@ import java.util.function.IntFunction;
 
 /**
  * 旧 1.7.10 の MOD ブロックを、1.21 のバニラブロックに読み替える。
- *
- * <p>対象は <b>UpToDateMod (yuma140902)</b>。1.7.10 に「新しいバージョンのバニラブロック」を
- * 足す MOD なので、素直に本来のバニラブロックへ戻せる。
- * (深層岩・磨かれた花崗岩・コンクリート・海のランタン・階段/ハーフ/塀 など)
- *
- * <p>Minecraft 自身の変換 (DataFixer) は MOD のブロックを知らないので<b>空気にしてしまう</b>。
- * そこで変換時に「どこに何があったか」を記録しておき、ワールドを開いたときに
- * バニラブロックとして置き直す。
- *
- * <p>向き (階段・ハーフ・原木の軸) は 1.7.10 のメタデータから復元する。
- * メタの意味はバニラと同じなので、そのまま解釈できる。
+ * 対象は UpToDateMod (yuma140902)。
  */
 public final class LegacyVanillaBlocks {
 
@@ -119,7 +109,7 @@ public final class LegacyVanillaBlocks {
         }
 
         // ---- 木 ----
-        //「全面樹皮」の原木 (1.13 の wood)
+        // 「全面樹皮」の原木 (1.13 の wood)
         put("wood", meta -> WOODS[Math.min(meta & 7, WOODS.length - 1)] + "_wood");
         for (String w : WOODS) {
             put("planks_" + planksKey(w), w + "_planks");
@@ -129,7 +119,7 @@ public final class LegacyVanillaBlocks {
             put("trap_door_" + planksKey(w), w + "_trapdoor");
             put("button_" + planksKey(w), w + "_button");
             put("pressure_plate_" + planksKey(w), w + "_pressure_plate");
-            //MOD は stripped_log_oak / stripped_oak_log の両方の名前を持つ
+            // MOD は stripped_log_oak / stripped_oak_log の両方の名前を持つ
             put("stripped_log_" + planksKey(w), "stripped_" + w + "_log");
             put("stripped_" + w + "_log", "stripped_" + w + "_log");
         }
@@ -141,8 +131,8 @@ public final class LegacyVanillaBlocks {
         put("sweet_berry_bush", "sweet_berry_bush");
 
         // ---- 階段 / ハーフ / 塀 ----
-        //MOD の登録名は "stairs_<素材>" / "slab_<素材>" / "wall_<素材>"。
-        //バニラは "<素材>_stairs" のように順番が逆なので入れ替える。
+        // MOD の登録名は "stairs_<素材>" / "slab_<素材>" / "wall_<素材>"。
+        // バニラは "<素材>_stairs" のように順番が逆なので入れ替える。
         for (String m : new String[]{
                 "granite", "polished_granite", "diorite", "polished_diorite", "andesite", "polished_andesite",
                 "stone", "mossy_cobblestone", "mossy_stone_bricks", "end_stone_bricks",
@@ -154,7 +144,7 @@ public final class LegacyVanillaBlocks {
             put("slab_" + m, m + "_slab");
             put("wall_" + m, m + "_wall");
         }
-        //綴り違い / 別名
+        // 綴り違い / 別名
         put("slab_dark_prismairne", "dark_prismarine_slab");
         put("wall_prismarine_brick", "prismarine_brick_wall");
         put("wall_bricks", "brick_wall");
@@ -190,9 +180,7 @@ public final class LegacyVanillaBlocks {
         return colon >= 0 ? n.substring(colon + 1) : n;
     }
 
-    /**
-     * 旧 MOD ブロック + メタ → 1.21 のブロック状態。変換できなければ null。
-     */
+    /** 旧 MOD ブロック + メタ → 1.21 のブロック状態。変換できなければ null。 */
     public static BlockState toVanilla(String name, int meta) {
         IntFunction<String> mapper = MAP.get(normalize(name));
         if (mapper == null) {
@@ -209,14 +197,12 @@ public final class LegacyVanillaBlocks {
 
     /**
      * 1.7.10 のメタデータから向きを復元する。メタの意味はバニラと同じ。
-     * <ul>
-     *   <li>階段: 下位 2bit = 向き、4 のビット = 上下反転</li>
-     *   <li>ハーフ: 8 のビット = 上付き</li>
-     *   <li>原木: 上位 2bit = 軸</li>
-     * </ul>
+     * 階段: 下位 2bit = 向き、4 のビット = 上下反転
+     * ハーフ: 8 のビット = 上付き
+     * 原木: 上位 2bit = 軸
      */
     private static BlockState applyMeta(BlockState state, int meta) {
-        //階段
+        // 階段
         if (state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)
                 && state.hasProperty(BlockStateProperties.HALF)) {
             Direction facing = switch (meta & 3) {
@@ -228,12 +214,12 @@ public final class LegacyVanillaBlocks {
             state = state.setValue(BlockStateProperties.HORIZONTAL_FACING, facing)
                     .setValue(BlockStateProperties.HALF, (meta & 4) != 0 ? Half.TOP : Half.BOTTOM);
         }
-        //ハーフブロック
+        // ハーフブロック
         if (state.hasProperty(BlockStateProperties.SLAB_TYPE)) {
             state = state.setValue(BlockStateProperties.SLAB_TYPE,
                     (meta & 8) != 0 ? SlabType.TOP : SlabType.BOTTOM);
         }
-        //原木・柱 (軸)
+        // 原木・柱 (軸)
         if (state.hasProperty(BlockStateProperties.AXIS)) {
             Direction.Axis axis = switch ((meta >> 2) & 3) {
                 case 1 -> Direction.Axis.X;

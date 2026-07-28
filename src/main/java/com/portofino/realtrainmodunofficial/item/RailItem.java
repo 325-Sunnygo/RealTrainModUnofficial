@@ -51,8 +51,8 @@ public class RailItem extends Item {
             return InteractionResult.PASS;
         }
 
-        //敷設済みのレールを右クリック → そのレールのモデルを、今このアイテムで選んでいる
-        //モデルに差し替える。引き直さずに見た目だけ変えられるようにするため。
+        // 敷設済みのレールを右クリック → そのレールのモデルを、今このアイテムで選んでいる
+        // モデルに差し替える。引き直さずに見た目だけ変えられるようにするため。
         if (level.getBlockEntity(context.getClickedPos()) instanceof TileEntityLargeRailBase railBase) {
             TileEntityLargeRailCore core = railBase.getRailCore();
             if (core != null) {
@@ -84,18 +84,9 @@ public class RailItem extends Item {
 
     /**
      * 敷設済みレールのモデル差し替え。
-     *
-     * <p>本家 ItemRail もレールを右クリックするとモデルをいじれる (シフトで差し替え、
+     * 本家 ItemRail もレールを右クリックするとモデルをいじれる (シフトで差し替え、
      * 素で重ねレールの追加) が、そちらは「コピーしたレール」アイテム側の話で、
      * モデル選択式の通常レールアイテムからは何もできなかった。
-     * 引き直さずに見た目だけ変えたい、という要望に応えて右クリックで差し替える。
-     *
-     * <p>シフト右クリックは本家どおり<b>重ねレール</b> (同じ線形に別モデルを重ねる。
-     * 三線軌条やガードレールを足すのに使う) の追加/削除にしてある。
-     *
-     * <p>差し替えると {@code markBlockForUpdate} が飛び、クライアント側の
-     * {@code loadAdditional} が {@code shouldRerenderRail} を立てるので、
-     * 統合メッシュ (VBO) も焼き直される。
      */
     private static void changeRailModel(TileEntityLargeRailCore core, ItemStack stack, Player player) {
         String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge
@@ -109,11 +100,12 @@ public class RailItem extends Item {
         String name = def != null ? def.getDisplayName() : selectedId;
 
         RailProperty old = core.getProperty();
-        //道床のブロックと高さは今のレールのものを引き継ぐ (変えるのはモデルだけ)
+        // 道床のブロックと高さは今のレールのものを引き継ぐ (変えるのはモデルだけ)
         RailProperty next = new RailProperty(selectedId, old.block, old.blockMetadata, old.blockHeight);
 
-        if (player.isShiftKeyDown()) {
-            //本家 ItemRail: 同じ線形に別モデルを重ねる (もう一度で解除)
+        // 本家と同じ操作。素で重ね、シフトで差し替え。
+        if (!player.isShiftKeyDown()) {
+            // 同じ線形に別モデルを重ねる (もう一度で解除)
             boolean had = core.subRails.stream()
                 .anyMatch(p -> p.railModel.equals(selectedId));
             core.addSubRail(next);

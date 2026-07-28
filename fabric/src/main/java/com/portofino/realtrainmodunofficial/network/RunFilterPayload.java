@@ -16,11 +16,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 編集フィルタの実行 (neo mcte)。
- *
- * <p>パラメータは {@code 名前=値} を改行で並べた 1 本の文字列で送る。
- * フィルタごとに専用パケットを作らずに済み、フィルタを足しても通信側を触らなくてよい。
- *
- * <p>{@code filterName} が {@code __undo__} のときは元に戻す。
+ * パラメータは 名前=値 を改行で並べた 1 本の文字列で送る。
  */
 public record RunFilterPayload(String filterName, String params) implements CustomPacketPayload {
 
@@ -58,7 +54,7 @@ public record RunFilterPayload(String filterName, String params) implements Cust
                 return;
             }
             if (OPEN.equals(payload.filterName())) {
-                //画面はクライアントが開く。ここでは選択の器だけ用意する。
+                // 画面はクライアントが開く。ここでは選択の器だけ用意する。
                 EditorSelection.of(player);
                 return;
             }
@@ -104,8 +100,8 @@ public record RunFilterPayload(String filterName, String params) implements Cust
             }
             applyParams(filter, payload.params());
 
-            //★上限を超える範囲は実行しない。誤って巨大範囲を選んだままフィルタを流すと
-            //サーバが固まるので、走らせる前に断る。
+            // ★上限を超える範囲は実行しない。誤って巨大範囲を選んだままフィルタを流すと
+            // サーバが固まるので、走らせる前に断る。
             long volume = editor.getVolume();
             if (volume > jp.ngt.mcte.editor.filter.EditorOps.MAX_BLOCKS) {
                 player.displayClientMessage(Component.translatable(
@@ -128,7 +124,7 @@ public record RunFilterPayload(String filterName, String params) implements Cust
         });
     }
 
-    /** {@code 名前=値} の並びを設定へ流し込む。 */
+    /** 名前=値 の並びを設定へ流し込む。 */
     private static void applyParams(EditFilter filter, String params) {
         if (params == null || params.isBlank()) {
             return;

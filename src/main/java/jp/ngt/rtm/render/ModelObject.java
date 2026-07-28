@@ -4,8 +4,7 @@ import jp.ngt.ngtlib.renderer.model.TextureSet;
 
 /**
  * 本家 jp.ngt.rtm.render.ModelObject の最小移植。
- * スクリプトは renderer.getModelObject().textures[0].material.texture を参照する。
- * TODO(Phase 4): IModelNGT/TextureSet 完全版に置換。
+ * スクリプトは renderer.getModelObject.textures[0].material.texture を参照する。
  */
 public class ModelObject {
     public TextureSet[] textures;

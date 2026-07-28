@@ -20,9 +20,7 @@ public abstract class SwitchType {
     @Deprecated
     protected List<RailMapSwitch> activeRails = new ArrayList<>();
 
-    /**
-     * @deprecated use {@link #SwitchType(int, int)}
-     */
+    /** @deprecated use #SwitchType(int, int) */
     @Deprecated
     protected SwitchType(int par1) {
         this(par1, 0);
@@ -33,25 +31,19 @@ public abstract class SwitchType {
         this.fixRTMRailMapVersion = fixRTMRailMapVersion;
     }
 
-    /**
-     * 初期化
-     */
+    /** 初期化 */
     public abstract boolean init(List<RailPosition> switchList, List<RailPosition> normalList);
 
     public abstract String getName();
 
-    /**
-     * ブロック更新時に呼ばれる
-     */
+    /** ブロック更新時に呼ばれる */
     public void onBlockChanged(Level world) {
     }
 
-    /**
-     * TileEntity.updateEntity()のタイミングで呼ばれる
-     */
+    /** TileEntity.updateEntityのタイミングで呼ばれる */
     public void onUpdate(Level world) {
-        //軽量化: 全分岐レールコアが両サイド毎tick通る。Arrays.stream は毎tick Stream+ラムダを
-        //アロケートするので素の for に (挙動は完全に同じ、GC 圧を下げるだけ)。
+        // 軽量化: 全分岐レールコアが両サイド毎tick通る。Arrays.stream は毎tick Stream+ラムダを
+        // アロケートするので素の for に (挙動は完全に同じ、GC 圧を下げるだけ)。
         for (Point point : this.points) {
             point.onUpdate(world);
         }
@@ -87,9 +79,7 @@ public abstract class SwitchType {
 
     // ================= 以下は Remaster 暫定互換 API (Phase 1 の BE 差し替え完了後に削除予定) =================
 
-    /**
-     * @deprecated Remaster 独自 API。本家に存在しない。
-     */
+    /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated
     public List<RailMap> getOpenRailMaps() {
         if (this.id == 3) {
@@ -104,9 +94,7 @@ public abstract class SwitchType {
         return open.isEmpty() ? List.of(this.railMaps) : open;
     }
 
-    /**
-     * @deprecated Remaster 独自 API。本家に存在しない。
-     */
+    /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated
     public int firstOpenRailIndex() {
         if (this.id == 3) {
@@ -120,9 +108,7 @@ public abstract class SwitchType {
         return 0;
     }
 
-    /**
-     * @deprecated Remaster 独自 API。本家に存在しない。
-     */
+    /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated
     public int[] getOpenRailIndices() {
         if (this.id == 3) {
@@ -153,11 +139,9 @@ public abstract class SwitchType {
 
     /****************************************************************************************************/
 
-    //Y字
+    // Y字
     public static class SwitchBasic extends SwitchType {
-        /**
-         * @deprecated use {@link #SwitchBasic(int)}
-         */
+        /** @deprecated use #SwitchBasic(int) */
         @Deprecated
         public SwitchBasic() {
             this(0);
@@ -210,11 +194,9 @@ public abstract class SwitchType {
 
     /****************************************************************************************************/
 
-    //N字
+    // N字
     public static class SwitchSingleCross extends SwitchType {
-        /**
-         * @deprecated use {@link #SwitchSingleCross(int)}
-         */
+        /** @deprecated use #SwitchSingleCross(int) */
         @Deprecated
         public SwitchSingleCross() {
             this(0);
@@ -307,11 +289,9 @@ public abstract class SwitchType {
 
     /****************************************************************************************************/
 
-    //シーサスクロッシング
+    // シーサスクロッシング
     public static class SwitchScissorsCross extends SwitchType {
-        /**
-         * @deprecated use {@link #SwitchScissorsCross(int)}
-         */
+        /** @deprecated use #SwitchScissorsCross(int) */
         @Deprecated
         public SwitchScissorsCross() {
             this(0);
@@ -324,9 +304,9 @@ public abstract class SwitchType {
         @Override
         public boolean init(List<RailPosition> switchList, List<RailPosition> normalList) {
             RailMapSwitch[] rails = new RailMapSwitch[4];
-            //RailMapSwitchになる頂点2つを格納
+            // RailMapSwitchになる頂点2つを格納
             RailPosition[][] rps = new RailPosition[4][2];
-            //頂点同士の組み合わせ調査
+            // 頂点同士の組み合わせ調査
             int rpsCount = 0;
             for (int i = 0; i < 4; ++i) {
                 for (int j = i + 1; j < 4; ++j) {
@@ -335,7 +315,7 @@ public abstract class SwitchType {
                         dirDif = 8 - dirDif;
                     }
 
-                    //角度差>45なら追加
+                    // 角度差>45なら追加
                     if (dirDif > 2 && rpsCount < 4) {
                         rps[rpsCount] = new RailPosition[]{switchList.get(i), switchList.get(j)};
                         ++rpsCount;
@@ -344,7 +324,7 @@ public abstract class SwitchType {
             }
 
             if (rpsCount == 4) {
-                //RailMap生成
+                // RailMap生成
                 for (int i = 0; i < 4; ++i) {
                     RailDir dir0 = RailDir.NONE;
                     RailDir dir1 = RailDir.NONE;
@@ -370,14 +350,14 @@ public abstract class SwitchType {
                 this.railMaps = rails;
                 this.activeRails.add(this.railMaps[0]);
 
-                //Point生成
+                // Point生成
                 this.points = new Point[4];
                 for (int i = 0; i < 4; ++i) {
                     RailPosition rp = switchList.get(i);
                     RailMapSwitch rms1 = null;
                     RailMapSwitch rms2 = null;
 
-                    //当該頂点を含むRailMapを2つ探す
+                    // 当該頂点を含むRailMapを2つ探す
                     for (int j = 0; j < 4; ++j) {
                         if (rails[j].getStartRP() == rp || rails[j].getEndRP() == rp) {
                             if (rms1 == null) {
@@ -466,11 +446,9 @@ public abstract class SwitchType {
 
     /****************************************************************************************************/
 
-    //ダイヤモンドクロス
+    // ダイヤモンドクロス
     public static class SwitchDiamondCross extends SwitchType {
-        /**
-         * @deprecated use {@link #SwitchDiamondCross(int)}
-         */
+        /** @deprecated use #SwitchDiamondCross(int) */
         @Deprecated
         public SwitchDiamondCross() {
             this(0);

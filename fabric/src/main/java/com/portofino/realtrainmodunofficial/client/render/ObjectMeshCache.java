@@ -11,41 +11,14 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * 設置オブジェクト (標識/看板/信号/踏切) の焼き込みキャッシュ。<b>本家 RTM のディスプレイリスト方式の移植</b>。
- *
- * <h2>本家の作り</h2>
- * <p>本家 {@code RailPartsRenderer.renderRailStatic} (KaizPatchX) はこうなっている:
- * <pre>
- *   hasList = prepareStaticDisplayList(te);                       //無ければ生成
- *   if (hasList &amp;&amp; te.shouldRerenderRail &amp;&amp; !shouldRefreshDisplayList(te))
- *       te.shouldRerenderRail = false;                            //★キーが同じなら焼き直さずフラグだけ下ろす
- *   if (!hasList || te.shouldRerenderRail) compileStaticRailParts(te);
- *   if (hasList) renderStaticDisplayList(te);                     //push→translate→bindTexture→callList→pop
- *
- *   shouldRefreshDisplayList = createStaticRenderKey(形状, 明るさ) != te.getStaticRenderKey(i)
- *   createStaticRenderKey    = 31*(31*deepHashCode(形状) + hashCode(明るさ)) + モデルキー
- * </pre>
- * 要点は 3 つ:
- * <ol>
- *   <li>焼き先は<b>ブロックエンティティ側</b>に持つ (te.glLists)</li>
- *   <li>無効化は<b>内容キーの比較</b>。「変わったかもしれない」フラグだけでは焼き直さない</li>
- *   <li><b>テクスチャの bind はリストの外</b> (本家コメント「ディスプレイリストに入れると生成重い」)</li>
- * </ol>
- *
- * <h2>1.21 での対応物</h2>
- * <p>ディスプレイリスト → {@link com.mojang.blaze3d.vertex.VertexBuffer} (VBO)。
- * {@code glTranslate + glCallList} → {@code vbo.drawWithShader(ModelView × pose, ...)}。
- * どちらも<b>頂点の CPU 処理がゼロ</b>で、GPU に置いた頂点を行列 1 本で描き直す点が同じ。
- * テクスチャは {@link net.minecraft.client.renderer.RenderType} が持つので、本家と同じく焼き込みの外側にある。
- *
- * <p>キーは本家の「形状 + 明るさ + モデル」ではなく {@link jp.ngt.ngtlib.renderer.GLRecorder#contentKey()}
- * (スクリプトが吐いた描画コマンドそのもの) + 明るさを使う。設置物のスクリプトは点滅・スクロール・可動部を
- * 自前で進めるので入力を数え上げられない。<b>出力を見れば取りこぼしが起きない</b>ため、
- * 「アニメが止まる」という以前の失敗をしない。スクリプト自体は毎フレーム走らせたままで、
- * 削るのは頂点提出のほうである (スクリプト実行は実測で列車コストの 1%)。
- *
- * <p>描画は {@link RailDrawQueue} へ渡す。焼き込み VBO を RenderType ごとに 1 回だけ
- * ステート設定してまとめて描く仕組みが既にあるので、レールと同じ土俵に載せたほうが速い。
+ * 設置オブジェクト (標識/看板/信号/踏切) の焼き込みキャッシュ。本家 RTM のディスプレイリスト方式の移植。
+ * 本家の作り
+ * 本家 RailPartsRenderer.renderRailStatic (KaizPatchX) はこうなっている:
+ * hasList = prepareStaticDisplayList(te);                       //無ければ生成
+ * if (hasList && te.shouldRerenderRail && !shouldRefreshDisplayList(te))
+ * te.shouldRerenderRail = false;                            //★キーが同じなら焼き直さずフラグだけ下ろす
+ * if (!hasList || te.shouldRerenderRail) compileStaticRailParts(te);
+ * if (hasList) renderStaticDisplayList(te);                     //push→translate→bindTexture→callList→pop
  */
 public final class ObjectMeshCache {
 
@@ -55,16 +28,13 @@ public final class ObjectMeshCache {
     private static final int MAX_VERTICES = 1 << 20;
     /**
      * 1 フレームに焼く数の上限。視界に大量の設置物が入った瞬間のスパイクを散らす
-     * (レール側 {@code RailMeshCache.MAX_BAKES_PER_FRAME} と同じ考え方)。
+     * (レール側 RailMeshCache.MAX_BAKES_PER_FRAME と同じ考え方)。
      */
     private static final int MAX_BAKES_PER_FRAME = 8;
     /**
      * 何フレーム連続で内容が変わったら「可動物」と見なすか。
-     *
-     * <p>本家は {@code renderRailStatic} と {@code renderRailDynamic} を<b>作る側が</b>分けていて、
-     * 動く部分はそもそも焼き込みに入れない。RTMU はスクリプトの中身を見て静的/可動を判別できないので、
-     * <b>実際に毎フレーム変わり続けたら可動物と判定して焼くのをやめる</b>。
-     * 焼き直しは捕捉 + アップロードを伴うので、毎フレーム変わる物を焼くと CPU 提出より高くつく。
+     * 本家は renderRailStatic と renderRailDynamic を作る側が分けていて、
+     * 動く部分はそもそも焼き込みに入れない。
      */
     private static final int DYNAMIC_AFTER = 4;
     /** 可動物と判定した後、再び焼けるか試すまでのフレーム数 (点滅が止まった信号を拾い直す)。 */
@@ -113,12 +83,10 @@ public final class ObjectMeshCache {
     }
 
     /**
-     * 焼き込みを描く。本家 {@code renderRailStatic} と同じ流れ。
-     *
+     * 焼き込みを描く。本家 renderRailStatic と同じ流れ。
+     * 単位行列基準 (ブロックエンティティ原点) で描画すること。
      * @param key   焼き直し判定キー (本家 createStaticRenderKey 相当)
-     * @param baker キーが変わったときだけ呼ばれる。渡された {@link MultiBufferSource} へ
-     *              <b>単位行列基準 (ブロックエンティティ原点) で</b>描画すること。
-     *              カメラ相対の pose を掛けて焼くと、カメラが動いた瞬間にずれる
+     * @param baker キーが変わったときだけ呼ばれる。渡された MultiBufferSource へ
      * @return true = 描画を予約した (呼び出し元は CPU 経路で描かない)
      */
     public static boolean draw(BlockEntity be, PoseStack poseStack, int key,
@@ -129,7 +97,7 @@ public final class ObjectMeshCache {
 
         Entry entry = CACHE.computeIfAbsent(be, k -> new Entry());
 
-        //可動物と判定済み: 焼かずに CPU 経路へ返す。ときどき再挑戦する。
+        // 可動物と判定済み: 焼かずに CPU 経路へ返す。ときどき再挑戦する。
         if (entry.dynamic) {
             if (frameCounter - entry.retryAtFrame < 0) {
                 return false;
@@ -138,20 +106,17 @@ public final class ObjectMeshCache {
             entry.churn = 0;
         }
 
-        //★本家の要点そのもの: キーが同じなら焼き直さない。
+        // ★本家の要点そのもの: キーが同じなら焼き直さない。
         boolean valid = entry.hasKey && entry.key == key && isUsable(entry.sections);
         if (!valid) {
-            //★視界に大量に入った瞬間のスパイクを散らす。ここを先に見るのが要点で、
-            //  枠待ちを「内容が変わった」と数えると、設置物が多い場面ほど可動物と誤判定されて
-            //  いちばん効かせたい所でキャッシュが外れる。
-            //★キーが変わったのに焼き直せないときは<b>古い絵を描かない</b>。
-            //  以前はここで前フレームのメッシュを描いて次へ回していたが、枠が空かない限り
-            //  古い絵のまま固まる。踏切のランプが「音は鳴るのに点滅しない」のはこれ。
-            //  焼けないフレームは CPU 経路へ落とす。1 フレームぶん重いだけで絵は必ず合う。
+            // ★視界に大量に入った瞬間のスパイクを散らす。
+            // 枠待ちを「内容が変わった」と数えると、設置物が多い場面ほど可動物と誤判定されて
+            // いちばん効かせたい所でキャッシュが外れる。
+            // ★キーが変わったのに焼き直せないときは古い絵を描かない。
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
                 return false;
             } else if (entry.hasKey && ++entry.churn >= DYNAMIC_AFTER) {
-                //焼き直しが続く = 中身が動き続けている。焼くほうが高くつくので手を引く。
+                // 焼き直しが続く = 中身が動き続けている。焼くほうが高くつくので手を引く。
                 entry.close();
                 entry.dynamic = true;
                 entry.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
@@ -161,7 +126,7 @@ public final class ObjectMeshCache {
                 entry.close();
                 List<MeshCapture.Section> baked = bake(baker);
                 if (baked == null) {
-                    //焼けなかった (頂点ゼロ/大きすぎ)。以降は CPU 経路に任せる。
+                    // 焼けなかった (頂点ゼロ/大きすぎ)。以降は CPU 経路に任せる。
                     entry.dynamic = true;
                     entry.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
                     return false;
@@ -175,8 +140,8 @@ public final class ObjectMeshCache {
         }
         com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(valid);
 
-        //本家 renderStaticDisplayList: push → translate → bindTexture (リストの外) → callList → pop。
-        //ここでは RenderType がテクスチャを持ち、pose が translate にあたる。
+        // 本家 renderStaticDisplayList: push → translate → bindTexture (リストの外) → callList → pop。
+        // ここでは RenderType がテクスチャを持ち、pose が translate にあたる。
         boolean drewAny = false;
         for (MeshCapture.Section s : entry.sections) {
             if (RailDrawQueue.enqueue(s.vbo(), s.renderType(), poseStack)) {
@@ -190,15 +155,15 @@ public final class ObjectMeshCache {
     public static void beginFrame() {
         bakesThisFrame = 0;
         frameCounter++;
-        //ワールドを移ったら全部捨てる。ここは BlockEntity を強参照で持つので、
-        //捨てないと前のワールドのブロックエンティティと VBO を掴んだままになる
-        //(レール側 RailMeshCache.dropIfLevelChanged と同じ)。
+        // ワールドを移ったら全部捨てる。ここは BlockEntity を強参照で持つので、
+        // 捨てないと前のワールドのブロックエンティティと VBO を掴んだままになる
+        // (レール側 RailMeshCache.dropIfLevelChanged と同じ)。
         net.minecraft.world.level.Level level = net.minecraft.client.Minecraft.getInstance().level;
         if (level != lastLevel) {
             clear();
             lastLevel = level;
         }
-        //壊された設置物を落とす。毎フレーム全部見ると重いので少しずつ。
+        // 壊された設置物を落とす。毎フレーム全部見ると重いので少しずつ。
         if ((frameCounter & 63) == 0) {
             CACHE.entrySet().removeIf(e -> {
                 if (e.getKey().isRemoved()) {
@@ -215,9 +180,8 @@ public final class ObjectMeshCache {
     /** 焼く。呼び出し元の描画をそのまま捕まえて RenderType ごとの VBO にする。 */
     private static List<MeshCapture.Section> bake(Consumer<MultiBufferSource> baker) {
         MeshCapture.Source source = new MeshCapture.Source();
-        //★レール側 (RailMeshCache.bake) と同じ。captureMode 中は MqoModelLoader の
-        //静的 VBO 直描画を止めて、頂点が必ずこの Source へ流れるようにする。
-        //これが無いと一部のバッチが単位行列のまま即座に描かれてしまう。
+        // ★レール側 (RailMeshCache.bake) と同じ。
+        // 静的 VBO 直描画を止めて、頂点が必ずこの Source へ流れるようにする。
         boolean prevCapture = com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.captureMode;
         com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.captureMode = true;
         try {

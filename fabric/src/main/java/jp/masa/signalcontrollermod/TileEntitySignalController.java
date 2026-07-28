@@ -20,12 +20,6 @@ import java.util.List;
  * SignalControllerMod (作者: masa300, https://github.com/masa300/SignalControllerMod)
  * の TileEntitySignalController 1.21.1 移植。制御ロジック・NBT キーは原作のまま。
  * 信号機の読み書きは当 MOD の信号 (InstalledObjectBlockEntity, SIGNAL カテゴリ) に接続。
- *
- * 動作 (原作準拠):
- *  - nextSignal (次閉塞の信号) の現示レベル最大値を取得 (last なら 1=停止扱い)
- *  - signalType.upSignalLevel で 1 段進めた現示を計算 (repeat は 3-4 現示を素通し)
- *  - レッドストーン入力があれば強制的に 1 (停止現示)
- *  - above (直上探索) と displayPos の信号機へ現示を設定
  */
 public class TileEntitySignalController extends BlockEntity {
     private SignalType signalType = SignalType.signal3;
@@ -49,9 +43,7 @@ public class TileEntitySignalController extends BlockEntity {
     private long lastDebugLog;
     private boolean prevRSPowered;
 
-    /**
-     * 原作 updateEntity (Server Only)
-     */
+    /** 原作 updateEntity (Server Only) */
     public void tick() {
         Level world = this.getLevel();
         if (world == null || world.isClientSide) {
@@ -88,7 +80,7 @@ public class TileEntitySignalController extends BlockEntity {
             }
         }
 
-        //表示する信号機の制御 (変化したときだけ変更して負荷を減らす — 原作コメント)
+        // 表示する信号機の制御 (変化したときだけ変更して負荷を減らす — 原作コメント)
         int signalLevel = (this.repeat && (3 <= nextSignalLevel && nextSignalLevel <= 4))
                 ? nextSignalLevel : this.signalType.upSignalLevel(nextSignalLevel);
         if (signalLevel > MAXSIGNALLEVEL) signalLevel = MAXSIGNALLEVEL;
@@ -141,14 +133,12 @@ public class TileEntitySignalController extends BlockEntity {
     private void setSignal(Level world, BlockPos pos, int level) {
         BlockEntity tile = world.getBlockEntity(pos);
         if (tile instanceof InstalledObjectBlockEntity be && be.getCategory() == InstalledObjectCategory.SIGNAL) {
-            //本家 TileEntitySignal.setElectricity 同様 — 信号機は電気レベル=現示 (BE 側でミラー)
+            // 本家 TileEntitySignal.setElectricity 同様 — 信号機は電気レベル=現示 (BE 側でミラー)
             be.setElectricity(level);
         }
     }
 
-    /**
-     * 原作 searchSignalAboveY: 直上 32 ブロックから信号機を探す
-     */
+    /** 原作 searchSignalAboveY: 直上 32 ブロックから信号機を探す */
     private BlockPos searchSignalAbove(Level world) {
         int searchMaxCount = 32;
         for (int i = 1; i <= searchMaxCount; i++) {

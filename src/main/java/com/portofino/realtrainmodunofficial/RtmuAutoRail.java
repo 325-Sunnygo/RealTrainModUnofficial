@@ -15,12 +15,9 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * レール敷設時に、敷設プレイヤーの RTMU 設定 ({@link RtmuSettings}) に従って
- * <ul>
- *   <li>自動カント: カーブ (曲線) のとき曲率に応じたカントを付ける</li>
- *   <li>自動高さ: RailPosition の height を指定レベル (1〜5) に揃える</li>
- * </ul>
- * を RailPosition 群へ適用する。サーバー側 (レール生成) で呼ぶ。
+ * レール敷設時に、敷設プレイヤーの RTMU 設定  に従って
+ * 自動カント: カーブ (曲線) のとき曲率に応じたカントを付ける
+ * 自動高さ: RailPosition の height を指定レベル (1〜5) に揃える
  */
 public final class RtmuAutoRail {
 
@@ -47,21 +44,21 @@ public final class RtmuAutoRail {
         }
         if (autoCant) {
             float cant = curveCant(rpS, rpE);
-            //接続端: 隣接レールのカント (ロール) に一致させる。null = 接続レール無し。
-            //  隣接が直線 (カント0) なら 0 に合う。カントレールなら同じカントに揃えて連続させる。
+            // 接続端: 隣接レールのカント (ロール) に一致させる。null = 接続レール無し。
+            // 隣接が直線 (カント0) なら 0 に合う。カントレールなら同じカントに揃えて連続させる。
             Float adjStart = adjacentRoll(world, rpS);
             Float adjEnd = adjacentRoll(world, rpE);
             if (cant == 0.0F && adjStart == null && adjEnd == null) {
                 return; //直線かつ孤立 → カント無し
             }
-            //フリー端 (接続なし) はこのカーブのカント C、接続端は隣接レールのロールに一致。
+            // フリー端 (接続なし) はこのカーブのカント C、接続端は隣接レールのロールに一致。
             float rollStart = adjStart != null ? adjStart : cant;
             float rollEnd = adjEnd != null ? adjEnd : cant;
             if (rollStart == 0.0F && rollEnd == 0.0F) {
                 return; //両端とも水平 (直線接続 or 平坦) → カント無し
             }
             float center = (rollStart + rollEnd) * 0.5F;
-            //getRailRoll: 始点ロール=startRP.cantEdge, 中央=startRP.cantCenter, 終点ロール=-endRP.cantEdge。
+            // getRailRoll: 始点ロール=startRP.cantEdge, 中央=startRP.cantCenter, 終点ロール=-endRP.cantEdge。
             rpS.cantEdge = rollStart;
             rpS.cantCenter = center;
             rpE.cantCenter = center;
@@ -71,11 +68,9 @@ public final class RtmuAutoRail {
 
     /**
      * rp の端点に接続する既存レールの「その端点でのロール (カント)」を返す。接続レールが無ければ null。
-     * <p>
-     * 端点ブロックとその周囲 (水平±1, 垂直±1) を走査して {@link BlockLargeRailBase} を探し、
+     * 端点ブロックとその周囲 (水平±1, 垂直±1) を走査して BlockLargeRailBase を探し、
      * そのコアの RailPosition から rp に一致する端点のロールを読む
-     * ({@code getRailRoll}: 始点=cantEdge, 終点=-cantEdge)。これに新レールの接続端を合わせると
-     * カントが連続する。レールはあるがカントを読めない場合は 0 (=直線とみなし平坦) を返す。
+     * (getRailRoll: 始点=cantEdge, 終点=-cantEdge)。
      */
     private static Float adjacentRoll(Level world, RailPosition rp) {
         if (world == null) {
@@ -137,7 +132,7 @@ public final class RtmuAutoRail {
                 rp.setHeight(h);
             }
         }
-        //分岐 (3点以上) のカントは扱いが複雑なので自動カントは 2 点レールのみ対象とする。
+        // 分岐 (3点以上) のカントは扱いが複雑なので自動カントは 2 点レールのみ対象とする。
     }
 
     /** level (1〜16) → レール高さ byte (0〜15)。0=OFF は呼び出し側で弾く。任意の高さ (9,10 等) が指定可能。 */
@@ -147,10 +142,7 @@ public final class RtmuAutoRail {
 
     /**
      * カーブなら曲率に応じたカント (度)、直線なら 0 を返す。
-     * <p>
      * まず一時 RailMap を作って直線/曲線を判定 (この時点で cant は 0 なので副作用なし)。
-     * カントの大きさは「進行方向の変化量 / 弦長」= 曲率に比例させ、上限 {@link #MAX_CANT} 度。
-     * 符号は曲がる向き (左右) に合わせる。
      */
     private static float curveCant(RailPosition rpS, RailPosition rpE) {
         try {
@@ -167,13 +159,13 @@ public final class RtmuAutoRail {
         if (chord < 1.0D) {
             return 0.0F;
         }
-        //rpE のアンカーは終点で「戻る向き」を指すので +180 して進行方向に合わせる。
+        // rpE のアンカーは終点で「戻る向き」を指すので +180 して進行方向に合わせる。
         float signedTurn = Mth.wrapDegrees(rpE.anchorYaw + 180.0F - rpS.anchorYaw);
         float magnitude = Math.min(MAX_CANT, Math.abs(signedTurn) / (float) chord * 1.1F);
         if (magnitude < 0.2F) {
             return 0.0F;
         }
-        //カーブの内側が下がる向き。曲がる向き (signedTurn) に対して符号を反転させると内側下がり。
+        // カーブの内側が下がる向き。曲がる向き (signedTurn) に対して符号を反転させると内側下がり。
         return -magnitude * Math.signum(signedTurn);
     }
 }

@@ -33,12 +33,8 @@ import java.util.Locale;
 
 /**
  * 変換したワールドを最初に開いたときに、旧 RTM のオブジェクトを RTMU のオブジェクトとして置き直す。
- *
- * <p>ここでやる理由は、モデルパックのレジストリ (どの車両/レール/設置物が入っているか) が
- * <b>ゲームが起動していないと引けない</b>ため。変換ツール側は旧 NBT をそのまま保存しておき、
- * 名前から定義を解決するのはこの復元時に行う。
- *
- * <p>1 tick に少しずつ置いていく (一気に置くとチャンク読み込みでサーバーが固まる)。
+ * ここでやる理由は、モデルパックのレジストリ (どの車両/レール/設置物が入っているか) が
+ * ゲームが起動していないと引けないため。
  */
 public final class LegacyRestorer {
 
@@ -78,13 +74,13 @@ public final class LegacyRestorer {
             return;
         }
         worldDir = dir;
-        //レールを先に敷く。あとから置く設置物がレールのマスに当たったら 1 段上へ逃がすので、
-        //順番が逆だとレールが設置物を上書きしてしまう。
+        // レールを先に敷く。あとから置く設置物がレールのマスに当たったら 1 段上へ逃がすので、
+        // 順番が逆だとレールが設置物を上書きしてしまう。
         List<RestoreData.ObjectRecord> ordered = new ArrayList<>(data.objects);
         ordered.sort(java.util.Comparator.comparingInt(r -> isRail(r.type) ? 0 : 1));
         OBJECTS.addAll(ordered);
         ENTITIES.addAll(data.entities);
-        //MOD ブロックのバニラ化はレールより先に済ませる (地形が先に戻っていた方が素直)
+        // MOD ブロックのバニラ化はレールより先に済ませる (地形が先に戻っていた方が素直)
         BLOCKS.addAll(data.blocks);
         total = OBJECTS.size() + ENTITIES.size();
         running = total > 0 || !BLOCKS.isEmpty();
@@ -95,13 +91,13 @@ public final class LegacyRestorer {
         if (!running) {
             return;
         }
-        //まず MOD ブロックをバニラに戻す (数が多いのでまとめて)
+        // まず MOD ブロックをバニラに戻す (数が多いのでまとめて)
         int blockBudget = BLOCKS_PER_TICK;
         while (blockBudget-- > 0 && !BLOCKS.isEmpty()) {
             placeVanillaBlock(server, BLOCKS.poll());
         }
         if (!BLOCKS.isEmpty()) {
-            //ブロックを置き切るまで RTM オブジェクトには進まない
+            // ブロックを置き切るまで RTM オブジェクトには進まない
             return;
         }
 
@@ -119,10 +115,7 @@ public final class LegacyRestorer {
 
     /**
      * 旧 MOD のブロックをバニラブロックとして置き直す。
-     * <p>
-     * Minecraft の変換 (DataFixer) は MOD のブロックを知らないので<b>空気にしてしまう</b>。
-     * UpToDateMod のように「新しいバージョンのバニラブロックを 1.7.10 に足す」MOD は、
-     * 本来のバニラブロックへそのまま戻せる。
+     * Minecraft の変換 (DataFixer) は MOD のブロックを知らないので空気にしてしまう。
      */
     private static void placeVanillaBlock(MinecraftServer server, RestoreData.BlockRecord rec) {
         try {
@@ -136,7 +129,7 @@ public final class LegacyRestorer {
                 return;
             }
             BlockPos pos = new BlockPos(rec.x, rec.y, rec.z);
-            //flag 2 = クライアントへ送るだけ (隣接更新を走らせない = 大量に置いても軽い)
+            // flag 2 = クライアントへ送るだけ (隣接更新を走らせない = 大量に置いても軽い)
             level.setBlock(pos, state, 2);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("[convert] ブロックの復元に失敗 {},{},{} ({})",
@@ -181,13 +174,8 @@ public final class LegacyRestorer {
 
     /**
      * レールのマスを避ける。
-     * <p>
-     * 本家では車止め・列車検知器は<b>エンティティ</b>なのでレールの上に「乗る」だけだが、
-     * RTMU ではブロックなので、レールのマスにそのまま置くと<b>レールの土台を踏み抜く</b>。
-     * 土台が壊れるとレール全体を撤去する処理が走るため、敷いたレールごと消えてしまう。
-     * (実際にこれで復元したレールが 122 ブロックまとめて自壊していた)
-     * <p>
-     * レールに当たったら 1 段ずつ上へ逃がす。描画は renderOffset で元の位置に戻すので見た目は変わらない。
+     * 本家では車止め・列車検知器はエンティティなのでレールの上に「乗る」だけだが、
+     * RTMU ではブロックなので、レールのマスにそのまま置くとレールの土台を踏み抜く。
      */
     private static BlockPos avoidRail(ServerLevel level, BlockPos pos) {
         BlockPos p = pos;
@@ -231,9 +219,8 @@ public final class LegacyRestorer {
     }
 
     /**
-     * レール。旧 RTM と RTMU は RailPosition の NBT キーが同一 (BlockPos / Direction / A_* / C_* …) なので、
-     * そのまま読み込める。違うのはレール自身の設定で、旧 "State" (ResourceState) が
-     * RTMU では "Property" (RailProperty) になっている点だけ。
+     * レール。
+     * そのまま読み込める。
      */
     private static boolean placeRail(ServerLevel level, RestoreData.ObjectRecord rec) {
         List<RailPosition> rps = readRailPositions(rec.nbt);
@@ -242,16 +229,12 @@ public final class LegacyRestorer {
         }
         RailProperty prop = readRailProperty(rec.nbt);
 
-        //★ 先に「死んだ古いレールブロック」を掃除する。
-        //
-        //旧ワールドのレール土台ブロックは、変換後も RTMU のレール土台ブロックとして<b>残っている</b>
-        //(ブロック名が一致するため)。ところが中身のブロックエンティティは旧 MOD のもので読み込めず、
-        //空の状態で作り直される。この土台は「自分のコアが見つからない」と判断して自壊し、
-        //その巻き添えで<b>新しく敷いたレールごと消えてしまう</b>。
-        //コアを持たない = 死んでいる土台だけを先に取り除く (生きている別のレールは壊さない)。
+        // ★ 先に「死んだ古いレールブロック」を掃除する。
+        // 旧ワールドのレール土台ブロックは、変換後も RTMU のレール土台ブロックとして残っている
+        // (ブロック名が一致するため)。
         clearDeadRailBlocks(level, rps, prop);
 
-        //本家の "makeRail" = 土台ブロックも作る、"isCreative" = 資材を消費しない
+        // 本家の "makeRail" = 土台ブロックも作る、"isCreative" = 資材を消費しない
         boolean ok = BlockMarker.createRail(level, rec.x, rec.y, rec.z, rps, prop, true, true);
         if (ok && com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(prop.railModel) == null) {
             RealTrainModUnofficial.LOGGER.warn("[convert] レールのモデル {} が見つかりません (パックを入れてください)", prop.railModel);
@@ -261,7 +244,6 @@ public final class LegacyRestorer {
 
     /**
      * レールが通る範囲にある「コアを持たないレール土台/マーカー」を取り除く。
-     * <p>
      * 生きているレール (コアが解決できる土台) には触らないので、既に復元済みの別のレールは壊れない。
      */
     private static void clearDeadRailBlocks(ServerLevel level, List<RailPosition> rps, RailProperty prop) {
@@ -279,7 +261,7 @@ public final class LegacyRestorer {
             maxY = Math.max(maxY, rp.blockY);
             maxZ = Math.max(maxZ, rp.blockZ);
         }
-        //曲線は端点の外へ膨らむ。道床の幅ぶんも見て余裕をとる。
+        // 曲線は端点の外へ膨らむ。道床の幅ぶんも見て余裕をとる。
         final int margin = 8;
         minX -= margin;
         minZ -= margin;
@@ -288,7 +270,7 @@ public final class LegacyRestorer {
         minY -= 2;
         maxY += 2;
 
-        //異常に巨大な範囲は掃除しない (安全弁)
+        // 異常に巨大な範囲は掃除しない (安全弁)
         long volume = (long) (maxX - minX + 1) * (maxY - minY + 1) * (maxZ - minZ + 1);
         if (volume > 400_000L) {
             return;
@@ -306,7 +288,7 @@ public final class LegacyRestorer {
                         dead = true;
                     } else if (block instanceof jp.ngt.rtm.rail.BlockLargeRailBase) {
                         net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(pos);
-                        //コアが解決できない = 旧ワールドの残骸
+                        // コアが解決できない = 旧ワールドの残骸
                         dead = !(be instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase base)
                                 || base.getRailCore() == null;
                     }
@@ -322,7 +304,7 @@ public final class LegacyRestorer {
     private static List<RailPosition> readRailPositions(CompoundTag nbt) {
         List<RailPosition> list = new ArrayList<>();
         if (nbt.contains("Size")) {
-            //分岐・クロス: RP0..RPn
+            // 分岐・クロス: RP0..RPn
             int size = nbt.getByte("Size");
             for (int i = 0; i < size; i++) {
                 CompoundTag rp = nbt.getCompound("RP" + i);
@@ -339,13 +321,8 @@ public final class LegacyRestorer {
 
     /**
      * 旧 "State" (ResourceStateRail) → RTMU の RailProperty。
-     * <pre>
-     *   State.ResourceName   → レールのモデル名
-     *   State.BlockName      → 道床ブロック (1.12 の名前。バニラはだいたいそのまま通る)
-     *   State.BlockMetadata  → 道床のメタ (1.12 の variant。1.21 では使わないが保持する)
-     *   State.BlockHeight    → 道床の高さ
-     * </pre>
-     * RTMU 側が既に "Property" で保存している (= 一度 RTMU で開いたワールド) 場合はそれを使う。
+     * State.ResourceName   → レールのモデル名
+     * State.BlockName      → 道床ブロック (1.12 の名前。
      */
     private static RailProperty readRailProperty(CompoundTag nbt) {
         if (nbt.contains("Property")) {
@@ -374,9 +351,8 @@ public final class LegacyRestorer {
     }
 
     /**
-     * 設置物。旧 RTM はどれも ResourceState を持ち、その "ResourceName" がモデル名
-     * ("Fluorescent01" / "CrossingGate01L" 等)。RTMU では設置物はすべて 1 種類のブロック +
-     * 定義 ID で表すので、モデル名からレジストリを引いて定義 ID とカテゴリを決める。
+     * 設置物。
+     * ("Fluorescent01" / "CrossingGate01L" 等)。
      */
     private static boolean placeInstalledObject(ServerLevel level, RestoreData.ObjectRecord rec) {
         String modelName = modelNameOf(rec.nbt);
@@ -395,44 +371,42 @@ public final class LegacyRestorer {
             return false;
         }
 
-        //向きは水平角 (Yaw) だけ。
-        //本家の "Pitch" は<b>設置した時のプレイヤーの視線の角度</b>であって、モデルの傾きではない
-        //(実データで -35 / -33 / -42 度などが入っている)。これを縦の傾きに入れると設置物が
-        //全部斜めになる。本家もこの値でモデルを傾けてはいないので、使わない。
+        // 向きは水平角 (Yaw) だけ。
+        // 本家の "Pitch" は設置した時のプレイヤーの視線の角度であって、モデルの傾きではない
+        // (実データで -35 / -33 / -42 度などが入っている)。
         be.setDefinition(def.getId(), def.getCategory(), rec.nbt.getFloat("Yaw"));
 
-        //本家はブロックのメタデータに「クリックした面」を入れていた。碍子と看板はそれで向きが決まる。
+        // 本家はブロックのメタデータに「クリックした面」を入れていた。碍子と看板はそれで向きが決まる。
         InstalledObjectCategory category = def.getCategory();
         if (category == InstalledObjectCategory.INSULATOR || category == InstalledObjectCategory.SIGNBOARD) {
             if (rec.meta >= 0 && rec.meta <= 5) {
                 be.setMountFace(rec.meta);
             }
         }
-        //蛍光灯は取付方向 (0..7) をメタデータに入れていた
+        // 蛍光灯は取付方向 (0..7) をメタデータに入れていた
         if (category == InstalledObjectCategory.FLUORESCENT && rec.meta >= 0 && rec.meta <= 7) {
             be.setFluorescentDir((byte) rec.meta);
         }
-        //看板は TileEntity に向き (dir 0-3) を持っている
+        // 看板は TileEntity に向き (dir 0-3) を持っている
         if (category == InstalledObjectCategory.SIGNBOARD && rec.nbt.contains("dir")) {
             be.setSignDirection((byte) rec.nbt.getInt("dir"));
         }
-        //本家の AttachedSide は「柱のどの面が接地しているか」(地面に立っていれば 0 = 下)。
-        //RTMU の mountFace は「クリックした面」なので意味が逆。地面に立っている柱に 0 を入れると
-        //天井付けとして描かれて倒れるため、そのまま流し込まない。
+        // 本家の AttachedSide は「柱のどの面が接地しているか」(地面に立っていれば 0 = 下)。
+        // RTMU の mountFace は「クリックした面」なので意味が逆。
 
-        //1.7.10 の設置物は自分でモデルをずらせる (offsetX/Y/Z)。そのまま引き継ぐ。
+        // 1.7.10 の設置物は自分でモデルをずらせる (offsetX/Y/Z)。そのまま引き継ぐ。
         if (rec.nbt.contains("offsetX") || rec.nbt.contains("offsetY") || rec.nbt.contains("offsetZ")) {
             be.setRenderOffset(rec.nbt.getFloat("offsetX"), rec.nbt.getFloat("offsetY"), rec.nbt.getFloat("offsetZ"));
         }
         be.setChanged();
 
-        //碍子は電線 (connections) を持っている。架線を張り直す。
+        // 碍子は電線 (connections) を持っている。架線を張り直す。
         if (rec.nbt.contains("connections")) {
             restoreWires(level, rec);
         }
 
-        //本家の信号は「土台の柱」を自分の中に抱えている (BaseBlockData)。RTMU では柱は別の
-        //設置物なので、同じマスには置けない。柱が失われることをログに出しておく。
+        // 本家の信号は「土台の柱」を自分の中に抱えている (BaseBlockData)。RTMU では柱は別の
+        // 設置物なので、同じマスには置けない。柱が失われることをログに出しておく。
         if (category == InstalledObjectCategory.SIGNAL && rec.nbt.contains("BaseBlockData")) {
             CompoundTag base = rec.nbt.getCompound("BaseBlockData");
             String poleName = modelNameOf(base);
@@ -448,10 +422,7 @@ public final class LegacyRestorer {
 
     /**
      * 碍子が持っている電線 (connections) から架線を張り直す。
-     * <p>
-     * 本家は「碍子が相手の座標と電線の種類を持つ」形。RTMU は<b>電線そのものが 1 つの設置物</b>で、
-     * 両端の座標を持つ (WireItem と同じく 2 点の中間マスに置く)。
-     * 電線は両側の碍子が同じものを持っているので、IsRoot が立っている側からだけ張る (二重防止)。
+     * 本家は「碍子が相手の座標と電線の種類を持つ」形。
      */
     private static void restoreWires(ServerLevel level, RestoreData.ObjectRecord rec) {
         ListTag conns = rec.nbt.getList("connections", Tag.TAG_COMPOUND);
@@ -487,13 +458,9 @@ public final class LegacyRestorer {
 
     /**
      * 旧オブジェクトのモデル名を取り出す。バージョンで保存場所が違う。
-     * <pre>
-     *   1.12.2 : State.ResourceName    (ResourceState)
-     *   1.7.10 : ModelName             (トップレベルの文字列)
-     *   1.7.10 の標識/看板 : textureName (テクスチャのパス)
-     * </pre>
-     * 1.7.10 の State には Color / DataMap / Name しか入っておらず ResourceName が無い。
-     * ここを見落としていたため、1.7.10 のワールドでは<b>設置物が 1 つも復元できなかった</b>。
+     * 1.12.2 : State.ResourceName    (ResourceState)
+     * 1.7.10 : ModelName             (トップレベルの文字列)
+     * 1.7.10 の標識/看板 : textureName (テクスチャのパス)
      */
     private static String modelNameOf(CompoundTag nbt) {
         String name = nbt.getCompound("State").getString("ResourceName");
@@ -508,10 +475,8 @@ public final class LegacyRestorer {
 
     /**
      * モデル名から設置物の定義を探す。パック名は問わない (同名なら最初に見つかったもの)。
-     *
-     * <p>標識と看板だけは本家が <b>モデル名ではなくテクスチャのパス</b> を持っている
-     * ("textures/rrs/rrs_01.png" / "textures/signboard/ngt_a01.png")。RTMU 側はそのファイル名を
-     * 定義名にしているので、パスの末尾を取り出して突き合わせる。
+     * 標識と看板だけは本家が モデル名ではなくテクスチャのパス を持っている
+     * ("textures/rrs/rrs_01.png" / "textures/signboard/ngt_a01.png")。
      */
     private static InstalledObjectDefinition findDefinition(String modelName) {
         InstalledObjectDefinition def = byName(modelName);
@@ -519,15 +484,15 @@ public final class LegacyRestorer {
             return def;
         }
         if (modelName.contains("/") || modelName.toLowerCase(Locale.ROOT).endsWith(".png")) {
-            //テクスチャそのものが一致する定義 (最優先)
+            // テクスチャそのものが一致する定義 (最優先)
             for (InstalledObjectDefinition d : InstalledObjectRegistry.getAll()) {
                 String tex = d.getSignTexture();
                 if (tex != null && !tex.isBlank() && sameTexture(tex, modelName)) {
                     return d;
                 }
             }
-            //定義側のテクスチャのファイル名と突き合わせる
-            //(看板は定義名が "SignBoard_ngt_a01" なのに本家は "textures/signboard/ngt_a01.png" を持つ)
+            // 定義側のテクスチャのファイル名と突き合わせる
+            // (看板は定義名が "SignBoard_ngt_a01" なのに本家は "textures/signboard/ngt_a01.png" を持つ)
             String leaf = leafName(modelName);
             for (InstalledObjectDefinition d : InstalledObjectRegistry.getAll()) {
                 String tex = d.getSignTexture();
@@ -535,7 +500,7 @@ public final class LegacyRestorer {
                     return d;
                 }
             }
-            //ファイル名 (拡張子なし) で突き合わせる
+            // ファイル名 (拡張子なし) で突き合わせる
             return byName(leaf);
         }
         return null;
@@ -587,8 +552,8 @@ public final class LegacyRestorer {
         try {
             LegacyIds.Kind kind = LegacyIds.entityKind(rec.type);
             if (kind == LegacyIds.Kind.ENTITY_OBJECT) {
-                //本家では車止め・列車検知器・ATC は<b>エンティティ</b>だが、RTMU では設置物 (ブロック)。
-                //足元のマスにブロックとして置き直す。
+                // 本家では車止め・列車検知器・ATC はエンティティだが、RTMU では設置物 (ブロック)。
+                // 足元のマスにブロックとして置き直す。
                 if (placeEntityAsObject(level, rec)) {
                     placed++;
                 } else {
@@ -597,7 +562,7 @@ public final class LegacyRestorer {
                 return;
             }
             if (kind != LegacyIds.Kind.TRAIN) {
-                //車 (VEHICLE) は後回し (RTMU 側の車両システムが別系統のため)
+                // 車 (VEHICLE) は後回し (RTMU 側の車両システムが別系統のため)
                 failed++;
                 return;
             }
@@ -643,7 +608,7 @@ public final class LegacyRestorer {
             return false;
         }
         be.setDefinition(def.getId(), def.getCategory(), readRotation(rec.nbt, 0));
-        //ブロックの角が原点なので、エンティティの実座標との差を描画オフセットで埋める
+        // ブロックの角が原点なので、エンティティの実座標との差を描画オフセットで埋める
         be.setRenderOffset(pos[0] - (bp.getX() + 0.5D), pos[1] - bp.getY(), pos[2] - (bp.getZ() + 0.5D));
         be.setChanged();
         return true;

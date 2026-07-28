@@ -55,7 +55,7 @@ public class BogieRenderer {
         try {
             Vec3 offset = entity != null ? entity.getBogieRenderOffset(bogieIndex, bogieDef, baseYaw, partialTicks) : bogieDef.position();
             // 本家RTM準拠: 台車は車体と同じレール面基準(getBogieRenderOffset 側で算出済み)へ置く。
-            // 本家は func_70033_W()=0 で視覚リフトを持たないため、ここでも一切リフトを足さない
+            // 本家は func_70033_W=0 で視覚リフトを持たないため、ここでも一切リフトを足さない
             // (従来の BOGIE_VISUAL_LIFT/-0.05 は車種ごとの浮き・沈みの原因だったので撤去)。
             poseStack.translate(offset.x, offset.y, offset.z);
             if (entity != null) {
@@ -88,9 +88,9 @@ public class BogieRenderer {
         if (parentDef == null) {
             return 0.0D;
         }
-        //★親車体の縮尺は掛けない。本家は台車を<b>別のモデルセット</b>として描くので、
-        //車体側 ModelConfig の scale は台車に効かない (mo1600 は scale 0.1 の voxel 車体で、
-        //ここで掛けていたせいで台車だけ 1/10 の大きさになっていた)。
+        // ★親車体の縮尺は掛けない。本家は台車を別のモデルセットとして描くので、
+        // 車体側 ModelConfig の scale は台車に効かない (mo1600 は scale 0.1 の voxel 車体で、
+        // ここで掛けていたせいで台車だけ 1/10 の大きさになっていた)。
         return RTM_BOGIE_RENDER_LIFT + BOGIE_VISUAL_LIFT;
     }
 
@@ -153,7 +153,7 @@ public class BogieRenderer {
             if (Math.abs(pitch) > 0.001F) {
                 poseStack.mulPose(Axis.XP.rotationDegrees(-pitch));
             }
-            //台車は本家どおり<b>親の縮尺を継がない</b> (上の getStandaloneRenderLift の説明と同じ)。
+            // 台車は本家どおり親の縮尺を継がない (上の getStandaloneRenderLift の説明と同じ)。
             MqoModelLoader.renderModel(bogieModel, poseStack, buffer, packedLight);
         } finally {
             poseStack.popPose();
@@ -170,8 +170,8 @@ public class BogieRenderer {
             return null;
         }
         Map<String, String> textureOverrides = bogieDef.textureOverrides();
-        //本家組込の ModelBogie.class は移植済み ({@link ClassModelGeometry}) なのでそのまま読む。
-        //移植していない .class だけ従来どおり汎用台車へ差し替える。
+        // 本家組込の ModelBogie.class は移植済み (ClassModelGeometry) なのでそのまま読む。
+        // 移植していない .class だけ従来どおり汎用台車へ差し替える。
         if (modelFile.toLowerCase(Locale.ROOT).endsWith(".class")
                 && !com.portofino.realtrainmodunofficial.client.model.ClassModelGeometry.isSupported(modelFile)) {
             modelFile = DEFAULT_CLASS_BOGIE_MODEL;

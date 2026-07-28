@@ -21,14 +21,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 本家 jp.ngt.rtm.entity.npc.macro.MacroRecorder の移植 (運転マクロの録画)。
- *
- * <p>{@code /rtm macro start} で録画開始 → 自分で列車を運転 (ノッチ/ドア/警笛が
- * 相対時刻つきで記録される) → {@code /rtm macro stop} で
- * {@code config/realtrainmodunofficial/macro/日時.txt} に保存。
- * 保存したマクロは運転士 (EntityMotorman) を素手右クリック → マクロ選択で再生できる。
- *
- * <p>RTMU は列車操作がサーバー側で確定するため、本家 (クライアント単体) と違い
- * プレイヤーごとのレコーダーをサーバーで持つ。
+ * /rtm macro start で録画開始 → 自分で列車を運転 (ノッチ/ドア/警笛が
+ * 相対時刻つきで記録される) → /rtm macro stop で
+ * config/realtrainmodunofficial/macro/日時.txt に保存。
  */
 public final class MacroRecorder {
 

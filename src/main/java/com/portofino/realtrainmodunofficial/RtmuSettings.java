@@ -14,19 +14,15 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * RTMU クライアント設定 (ポーズメニューの「RTMU設定」から変更)。
- * <ul>
- *   <li>autoCant: カーブに自動でカントを付けるか (ON/OFF)</li>
- *   <li>autoHeightLevel: レール敷設時の自動高さ調整レベル (1〜5、レンチ高さ単位=1/16ブロック)</li>
- * </ul>
- * クライアントの値はファイルへ永続化し、サーバーへは {@code RtmuSettingsPayload} で同期する
- * (レール生成はサーバー側で行うため、敷設プレイヤーの設定をサーバーが参照する)。
+ * autoCant: カーブに自動でカントを付けるか (ON/OFF)
+ * autoHeightLevel: レール敷設時の自動高さ調整レベル (1〜5、レンチ高さ単位=1/16ブロック)
  */
 public final class RtmuSettings {
 
     // ---- クライアント自身の設定 ----
     public static boolean autoCant = false;
     /**
-     * レール敷設時の自動高さ。<b>0 = OFF、1〜16 = 有効</b>で、実際のレール高さ byte = level-1 (0〜15、1/16ブロック単位)。
+     * レール敷設時の自動高さ。0 = OFF、1〜16 = 有効で、実際のレール高さ byte = level-1 (0〜15、1/16ブロック単位)。
      * これで 9,10 など任意の高さを指定できる (以前は 5 段階固定だった)。
      */
     public static int autoHeightLevel = 1;
@@ -35,9 +31,8 @@ public final class RtmuSettings {
 
     // ---- 軽量化 (すべて opt-in。既定値は「見た目が変わらない」側) ----
     /**
-     * 車両描画距離 (ブロック)。<b>0 = 無制限 (バニラどおり)</b>。>0 のとき、この距離より遠い
-     * 車両は<b>丸ごと描画をスキップ</b>する。RTMU の最大負荷は「スクリプト車両の毎フレーム
-     * Nashorn/GraalJS 実行」なので、遠方車両を間引くのが最も効く。既定 0。
+     * 車両描画距離 (ブロック)。0 = 無制限 (バニラどおり)。
+     * 車両は丸ごと描画をスキップする。
      */
     public static int vehicleRenderDistance = 0;
 
@@ -47,8 +42,8 @@ public final class RtmuSettings {
 
     // ---- 乗客シミュレーション ----
     /**
-     * ワールド全体に湧く乗客 NPC の最大数。<b>0〜100、および 101 = 無制限</b>。既定 30。
-     * サーバー側の値なので、設定画面での変更は {@code RtmuSettingsPayload} でサーバーへ送る
+     * ワールド全体に湧く乗客 NPC の最大数。0〜100、および 101 = 無制限。既定 30。
+     * サーバー側の値なので、設定画面での変更は  でサーバーへ送る
      * (ワールド全体で 1 つの値。最後に送ったプレイヤーの値が反映される)。
      */
     public static final int MAX_PASSENGERS_UNLIMITED = 101;

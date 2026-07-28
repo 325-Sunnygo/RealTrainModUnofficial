@@ -24,9 +24,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * 受信機と変更機は見た目と役割だけが違うので、同じブロック実装を共有します。
- */
+/** 受信機と変更機は見た目と役割だけが違うので、同じブロック実装を共有します。 */
 public class SignalRemoteBlock extends BaseEntityBlock {
     public enum Mode {
         RECEIVER,

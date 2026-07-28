@@ -31,27 +31,21 @@ import java.util.List;
 /**
  * 本家 jp.ngt.rtm.item.ItemWrench (KaizPatchX) の忠実移植。
  * モード (本家はダメージ値、ここではコンポーネント):
- *  0:マーカー設置 1:分岐マーカー設置 6:距離表示切替 7:表示モード切替
- *  8:マーカー高さ変更 10:隣接レール接続切替 11:レール→マーカー復元
- *  (2:直線マーカー, 9:アンカー移動 は未移植 — TODO)
- * 空中右クリック: モード切替 / スニーク+右クリック: モードロック
  */
 public class RtmWrenchItem extends Item {
-    //モード 9 (アンカー移動) 中はアンカー線を右クリックで掴んで動かす (MarkerBlockEntityRenderer)
+    // モード 9 (アンカー移動) 中はアンカー線を右クリックで掴んで動かす (MarkerBlockEntityRenderer)
     private static final int[] MODE_CYCLE = {0, 1, 6, 7, 8, 9, 10, 11, 12};
     /** マーカーをブロック未満の位置に動かす (本家に無い。ペンマーカーの代わり)。 */
     public static final int MODE_OFFSET = 12;
     public static final int MODE_ANCHOR = 9;
-    /**
-     * RailPosition.direction (8方位) → マーカー blockstate facing
-     */
+    /** RailPosition.direction (8方位) → マーカー blockstate facing */
     private static final int[] DIRECTION_META_MAP = {2, 5, 1, 4, 0, 7, 3, 6};
 
     public RtmWrenchItem() {
         super(new Properties().stacksTo(1));
     }
 
-    //---- モード管理 (本家はダメージ値 + NBT ModeLocked) ----
+    // ---- モード管理 (本家はダメージ値 + NBT ModeLocked) ----
 
     public static int getMode(ItemStack stack) {
         CustomData data = stack.get(DataComponents.CUSTOM_DATA);
@@ -94,9 +88,7 @@ public class RtmWrenchItem extends Item {
         };
     }
 
-    /**
-     * 本家 onItemRightClick: 空中右クリックでモード切替 (スニークでロック切替)
-     */
+    /** 本家 onItemRightClick: 空中右クリックでモード切替 (スニークでロック切替) */
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
@@ -138,9 +130,7 @@ public class RtmWrenchItem extends Item {
         return InteractionResultHolder.success(stack);
     }
 
-    /**
-     * 本家 onItemUse: 上面クリックでマーカー設置 / レール復元
-     */
+    /** 本家 onItemUse: 上面クリックでマーカー設置 / レール復元 */
     @Override
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
@@ -152,9 +142,9 @@ public class RtmWrenchItem extends Item {
         int mode = getMode(stack);
         BlockPos pos = context.getClickedPos();
 
-        //マーカーをクリックした場合は BlockMarker 側 (useItemOn) が処理する。
-        //ただしスニーク中はバニラがブロック操作をスキップして item.use() (モードロック切替)
-        //へ行ってしまうため、カント設定 GUI はここで開く。
+        // マーカーをクリックした場合は BlockMarker 側 (useItemOn) が処理する。
+        // ただしスニーク中はバニラがブロック操作をスキップして item.use (モードロック切替)
+        // へ行ってしまうため、カント設定 GUI はここで開く。
         if (level.getBlockState(pos).getBlock() instanceof BlockMarker) {
             if (player.isShiftKeyDown()) {
                 if (level.isClientSide
@@ -188,9 +178,7 @@ public class RtmWrenchItem extends Item {
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
 
-    /**
-     * 本家 placeMarker: プレイヤーの向き (8方位) から facing を決めて設置
-     */
+    /** 本家 placeMarker: プレイヤーの向き (8方位) から facing を決めて設置 */
     private void placeMarker(Player player, Level level, BlockPos pos, Block block) {
         if (level.isClientSide) {
             return;
@@ -203,14 +191,12 @@ public class RtmWrenchItem extends Item {
         BlockState state = block.defaultBlockState().setValue(BlockMarker.META, meta);
         level.setBlock(pos, state, 3);
         if (block instanceof BlockMarker marker) {
-            //本家 setPlacedBy 相当の初期化 (プレビュー表示)
+            // 本家 setPlacedBy 相当の初期化 (プレビュー表示)
             marker.setPlacedBy(level, pos, state, player, ItemStack.EMPTY);
         }
     }
 
-    /**
-     * 本家 revertRailToMarker: レールを撤去して RailPosition からマーカーを復元
-     */
+    /** 本家 revertRailToMarker: レールを撤去して RailPosition からマーカーを復元 */
     public void revertRailToMarker(Level level, BlockPos pos) {
         BlockEntity tile = level.getBlockEntity(pos);
         if (!(tile instanceof TileEntityLargeRailBase rail)) {
@@ -221,7 +207,7 @@ public class RtmWrenchItem extends Item {
             return;
         }
         RailPosition[] rps = core.getRailPositions();
-        //先に撤去 (onRemove の破壊チェーンでレール全体が消える)
+        // 先に撤去 (onRemove の破壊チェーンでレール全体が消える)
         level.removeBlock(pos, false);
         if (rps == null) {
             return;
@@ -242,9 +228,7 @@ public class RtmWrenchItem extends Item {
         }
     }
 
-    /**
-     * 本家 onRightClickMarker: BlockMarker から呼ばれる (C/S 両方)
-     */
+    /** 本家 onRightClickMarker: BlockMarker から呼ばれる (C/S 両方) */
     public void onRightClickMarker(ItemStack stack, Level level, Player player, TileEntityMarker marker) {
         switch (getMode(stack)) {
             case 6 -> {
@@ -262,7 +246,7 @@ public class RtmWrenchItem extends Item {
                 }
             }
             case MODE_OFFSET -> {
-                //ブロック未満の位置調整。ブロック単位でしか置けないマーカーの弱点を埋める。
+                // ブロック未満の位置調整。ブロック単位でしか置けないマーカーの弱点を埋める。
                 if (level.isClientSide) {
                     com.portofino.realtrainmodunofficial.ClientHooks.openMarkerOffsetScreen(marker);
                 }
@@ -272,9 +256,7 @@ public class RtmWrenchItem extends Item {
         }
     }
 
-    /**
-     * 本家 changeMarkerHeight
-     */
+    /** 本家 changeMarkerHeight */
     private void changeMarkerHeight(Level level, Player player, TileEntityMarker marker) {
         marker.setDisplayMode((byte) 2);
         byte b = marker.increaseHeight();

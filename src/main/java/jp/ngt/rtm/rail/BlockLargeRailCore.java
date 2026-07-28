@@ -8,9 +8,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
 
-/**
- * 本家 jp.ngt.rtm.rail.BlockLargeRailCore の忠実移植。
- */
+/** 本家 jp.ngt.rtm.rail.BlockLargeRailCore の忠実移植。 */
 public class BlockLargeRailCore extends BlockLargeRailBase {
     public static final MapCodec<BlockLargeRailCore> CODEC = simpleCodec(props -> new BlockLargeRailCore(2, props));
 

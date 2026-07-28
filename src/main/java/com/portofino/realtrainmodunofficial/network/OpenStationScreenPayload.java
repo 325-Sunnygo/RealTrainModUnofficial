@@ -11,7 +11,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 駅ブロックを右クリックしたとき、サーバーがその駅の現在のタグビットを添えてクライアントへ送り、
- * 駅設定 GUI を開かせる。クライアントは受け取ったビットで {@code StationScreen} を開く。
+ * 駅設定 GUI を開かせる。クライアントは受け取ったビットで StationScreen を開く。
  */
 public record OpenStationScreenPayload(BlockPos pos, int bits) implements CustomPacketPayload {
 
@@ -29,9 +29,9 @@ public record OpenStationScreenPayload(BlockPos pos, int bits) implements Custom
     }
 
     public static void handleOnClient(OpenStationScreenPayload payload, IPayloadContext context) {
-        //★クライアント専用クラス (Screen) をこのクラスから直接参照すると、専用サーバーでの
-        //  playToClient 登録時に Screen のロードが試みられてクラッシュする。ClientHooks (リフレクションで
-        //  クライアント側だけロード) を経由して隔離する。
+        // ★クライアント専用クラス (Screen) をこのクラスから直接参照すると、専用サーバーでの
+        // playToClient 登録時に Screen のロードが試みられてクラッシュする。ClientHooks (リフレクションで
+        // クライアント側だけロード) を経由して隔離する。
         context.enqueueWork(() ->
             com.portofino.realtrainmodunofficial.ClientHooks.openStationScreen(payload.pos(), payload.bits()));
     }

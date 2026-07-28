@@ -28,20 +28,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 本家式レール描画システム (Phase 3 先行 / レール描画の作り直し)。
- *
  * 本家アーキテクチャの忠実再現:
- * - スクリプト付き: renderRailStatic(tile,x,y,z,pt,pass) をスクリプトが実行。
- *   デフォルト配置はスクリプトが renderer.renderStaticParts(...) を呼んだ時のみ
- *   (shouldRenderObject を位置ごとに通す = 端トリミング/枕木循環)。
- * - スクリプト無し: renderStaticParts 相当のデフォルト配置のみ。
- * - GL 呼び出しは GLRecorder に記録し BE ごとにキャッシュ (本家 DisplayList 相当)。
- * - 分岐コアのみ既存パイプラインにフォールバック (トング/ポイント描画は未移植)。
  */
 public final class RailScriptRenderers {
 
-    /**
-     * スクリプトが GL11 として使うファサードのプリバインド (mozilla_compat の importPackage より優先される)。
-     */
+    /** スクリプトが GL11 として使うファサードのプリバインド (mozilla_compat の importPackage より優先される)。 */
     private static final String PRELUDE =
             "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n" +
             "var GL12 = GL11;\n";
@@ -49,9 +40,7 @@ public final class RailScriptRenderers {
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
     private static final Scripted INVALID = new Scripted(null, null);
 
-    /**
-     * スクリプト無しレール用の素の RailPartsRenderer (shouldRenderObject 常に true)。
-     */
+    /** スクリプト無しレール用の素の RailPartsRenderer (shouldRenderObject 常に true)。 */
     private static final RailPartsRenderer PLAIN = new RailPartsRenderer();
     private static final Map<BlockPos, GLRecorder> PLAIN_CACHE = new HashMap<>();
 
@@ -80,9 +69,9 @@ public final class RailScriptRenderers {
                 RealTrainModUnofficial.LOGGER.warn("Rail script not readable for {} ({})", def.getId(), def.getScriptPath());
                 return INVALID;
             }
-            //★ //include の展開と FQN remap は全経路で共通 (PackScriptSource.prepare)。
-            //以前この経路だけ prepare() を通しておらず、include を使うレール/架線/設置物パックが
-            //「スクリプトはあるのに何も描かない」状態になっていた。
+            // ★ //include の展開と FQN remap は全経路で共通 (PackScriptSource.prepare)。
+            // 以前この経路だけ prepare を通しておらず、include を使うレール/架線/設置物パックが
+            // 「スクリプトはあるのに何も描かない」状態になっていた。
             ScriptEngine se = ScriptUtil.doScript(PRELUDE + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, def.getScriptPath()));
             Object rcName = se.get("renderClass");
             if (rcName == null) {
@@ -92,7 +81,7 @@ public final class RailScriptRenderers {
             Class<?> rc = Class.forName(rcName.toString(), true, ScriptUtil.class.getClassLoader());
             Object instance = rc.getDeclaredConstructor().newInstance();
             if (!(instance instanceof RailPartsRenderer renderer)) {
-                //車両用等は対象外 (RailPartsRenderer のみ)
+                // 車両用等は対象外 (RailPartsRenderer のみ)
                 return INVALID;
             }
             renderer.setScript(se);
@@ -111,13 +100,8 @@ public final class RailScriptRenderers {
 
     /**
      * このレールの明るさが前回から変わったか。
-     * <p>
-     * 明るさは記録 (GLRecorder) と統合メッシュの両方に<b>焼き込まれる</b>ので、光が変わったら
-     * 記録ごと作り直さないと元に戻らない。以前はコアブロック 1 点の明るさだけを見ていたが、
-     * コアはバラストや地面に埋まっていて {@code getLightColor} が 0 のまま動かないことがあり、
-     * 「直線レールが真っ黒で、リログするまで直らない」状態になっていた。
-     * <p>
-     * レール上を等間隔に拾って指紋にする。読むのは光配列だけなので毎フレームでも軽い。
+     * 明るさは記録 (GLRecorder) と統合メッシュの両方に焼き込まれるので、光が変わったら
+     * 記録ごと作り直さないと元に戻らない。
      */
     /** 描画フレーム番号。明るさ判定を毎フレームやらないために使う。 */
     private static int frameCounter;
@@ -130,16 +114,8 @@ public final class RailScriptRenderers {
     }
 
     private static boolean lightChanged(BlockPos pos, TileEntityLargeRailCore be, RailMap[] maps) {
-        //★毎フレームは調べない。
-        //
-        //ここは 1 本につきレール上を 9 点サンプリングして LevelRenderer.getLightColor を引く。
-        //getLightColor はブロック取得と光エンジン参照を伴うので 1 回が安くなく、レールを
-        //数十本描くと<b>これがレール描画時間の主費目</b>になる (焼き込みは効いていて bake=0
-        //なのに 1 本 0.1ms かかっていた原因)。
-        //
-        //光が変わるのは松明を置いた・日が暮れたといった稀な出来事で、数フレーム遅れて
-        //焼き直しても見えない。位置でずらして調べるフレームを散らすので、
-        //特定フレームに固まることもない。
+        // ★毎フレームは調べない。
+        // ここは 1 本につきレール上を 9 点サンプリングして LevelRenderer.getLightColor を引く。
         int slot = Math.floorMod(pos.hashCode(), LIGHT_PROBE_INTERVAL);
         if (LIGHT_SIGNATURES.containsKey(pos)
                 && Math.floorMod(frameCounter, LIGHT_PROBE_INTERVAL) != slot) {
@@ -156,7 +132,7 @@ public final class RailScriptRenderers {
         if (level == null || maps == null) {
             return 0L;
         }
-        //端と中間で 9 点。レール全体が一斉に暗い→明るいへ変わる読み込み直後を確実に捉えられる。
+        // 端と中間で 9 点。レール全体が一斉に暗い→明るいへ変わる読み込み直後を確実に捉えられる。
         final int probes = 8;
         long signature = 1L;
         for (RailMap map : maps) {
@@ -179,7 +155,6 @@ public final class RailScriptRenderers {
 
     /**
      * スクリプト無しレールの本家デフォルト描画 (作り直し後の標準パス)。
-     *
      * @return true = 描画を担当した
      */
     public static boolean renderPlain(TileEntityLargeRailCore be, RailMap[] maps, PoseStack poseStack,
@@ -191,7 +166,7 @@ public final class RailScriptRenderers {
         BlockPos pos = be.getBlockPos();
         GLRecorder rec = PLAIN_CACHE.get(pos);
         boolean rebuilt = false;
-        //指紋は毎フレーム更新する (初回に記録し損ねると次フレームで無駄な作り直しが 1 回入る)
+        // 指紋は毎フレーム更新する (初回に記録し損ねると次フレームで無駄な作り直しが 1 回入る)
         boolean lightChanged = lightChanged(pos, be, maps);
         if (rec == null || be.shouldRerenderRail || lightChanged) {
             rec = new GLRecorder();
@@ -216,12 +191,8 @@ public final class RailScriptRenderers {
     }
 
     /**
-     * 重ねレール (サブレール) を 1 本描く。メインと同じ RailMap 上に、<b>サブレール定義自身の
-     * モデル+スクリプト</b>で描く。
-     * <p>
-     * メインは pos キーのメッシュキャッシュ (RailMeshCache) を使うため、同じ pos に複数モデルを
-     * 焼くとキャッシュが取り合いになる。そこでサブレールは {@link #SUB_CACHE} に (pos|定義ID) で
-     * 記録をキャッシュし、焼かず直接 replay する。分岐コアはトング可動と競合するので未対応。
+     * 重ねレール (サブレール) を 1 本描く。
+     * モデル+スクリプトで描く。
      */
     public static void renderSubRail(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
                                      PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay,
@@ -232,8 +203,8 @@ public final class RailScriptRenderers {
         BlockPos pos = be.getBlockPos();
         String key = pos.asLong() + "|" + subDef.getId();
         GLRecorder rec = SUB_CACHE.get(key);
-        //メインの再記録フラグ shouldRerenderRail を共有で見る (ここでは false に戻さない。
-        //戻すのはメイン描画側。サブが先に描かれてもこの後メインが再記録できるようにするため)。
+        // メインの再記録フラグ shouldRerenderRail を共有で見る (ここでは false に戻さない。
+        // 戻すのはメイン描画側。サブが先に描かれてもこの後メインが再記録できるようにするため)。
         if (rec == null || be.shouldRerenderRail) {
             rec = new GLRecorder();
             GLRecorder.activate(rec);
@@ -277,28 +248,24 @@ public final class RailScriptRenderers {
 
         /**
          * スクリプト描画 (renderRailStatic → 内部で renderStaticParts) を記録・再生する。
-         *
          * @return true = このレンダラが描画を担当した
          */
         public boolean render(TileEntityLargeRailCore be, RailMap[] maps, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
             boolean isSwitch = be instanceof TileEntityLargeRailSwitchCore;
-            //★トング可動パーツ持ちのモデル (RTM 公式レール等) もここで描く。
-            //以前は「renderRailDynamic 未移植」として RTMU 独自パイプラインへ逃がしていたが、
-            //その独自パイプラインは道床/枕木/レールを RTMU が名前で勝手に振り分けており
-            //(RailGroup.BASE + renderSwitchPoint)、分岐で道床や枕木が抜ける原因になっていた。
-            //本家は分岐も通常レールも同じで、静的部分は renderRailStatic、可動部 (トング) は
-            //renderRailDynamic をスクリプトに描かせる (LibRenderRail.js の renderPoint)。
-            //その両方は下で既に呼んでいるので、素直にスクリプトへ任せる。
+            // ★トング可動パーツ持ちのモデル (RTM 公式レール等) もここで描く。
+            // 以前は「renderRailDynamic 未移植」として RTMU 独自パイプラインへ逃がしていたが、
+            // その独自パイプラインは道床/枕木/レールを RTMU が名前で勝手に振り分けており
+            // (RailGroup.BASE + renderSwitchPoint)、分岐で道床や枕木が抜ける原因になっていた。
             BlockPos pos = be.getBlockPos();
-            //スクリプトが分岐を描かないパック (AR 等は isSwitchRail で早期 return):
-            //記録が空だったコアは旧パイプラインに任せる (端トリミング付き)
+            // スクリプトが分岐を描かないパック (AR 等は isSwitchRail で早期 return):
+            // 記録が空だったコアは旧パイプラインに任せる (端トリミング付き)
             if (isSwitch && this.scriptSkippedSwitches.contains(pos) && !be.shouldRerenderRail) {
                 return false;
             }
             GLRecorder rec = this.staticCache.get(pos);
-            //明るさは記録に焼き込まれるので、光が変わったら記録ごと作り直す (lightChanged 参照)
+            // 明るさは記録に焼き込まれるので、光が変わったら記録ごと作り直す (lightChanged 参照)
             boolean lightChanged = lightChanged(pos, be, maps);
             boolean rebuilt = rec == null || be.shouldRerenderRail || lightChanged;
             if (rebuilt) {
@@ -307,31 +274,22 @@ public final class RailScriptRenderers {
                 try {
                     this.renderer.modelGroupNames = model.getOriginalGroupNames();
                     if (isSwitch) {
-                        //★分岐でも静的描画は<b>1 回だけ</b>。本家 RenderRailStandard.js の
-                        //renderRailStatic は renderer.renderStaticParts(...) を 1 回呼ぶだけで、
-                        //RailMap ごとに回したりはしない。分岐のレール本体とトングは
-                        //renderRailDynamic (LibRenderRail.js の renderPoint) が Point 単位で描く。
-                        //
-                        //以前はここで getAllRailMaps を全部回していた。すると土台 (base) が
-                        //<b>マップの本数ぶん重ねて</b>描かれ、マップが収束する分岐の端で
-                        //わずかに向きの違う同じピースが重なり、潰れたような見た目になっていた。
+                        // ★分岐でも静的描画は1 回だけ。
+                        // renderRailStatic は renderer.renderStaticParts(...) を 1 回呼ぶだけで、
+                        // RailMap ごとに回したりはしない。
                         this.renderer.currentRailIndex = 0;
                         this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
                     } else {
-                        //この定義のレール 1 本だけ描く。重ねレール (サブレール) は
-                        //RailCoreBlockEntityRenderer 側で各サブ定義のモデル+スクリプトを使い別途描く
-                        //({@link #renderSubRail})。以前はここで 1+subRails.size() 回ループしていたが、
-                        //モデルは差し替わらないため<b>本レールを重複描画</b>していただけで、サブレールの
-                        //モデルは一切出ていなかった (ユーザー報告: 重ねても見た目が変わらない)。
+                        // この定義のレール 1 本だけ描く。
+                        // RailCoreBlockEntityRenderer 側で各サブ定義のモデル+スクリプトを使い別途描く
+                        // (#renderSubRail)。
                         this.renderer.currentRailIndex = 0;
                         this.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
-                        //★renderRailDynamic は<b>ここでは呼ばない</b>。
-                        //本家 RailPartsRenderer.renderRail は
-                        //    renderRailStatic(...)   → ディスプレイリストへ焼く
-                        //    renderRailDynamic(...)  → リストの外で毎フレーム実行 (キャッシュしない)
-                        //の順で、可動部を焼き込みに含めない。含めると「形が変わっていないのに
-                        //可動部のせいで毎フレーム焼き直す」ことになり、軽量化が効かなくなる。
-                        //下の共通ブロックで毎フレーム実行する。
+                        // ★renderRailDynamic はここでは呼ばない。
+                        // 本家 RailPartsRenderer.renderRail は
+                        // renderRailStatic(...)   → ディスプレイリストへ焼く
+                        // renderRailDynamic(...)  → リストの外で毎フレーム実行 (キャッシュしない)
+                        // の順で、可動部を焼き込みに含めない。
                     }
                 } catch (Throwable t) {
                     RealTrainModUnofficial.LOGGER.warn("Rail script render failed at {}", pos, t);
@@ -344,15 +302,9 @@ public final class RailScriptRenderers {
                 be.shouldRerenderRail = false;
             }
 
-            //分岐: レール本体は本家どおり renderRailDynamic (トング可動) が描く。
-            //movement (転てつ状態) が変わらない限り記録を再利用する。
-            //★可動部は<b>全レール共通</b>で焼き込みの外。本家 renderRail と同じ順序
-            //(static → dynamic) で、dynamic はキャッシュに載せない。
-            //通常レールのスクリプトは renderRailDynamic を定義していないことが多く、その場合
-            //ScriptUtil 側で何も起きないので実質ゼロコスト。定義しているパック
-            //(Baru's Roof 等) は本家と同じく毎フレーム実行になる。
-            //分岐だけは転てつ状態 (dynKey) が変わらない限り記録を使い回す。
-            //ここはトングが 80tick かけて動く間だけ差が出る所で、本家より軽い側の逸脱。
+            // 分岐: レール本体は本家どおり renderRailDynamic (トング可動) が描く。
+            // movement (転てつ状態) が変わらない限り記録を再利用する。
+            // ★可動部は全レール共通で焼き込みの外。
             GLRecorder dyn = null;
             if (isSwitch) {
                 long dynKey = computeSwitchDynKey((TileEntityLargeRailSwitchCore) be);
@@ -370,31 +322,22 @@ public final class RailScriptRenderers {
             boolean staticDrew = !rec.isEmpty();
             boolean dynDrew = dyn != null && !dyn.isEmpty();
             if (isSwitch && !staticDrew && !dynDrew) {
-                //スクリプトが分岐で何も描かなかった → 旧パイプラインで描かせる
+                // スクリプトが分岐で何も描かなかった → 旧パイプラインで描かせる
                 this.scriptSkippedSwitches.add(pos);
                 return false;
             }
             this.scriptSkippedSwitches.remove(pos);
             if (staticDrew) {
-                //静的部分 (レール本体・枕木・バラスト) はレール 1 本 = 1 メッシュに焼いて
-                //GPU に置きっぱなしにする (本家のディスプレイリスト相当)。
-                //転てつのトング (dyn) は動くので焼かず、従来どおり毎フレーム描く。
+                // 静的部分 (レール本体・枕木・バラスト) はレール 1 本 = 1 メッシュに焼いて
+                // GPU に置きっぱなしにする (本家のディスプレイリスト相当)。
+                // 転てつのトング (dyn) は動くので焼かず、従来どおり毎フレーム描く。
                 if (!RailMeshCache.draw(pos, rec, model, poseStack, packedLight, packedOverlay, rebuilt)) {
                     replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
                 }
             }
             if (dynDrew) {
-                //★可動部 (トング) も焼き込みへ。
-                //
-                //本家 renderRail は renderRailDynamic を焼き込みの<b>外</b>で毎フレーム実行する。
-                //1.7.10 の即時描画ならそれで済むが、1.21 では「再生 = 全頂点を CPU で提出」
-                //になるため、ここがレール描画時間の 99% を占めていた
-                //(区間計測: script=2.60 のうち replay=2.57)。分岐の記録自体は dynKey で
-                //使い回せていたのに、頂点だけ毎フレーム流し直していた。
-                //
-                //記録の内容をキーに焼けば、トングが止まっている間は GPU に置いたまま描ける。
-                //実際に転てつが動いている間は内容が変わるので自動的に焼き込みから外れ、
-                //従来どおり CPU 再生になる (ObjectMeshCache が連続変化を見て判断する)。
+                // ★可動部 (トング) も焼き込みへ。
+                // 本家 renderRail は renderRailDynamic を焼き込みの外で毎フレーム実行する。
                 final GLRecorder dynRec = dyn;
                 int dynBakeKey = 31 * dynRec.contentKey() + packedLight;
                 boolean dynBaked = ObjectMeshCache.draw(be, poseStack, dynBakeKey,
@@ -407,15 +350,11 @@ public final class RailScriptRenderers {
             return true;
         }
 
-        /**
-         * スクリプトが描画を拒否した分岐コア (毎フレームのスクリプト再実行を避けるキャッシュ)。
-         */
+        /** スクリプトが描画を拒否した分岐コア (毎フレームのスクリプト再実行を避けるキャッシュ)。 */
         private final java.util.Set<BlockPos> scriptSkippedSwitches =
                 java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-        /**
-         * 分岐の動的描画 (トング) 記録キャッシュ。転てつ movement が変わったら再記録。
-         */
+        /** 分岐の動的描画 (トング) 記録キャッシュ。転てつ movement が変わったら再記録。 */
         private final java.util.Map<BlockPos, DynEntry> dynamicCache = new java.util.concurrent.ConcurrentHashMap<>();
 
         private record DynEntry(long key, GLRecorder rec) {
@@ -425,9 +364,9 @@ public final class RailScriptRenderers {
         private GLRecorder recordDynamic(TileEntityLargeRailCore be,
                                          com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model,
                                          float partialTick, net.minecraft.core.BlockPos pos) {
-            //★スクリプトが renderRailDynamic を持たないパックでは記録ごと作らない。
-            //可動部を定義しないレールは多く、そこで毎フレーム GLRecorder を確保しても
-            //中身は必ず空になる。本家も「関数があるパックだけ毎フレーム実行」に等しい。
+            // ★スクリプトが renderRailDynamic を持たないパックでは記録ごと作らない。
+            // 可動部を定義しないレールは多く、そこで毎フレーム GLRecorder を確保しても
+            // 中身は必ず空になる。本家も「関数があるパックだけ毎フレーム実行」に等しい。
             if (!jp.ngt.ngtlib.io.ScriptUtil.hasFunction(this.renderer.getScript(), "renderRailDynamic")) {
                 return null;
             }
@@ -460,9 +399,7 @@ public final class RailScriptRenderers {
 
     }
 
-    /**
-     * RailMeshCache が「統合メッシュへの焼き込み」に使う再生 (捕獲用 MultiBufferSource に流す)。
-     */
+    /** RailMeshCache が「統合メッシュへの焼き込み」に使う再生 (捕獲用 MultiBufferSource に流す)。 */
     static void replayForCapture(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                                  int packedLight, int packedOverlay, MqoModelLoader.MqoModel model) {
         replay(rec, poseStack, buffer, packedLight, packedOverlay, model);
@@ -487,7 +424,7 @@ public final class RailScriptRenderers {
                 }
                 case TRANSLATE -> poseStack.translate(cmd.a, cmd.b, cmd.c);
                 case ROTATE -> {
-                    //Quaternion は記録時に確定済み (payload)
+                    // Quaternion は記録時に確定済み (payload)
                     if (cmd.payload instanceof org.joml.Quaternionf quat) {
                         poseStack.mulPose(quat);
                     }
@@ -495,11 +432,11 @@ public final class RailScriptRenderers {
                 case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
                 case BRIGHTNESS -> light = (int) cmd.a;
                 case COLOR -> {
-                    //カラーオーバーレイは現状のレールスクリプトでは未使用
+                    // カラーオーバーレイは現状のレールスクリプトでは未使用
                 }
                 case RENDER_PARTS -> {
-                    //正規化 Set は記録時に確定済み (payload) — 同一インスタンスで
-                    //renderNamedGroups の IdentityHashMap キャッシュにヒットさせる
+                    // 正規化 Set は記録時に確定済み (payload) — 同一インスタンスで
+                    // renderNamedGroups の IdentityHashMap キャッシュにヒットさせる
                     if (cmd.payload instanceof Set<?> names) {
                         model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
                     }
@@ -511,7 +448,7 @@ public final class RailScriptRenderers {
                 }
             }
         }
-        //スクリプトの push/pop 不整合を補正
+        // スクリプトの push/pop 不整合を補正
         while (depth > 0) {
             poseStack.popPose();
             depth--;

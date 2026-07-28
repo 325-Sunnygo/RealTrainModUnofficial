@@ -28,16 +28,13 @@ import static com.portofino.realtrainmodunofficial.util.RealTrainModUnofficialCo
 import static com.portofino.realtrainmodunofficial.util.RealTrainModUnofficialConstants.TICK_PER_SECOND;
 import static com.portofino.realtrainmodunofficial.util.UnitConverter.*;
 
-/// 自動車Entityクラス
+// / 自動車Entityクラス
 public final class CarEntity extends Entity {
     /**
-     * 本家 {@code EntityVehicleBase.getBrightnessForRender} 相当。
-     *
-     * <p>1.7.10 のバニラ {@code Entity.getBrightnessForRender} は
-     * <pre>int j = MathHelper.floor_double(this.posY + (double)(this.height / 2.0F));</pre>
-     * と<b>車体の中心の高さ</b>で明るさを取る。1.21 の {@code getLightProbePosition} は
-     * 既定で<b>足元</b>を返すため、レールや道床の中を拾って日中でも暗くなる。
-     * 本家と同じ「中心で拾う」に揃える。
+     * 本家 EntityVehicleBase.getBrightnessForRender 相当。
+     * 1.7.10 のバニラ Entity.getBrightnessForRender は
+     * int j = MathHelper.floor_double(this.posY + (double)(this.height / 2.0F));
+     * と車体の中心の高さで明るさを取る。
      */
     @Override
     public net.minecraft.world.phys.Vec3 getLightProbePosition(float partialTicks) {
@@ -80,86 +77,85 @@ public final class CarEntity extends Entity {
     public double field_70163_u;
     public double field_70161_v;
 
-    /// 車輪のX座標オフセット
+    // / 車輪のX座標オフセット
     public static final float WHEEL_X_COORD = cm2m(72.47766876220703f);
-    //    private static final EntityDataAccessor<Float> DATA_SPEED =
-//        SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.FLOAT);
+    // private static final EntityDataAccessor<Float> DATA_SPEED =
+    // SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.FLOAT);
     // 自動車の情報
 
-    /// 乗車定員
+    // / 乗車定員
     private static final int RIDING_CAPACITY = 5;
 
     // モデル情報
-    /// 前輪のZ座標
+    // / 前輪のZ座標
     public static final float WHEEL_F_COORD = cm2m(158.62274169921875f);
-    /// 後輪のZ座標
+    // / 後輪のZ座標
     public static final float WHEEL_R_COORD = cm2m(-164.98480224609375f);
-    /// 車輪のY座標
+    // / 車輪のY座標
     public static final float WHEEL_Y_COORD = cm2m(37.28034973144531f);
-    /// 車輪の半径
+    // / 車輪の半径
     public static final float WHEEL_RADIUS = WHEEL_Y_COORD;
-    /// ホイールベースの距離
+    // / ホイールベースの距離
     private static final float WHEELBASE = WHEEL_F_COORD - WHEEL_R_COORD;
 
     // 性能
-    /// 加速度（ブロック毎ティック毎ティック）
+    // / 加速度（ブロック毎ティック毎ティック）
     private static final float ACCELERATION = mpss2bpts(4.15f); // ゼロヒャク6.7秒から計算 約0.01f
-    /// 減速度 正の値（ブロック毎ティック毎ティック）
+    // / 減速度 正の値（ブロック毎ティック毎ティック）
     private static final float DECELERATION = ACCELERATION * 1.2f; // 加速度より少し強め
-    /// 惰性の減速度 正の値（ブロック毎ティック毎ティック）
+    // / 惰性の減速度 正の値（ブロック毎ティック毎ティック）
     private static final float SLOWDOWN_DECELERATION = 0.001f;
-    /// 前進の最高速度 120km/h -> 33.33…m/s -> 1.666…block/tick
+    // / 前進の最高速度 120km/h -> 33.33…m/s -> 1.666…block/tick
     private static final float MAX_SPEED = kph2bpt(120.0f);
 
-    /// 車両が停止しているとみなす速度の閾値
+    // / 車両が停止しているとみなす速度の閾値
     private static final float SPEED_STOP_THRESHOLD = 0.01f;
-    /// ステアリングレシオ
+    // / ステアリングレシオ
     public static final float STEERING_RATIO = 1 / 12.0f; // ステアリング角度は、ハンドルの回転角度の12分の1
 
-    /// 左右入力中の1tick当たりのハンドル回転角度（度毎ティック）
+    // / 左右入力中の1tick当たりのハンドル回転角度（度毎ティック）
     private static final float STEERING_WHEEL_ANGULAR_VELOCITY_MANIPULATED = 10.0f;
-    /// セルフセンタリングによる1tick当たりのハンドル回転係数（単位無し 1ブロック移動するごとに変化させる割合を決める）
+    // / セルフセンタリングによる1tick当たりのハンドル回転係数（単位無し 1ブロック移動するごとに変化させる割合を決める）
     private static final float STEERING_WHEEL_SELF_CENTERING_PARAMETER = 2.0f;
-    /// ハンドルの最大回転角度 左右に1.75回転ずつ（度）
+    // / ハンドルの最大回転角度 左右に1.75回転ずつ（度）
     private static final float STEERING_WHEEL_MAX_ANGLE = 630.0f;
-    /// ハンドルの回転角度
+    // / ハンドルの回転角度
     public float currentSteeringWheelAngle = 0.0f; // 単位: 度
-    /// 前回tickでのハンドルの回転角度
+    // / 前回tickでのハンドルの回転角度
     public float prevSteeringWheelAngle = 0.0f;
 
-    /// 車輪の回転角度 クライアントのみ
+    // / 車輪の回転角度 クライアントのみ
     public float wheelRotation = 0.0f;
-    /// 前tickでの車輪の回転角度 クライアントのみ
+    // / 前tickでの車輪の回転角度 クライアントのみ
     public float prevWheelRotation = 0.0f;
 
-    /// 踏んでいる間のアクセル開度の変化量
+    // / 踏んでいる間のアクセル開度の変化量
     private static final float ACCELERATOR_STROKE_CHANGE_RATE = 1.0f / TICK_PER_SECOND / 3.0f; // 3秒でベタ踏み
-    /// アクセル開度 0~1
+    // / アクセル開度 0~1
     private float acceleratorStroke = 0.0f;
-    /// 踏んでいる間のブレーキストロークの変化量
+    // / 踏んでいる間のブレーキストロークの変化量
     private static final float BRAKE_STROKE_CHANGE_RATE = 1.0f / TICK_PER_SECOND; // 1秒でベタ踏み
-    /// ブレーキのストローク量 0~1
+    // / ブレーキのストローク量 0~1
     private float brakeStroke = 0.0f;
-    /// ギアをリバースに入れているか
+    // / ギアをリバースに入れているか
     private boolean isReversing = false;
-    /// 現在ブレーキ中か
+    // / 現在ブレーキ中か
     private boolean isBraking = false;
-    /// 前tickでのwSの値
+    // / 前tickでのwSの値
     private float prevWs = 0.0f;
-    /// ブレーキ中に停止してもキーを押し続けた際に、方向転換をロックする
+    // / ブレーキ中に停止してもキーを押し続けた際に、方向転換をロックする
     private boolean isReversalLocked = false;
-    /// 速度 前進方向が正、後進方向が負
+    // / 速度 前進方向が正、後進方向が負
     public float speed = 0.0f;
-    /// 現在のtickでのヨーの変化量（度）
+    // / 現在のtickでのヨーの変化量（度）
     private float deltaYaw = 0.0f;
 
 
     public CarEntity(EntityType<? extends CarEntity> entityType, Level level) {
         super(entityType, level);
-        //本家 EntityVehicleBase:85 の ignoreFrustumCheck = true 相当。
-        //SRB / NGTO Builder の描画スクリプトは<b>ワールド座標</b>にマーカーや補助線を描くが、
-        //描画されるのは「車が視錐台に入っているとき」だけ。車はプレイヤーの位置に居るため、
-        //前を向くと車がカメラ後方に外れて描画自体が呼ばれず、マーカーが丸ごと消える。
+        // 本家 EntityVehicleBase:85 の ignoreFrustumCheck = true 相当。
+        // SRB / NGTO Builder の描画スクリプトはワールド座標にマーカーや補助線を描くが、
+        // 描画されるのは「車が視錐台に入っているとき」だけ。
         this.noCulling = true;
     }
 
@@ -232,14 +228,14 @@ public final class CarEntity extends Entity {
             return;
         }
         try {
-            //本家と同じ Nashorn (jp.ngt 実クラス) でサーバースクリプトを実行
+            // 本家と同じ Nashorn (jp.ngt 実クラス) でサーバースクリプトを実行
             serverScript = com.portofino.realtrainmodunofficial.script.CarServerScripts.get(def);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to load server script for {}: {}", id, t.toString());
         }
     }
 
-    /** RTM 互換: スクリプトから entity.getResourceState() で呼ばれる。 */
+    /** RTM 互換: スクリプトから entity.getResourceState で呼ばれる。 */
     public ResourceStateCompat getResourceState() {
         return new ResourceStateCompat(this);
     }
@@ -286,7 +282,7 @@ public final class CarEntity extends Entity {
             if (car == null) {
                 return;
             }
-            //サーバーが書いた値のクライアントへの配布は tick 側の CarScriptDataSyncPayload が行う。
+            // サーバーが書いた値のクライアントへの配布は tick 側の CarScriptDataSyncPayload が行う。
             car.setScriptDataValue(key, value);
             if (syncType != 0 && car.level().isClientSide()) {
                 try {
@@ -300,23 +296,23 @@ public final class CarEntity extends Entity {
     }
 
     // ===== RTM 1.12.2 MCP 名の互換メソッド (SRB3 等のサーバスクリプトが直接呼ぶ) =====
-    /** func_184188_bt = getPassengers() */
+    /** func_184188_bt = getPassengers */
     public java.util.List<Entity> func_184188_bt() {
         return this.getPassengers();
     }
-    /** func_184187_bx = getVehicle() (乗っている対象) */
+    /** func_184187_bx = getVehicle (乗っている対象) */
     public Entity func_184187_bx() {
         return this.getVehicle();
     }
-    /** func_184210_p = stopRiding() (降車/乗り物から降りる) */
+    /** func_184210_p = stopRiding (降車/乗り物から降りる) */
     public void func_184210_p() {
         this.stopRiding();
     }
-    /** func_145782_y = getId() (エンティティID) */
+    /** func_145782_y = getId (エンティティID) */
     public int func_145782_y() {
         return this.getId();
     }
-    /** func_70106_y = discard() (エンティティ除去) */
+    /** func_70106_y = discard (エンティティ除去) */
     public void func_70106_y() {
         this.discard();
     }
@@ -325,13 +321,10 @@ public final class CarEntity extends Entity {
         this.setPos(x, y, z);
     }
     /**
-     * func_70078_a = mountEntity (1.7.10)。<b>この車が target に乗る</b> (target=null で降りる)。
-     *
-     * <p>SRB3 / NGTO Builder のサーバースクリプトは
+     * func_70078_a = mountEntity (1.7.10)。この車が target に乗る (target=null で降りる)。
+     * SRB3 / NGTO Builder のサーバースクリプトは
      * 「プレイヤーを降ろす → 車をプレイヤーに乗せる」で追従を実現しており、
-     * 本家 1.7.10 の {@code RTMApiCompat.doFollowing} が空実装なのはそのため。
-     * ここを騎乗させないと車の rider が翌 tick も残り、スクリプトが
-     * {@code isEndEdit = true} (編集終了) へ直行してツールが即死する。
+     * 本家 1.7.10 の RTMApiCompat.doFollowing が空実装なのはそのため。
      */
     public void func_70078_a(Object target) {
         if (target == null) {
@@ -342,12 +335,9 @@ public final class CarEntity extends Entity {
         if (e == null) {
             return;
         }
-        //★必ず<b>自分と同じレベル</b>の実体へ乗る。
-        //スクリプトが持つラッパー (PlayerCompat) は、スクリプトエンジンが定義ごとに
-        //共有されている関係で<b>反対サイドのプレイヤー</b>を指していることがある。
-        //サーバーの車がクライアントの LocalPlayer に騎乗すると、その車は
-        //ServerLevel のtick対象から外れ (乗り物がサーバーに居ないため)、
-        //ClientLevel.tickPassenger だけで回るようになる = サーバー処理が完全に止まる。
+        // ★必ず自分と同じレベルの実体へ乗る。
+        // スクリプトが持つラッパー (PlayerCompat) は、スクリプトエンジンが定義ごとに
+        // 共有されている関係で反対サイドのプレイヤーを指していることがある。
         if (e.level() != this.level()) {
             Entity sameSide = this.level().getEntity(e.getId());
             if (sameSide == null) {
@@ -359,29 +349,25 @@ public final class CarEntity extends Entity {
             }
             e = sameSide;
         }
-        //本家 1.7.10 では「車がプレイヤーに乗る」= プレイヤーは車の乗客ではあり得ない。
-        //スクリプトは dismountPlayer → startRiding の順で呼ぶが、降車が何らかの理由で
-        //効かないと<b>相互に乗った状態</b>になり、rider が毎tick残ってサーバースクリプトが
-        //「編集終了 (isEndEdit)」の枝から出られなくなる (= 敷設も終了も効かない)。
-        //ここで確実に切っておく。
+        // 本家 1.7.10 では「車がプレイヤーに乗る」= プレイヤーは車の乗客ではあり得ない。
+        // スクリプトは dismountPlayer → startRiding の順で呼ぶが、降車が何らかの理由で
+        // 効かないと相互に乗った状態になり、rider が毎tick残ってサーバースクリプトが
+        // 「編集終了 (isEndEdit)」の枝から出られなくなる (= 敷設も終了も効かない)。
         this.ejectPassengers();
         boolean ok = this.startRiding(e, true);
-        //★乗り物がプレイヤー本人の場合、そのプレイヤーには乗客同期が届かない。
-        //バニラは乗客の変化を ServerEntity:89 の broadcast で「その乗り物を追跡している
-        //<b>他の</b>プレイヤー」にだけ送るため、自分に何かが乗ったことを本人は知らない。
-        //結果クライアント側の車は騎乗せず、その場に取り残されて見える
-        //(本家 1.7.10 は騎乗だけで追従が成立するので doFollowing が空実装)。
-        //本人にも明示的に送って、クライアントでも positionRider が働くようにする。
+        // ★乗り物がプレイヤー本人の場合、そのプレイヤーには乗客同期が届かない。
+        // バニラは乗客の変化を ServerEntity:89 の broadcast で「その乗り物を追跡している
+        // 他のプレイヤー」にだけ送るため、自分に何かが乗ったことを本人は知らない。
         if (ok && e instanceof net.minecraft.server.level.ServerPlayer sp) {
             sp.connection.send(new net.minecraft.network.protocol.game.ClientboundSetPassengersPacket(sp));
         }
     }
 
-    /// 右クリックされた時の処理
-    ///
-    /// @param player 右クリックしたプレイヤー
-    /// @param hand   メインハンドまたはオフハンド
-    /// @return 処理の完了状態
+    // / 右クリックされた時の処理
+    // /
+    // / @param player 右クリックしたプレイヤー
+    // / @param hand   メインハンドまたはオフハンド
+    // / @return 処理の完了状態
     @Override
     public @NotNull InteractionResult interact(@NotNull Player player, @NotNull InteractionHand hand) {
         if (this.canAddPassenger(player)) {
@@ -397,9 +383,9 @@ public final class CarEntity extends Entity {
     }
 
 
-    /// 操縦しているLivingEntity
-    ///
-    /// @return あればそのLivingEntity、なければnull
+    // / 操縦しているLivingEntity
+    // /
+    // / @return あればそのLivingEntity、なければnull
     @Override
     public LivingEntity getControllingPassenger() {
         final var passengers = this.getPassengers();
@@ -407,12 +393,12 @@ public final class CarEntity extends Entity {
         return controllingEntity instanceof LivingEntity controllingLivingEntity ? controllingLivingEntity : null;
     }
 
-    /// 渡された乗客Entityの着席位置
-    ///
-    /// @param passenger   乗客Entity
-    /// @param dimensions  自動車の情報 寸法、目の高さなど
-    /// @param partialTick なぜ？
-    /// @return 位置のベクトル
+    // / 渡された乗客Entityの着席位置
+    // /
+    // / @param passenger   乗客Entity
+    // / @param dimensions  自動車の情報 寸法、目の高さなど
+    // / @param partialTick なぜ？
+    // / @return 位置のベクトル
     @Override
     @NotNull
     protected Vec3 getPassengerAttachmentPoint(@NotNull Entity passenger, @NotNull EntityDimensions dimensions, float partialTick) {
@@ -439,7 +425,7 @@ public final class CarEntity extends Entity {
         };
     }
 
-    /// 乗客の向きを車両と同期するために使用 詳細不明
+    // / 乗客の向きを車両と同期するために使用 詳細不明
     @Override
     protected void positionRider(@NotNull Entity passenger, Entity.@NotNull MoveFunction callback) {
         super.positionRider(passenger, callback);
@@ -447,29 +433,29 @@ public final class CarEntity extends Entity {
         player.setYRot(player.getYRot() + this.deltaYaw);
     }
 
-    /// 謎
+    // / 謎
     @Override
     public boolean canCollideWith(@NotNull Entity entity) {
         return true;
     }
 
-    /// 体当たりをして押せるかどうかだと思われる
-    ///
-    /// @return 常に偽 自動車だし押せなくていいよね
+    // / 体当たりをして押せるかどうかだと思われる
+    // /
+    // / @return 常に偽 自動車だし押せなくていいよね
     @Override
     public boolean isPushable() {
         return false;
     }
 
-    /// クリック判定を発生させるかどうかだと思われる
-    ///
-    /// @return もちろん発生させる じゃないと乗れない
+    // / クリック判定を発生させるかどうかだと思われる
+    // /
+    // / @return もちろん発生させる じゃないと乗れない
     @Override
     public boolean isPickable() {
         return true;
     }
 
-    /// バール・素手でプレイヤーが攻撃したら車を撤去してアイテムを回収する
+    // / バール・素手でプレイヤーが攻撃したら車を撤去してアイテムを回収する
     @Override
     public boolean hurt(@NotNull DamageSource source, float amount) {
         if (level().isClientSide) return false;
@@ -485,14 +471,14 @@ public final class CarEntity extends Entity {
         return true;
     }
 
-    /// 用途不明
+    // / 用途不明
     @Override
     @NotNull
     public Packet<ClientGamePacketListener> getAddEntityPacket(@NotNull ServerEntity entity) {
         return new ClientboundAddEntityPacket(this, entity);
     }
 
-    /// 毎Tick呼び出される
+    // / 毎Tick呼び出される
     @Override
     public void tick() {
         super.tick();
@@ -526,10 +512,10 @@ public final class CarEntity extends Entity {
             }
         }
 
-        //★乗り物がプレイヤー本人のとき、そのプレイヤーには乗客同期が届かない
-        //(ServerEntity:89 の broadcast は「乗り物を追跡している<b>他の</b>プレイヤー」宛)。
-        //騎乗した瞬間に 1 回送るだけだと、クライアントがまだ車を認識していない場合に
-        //取りこぼして車がその場に残る。騎乗している間は定期的に送り直して確実に合わせる。
+        // ★乗り物がプレイヤー本人のとき、そのプレイヤーには乗客同期が届かない
+        // (ServerEntity:89 の broadcast は「乗り物を追跡している他のプレイヤー」宛)。
+        // 騎乗した瞬間に 1 回送るだけだと、クライアントがまだ車を認識していない場合に
+        // 取りこぼして車がその場に残る。騎乗している間は定期的に送り直して確実に合わせる。
         if (!this.level().isClientSide()
                 && this.getVehicle() instanceof net.minecraft.server.level.ServerPlayer host) {
             if (this.lastPassengerSyncVehicleId != host.getId() || this.tickCount % 20 == 0) {
@@ -541,8 +527,8 @@ public final class CarEntity extends Entity {
             this.lastPassengerSyncVehicleId = -1;
         }
 
-        //★別レベルの乗り物に乗ってしまっている車を自己修復する。
-        //この状態になると、その車は自分のレベルのtickから外れて処理が止まる。
+        // ★別レベルの乗り物に乗ってしまっている車を自己修復する。
+        // この状態になると、その車は自分のレベルのtickから外れて処理が止まる。
         if (this.getVehicle() != null && this.getVehicle().level() != this.level()) {
             RealTrainModUnofficial.LOGGER.warn("[RTMU] 別レベルの乗り物に騎乗していたため降車させました: self={} vehicle={}",
                 this.level().getClass().getSimpleName(), this.getVehicle().level().getClass().getSimpleName());
@@ -554,8 +540,8 @@ public final class CarEntity extends Entity {
         if (!this.level().isClientSide()) {
             ensureServerScriptLoaded();
             if (serverScript != null) {
-                //スクリプトが読む1.7.10シムを実値で埋めてから走らせる。
-                //埋めないと motion が前回値のまま累積し、車が滑って暴れる。
+                // スクリプトが読む1.7.10シムを実値で埋めてから走らせる。
+                // 埋めないと motion が前回値のまま累積し、車が滑って暴れる。
                 net.minecraft.world.phys.Vec3 before = this.getDeltaMovement();
                 this.field_70159_w = before.x;
                 this.field_70181_x = before.y;
@@ -571,8 +557,8 @@ public final class CarEntity extends Entity {
                 this.yRotO = this.field_70177_z;
                 this.xRotO = this.field_70125_A;
 
-                //スクリプトが書いた motion (field_70159_w/x/y) を実際の移動へ反映する。
-                //MFCP の車はここで前進/操舵を表現するので、反映しないと 1mm も動かない。
+                // スクリプトが書いた motion (field_70159_w/x/y) を実際の移動へ反映する。
+                // MFCP の車はここで前進/操舵を表現するので、反映しないと 1mm も動かない。
                 double mx = this.field_70159_w;
                 double my = this.field_70181_x;
                 double mz = this.field_70179_y;
@@ -584,8 +570,7 @@ public final class CarEntity extends Entity {
             }
             // ホストプレイヤー追従は本家どおり「車がプレイヤーに騎乗する」で行う
             // (mc1710 の RTMApiCompat.doFollowing は空実装)。位置ミラーはしない。
-            // サーバ→クライアント scriptData 同期。SRB3 の render(クライアント)は
-            // hostPlayerEntityId 等のサーバ設定値を読んで GUI を起動するため必須。
+            // サーバ→クライアント scriptData 同期。
             if (scriptDataDirty && !scriptData.isEmpty()) {
                 scriptDataDirty = false;
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
@@ -602,23 +587,23 @@ public final class CarEntity extends Entity {
         // Entityの移動操作に使うとよいっぽい
         // マルチプレイでどうなるかはわからないが、テストする友達がいません（泣）
         // 降りた後に惰性で動かないので、とりあえずコメントアウトして無効化 要研究
-//        if (!this.isControlledByLocalInstance()) return;
+        // if (!this.isControlledByLocalInstance) return;
 
-        //移動はサーバスクリプト任せ (本家 RTM と同じ)。RTMU 独自の車物理は持たない。
-        //スクリプトが書いた motion をそのまま適用する。
+        // 移動はサーバスクリプト任せ (本家 RTM と同じ)。RTMU 独自の車物理は持たない。
+        // スクリプトが書いた motion をそのまま適用する。
         if (level.isClientSide) {
             updateWheelRotationInClient();
         }
         this.move(MoverType.SELF, this.getDeltaMovement());
     }
 
-    /// 車輪の回転角度を更新する クライアントのみ。
-    /// 速度はスクリプトが動かす実移動量から取る (独自物理の speed は持たない)。
+    // / 車輪の回転角度を更新する クライアントのみ。
+    // / 速度はスクリプトが動かす実移動量から取る (独自物理の speed は持たない)。
     private void updateWheelRotationInClient() {
         this.prevWheelRotation = this.wheelRotation;
         Vec3 m = this.getDeltaMovement();
         double horizontal = Math.sqrt(m.x * m.x + m.z * m.z);
-        //進行方向 (車体前方) との内積で前進/後退の符号を決める
+        // 進行方向 (車体前方) との内積で前進/後退の符号を決める
         Vec3 forward = Vec3.directionFromRotation(0.0F, this.getYRot());
         double signed = (m.x * forward.x + m.z * forward.z) < 0 ? -horizontal : horizontal;
         this.speed = (float) signed;

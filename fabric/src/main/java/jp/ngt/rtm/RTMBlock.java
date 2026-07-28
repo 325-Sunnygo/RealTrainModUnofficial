@@ -2,9 +2,7 @@ package jp.ngt.rtm;
 
 import net.minecraft.world.level.block.Block;
 
-/**
- * 本家 jp.ngt.rtm.RTMBlock のスクリプト互換 (マーカー参照等)。
- */
+/** 本家 jp.ngt.rtm.RTMBlock のスクリプト互換 (マーカー参照等)。 */
 @SuppressWarnings("unused")
 public final class RTMBlock {
     private RTMBlock() {
@@ -38,8 +36,7 @@ public final class RTMBlock {
     }
 
     // 本家の signal / speaker / turnstile / fluorescent 等の個別ブロックは、RTMU では
-    // すべて単一の INSTALLED_OBJECT ブロック + カテゴリで表現される。ここへ
+    // すべて単一の INSTALLED_OBJECT ブロック + カテゴリで表現される。
     // INSTALLED_OBJECT を割り当てると world.getBlock(...) == RTMBlock.signal が
     // 「あらゆる設置物」に対して true になり誤判定を招くため、あえて未定義のままにする。
-    // 種別判定が要るスクリプトは InstalledObjectBlockEntity.getCategory() を見ること。
 }

@@ -22,20 +22,15 @@ public final class BundledPackStore {
     }
 
     /**
-     * このパスが <b>この MOD 自身の jar</b> か。
-     * <p>
+     * このパスが この MOD 自身の jar か。
      * 各パックローダは mods/ や gameDir 直下の .zip/.jar を「モデルパック」として総なめする。
-     * この MOD の jar も mods/ にあるので、除外しないと <b>jar に同梱した本家定義が
-     * もう一度パックとして読み込まれ、全定義が二重登録される</b> (選択欄に同じモデルが
-     * 2 つ並ぶ)。同梱モデルを持たなかった頃は実害が無かったが、本家の 209 定義を
-     * 全て同梱した今は必ず弾く必要がある。
      */
     public static boolean isOwnModJar(Path path) {
         if (path == null) {
             return false;
         }
         String fileName = path.getFileName().toString().toLowerCase(java.util.Locale.ROOT);
-        //開発環境や配布名の揺れに備えて、ファイル名でも実体でも判定する。
+        // 開発環境や配布名の揺れに備えて、ファイル名でも実体でも判定する。
         if (fileName.startsWith(RealTrainModUnofficial.MODID.toLowerCase(java.util.Locale.ROOT) + "-")
                 && fileName.endsWith(".jar")) {
             return true;

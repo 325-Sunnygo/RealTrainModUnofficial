@@ -30,9 +30,9 @@ import java.util.Locale;
 
 public class TrainItem extends Item {
     /**
-     * 本家 KaizPatchX の {@code customIconTexture} 用の描画器。
-     * <p>実際に使われるのは、選択中のモデルが {@code customIconTexture} を持つときだけ
-     * ({@link com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel} が判定する)。
+     * 本家 KaizPatchX の customIconTexture 用の描画器。
+     * 実際に使われるのは、選択中のモデルが customIconTexture を持つときだけ
+     * (com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel が判定する)。
      */
     @Override
     public void initializeClient(java.util.function.Consumer<
@@ -82,11 +82,10 @@ public class TrainItem extends Item {
         if (level.isClientSide()) {
             boolean canSpawn = findNearestRailSpawn(level, context.getClickedPos(), context.getClickLocation(), player.getYRot()) != null;
             if (canSpawn) {
-                //専用サーバー保険 (アイテム同期に一切依存しない確実版): 設置直前に、クライアントが
-                //持っている選択IDをサーバーへ送る。この選択パケットは使用パケット (UseItemOn) より
-                //先に送られる (startPrediction はクライアント側 useOn を実行してから使用パケットを送る)
-                //ので、サーバーの useOn は ServerVehicleSelection から確実に読める。Bukkit 系で
-                //アイテムのカスタムデータが剥がれても選択が効く。
+                // 専用サーバー保険 (アイテム同期に一切依存しない確実版): 設置直前に、クライアントが
+                // 持っている選択IDをサーバーへ送る。
+                // 先に送られる (startPrediction はクライアント側 useOn を実行してから使用パケットを送る)
+                // ので、サーバーの useOn は ServerVehicleSelection から確実に読める。
                 ItemStack held = context.getItemInHand();
                 String sel = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(held);
                 if (sel != null && !sel.isBlank()) {
@@ -105,19 +104,16 @@ public class TrainItem extends Item {
             return InteractionResult.PASS;
         }
         ItemStack stack = context.getItemInHand();
-        //自動車 (CarItem) と同じく getSelectedModelId で読む。これはモダンコンポーネントが
-        //null のとき minecraft:custom_data NBT (LEGACY_MODEL_NAME) にフォールバックする。
-        //専用サーバー (Youer/Mohist 等 Bukkit 系ハイブリッド) はカスタムデータコンポーネントを
-        //ItemStack 変換で剥がすが custom_data NBT は保持するため、これで選択が生き残る。
-        //(以前は stack.get(SELECTED_MODEL_ID) だけで、剥がれて全列車が先頭=223系5000番台Tcに)。
+        // 自動車 (CarItem) と同じく getSelectedModelId で読む。
+        // null のとき minecraft:custom_data NBT (LEGACY_MODEL_NAME) にフォールバックする。
         String itemSel = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         String serverSel = com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.get(player.getUUID());
         String selectedId = (itemSel == null || itemSel.isBlank()) ? serverSel : itemSel;
         VehicleDefinition def = VehicleRegistry.getById(selectedId);
         if (def == null || !accepts(def)) {
-            //選択があった (serverSel 非空) のに解決できない = サーバーにそのパックが無い可能性を
-            //<b>ログにだけ</b>残す。無選択で既定車両になるのは正常なので、プレイヤーへの通知は出さない
-            //(毎回「選択が届いていません」と出て邪魔だったため撤去)。
+            // 選択があった (serverSel 非空) のに解決できない = サーバーにそのパックが無い可能性を
+            // ログにだけ残す。無選択で既定車両になるのは正常なので、プレイヤーへの通知は出さない
+            // (毎回「選択が届いていません」と出て邪魔だったため撤去)。
             if (serverSel != null && !serverSel.isBlank()
                     && com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(serverSel) == null) {
                 RealTrainModUnofficial.LOGGER.warn(
@@ -140,7 +136,7 @@ public class TrainItem extends Item {
             return InteractionResult.FAIL;
         }
 
-        //本家: 半径16の既存車両との干渉チェック
+        // 本家: 半径16の既存車両との干渉チェック
         int r = 16;
         List<net.minecraft.world.entity.Entity> list = level.getEntities(player,
                 new net.minecraft.world.phys.AABB(cp.getX() - r, cp.getY() - 4, cp.getZ() - r,
@@ -161,11 +157,8 @@ public class TrainItem extends Item {
 
         int i0 = rm0.getNearlestPoint(128, cp.getX() + 0.5D, cp.getZ() + 0.5D);
         float yw0 = Mth.wrapDegrees(rm0.getRailYaw(128, i0));
-        //本家 ItemTrain: yaw = fixBogieYaw(-playerYaw, railYaw)
-        //
-        //fixBogieYaw は「レールの向き (yw0) か、その 180 度反対か」のうち第1引数に近い方を返す。
-        //つまり第1引数に 180 を足すと<b>選ばれる向きが反転する</b>。ここには本家に無い +180 が
-        //入っており、そのせいで本家と逆向きに列車が置かれていた。本家どおり -playerYaw を渡す。
+        // 本家 ItemTrain: yaw = fixBogieYaw(-playerYaw, railYaw)
+        // fixBogieYaw は「レールの向き (yw0) か、その 180 度反対か」のうち第1引数に近い方を返す。
         float yaw = jp.ngt.rtm.entity.train.EntityBogie.fixBogieYaw(
                 Mth.wrapDegrees(-player.getYRot()), yw0);
         float pitch = jp.ngt.rtm.entity.train.EntityBogie.fixBogiePitch(rm0.getRailPitch(128, i0), yw0, yaw);
@@ -175,19 +168,18 @@ public class TrainItem extends Item {
 
         jp.ngt.rtm.entity.train.EntityTrain train =
                 new jp.ngt.rtm.entity.train.EntityTrain(jp.ngt.rtm.entity.RTMEntities.TRAIN.get(), level);
-        //本家 ItemTrain.onItemUse:84-89 と同じ順序:
-        //  setPositionAndRotation → getResourceState().readFromNBT(アイテムの State)
-        //  → setModelName → spawnTrain → onModelChanged
-        //状態の取り込みは setModelName より<b>前</b>。順序を崩すとモデル差し替え時の
-        //後始末 (onModelChanged) が古い状態を見る。
+        // 本家 ItemTrain.onItemUse:84-89 と同じ順序:
+        // setPositionAndRotation → getResourceState.readFromNBT(アイテムの State)
+        // → setModelName → spawnTrain → onModelChanged
+        // 状態の取り込みは setModelName より前。
         train.moveTo(posX, posY, posZ, yaw, pitch);
 
-        //アイテム側で設定した State (DataMap / 名前 / 色) をエンティティへ移送する。
-        //RTMU はここが丸ごと抜けており、モデル選択画面で入れた DataMap・名前・色が
-        //設置した瞬間に消えていた (本家 ItemTrain.onItemUse:86)。
+        // アイテム側で設定した State (DataMap / 名前 / 色) をエンティティへ移送する。
+        // RTMU はここが丸ごと抜けており、モデル選択画面で入れた DataMap・名前・色が
+        // 設置した瞬間に消えていた (本家 ItemTrain.onItemUse:86)。
         String dataMap = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedDataMap(stack);
         if (dataMap != null && !dataMap.isBlank()) {
-            //DataMap.setArg は本家 getArg 形式 "key=(Type)value,..." をそのまま取り込む
+            // DataMap.setArg は本家 getArg 形式 "key=(Type)value,..." をそのまま取り込む
             train.getResourceState().setArg(dataMap, true);
         }
         String customName = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedCustomName(stack);
@@ -199,9 +191,9 @@ public class TrainItem extends Item {
 
         train.setModelName(def.getId());
         train.spawnTrain(level);
-        //本家 ItemTrain.onItemUse:88  モデル確定後の後始末。
+        // 本家 ItemTrain.onItemUse:88  モデル確定後の後始末。
         train.onModelChanged();
-        //本家 ItemTrain.onItemUse:89  --itemStack.stackSize (本家はクリエイティブでも消費する)
+        // 本家 ItemTrain.onItemUse:89  --itemStack.stackSize (本家はクリエイティブでも消費する)
         if (!player.getAbilities().instabuild) {
             stack.shrink(1);
         }
@@ -467,7 +459,7 @@ public class TrainItem extends Item {
                         coreMaps = core.getAllRailMaps();
                         corePos = core.getBlockPos();
                     } else if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore newCore && newCore.isLoaded()) {
-                        //jp.ngt.rtm.rail (Phase 1 本家忠実システム)
+                        // jp.ngt.rtm.rail (Phase 1 本家忠実システム)
                         coreMaps = newCore.getAllRailMaps();
                         corePos = newCore.getBlockPos();
                     }

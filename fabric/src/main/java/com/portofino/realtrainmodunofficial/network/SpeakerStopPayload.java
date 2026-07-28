@@ -11,7 +11,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * スピーカーブロックが壊された等で、指定座標で再生中の音を止めるパケット。
- * クライアントは {@link LegacyScriptSoundManager#stopAt} でその位置の音を停止する
+ * クライアントは LegacyScriptSoundManager#stopAt でその位置の音を停止する
  * (長い音がブロック破壊後も鳴り続ける問題の対策)。
  */
 public record SpeakerStopPayload(double x, double y, double z) implements CustomPacketPayload {

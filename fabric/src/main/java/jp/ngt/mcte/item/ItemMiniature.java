@@ -4,33 +4,12 @@ import jp.ngt.ngtlib.block.NGTObject;
 import net.minecraft.nbt.CompoundTag;
 
 /**
- * MCTE {@code jp.ngt.mcte.item.ItemMiniature} の static API 移植 (neo mcte)。
- *
- * <p>ミニチュアの中身と設定を格納/取得する<b>唯一の窓口</b>。実アイテムは
- * {@code com.portofino.realtrainmodunofficial.item.MiniatureItem}、
- * 設置済みは {@code MiniatureBlockEntity} が、どちらもここを通す。
- *
- * <h2>★データは ItemStack 自身が持つ (最重要)</h2>
- * MCTEU は中身を {@code miniatureId} という文字列だけスタックに持たせ、実体は
- * その ID をキーにした外部テーブル ({@code PlacedMiniatureManager} /
- * {@code MiniatureWorldData}) に置いていた。そのうえで ID の再割り当てを
- * <pre>if (!newMiniatureId.isEmpty() &amp;&amp; !tag.contains("miniatureId")) { ... }</pre>
- * (MCTEU {@code MiniatureNetwork.java:206} / {@code MiniatureSettingsScreen.java:135})
- * と「既に ID があれば振り直さない」ようにしていたため、NGTO を選び直すと
- * <b>ID は据え置きのままテーブル側が上書き</b>され、同じ ID を共有する
- * インベントリ内の全ミニチュアの見た目が一緒に変わっていた。
- *
- * <p>neo mcte は MCTE 本家と同じく {@code BlocksData} を<b>スタックの NBT に直接</b>持つ。
- * スタックごとに独立した実体を持つので、この波及は<b>原理的に起こらない</b>。
- *
- * <h2>NBT 契約 (本家 MCTE と同一)</h2>
- * <ul>
- *   <li>{@code BlocksData} — {@link NGTObject} 本体</li>
- *   <li>{@code Scale} (float) — 縮尺。旧 {@code MinimizeRate} (int) も読む</li>
- *   <li>{@code OffsetX/OffsetY/OffsetZ} (float) — 表示位置の微調整</li>
- *   <li>{@code Mode} (byte) — {@link MiniatureMode}</li>
- *   <li>{@code MBState} — 設置時のブロック状態 (明るさ等)。旧 {@code LightValue} も読む</li>
- * </ul>
+ * MCTE jp.ngt.mcte.item.ItemMiniature の static API 移植 (neo mcte)。
+ * ミニチュアの中身と設定を格納/取得する唯一の窓口。
+ * ★データは ItemStack 自身が持つ (最重要)
+ * MCTEU は中身を miniatureId という文字列だけスタックに持たせ、実体は
+ * その ID をキーにした外部テーブル (PlacedMiniatureManager /
+ * MiniatureWorldData) に置いていた。
  */
 public final class ItemMiniature {
 
@@ -48,8 +27,8 @@ public final class ItemMiniature {
     }
 
     /**
-     * 本家 {@code MiniatureMode}。設置したときの振る舞い。
-     * <p>宣言順が id になる (本家は {@code nextId++})。NBT に byte で入るので順序を変えないこと。
+     * 本家 MiniatureMode。設置したときの振る舞い。
+     * 宣言順が id になる (本家は nextId++)。NBT に byte で入るので順序を変えないこと。
      */
     public enum MiniatureMode {
         /** 縮小した模型として 1 ブロックに収める。 */
@@ -72,16 +51,15 @@ public final class ItemMiniature {
     // ---- BlocksData ----
 
     /**
-     * NBT から {@link NGTObject} を復元。無ければ null。
-     * <p>ラッパー NBT ({@code jp.ngt.mccompat.nbt.NBTTagCompound}) と実 {@link CompoundTag} の両対応。
-     * NGTO Builder 等のパックスクリプトは {@code item.func_77978_p()} をそのまま渡してくる。
+     * NBT から NGTObject を復元。無ければ null。
+     * ラッパー NBT (jp.ngt.mccompat.nbt.NBTTagCompound) と実 CompoundTag の両対応。
      */
     public static NGTObject getNGTObject(Object nbtLike) {
         CompoundTag tag = unwrap(nbtLike);
         if (tag == null) {
             return null;
         }
-        //旧 RTMU 実装は BlocksData の中身をタグ直下へ展開していた。両方受ける。
+        // 旧 RTMU 実装は BlocksData の中身をタグ直下へ展開していた。両方受ける。
         CompoundTag data = tag.contains(KEY_BLOCKS) ? tag.getCompound(KEY_BLOCKS) : tag;
         if (!data.contains("Blocks") && !data.contains("SizeX")) {
             return null;
@@ -94,7 +72,7 @@ public final class ItemMiniature {
         }
     }
 
-    /** 本家 {@code setNGTObject}。{@code BlocksData} として<b>そのスタックの NBT に</b>書く。 */
+    /** 本家 setNGTObject。BlocksData としてそのスタックの NBT に書く。 */
     public static void setNGTObject(NGTObject obj, Object nbtLike) {
         CompoundTag tag = unwrap(nbtLike);
         if (tag == null || obj == null) {
@@ -113,7 +91,7 @@ public final class ItemMiniature {
 
     // ---- Scale ----
 
-    /** 本家 {@code getScale}。旧 {@code MinimizeRate}(整数の分母) も読む。 */
+    /** 本家 getScale。旧 MinimizeRate(整数の分母) も読む。 */
     public static float getScale(Object nbtLike) {
         CompoundTag tag = unwrap(nbtLike);
         if (tag == null) {
@@ -139,8 +117,8 @@ public final class ItemMiniature {
     // ---- Offset ----
 
     /**
-     * 本家 {@code getOffset}。
-     * <p>★本家は {@code private static float[] offset} を使い回して返していたが、
+     * 本家 getOffset。
+     * ★本家は private static float[] offset を使い回して返していたが、
      * 呼び出し側が保持すると別のミニチュアの値に書き換わる。ここでは毎回新しい配列を返す。
      */
     public static float[] getOffset(Object nbtLike) {
@@ -180,7 +158,7 @@ public final class ItemMiniature {
 
     // ---- 設置時のブロック状態 ----
 
-    /** 本家 {@code MBState.lightValue} 相当。旧 {@code LightValue} も読む。 */
+    /** 本家 MBState.lightValue 相当。旧 LightValue も読む。 */
     public static int getLightValue(Object nbtLike) {
         CompoundTag tag = unwrap(nbtLike);
         if (tag == null) {

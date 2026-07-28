@@ -7,7 +7,7 @@ import java.nio.file.Path;
 
 /**
  * MOD 同梱デフォルトアセットの展開先。mods / config とは別の専用フォルダ
- * (&lt;gameDir&gt;/rtm_default_assets) に置き、各パックローダのスキャン対象に含める。
+ * (<gameDir>/rtm_default_assets) に置き、各パックローダのスキャン対象に含める。
  */
 public final class DefaultAssetsFolder {
     public static final String NAME = "rtm_default_assets";
@@ -15,16 +15,12 @@ public final class DefaultAssetsFolder {
     private DefaultAssetsFolder() {
     }
 
-    /**
-     * フォルダの Path (存在しなくても返す。作成は ensure() で行う)。
-     */
+    /** フォルダの Path (存在しなくても返す。作成は ensure で行う)。 */
     public static Path get() {
         return FMLPaths.GAMEDIR.get().resolve(NAME);
     }
 
-    /**
-     * フォルダを作成して返す。
-     */
+    /** フォルダを作成して返す。 */
     public static Path ensure() {
         Path dir = get();
         try {

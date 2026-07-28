@@ -1,8 +1,6 @@
 package jp.ngt.rtm.render;
 
-/**
- * 本家 jp.ngt.rtm.render.RenderPass の忠実移植。
- */
+/** 本家 jp.ngt.rtm.render.RenderPass の忠実移植。 */
 public enum RenderPass {
     NORMAL(0),
     TRANSPARENT(1),

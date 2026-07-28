@@ -4,8 +4,7 @@ import java.util.Arrays;
 
 /**
  * 本家 jp.ngt.rtm.modelpack.cfg.TrainConfig の段階的移植 (物理・台車関連フィールド)。
- * 既定値は本家 init() と同一。
- * TODO(Phase 4): NGTJson による ModelTrain_*.json 直読。現状は VehicleDefinition アダプタが充填する。
+ * 既定値は本家 init と同一。
  */
 public class TrainConfig {
     /** 本家 IConfigWithType の型名。スクリプトが cfg.TYPE で判定する。 */
@@ -13,13 +12,11 @@ public class TrainConfig {
 
     public String trainName = "";
     public String trainType = "EC";
-    /** 本家 ModelConfig.smoothing (NGTO Builder の renderStatic が getConfig().smoothing を読む)。 */
+    /** 本家 ModelConfig.smoothing (NGTO Builder の renderStatic が getConfig.smoothing を読む)。 */
     public boolean smoothing;
 
     public boolean muteJointSound;
-    /**
-     * 3つ以上の車輪対応, 台車前後別
-     */
+    /** 3つ以上の車輪対応, 台車前後別 */
     public float[][] jointDelay;
     private float[][] bogiePos;
     public float trainDistance;
@@ -38,9 +35,7 @@ public class TrainConfig {
     public Object[][] smoke;
     public float[][] playerPos;
 
-    /**
-     * 本家 slotPos: {x, y, z, seatType} — EntityFloor (座席/フロア) のスポーン位置
-     */
+    /** 本家 slotPos: {x, y, z, seatType} — EntityFloor (座席/フロア) のスポーン位置 */
     private float[][] slotPos = new float[0][];
 
     public String[] rollsignNames = new String[0];
@@ -56,14 +51,12 @@ public class TrainConfig {
     /** レバーサ操作音。 */
     public String sound_Reversal;
 
-    /** 車体モデル (本家 VehicleConfig.model / getModel())。 */
+    /** 車体モデル (本家 VehicleConfig.model / getModel)。 */
     public Object model;
     /** 台車モデル (本家 bogieModel3 / getBogieModel(i))。 */
     public Object[] bogieModel;
 
-    /**
-     * 本家 init() の既定値適用。
-     */
+    /** 本家 init の既定値適用。 */
     public void init() {
         if (this.bogiePos == null) {
             this.bogiePos = new float[][]{{0.0F, 0.0F, 7.125F}, {0.0F, 0.0F, -7.125F}};

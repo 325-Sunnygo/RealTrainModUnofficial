@@ -18,16 +18,11 @@ public enum InstalledObjectCategory {
     /**
      * 本家: ATC 地上子 (EntityATC / ModelMachine machineType="Antenna_Send")。TRAIN_DETECTOR の送信側。
      * レールの上に置き、真下のレールに signal (ATS 信号レベル) を書き込む。通過した列車が拾って ATS/ATS-P に使う。
-     * Phase 1: レッドストーン強度 (0-15) をそのまま信号レベルとして送出する。
      */
     ATC,
-    /**
-     * 本家: 入力コネクタ (レッドストーン→配線網)
-     */
+    /** 本家: 入力コネクタ (レッドストーン→配線網) */
     CONNECTOR_INPUT,
-    /**
-     * 本家: 出力コネクタ (配線網→レッドストーン)
-     */
+    /** 本家: 出力コネクタ (配線網→レッドストーン) */
     CONNECTOR_OUTPUT,
     /**
      * 本家: ガラスの蛍光灯 (BlockFluorescent / ModelOrnament ornamentType="Lamp")。

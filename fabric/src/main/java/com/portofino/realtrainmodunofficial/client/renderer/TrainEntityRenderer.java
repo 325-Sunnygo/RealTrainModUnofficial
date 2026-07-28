@@ -86,16 +86,9 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     }
 
     /**
-     * 本家 {@code RenderVehicleBase.preRenderBody} の移植。
-     * <pre>
-     * useInteriorLighting = cfg.interiorLights != null &amp;&amp; getLightValue(vehicle) &lt; 7
-     * if (lightState &gt; 0 &amp;&amp; useInteriorLighting) GLHelper.setLightmapMaxBrightness();
-     * </pre>
-     * <p>つまり<b>室内灯 ON かつ周囲が暗いときは、車体の通常描画そのものがフルブライト</b>になる。
-     * 夜に外から見て車内が明るく見えるのはこれで、発光テクスチャ (***_light0.png) の働きではない。
-     * 発光パス側をフルブライトにすると車体が二重に見えるので、そちらではなくここで効かせる。
-     * <p>本家はさらに {@code enableCustomLighting} で室内灯の位置に GL 点光源を置くが、
-     * 1.21 は固定機能ライトが無いので lightmap 側だけ再現する。
+     * 本家 RenderVehicleBase.preRenderBody の移植。
+     * useInteriorLighting = cfg.interiorLights != null && getLightValue(vehicle) < 7
+     * if (lightState > 0 && useInteriorLighting) GLHelper.setLightmapMaxBrightness;
      */
     public static int applyInteriorLighting(net.minecraft.world.level.Level level, double x, double y, double z,
                                             boolean hasInteriorLights, int interiorLightState, int packedLight) {
@@ -108,7 +101,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         return net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
     }
 
-    /** 本家 {@code getLightValue}: 空 (時刻で減衰) とブロックの明るいほう。 */
+    /** 本家 getLightValue: 空 (時刻で減衰) とブロックの明るいほう。 */
     private static int ambientLightValue(net.minecraft.world.level.Level level, double x, double y, double z) {
         BlockPos pos = BlockPos.containing(x, y + 0.5D, z);
         int skyBrightness = Mth.clamp(15 - level.getSkyDarken(), 0, 15);
@@ -124,7 +117,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
 
     @Override
     public boolean shouldRender(TrainEntity entity, Frustum frustum, double camX, double camY, double camZ) {
-        //軽量化: 車両描画距離が有効なら遠方車両を丸ごと省略 (既定 0 = 無制限)。
+        // 軽量化: 車両描画距離が有効なら遠方車両を丸ごと省略 (既定 0 = 無制限)。
         if (com.portofino.realtrainmodunofficial.RtmuSettings.beyondVehicleRenderDistance(
                 entity.getX(), entity.getY(), entity.getZ(), camX, camY, camZ)) {
             return false;
@@ -171,11 +164,8 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             float renderYaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
             poseStack.mulPose(Axis.YP.rotationDegrees(renderYaw));
 
-            // Pitch: 坂で車体が水平のまま浮かないように適用。ただし RTM 系のレンダラスクリプトが
+            // Pitch: 坂で車体が水平のまま浮かないように適用。
             // GL11.glRotated で body に独自に pitch を加える車両があり、二重回転で異常傾斜の原因になる。
-            // → スクリプトを持つ車両ではここでは適用せず、スクリプト側に任せる。
-            // → スクリプト無し or スクリプト読込失敗の車両のみここで適用。
-            // さらに値域を ±45° に clamp して、ボギー1個がブロック上に乗っただけで45度傾く現象を防ぐ。
             float renderPitch = Mth.lerp(partialTicks, entity.xRotO, entity.getXRot());
             renderPitch = Mth.clamp(renderPitch, -45.0F, 45.0F);
             // 坂で車体を傾ける。スクリプトの有無に関わらず適用 (RTM 標準スクリプトは
@@ -195,9 +185,9 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             // Apply model offset and scale (TrainEntity Y がすでに body center に合わせて
             // RTM_VEHICLE_Y_OFFSET 分上げてあるので、ここでは +0.2 のような追加リフトをしない)
             poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
-            //★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。本家は
-            //NGTOParts.render の中だけで glScalef(scale) するので、スクリプトが台車/ドアを
-            //置く glTranslatef はブロック単位のまま。ここで掛けると全部が中央に寄る。
+            // ★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。本家は
+            // NGTOParts.render の中だけで glScalef(scale) するので、スクリプトが台車/ドアを
+            // 置く glTranslatef はブロック単位のまま。ここで掛けると全部が中央に寄る。
             if (!model.isVoxelModel()) {
                 poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
             }
@@ -219,9 +209,8 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             double rollsignThreshold = compatibilityHeavy ? 42.0D : 64.0D;
             double lightThreshold = compatibilityHeavy ? 64.0D : 96.0D;
             boolean nearTrain = cameraDistanceSq < nearThreshold * nearThreshold;
-            //★本家は内装を距離で間引かない。外から室内灯の光が見えるのは、窓の穴 (α=0) 越しに
-            //<b>室内の面そのもの</b>が見えているからで、内装を消すと光も消える。
-            //既定は本家どおり常に描き、軽量化設定で車両描画距離を有効にした時だけ従来の間引きを使う。
+            // ★本家は内装を距離で間引かない。
+            // 室内の面そのものが見えているからで、内装を消すと光も消える。
             boolean distanceCulling =
                 com.portofino.realtrainmodunofficial.RtmuSettings.vehicleRenderDistance > 0;
             boolean renderInterior = ridingThisTrain || !distanceCulling || nearTrain;
@@ -232,20 +221,19 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             int trainPackedLight = resolveTrainPackedLight(entity, packedLight);
 
             boolean modelScriptRunning = model.hasRenderScript();
-            // def.hasScript() covers cases where the JS engine failed to load (e.g. unsupported JS runtime)
+            // def.hasScript covers cases where the JS engine failed to load (e.g. unsupported JS runtime)
             // but the pack was designed with a renderer script (e.g. SL packs with rod animation).
             // In that case, wheel/truck groups belong in the main model and must NOT be filtered out.
             boolean modelHasScript = modelScriptRunning || def.hasScript();
-            //★ボクセルモデル (.ngto/.ngtz) + スクリプト稼働中は、ベイク側を一切描かない。
-            //本家 NGTZModel はパーツを自分のグリッド中央へ寄せて描き、位置決めはスクリプトの
-            //glTranslatef が行う。ここで別に描くと、台車やドアが<b>車両の中央</b>に出て、
-            //本体は二重になってチカチカする (NM_251)。
+            // ★ボクセルモデル (.ngto/.ngtz) + スクリプト稼働中は、ベイク側を一切描かない。
+            // 本家 NGTZModel はパーツを自分のグリッド中央へ寄せて描き、位置決めはスクリプトの
+            // glTranslatef が行う。
             boolean voxelDrawnByScript = model.isVoxelModel() && modelScriptRunning;
             MqoModelLoader.GroupPredicate groupFilter = voxelDrawnByScript
                 ? groupName -> false
                 : groupName -> shouldRenderTrainGroup(groupName, renderInterior, aggressiveDistanceCulling, compatibilityHeavy, def, modelHasScript, modelScriptRunning);
-            //本家 BasicVehiclePartsRenderer と同じく、動かす部品は JSON の objects で決まる。
-            //名前に "door" を含むか等の推測はしない (本家に無いし、扉/panel 等の命名で外れる)。
+            // 本家 BasicVehiclePartsRenderer と同じく、動かす部品は JSON の objects で決まる。
+            // 名前に "door" を含むか等の推測はしない (本家に無いし、扉/panel 等の命名で外れる)。
             java.util.Map<String, java.util.List<PartsStep>> leftChains = partsChains(def.getLeftDoors());
             java.util.Map<String, java.util.List<PartsStep>> rightChains = partsChains(def.getRightDoors());
             MqoModelLoader.GroupTransform doorTransform = new MqoModelLoader.GroupTransform() {
@@ -264,7 +252,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                     if (groupName == null || groupName.isEmpty()) return false;
                     if (isRunningGearGroup(groupName)) return true;
                     if (leftChains.isEmpty() && rightChains.isEmpty()) {
-                        //ドア定義の無いパックは名前推定フォールバックに掛かる可能性がある
+                        // ドア定義の無いパックは名前推定フォールバックに掛かる可能性がある
                         return groupName.length() >= 4 && containsDoorWord(groupName);
                     }
                     return hasPartsTransform(leftChains, groupName) || hasPartsTransform(rightChains, groupName);
@@ -280,8 +268,6 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             }
             // 列車の実座標から取り直した lightmap を使用し、室内灯OFFの外装が夜に白く浮かないようにする。
             // 発光 pass は MqoModelLoader/TrainScriptSystem 側で室内灯ONの内装だけに制限する。
-            //本家 preRenderBody/postRenderBody は<b>車体パスだけ</b>を挟む (台車・方向幕・
-            //ライト効果には掛からない)。室内灯によるフルブライトもここだけに効かせる。
             int bodyLight = applyInteriorLighting(entity.level(), entity.getX(), entity.getY(), entity.getZ(),
                 !def.getInteriorLights().isEmpty(), entity.isInteriorLightOn() ? 1 : 0, trainPackedLight);
             com.portofino.realtrainmodunofficial.client.render.InteriorLighting.begin(
@@ -369,7 +355,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     /** 本家 EntityVehicleBase.MAX_DOOR_MOVE。開度は doorMove / これ。 */
     public static final float MAX_DOOR_MOVE = 60.0F;
 
-    /** 本家 VehicleParts の変換 1 段 ({@code pos} を原点にした {@code transform} 列)。 */
+    /** 本家 VehicleParts の変換 1 段 (pos を原点にした transform 列)。 */
     public record PartsStep(float[] pos, java.util.List<float[]> transforms) {
     }
 
@@ -378,10 +364,8 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             java.util.Collections.synchronizedMap(new java.util.IdentityHashMap<>());
 
     /**
-     * 本家 {@code BasicVehiclePartsRenderer.getParts} 相当。
-     * <p>親子の入れ子を「グループ名 → 根から順に適用する変換列」へ平坦化する。本家は
-     * 子を親の行列の中で描くので、子のグループには親の変換も掛かる。平坦化しておけば
-     * バッチ単位描画でも同じ結果になり、探索も 1 回の map 参照で済む。
+     * 本家 BasicVehiclePartsRenderer.getParts 相当。
+     * 親子の入れ子を「グループ名 → 根から順に適用する変換列」へ平坦化する。
      */
     public static java.util.Map<String, java.util.List<PartsStep>> partsChains(
             java.util.List<VehicleDefinition.DoorAnimationDefinition> parts) {
@@ -404,7 +388,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             chain.add(new PartsStep(new float[]{(float) p.x, (float) p.y, (float) p.z}, part.transforms()));
             java.util.List<PartsStep> frozen = java.util.List.copyOf(chain);
             for (String name : part.objects()) {
-                //大小どちらの綴りでも引けるようにしておく (完全一致が当たれば lowercase を作らずに済む)
+                // 大小どちらの綴りでも引けるようにしておく (完全一致が当たれば lowercase を作らずに済む)
                 out.put(name, frozen);
                 out.putIfAbsent(name.toLowerCase(java.util.Locale.ROOT), frozen);
             }
@@ -424,13 +408,10 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     }
 
     /**
-     * 本家 {@code BasicVehiclePartsRenderer.renderParts} の忠実移植。
-     * <pre>
-     *   translate(pos) → transform を並び順に全て適用 → translate(-pos)
-     *   transform の要素数 3 = 平行移動 {x,y,z} × move
-     *                     4 = 回転 {angle × move, vecX, vecY, vecZ}
-     * </pre>
-     * 開度の補間も本家と同じ {@code sigmoid}。
+     * 本家 BasicVehiclePartsRenderer.renderParts の忠実移植。
+     * translate(pos) → transform を並び順に全て適用 → translate(-pos)
+     * transform の要素数 3 = 平行移動 {x,y,z} × move
+     * 4 = 回転 {angle × move, vecX, vecY, vecZ}
      */
     public static void applyPartsTransform(PoseStack poseStack,
                                            java.util.Map<String, java.util.List<PartsStep>> chains,
@@ -495,7 +476,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             return;
         }
         if (doors == null || doors.isEmpty()) {
-            //JSON にドア定義が無いパック向けの名前推定フォールバック (本家には無い RTMU の補助)
+            // JSON にドア定義が無いパック向けの名前推定フォールバック (本家には無い RTMU の補助)
             applyLegacyDoorFallback(poseStack, groupName,
                     smoothstep(Mth.clamp(progressTicks / MAX_DOOR_MOVE, 0.0F, 1.0F)), leftSide);
             return;
@@ -533,14 +514,9 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     }
 
     /**
-     * 車両 JSON の {@code rollsigns} (頂点座標 + UV で定義された方向幕パネル) を描く。
-     *
-     * <p>本家 RenderVehicleBase.renderRollsign と同じで、<b>描画スクリプトの有無に関係なく</b>
-     * エンジン側が描く。パックが自前で幕を描く場合 (西武・E259 等) は {@code "rollsigns": []} と
-     * 空配列にしてあるので、配列が空でなければ描く、で正しく切り分けられる。
-     *
-     * <p>実際に列車を描くのは {@code RtmTrainRenderer} なので、そちらからも呼べるよう
-     * エンティティに依存しない形 (行き先インデックスだけ受ける) にしてある。
+     * 車両 JSON の rollsigns (頂点座標 + UV で定義された方向幕パネル) を描く。
+     * 本家 RenderVehicleBase.renderRollsign と同じで、描画スクリプトの有無に関係なく
+     * エンジン側が描く。
      */
     static void renderConfiguredRollsigns(int rawDestinationIndex, float animation, VehicleDefinition def, PoseStack poseStack,
                                           MultiBufferSource buffer, int packedLight) {
@@ -595,16 +571,15 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             float uMax = uv[1];
             float baseVMin = uv[2];
             float baseVMax = uv[3];
-            //★本家 RenderVehicleBase.renderRollsign と同じ:
-            //  f1 = doAnimation ? getRollsignAnimation() (連続値で滑らかに幕回し) : 行先 index (段でスナップ)。
-            //  幕を names 数で縦分割し、その 1 コマ分 (segment) を f1 番目から f1+1 番目まで切り出す。
+            // ★本家 RenderVehicleBase.renderRollsign と同じ:
+            // f1 = doAnimation ? getRollsignAnimation (連続値で滑らかに幕回し) : 行先 index (段でスナップ)。
             float f1 = rollsign.doAnimation() ? animation : (float) discreteIndex;
             float segment = (baseVMax - baseVMin) / (float) count;
             float vMin = baseVMin + segment * f1;
             float vMax = baseVMin + segment * (f1 + 1.0F);
-            //★本家は disableLighting が false のときに GL のライティングを切って
-            //  ライトマップを最大にする = 幕が自己発光する。名前と逆なので注意
-            //  (RTMU は条件が反転していて、光るべき幕が暗いままだった)。
+            // ★本家は disableLighting が false のときに GL のライティングを切って
+            // ライトマップを最大にする = 幕が自己発光する。名前と逆なので注意
+            // (RTMU は条件が反転していて、光るべき幕が暗いままだった)。
             int signLight = rollsign.disableLighting() ? packedLight : 0x00F000F0;
 
             for (float[][] quad : rollsign.pos()) {
@@ -680,22 +655,13 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         }
         String normalized = groupName.toLowerCase(java.util.Locale.ROOT);
         // 連結曲げ用の角度バリアントメッシュ (body-90 / body-80(mx) / bogie1-90 等、末尾"-NN"でNN>=10)
-        // は RTM が曲げ角に応じ1つだけ描く代替メッシュ。移植版には曲げ処理が無いため、原点姿勢で
-        // 描くと翼のように散乱する。スクリプトが描画失敗したフレームでは shouldRenderBakedGroup の
-        // 除外が効かず、このフィルタだけで baked が全グループを描くため、ここでも必ず除外する。
-        // (TTP蒸気機関車は全て曲げ変種を持つため、スクリプト不調時に車体パネルが散乱していた)
+        // は RTM が曲げ角に応じ1つだけ描く代替メッシュ。
+        // 描くと翼のように散乱する。
         if (isAngleBendVariant(normalized)) {
             return false;
         }
-        //★台車/車輪グループは<b>隠さない</b>。本家 ModelObject.render は名前でグループを
-        //出し分けない (台車は EntityBogie 側で別途描かれるだけ)。以前は「別台車モデルが
-        //あるなら車体側の台車を隠す」としていたが、.ngtz のように<b>台車をモデルに内蔵</b>した
-        //車両で台車が消えていた。
-        // RTMパックには非表示にすべきヘルパーグループが含まれている:
-        //   shadow    - 地面に張り付いたシャドウポリゴン(レールを隠す)
-        //   *_guide   - モデルエディタ用ガイド(roll_guide, seat_guide_L/R など)
-        //   *_atari   - 当たり判定用ガイドポリゴン
-        //   *[obj]    - Metasequoiaの親コンテナ(フェイスなしだが念のため)
+        // ★台車/車輪グループは隠さない。
+        // 出し分けない (台車は EntityBogie 側で別途描かれるだけ)。
         if (normalized.contains("shadow")) {
             return false;
         }
@@ -725,18 +691,11 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 return false;
             }
         }
-        // 台車/車輪グループは常に描画する。スクリプトが描いてもバグで消えるケースが
-        // 多発するため、確実に見えるようベイクド側からも描画する。別bogieファイルと
-        // 多少重なってもよしとする(消えるより遥かに良い)。
-        // 旧: !hasScript && !def.getBogies().isEmpty() のときだけ非表示にしていた
-        // Script-controlled headlight/taillight overlay geometry uses emissive textures
-        // that need script management for correct color/alpha. Only suppress them when
-        // the light mode is OFF — always show when the train's lights are switched on,
-        // even without a running script, so something visible appears as a fallback.
-        // (The script path handles animated color; the baked path gives a static glow.)
+        // 台車/車輪グループは常に描画する。
+        // 多発するため、確実に見えるようベイクド側からも描画する。
         if (def.hasScript() && !scriptActuallyRunning
                 && def.getHeadLights().isEmpty() && def.getTailLights().isEmpty()) {
-            // "light" (exact): SL front headlight (D51 etc.)
+            // "light" (exact): SL front headlight ( etc.)
             // "lightf" / "lightb" / "lightr" / "lightl": EMU-style per-direction headlights
             boolean isLightGroup = normalized.equals("light") || normalized.equals("lightf") || normalized.equals("lightb")
                     || normalized.equals("lightr") || normalized.equals("lightl")
@@ -748,8 +707,6 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 // to know mode here). We allow it to pass and rely on isEmissiveGroup / light-mode
                 // gating inside renderParts to control visibility per-frame.
                 // Only suppress the "shadow"-level legacy groups that truly break when unscripted:
-                // none currently match this category, so allow all through.
-                // Intentionally not returning false here so baked render shows the geometry.
             }
         }
         if (aggressiveDistanceCulling) {
@@ -806,11 +763,9 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     }
 
     /**
-     * 本家 {@code RenderBogie} は台車モデルを<b>無条件に描く</b>。
+     * 本家 RenderBogie は台車モデルを無条件に描く。
      * 描かないのは「モデルセットがダミー」= パック側が台車を無効にしている時だけなので、
-     * ここも {@code air}/{@code none} 等のダミー指定だけを見る。
-     * <p>以前あった「.class は描かない」「車体が走り装置を持つなら描かない」は RTMU 独自の
-     * 推測で、既定車両 (df200) や .ngtz 車両 (NM_251) で台車が消える原因になっていた。
+     * ここも air/none 等のダミー指定だけを見る。
      */
     private static boolean shouldSkipInlineBogie(boolean selfDrawsRunningGear, VehicleDefinition.BogieDefinition bogieDef) {
         if (bogieDef == null || bogieDef.modelFile() == null || bogieDef.modelFile().isBlank()) {
@@ -856,8 +811,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         if (singleTrainActive && mode == 1) renderTailLights = true;
 
         // カメラの right/up ベクトルを列車ローカル座標系に変換してビルボードを実現。
-        // 列車トランスフォームは Y軸回転 + オフセット + スケール。方向ベクトルには
-        // 回転のみが効くため、カメラ回転に列車 yaw の逆クォータニオンを掛けて変換する。
+        // 列車トランスフォームは Y軸回転 + オフセット + スケール。
         Vector3f billRight = new Vector3f(1, 0, 0);
         Vector3f billUp    = new Vector3f(0, 1, 0);
         Quaternionf invYaw = Axis.YP.rotationDegrees(renderYaw).conjugate();

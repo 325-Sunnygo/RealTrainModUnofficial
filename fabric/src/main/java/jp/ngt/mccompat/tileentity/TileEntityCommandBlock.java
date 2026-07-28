@@ -4,20 +4,8 @@ import net.minecraft.world.level.block.entity.CommandBlockEntity;
 
 /**
  * 1.7.10 net.minecraft.tileentity.TileEntityCommandBlock のスクリプト互換ラッパー。
- *
- * <p>列車検知器 (hi03TrainDetector 等) のサーバースクリプトは、自分の真下を掘って
- * コマンドブロックを探し、その<b>コマンド文字列を設定ファイルとして読む</b>:
- * <pre>
- *   var block = world.func_147438_o(x, y - i, z);
- *   if (block instanceof TileEntityCommandBlock) return block;
- *   ...
- *   var command = NGTUtil.getField(CommandBlockLogic.class, commandBlock.func_145993_a(),
- *                                  ["Command", "field_145763_e"]);
- *   var data = JSON.parse(command);   //{"setting":{"outputPos":[x,y,z]}, "train":{...}}
- * </pre>
- *
- * <p>1.21 の {@link CommandBlockEntity} には {@code instanceof} を通せないので、
- * {@code WorldCompat.func_147438_o} がコマンドブロックだけこのラッパーに包んで返す。
+ * 列車検知器 (hi03TrainDetector 等) のサーバースクリプトは、自分の真下を掘って
+ * コマンドブロックを探し、そのコマンド文字列を設定ファイルとして読む:
  */
 @SuppressWarnings("unused")
 public final class TileEntityCommandBlock {

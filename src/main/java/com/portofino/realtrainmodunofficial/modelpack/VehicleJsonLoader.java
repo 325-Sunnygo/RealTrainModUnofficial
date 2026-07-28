@@ -22,9 +22,7 @@ import java.util.Map;
 public class VehicleJsonLoader {
     private static final String[] ENCODINGS = {"UTF-8", "SJIS"};
     
-    /**
-     * Parse vehicle configuration from JSON with legacy-style validation
-     */
+    /** Parse vehicle configuration from JSON with legacy-style validation */
     public static VehicleConfig parseVehicleConfig(Path jsonPath) throws IOException {
         String jsonContent = readFileWithEncoding(jsonPath);
         JsonElement root = JsonParser.parseString(jsonContent);
@@ -37,9 +35,7 @@ public class VehicleJsonLoader {
         return parseVehicleConfig(obj, jsonPath.getFileName().toString());
     }
     
-    /**
-     * Parse vehicle configuration from JSON object
-     */
+    /** Parse vehicle configuration from JSON object */
     private static VehicleConfig parseVehicleConfig(JsonObject obj, String fileName) {
         VehicleConfig config = new VehicleConfig();
         
@@ -80,9 +76,7 @@ public class VehicleJsonLoader {
         return config;
     }
     
-    /**
-     * Read file with multiple encoding attempts (legacy-style)
-     */
+    /** Read file with multiple encoding attempts (legacy-style) */
     private static String readFileWithEncoding(Path path) throws IOException {
         for (String encoding : ENCODINGS) {
             try {
@@ -94,9 +88,7 @@ public class VehicleJsonLoader {
         throw new IOException("Failed to read file with any supported encoding: " + path);
     }
     
-    /**
-     * Parse seat positions with legacy-style naming conventions
-     */
+    /** Parse seat positions with legacy-style naming conventions */
     private static List<Vec3> parseSeatPositions(JsonObject obj) {
         List<Vec3> seats = new ArrayList<>();
         
@@ -110,18 +102,14 @@ public class VehicleJsonLoader {
         return seats;
     }
     
-    /**
-     * Parse bogie positions
-     */
+    /** Parse bogie positions */
     private static List<Vec3> parseBogiePositions(JsonObject obj) {
         List<Vec3> bogies = new ArrayList<>();
         appendVec3Array(obj, "bogiePos", bogies);
         return bogies;
     }
     
-    /**
-     * Parse bogie model configurations (legacy-style)
-     */
+    /** Parse bogie model configurations (legacy-style) */
     private static List<BogieModelConfig> parseBogieModels(JsonObject obj) {
         List<BogieModelConfig> bogieModels = new ArrayList<>();
         
@@ -158,9 +146,7 @@ public class VehicleJsonLoader {
         return bogieModels;
     }
     
-    /**
-     * Parse texture overrides with legacy-style array format
-     */
+    /** Parse texture overrides with legacy-style array format */
     private static Map<String, String> parseTextures(JsonObject modelObj) {
         Map<String, String> textures = new HashMap<>();
         
@@ -206,9 +192,7 @@ public class VehicleJsonLoader {
         return texture + "|ptmeta=" + String.join(",", flags);
     }
     
-    /**
-     * Append Vec3 array from JSON object to list
-     */
+    /** Append Vec3 array from JSON object to list */
     private static void appendVec3Array(JsonObject obj, String key, List<Vec3> out) {
         if (!obj.has(key) || !obj.get(key).isJsonArray()) return;
         
@@ -230,9 +214,7 @@ public class VehicleJsonLoader {
         }
     }
     
-    /**
-     * Parse Vec3 with scaling
-     */
+    /** Parse Vec3 with scaling */
     private static Vec3 parseVec3(JsonObject obj, String key, double scale) {
         if (obj == null || !obj.has(key) || !obj.get(key).isJsonArray()) return Vec3.ZERO;
         
@@ -273,9 +255,7 @@ public class VehicleJsonLoader {
         }
     }
     
-    /**
-     * Enhanced vehicle configuration class based on legacy's structure
-     */
+    /** Enhanced vehicle configuration class based on legacy's structure */
     public static class VehicleConfig {
         public String id;
         public String displayName;
@@ -302,9 +282,7 @@ public class VehicleJsonLoader {
         }
     }
     
-    /**
-     * Bogie model configuration
-     */
+    /** Bogie model configuration */
     public static class BogieModelConfig {
         public String modelFile;
         public Map<String, String> textures = new HashMap<>();

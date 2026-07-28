@@ -6,7 +6,6 @@ import net.minecraft.world.level.block.Block;
 /**
  * 本家 jp.ngt.rtm.RTMRail のスクリプト互換 (SRB3 等がレール生成に使用)。
  * フィールド名は KaizPatchX (1.7.10) の "0" 付き。
- * 登録完了後にスクリプトから参照される前提で遅延初期化する。
  */
 @SuppressWarnings("unused")
 public final class RTMRail {
@@ -19,7 +18,7 @@ public final class RTMRail {
     public static Block largeRailSwitchCore0;
     public static Block largeRailSlopeBase0;
     public static Block largeRailSlopeCore0;
-    //1.12 名 (isOldVer=false 分岐用の保険)
+    // 1.12 名 (isOldVer=false 分岐用の保険)
     public static Block largeRailBase;
     public static Block largeRailCore;
     public static Block largeRailSwitchBase;

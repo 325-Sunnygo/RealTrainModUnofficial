@@ -2,9 +2,7 @@ package jp.ngt.mccompat.nbt;
 
 import net.minecraft.nbt.ListTag;
 
-/**
- * 1.7.10/1.12 NBTTagList のスクリプト互換ラッパー。
- */
+/** 1.7.10/1.12 NBTTagList のスクリプト互換ラッパー。 */
 public final class NBTTagList {
     public final ListTag list;
 

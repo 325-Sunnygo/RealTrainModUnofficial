@@ -26,17 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 本家式の架線・架線柱スクリプト描画。
- *
- * <p>ModelWire_*.json の rendererPath (render_baru_pole_bx_f.js 等) を Nashorn で実行し、
- * renderClass ({@link WirePartsRenderer}) の renderWireStatic / renderWireDynamic を
- * 本家 RenderElectricalWiring と同じ座標系 (<b>接続元の取付点が原点</b>) で呼ぶ。
- *
- * <p>これが無かったため、架線柱パックはすべて自前の近似描画 (モデルを線に沿って等間隔で
- * 並べるだけ) に落ちていた。Baru's Pole のようにビームを Fix/Loop/Fix に分けて長さに
- * 合わせて敷き詰めるパックは、本家と違う見た目になっていた。
- *
- * <p>スクリプトが何も描かなかった場合 (未対応 API で落ちた等) は false を返し、
- * 呼び出し側の従来描画にフォールバックする。
+ * ModelWire_*.json の rendererPath (render_baru_pole_bx_f.js 等) を Nashorn で実行し、
+ * renderClass (WirePartsRenderer) の renderWireStatic / renderWireDynamic を
+ * 本家 RenderElectricalWiring と同じ座標系 (接続元の取付点が原点) で呼ぶ。
  */
 public final class WireScriptRenderers {
 
@@ -62,14 +54,14 @@ public final class WireScriptRenderers {
                         def.getId(), def.getScriptPath());
                 return INVALID;
             }
-            //Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-8 だと構文ごと壊れる)
+            // Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-8 だと構文ごと壊れる)
             String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
             ScriptEngine se = ScriptUtil.doScript(
                     "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n"
                     + "var GL12 = GL11;\n"
                     + "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n"
-                    //スクリプトは 1.12 の net.minecraft.util.math.BlockPos を import する。
-                    //1.21 では core.BlockPos なので、あらかじめグローバルに束縛しておく。
+                    // スクリプトは 1.12 の net.minecraft.util.math.BlockPos を import する。
+                    // 1.21 では core.BlockPos なので、あらかじめグローバルに束縛しておく。
                     + "var BlockPos = Java.type('" + net.minecraft.core.BlockPos.class.getName() + "');\n"
                     + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, def.getScriptPath()));
             Object rcName = se.get("renderClass");
@@ -85,13 +77,13 @@ public final class WireScriptRenderers {
                 instance = rc.getDeclaredConstructor().newInstance();
             }
             if (!(instance instanceof WirePartsRenderer renderer)) {
-                //架線以外の renderClass (BasicWire 等が別クラスを指す場合) は従来描画に任せる
+                // 架線以外の renderClass (BasicWire 等が別クラスを指す場合) は従来描画に任せる
                 return INVALID;
             }
             renderer.setScript(se);
             se.put("renderer", renderer);
 
-            //定義 (JSON) の値を本家 WireConfig 相当としてレンダラへ
+            // 定義 (JSON) の値を本家 WireConfig 相当としてレンダラへ
             renderer.sectionLength = def.getSectionLength();
             renderer.deflectionCoefficient = def.getDeflectionCoefficient();
             renderer.smoothing = def.isSmoothing();
@@ -148,10 +140,8 @@ public final class WireScriptRenderers {
         private final WirePartsRenderer renderer;
         private final ModelObject modelObject;
         /**
-         * モデル定義の "default" テクスチャ。<b>架線スクリプトは自分で bindTexture を呼ばない</b>
+         * モデル定義の "default" テクスチャ。
          * (本家は描画前に host 側がモデルの default テクスチャを bind してからスクリプトを呼ぶ)。
-         * RenderSimpleCatenary.js は UV だけ指定して simpleCatenary.png を貼る前提なので、
-         * これを tessellator 描画の既定テクスチャとして渡さないと白い板になる。
          */
         private final net.minecraft.resources.ResourceLocation defaultTexture;
 
@@ -171,11 +161,9 @@ public final class WireScriptRenderers {
                               net.minecraft.world.phys.Vec3 to, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
-            //★model == null を弾かないこと。BasicWireBlack / SimpleCatenary の modelFile は
-            //"Model_none.mqo" (モデル無し) で、架線の見た目は<b>全てスクリプトの tessellator</b>が
-            //描く。ここで弾いていたため、これらの架線がスクリプトを実行されず、RTMU 独自の
-            //ハードコード単線描画 (黒いたるみ線 1 本) に落ちていた。本家はトロリ線とハンガーを
-            //含む板をテクスチャで描くので、見た目がまったく違っていた。
+            // ★model == null を弾かないこと。
+            // "Model_none.mqo" (モデル無し) で、架線の見た目は全てスクリプトの tessellatorが
+            // 描く。
             if (this.renderer == null) {
                 return false;
             }
@@ -183,7 +171,7 @@ public final class WireScriptRenderers {
             GLRecorder.activate(rec);
             try {
                 this.renderer.modelGroupNames = model != null ? model.getOriginalGroupNames() : java.util.Set.of();
-                //本家 RenderElectricalWiring: 原点は<b>接続元の取付点</b>、vec は相手までの相対ベクトル
+                // 本家 RenderElectricalWiring: 原点は接続元の取付点、vec は相手までの相対ベクトル
                 Vec3 vec = new Vec3(to.x - from.x, to.y - from.y, to.z - from.z);
                 rec.push();
                 rec.translate((float) from.x, (float) from.y, (float) from.z);
@@ -195,7 +183,7 @@ public final class WireScriptRenderers {
                 GLRecorder.deactivate();
                 this.renderer.consumeScriptFailure();
             }
-            //スクリプトが未対応 API で落ちて何も描けなかった場合は従来描画に戻す
+            // スクリプトが未対応 API で落ちて何も描けなかった場合は従来描画に戻す
             if (!rec.hasGeometry()) {
                 if (!WARNED_EMPTY.contains(this.renderer.getClass().getName())) {
                     WARNED_EMPTY.add(this.renderer.getClass().getName());

@@ -23,11 +23,11 @@ import java.util.List;
 
 public class CarItem extends Item {
     /**
-     * 本家 KaizPatchX の {@code customIconTexture} 用の描画器。
-     * <p>実際に使われるのは、選択中のモデルが {@code customIconTexture} を持つときだけ
-     * ({@link com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel} が判定する)。
+     * 本家 KaizPatchX の customIconTexture 用の描画器。
+     * 実際に使われるのは、選択中のモデルが customIconTexture を持つときだけ
+     * (com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel が判定する)。
      */
-    //★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
+    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
         consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {
@@ -52,13 +52,13 @@ public class CarItem extends Item {
         Level level = context.getLevel();
         ItemStack stack = context.getItemInHand();
         String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
-        //専用サーバー保険: コンポーネントが同期・保持されない環境では、サーバー側に控えた選択を使う。
-        //(クライアントでは控えが空なので従来通り選択画面が開く)
+        // 専用サーバー保険: コンポーネントが同期・保持されない環境では、サーバー側に控えた選択を使う。
+        // (クライアントでは控えが空なので従来通り選択画面が開く)
         if ((selectedId == null || selectedId.isBlank()) && context.getPlayer() != null) {
             selectedId = com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.get(context.getPlayer().getUUID());
         }
         // モデル未選択時は spawn せずに直接選択画面を開く。
-        // useOn で PASS しても use() は自動では呼ばれないため、ここで client 側に
+        // useOn で PASS しても use は自動では呼ばれないため、ここで client 側に
         // フックして選択画面を開かないと UI が出ないまま。
         if (selectedId == null || selectedId.isBlank()) {
             if (level.isClientSide() && context.getPlayer() != null) {
@@ -73,8 +73,8 @@ public class CarItem extends Item {
             }
             return InteractionResult.sidedSuccess(level.isClientSide());
         }
-        //本家 ItemVehicle.onItemUse:69 は上面 (par7 == 1) 以外を無視する。
-        //側面/底面クリックで車が生成されるのは RTMU 独自の挙動だった。
+        // 本家 ItemVehicle.onItemUse:69 は上面 (par7 == 1) 以外を無視する。
+        // 側面/底面クリックで車が生成されるのは RTMU 独自の挙動だった。
         if (context.getClickedFace() != net.minecraft.core.Direction.UP) {
             return InteractionResult.PASS;
         }
@@ -88,21 +88,21 @@ public class CarItem extends Item {
         if (car == null) {
             return InteractionResult.FAIL;
         }
-        //本家 ItemVehicle.onItemUse:88
-        //  vehicle.rotationYaw = MathHelper.wrapAngleTo180_float(-player.rotationYaw);
-        //RTMU は素の getYRot() を入れていたため、向きが本家と左右反転していた。
+        // 本家 ItemVehicle.onItemUse:88
+        // vehicle.rotationYaw = MathHelper.wrapAngleTo180_float(-player.rotationYaw);
+        // RTMU は素の getYRot を入れていたため、向きが本家と左右反転していた。
         float yaw = context.getPlayer() != null
                 ? net.minecraft.util.Mth.wrapDegrees(-context.getPlayer().getYRot())
                 : 0.0F;
         car.moveTo(spawnPos.x, spawnPos.y, spawnPos.z, yaw, 0f);
         car.setVehicleId(selectedId);
-        //本家 ItemVehicle.onItemUse:90
-        //  vehicle.getResourceState().readFromNBT(this.getModelState(itemStack).writeToNBT());
-        //アイテム側で設定した DataMap をエンティティへ移送する。これが無いと
-        //モデル選択画面で入れた DataMap が生成時に消える (NGTO Builder 等の設定込み車両が壊れる)。
+        // 本家 ItemVehicle.onItemUse:90
+        // vehicle.getResourceState.readFromNBT(this.getModelState(itemStack).writeToNBT);
+        // アイテム側で設定した DataMap をエンティティへ移送する。これが無いと
+        // モデル選択画面で入れた DataMap が生成時に消える (NGTO Builder 等の設定込み車両が壊れる)。
         applyItemDataMap(car, stack);
         level.addFreshEntity(car);
-        //本家 ItemVehicle.onItemUse:95  クリエイティブ以外はアイテムを 1 個消費する。
+        // 本家 ItemVehicle.onItemUse:95  クリエイティブ以外はアイテムを 1 個消費する。
         if (context.getPlayer() != null && !context.getPlayer().getAbilities().instabuild) {
             stack.shrink(1);
         }
@@ -111,8 +111,7 @@ public class CarItem extends Item {
 
     /**
      * アイテム NBT の DataMap を車へ移送する (本家 ResourceState.readFromNBT 相当)。
-     * ブリッジが返す形式は {@code name=(type)value,name=(type)value}。
-     * 車の DataMap は文字列マップ ({@link CarEntity.DataMapCompat}) なので型注記は落として値だけ入れる。
+     * ブリッジが返す形式は name=(type)value,name=(type)value。
      */
     private static void applyItemDataMap(CarEntity car, ItemStack stack) {
         String dataMap = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedDataMap(stack);
@@ -126,7 +125,7 @@ public class CarItem extends Item {
             }
             String key = entry.substring(0, eq).trim();
             String value = entry.substring(eq + 1).trim();
-            //"(type)" の型注記を落とす
+            // "(type)" の型注記を落とす
             if (value.startsWith("(")) {
                 int close = value.indexOf(')');
                 if (close >= 0) {

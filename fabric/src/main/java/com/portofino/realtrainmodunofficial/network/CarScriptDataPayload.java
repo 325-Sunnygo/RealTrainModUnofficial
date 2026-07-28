@@ -12,11 +12,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * クライアント→サーバの scriptData(DataMap) 同期。
- *
- * <p>SuperRailBuilder3 等は render(クライアント)スクリプトで GUI 入力を受け取り、設置点や
- * isBuilding 等を DataMap へ書く。サーバの onUpdate がそれを読んで実際にレールを敷くため、
- * クライアントの書き込みをサーバの同一エンティティへ届ける必要がある(RTMUは従来サーバ→
- * クライアント同期しか無かった)。</p>
+ * SuperRailBuilder3 等は render(クライアント)スクリプトで GUI 入力を受け取り、設置点や
+ * isBuilding 等を DataMap へ書く。
  */
 public record CarScriptDataPayload(int entityId, String key, String value) implements CustomPacketPayload {
     public static final Type<CarScriptDataPayload> TYPE = new Type<>(

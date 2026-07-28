@@ -3,9 +3,8 @@ package jp.ngt.ngtlib.renderer;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 /**
- * 1.7.10/1.12 の {@code net.minecraft.client.renderer.OpenGlHelper} 互換。
- *
- * <p>スクリプトが使うのはブレンド指定 ({@code func_148821_a} = glBlendFunc の分離版) 程度。
+ * 1.7.10/1.12 の net.minecraft.client.renderer.OpenGlHelper 互換。
+ * スクリプトが使うのはブレンド指定 (func_148821_a = glBlendFunc の分離版) 程度。
  */
 public final class OpenGlHelperCompat {
 
@@ -17,7 +16,7 @@ public final class OpenGlHelperCompat {
         try {
             RenderSystem.blendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
         } catch (Throwable ignored) {
-            //描画スレッド外から呼ばれても落とさない
+            // 描画スレッド外から呼ばれても落とさない
         }
     }
 

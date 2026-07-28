@@ -20,7 +20,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
  * の ItemPosSettingTool 1.21.1 移植。
  * 使い方 (原作同様): 信号機を右クリック → 位置を記録、
  * SignalController を右クリック → 記録した位置を NextSignal / DisplayPos として追加。
- * 原作はメタ 0/1 の 2 種、1.21 ではアイテム 2 個 (mode 0=NextSignal, 1=DisplayPos)。
  */
 public class ItemPosSettingTool extends Item {
     private final int mode;

@@ -17,17 +17,8 @@ import java.util.Set;
 
 /**
  * RTMU のオンライン連携 (クライアント専用・起動時に1回、バックグラウンドで実行)。
- *
- * <ul>
- *   <li><b>アップデート通知:</b> GitHub の最新リリースと現在のバージョンを比較し、
- *       古ければタイトル画面にお知らせを出す ({@link OnlineClientHooks})。</li>
- *   <li><b>BAN:</b> RTMU 公式サイト (借りているサーバー) の {@code ban.txt} を取得し、
- *       自分の Minecraft ユーザー名が載っていたら BAN 画面から先へ進めなくする。
- *       リストはサーバー側のテキストを編集するだけで追加/削除できる (mod の更新不要)。</li>
- * </ul>
- *
- * <p>どちらも失敗時は安全側 (通知なし / BAN なし) に倒す。サーバーが落ちていても
- * ゲームは普通に遊べる。
+ * アップデート通知: GitHub の最新リリースと現在のバージョンを比較し、
+ * 古ければタイトル画面にお知らせを出す (OnlineClientHooks)。
  */
 public final class RtmuOnlineServices {
 
@@ -41,11 +32,10 @@ public final class RtmuOnlineServices {
     /**
      * BAN リストの URL。RTMU 公式サイト (rtmu.net) 上の ban.txt。
      * 1 行に 1 ユーザー名 (大文字小文字は無視、# で始まる行はコメント)。
-     * サーバー上のテキストを編集するだけで BAN の追加/削除ができる (mod 更新不要)。
      */
     private static final String BAN_LIST_URL = "https://rtmu.net/ban.txt";
 
-    //--- 結果 (バックグラウンドスレッドが書き、描画/イベントスレッドが読む) ---
+    // --- 結果 (バックグラウンドスレッドが書き、描画/イベントスレッドが読む) ---
     private static volatile String updateLatestVersion; //新しいバージョンがある時のみ非null
     private static volatile String updateUrl = "https://github.com/325-Sunnygo/RealTrainModUnofficial/releases";
     private static volatile boolean banned;
@@ -79,7 +69,7 @@ public final class RtmuOnlineServices {
         return banned;
     }
 
-    //------------------------------------------------------------------
+    // ------------------------------------------------------------------
     private static HttpClient newClient() {
         return HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(8))
@@ -166,9 +156,9 @@ public final class RtmuOnlineServices {
         }
     }
 
-    //------------------------------------------------------------------
+    // ------------------------------------------------------------------
     private static void checkBan() {
-        //URL が未設定 (プレースホルダのまま) なら何もしない。
+        // URL が未設定 (プレースホルダのまま) なら何もしない。
         if (BAN_LIST_URL.contains("YOUR-SERVER")) {
             return;
         }
@@ -195,7 +185,7 @@ public final class RtmuOnlineServices {
                 RealTrainModUnofficial.LOGGER.warn("[Online] user is banned from RTMU");
             }
         } catch (Exception e) {
-            //サーバーが落ちている/オフライン → 安全側 (BAN しない)。
+            // サーバーが落ちている/オフライン → 安全側 (BAN しない)。
         }
     }
 }

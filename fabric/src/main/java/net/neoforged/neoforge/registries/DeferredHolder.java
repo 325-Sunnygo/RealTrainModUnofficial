@@ -4,9 +4,7 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.function.Supplier;
 
-/**
- * シム: Fabric は登録が即時なので、生成済みインスタンスを保持するだけの Holder。
- */
+/** シム: Fabric は登録が即時なので、生成済みインスタンスを保持するだけの Holder。 */
 public class DeferredHolder<R, T extends R> implements Supplier<T> {
     private final ResourceLocation id;
     private final T value;

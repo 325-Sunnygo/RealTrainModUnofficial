@@ -22,16 +22,12 @@ public final class TextureUtil {
     private TextureUtil() {
     }
 
-    /**
-     * 1.7.10 SRG: glGenTextures 相当 (疑似ハンドル)
-     */
+    /** 1.7.10 SRG: glGenTextures 相当 (疑似ハンドル) */
     public static int func_110996_a() {
         return NEXT_ID.getAndIncrement();
     }
 
-    /**
-     * 1.7.10 SRG: uploadTextureImageAllocate
-     */
+    /** 1.7.10 SRG: uploadTextureImageAllocate */
     public static int func_110987_a(int handle, BufferedImage image) {
         if (image == null) {
             return handle;

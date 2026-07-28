@@ -20,7 +20,6 @@ public class RealTrainModUnofficialClient {
     public RealTrainModUnofficialClient(ModContainer container) {
         // NeoForgeがこのMODのコンフィグ画面を作成できるようにします。
         // コンフィグ画面は、Mods画面＞自分のModをクリック＞コンフィグをクリックで表示されます。
-        // 設定オプションの翻訳をen_us.jsonファイルに追加することを忘れないでください。
         container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
     }
 
@@ -30,9 +29,9 @@ public class RealTrainModUnofficialClient {
         com.portofino.realtrainmodunofficial.script.TrainScriptSystem.getInstance().initialize();
         VehicleModelPackManager.INSTANCE.initialize(Minecraft.getInstance().getResourceManager());
         PackRequirementWarnings.refresh();
-        //オンライン連携 (GitHub アップデート確認 + 公式サイトの BAN リスト)。バックグラウンドで実行。
+        // オンライン連携 (GitHub アップデート確認 + 公式サイトの BAN リスト)。バックグラウンドで実行。
         com.portofino.realtrainmodunofficial.online.RtmuOnlineServices.init();
-        //RTMU 設定 (自動カント/自動高さ) をファイルから読み込む。
+        // RTMU 設定 (自動カント/自動高さ) をファイルから読み込む。
         RtmuSettings.load();
     }
 
@@ -46,10 +45,8 @@ public class RealTrainModUnofficialClient {
 
     /**
      * ワールドを抜けたら看板まわりのキャッシュを捨てる。
-     * <p>
      * 看板の文字は OS フォントを焼いた GL テクスチャなので、放っておくとワールドを
-     * 出入りするたびに溜まっていく。時刻表も破棄して、ユーザーが
-     * config/realtrainmodunofficial/timetable/ に置いた tt_*.csv を再入場で拾えるようにする。
+     * 出入りするたびに溜まっていく。
      */
     @SubscribeEvent
     static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {

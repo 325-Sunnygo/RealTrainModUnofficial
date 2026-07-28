@@ -2,11 +2,9 @@ package jp.ngt.ngtlib.renderer.model;
 
 import jp.ngt.ngtlib.math.Vec3;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.model.Vertex のスクリプト互換移植。
- */
+/** 本家 jp.ngt.ngtlib.renderer.model.Vertex のスクリプト互換移植。 */
 public class Vertex {
-    //本家の Vertex は setVec/add/expand/normalize で書き換わるため可変
+    // 本家の Vertex は setVec/add/expand/normalize で書き換わるため可変
     public float x;
     public float y;
     public float z;

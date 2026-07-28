@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 本家 ResourceState.getDataMap() 相当 (スクリプトが値を出し入れする箱)。
+ * 本家 ResourceState.getDataMap 相当 (スクリプトが値を出し入れする箱)。
  * レールなど「保存する必要がない」対象向けの、その場かぎりの実装。
  */
 public class DataMapCompat {

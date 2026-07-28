@@ -70,9 +70,7 @@ public enum EnumNotch {
         return notch.acceleration;
     }
 
-    /**
-     * @param par1 目標速度
-     */
+    /** @param par1 目標速度 */
     public static EnumNotch getSuitableNotchFromSpeed(float par1) {
         if (par1 >= accelerate_5.max_speed) {
             return accelerate_5;
@@ -85,9 +83,7 @@ public enum EnumNotch {
         return inertia;
     }
 
-    /**
-     * @param par1 目標加速度
-     */
+    /** @param par1 目標加速度 */
     public static EnumNotch getSuitableNotchFromAcceleration(float par1) {
         if (par1 > 0.0F) {
             return accelerate_4;

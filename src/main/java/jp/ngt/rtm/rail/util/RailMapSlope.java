@@ -12,7 +12,6 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * 本家 jp.ngt.rtm.rail.util.RailMapSlope (KaizPatchX) の忠実移植。
  * slopeType 0-3 → 長さ 16/8/4/2、固定ピッチ 3.576334/7.125016/14.03624/26.56505°。
- * 本家は高さを metadata (0-15) に入れていたが、1.21 では BlockState の HEIGHT プロパティで代替。
  */
 public class RailMapSlope extends RailMapBasic {
     private final float dirDeg;
@@ -59,7 +58,7 @@ public class RailMapSlope extends RailMapBasic {
             int y = rail[1];
             int z = rail[2];
             BlockPos pos = new BlockPos(x, y, z);
-            //本家: metadata に高さ (0-15)。1.21: HEIGHT ブロックステート
+            // 本家: metadata に高さ (0-15)。1.21: HEIGHT ブロックステート
             BlockState state = block.defaultBlockState();
             if (block instanceof BlockLargeRailSlopeBase) {
                 state = state.setValue(BlockLargeRailSlopeBase.HEIGHT, this.getHeight(x, z));

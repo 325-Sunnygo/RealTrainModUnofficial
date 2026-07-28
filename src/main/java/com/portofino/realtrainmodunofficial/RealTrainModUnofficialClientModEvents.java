@@ -24,12 +24,9 @@ public final class RealTrainModUnofficialClientModEvents {
     }
 
     /**
-     * 本家 KaizPatchX の {@code customIconTexture} を効かせる。
-     *
-     * <p>設置物アイテムの焼き上がったモデルを包み、<b>スタックを見られる ItemOverrides</b> で
-     * 差し替え判定をする。包むだけなので、{@code customIconTexture} を書いていないパックの
-     * 見た目は一切変わらない。詳しくは
-     * {@link com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel}。
+     * 本家 KaizPatchX の customIconTexture を効かせる。
+     * 設置物アイテムの焼き上がったモデルを包み、スタックを見られる ItemOverrides で
+     * 差し替え判定をする。
      */
     @SubscribeEvent
     public static void wrapCustomIconModels(net.neoforged.neoforge.client.event.ModelEvent.ModifyBakingResult event) {
@@ -39,7 +36,7 @@ public final class RealTrainModUnofficialClientModEvents {
             if (!RealTrainModUnofficial.MODID.equals(key.id().getNamespace())) {
                 continue;
             }
-            //アイテムのモデルだけ (ブロックの状態モデルは対象外)
+            // アイテムのモデルだけ (ブロックの状態モデルは対象外)
             if (!"inventory".equals(key.getVariant())) {
                 continue;
             }
@@ -129,7 +126,7 @@ public final class RealTrainModUnofficialClientModEvents {
             com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.CAR.get(),
             CarRenderer::new
         );
-        //本家 EntityMotorman (運転士): プレイヤーモデル + 同梱スキン
+        // 本家 EntityMotorman (運転士): プレイヤーモデル + 同梱スキン
         event.registerEntityRenderer(
             jp.ngt.rtm.entity.RTMEntities.MOTORMAN.get(),
             com.portofino.realtrainmodunofficial.client.renderer.MotormanRenderer::new
@@ -152,7 +149,7 @@ public final class RealTrainModUnofficialClientModEvents {
     @SubscribeEvent
     public static void registerPackFinders(AddPackFindersEvent event) {
         ExternalSoundPackBridge.register(event);
-        //mods フォルダの 1.7.10 建材ブロックぶんの blockstate/model/texture/lang を生成注入。
+        // mods フォルダの 1.7.10 建材ブロックぶんの blockstate/model/texture/lang を生成注入。
         com.portofino.realtrainmodunofficial.client.building.ExternalBuildingPackBridge.register(event);
     }
 

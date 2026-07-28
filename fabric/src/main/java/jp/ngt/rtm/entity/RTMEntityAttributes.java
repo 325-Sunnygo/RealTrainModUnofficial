@@ -6,9 +6,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 
-/**
- * 生物系エンティティ (運転士 NPC) の属性登録。
- */
+/** 生物系エンティティ (運転士 NPC) の属性登録。 */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, bus = EventBusSubscriber.Bus.MOD)
 public final class RTMEntityAttributes {
 

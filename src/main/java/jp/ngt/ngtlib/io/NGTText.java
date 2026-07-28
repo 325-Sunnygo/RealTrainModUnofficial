@@ -5,10 +5,7 @@ import java.util.List;
 
 /**
  * 本家 NGTLib jp.ngt.ngtlib.io.NGTText の移植 (スクリプトが触る範囲)。
- *
- * <p>パックのスクリプトは {@code Packages.jp.ngt.ngtlib.io.NGTText} で直接参照してくる。
- * クラスが無いと {@code NGTText.readText is not a function} で落ちる (ログに 505 件)。
- * 実ファイルの読み書きはパック側の想定と噛み合わないので、空を返す安全な実装にする。
+ * パックのスクリプトは Packages.jp.ngt.ngtlib.io.NGTText で直接参照してくる。
  */
 public final class NGTText {
 
@@ -22,7 +19,6 @@ public final class NGTText {
     /**
      * パック内アセット (ResourceLocation / パス文字列) をテキストとして 1 行ずつ読む。
      * スクリプトの自前 include (eval(append(readText(getResource(path)))) 等) が使う。
-     * 見つからなければ空リスト (パックアセット以外は読まないので安全)。
      */
     public static List<String> readTextLines(Object resource) {
         List<String> lines = new ArrayList<>();
@@ -35,7 +31,7 @@ public final class NGTText {
                 lines.add(line);
             }
         } catch (Exception ignored) {
-            //読めない場合は空 (呼び出し側は include をスキップして続行)
+            // 読めない場合は空 (呼び出し側は include をスキップして続行)
         }
         return lines;
     }

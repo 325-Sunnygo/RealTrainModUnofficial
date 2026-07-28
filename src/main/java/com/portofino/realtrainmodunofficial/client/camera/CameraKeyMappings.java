@@ -29,7 +29,7 @@ public final class CameraKeyMappings {
     public static final KeyMapping CYCLE_GRID = key("camera_cycle_grid", GLFW.GLFW_KEY_H);
     public static final KeyMapping CYCLE_ASPECT = key("camera_cycle_aspect", GLFW.GLFW_KEY_J);
     public static final KeyMapping TOGGLE_LEVEL = key("camera_toggle_level", GLFW.GLFW_KEY_K);
-    //レンズ / テレコンはアイテムを持って右クリックで装着するのでキーは無い。
+    // レンズ / テレコンはアイテムを持って右クリックで装着するのでキーは無い。
     /** 撮影 */
     public static final KeyMapping SHOOT = key("camera_shoot", GLFW.GLFW_KEY_ENTER);
 

@@ -149,9 +149,8 @@ public class TrainEntity extends Entity {
     private static final double BOGIE_SPAN_TOLERANCE = 1.75D;
     private static final double RAIL_CONNECTION_MAX_DISTANCE_SQ = 0.25D;
     private static final float RAIL_CONNECTION_MAX_YAW_DIFF = 20.0F;
-    // 1tickの本体中心移動の許容上限(=移動距離 + この余裕)。これを超えるジャンプは
-    // 逆向き継ぎ目等でのレール選択不安定によるワープとみなし棄却する。MAX_SPEED(2.0)に
-    // カーブ補間の揺れ余裕を足した値。通常走行・カーブでは到達しない。
+    // 1tickの本体中心移動の許容上限(=移動距離 + この余裕)。
+    // 逆向き継ぎ目等でのレール選択不安定によるワープとみなし棄却する。
     private static final double RAIL_TELEPORT_TOLERANCE = 3.0D;
     // 0.74 → +0.1 = 0.84。
     private static final double EXTRA_TRAIN_BODY_LIFT = 0.84D;
@@ -159,7 +158,7 @@ public class TrainEntity extends Entity {
     // モデル原点より低い床下パーツがレールと干渉しない高さ。
     private static final double RAIL_HEIGHT_OFFSET = 1.09D;
     // RTM 本家はレール基準で車体中心を 1.1875 上げて描画する。
-    // この実装では sampleRail() 側で RAIL_HEIGHT_OFFSET を先に足しているため、
+    // この実装では sampleRail 側で RAIL_HEIGHT_OFFSET を先に足しているため、
     // ここでは残り分だけを加算して車体と台車の相対位置を本家に合わせる。
     private static final double TRAIN_BODY_HEIGHT_OFFSET = (RTM_VEHICLE_Y_OFFSET - RAIL_HEIGHT_OFFSET) + EXTRA_TRAIN_BODY_LIFT;
     private static final double BOGIE_HITBOX_HEIGHT_OFFSET = 0.25D + EXTRA_BOGIE_LIFT;
@@ -222,8 +221,7 @@ public class TrainEntity extends Entity {
     private Vec3 clientFrontBogieOffCurr = Vec3.ZERO;
     private boolean clientBogieOffInit;
     // クライアント: 端台車(0=後/1=前)のレール接線ヨーの前tick/現tick値。
-    // 毎フレーム生計算すると微振動(ガクガク)、減衰平滑すると遅延する。tick値を partialTicks で
-    // 補間して「滑らか＋遅延なし(RTM同等)」にする。
+    // 毎フレーム生計算すると微振動(ガクガク)、減衰平滑すると遅延する。
     private final float[] clientBogieYawPrev = {Float.NaN, Float.NaN};
     private final float[] clientBogieYawCurr = {Float.NaN, Float.NaN};
     private final int[] clientBogieYawRejectCount = {0, 0};
@@ -234,8 +232,8 @@ public class TrainEntity extends Entity {
     private float prevRotationRoll;
     public float doorMoveL;
     public float doorMoveR;
-    //クライアント側ドア開閉音 (sound_DoorOpen/sound_DoorClose) の状態変化検出用。
-    //多くのパック (209/125 系等) はサウンドスクリプトでドア音を鳴らさず、この設定に頼る。
+    // クライアント側ドア開閉音 (sound_DoorOpen/sound_DoorClose) の状態変化検出用。
+    // 多くのパック (209/125 系等) はサウンドスクリプトでドア音を鳴らさず、この設定に頼る。
     private boolean prevDoorLeftForSound;
     private boolean prevDoorRightForSound;
     private boolean doorSoundStateInitialized;
@@ -249,9 +247,8 @@ public class TrainEntity extends Entity {
     public TrainEntity(EntityType<?> type, Level level) {
         super(type, level);
         this.setNoGravity(true);
-        // noCulling は false。描画カリングは TrainEntityRenderer.shouldRender が車両長ベースの
+        // noCulling は false。
         // 広い AABB でフラスタム判定するので、画面外の車両は描画(JS実行含む)がスキップされる。
-        // true にするとバニラ経路で常時描画扱いになりうるため false にしておく。
         this.noCulling = false;
     }
 
@@ -324,7 +321,7 @@ public class TrainEntity extends Entity {
         builder.define(PANTOGRAPH_UP, true);
         builder.define(REVERSE, false);
         builder.define(REVERSER, 1);
-        //-1 = まだ誰も座っていない (進行方向に従う)
+        // -1 = まだ誰も座っていない (進行方向に従う)
         builder.define(SEAT_DIRECTION, -1);
         builder.define(DESTINATION_INDEX, 0);
         builder.define(SOUND_INDEX, 0);
@@ -438,7 +435,7 @@ public class TrainEntity extends Entity {
     public float getSeatDirection() {
         int dir = entityData.get(SEAT_DIRECTION);
         if (dir < 0) {
-            //未設定: 進行方向に合わせる (従来の挙動)
+            // 未設定: 進行方向に合わせる (従来の挙動)
             return getReverser() >= 0 ? 0.0F : 1.0F;
         }
         return dir;
@@ -675,9 +672,9 @@ public class TrainEntity extends Entity {
         boolean runScriptTick = !level().isClientSide() || shouldRunClientVisualScriptThisTick();
         if (level().isClientSide() && soundScriptEngine != null) {
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAutoRunningSound(this);
-            //本家 SoundUpdaterVehicle.update():45 と同じ onUpdate(su) 1 本。
-            //以前ここだけ「生エンティティを tick()/update() へ渡す」独自呼出になっていて、
-            //EntityTrainBase 側 (本家系) と全く違うフックを同じサウンドスクリプトに投げていた。
+            // 本家 SoundUpdaterVehicle.update:45 と同じ onUpdate(su) 1 本。
+            // 以前ここだけ「生エンティティを tick/update へ渡す」独自呼出になっていて、
+            // EntityTrainBase 側 (本家系) と全く違うフックを同じサウンドスクリプトに投げていた。
             TrainScriptSystem.invokeSoundScript(soundScriptEngine, this);
         } else {
             if (level().isClientSide()) {
@@ -747,8 +744,7 @@ public class TrainEntity extends Entity {
                 this.hurtMarked = true;
                 this.hasImpulse = true;
                 // 後続車もここで早期returnするため、台車位置の同期を必ず行う。
-                // (アンカーは編成側 formation.updateTrainMovement が設定済み。)
-                // これをしないと後続車の台車がクライアントで剛体描画になりカーブでズレる。
+                // (アンカーは編成側 formation.updateTrainMovement が設定済み。
                 syncBogieRenderOffsets();
                 return;
             }
@@ -988,7 +984,7 @@ public class TrainEntity extends Entity {
         if (left == prevDoorLeftForSound && right == prevDoorRightForSound) {
             return;
         }
-        //開いた側があれば開音、閉じた側があれば閉音 (左右同時操作は各 1 回に集約)。
+        // 開いた側があれば開音、閉じた側があれば閉音 (左右同時操作は各 1 回に集約)。
         boolean opened = (left && !prevDoorLeftForSound) || (right && !prevDoorRightForSound);
         boolean closed = (!left && prevDoorLeftForSound) || (!right && prevDoorRightForSound);
         prevDoorLeftForSound = left;
@@ -2670,7 +2666,7 @@ public class TrainEntity extends Entity {
             return sampleAnchorTangentYaw(anchor, reference);
         }
         // クライアント: アンカー/bogieYawMemory が無いので、台車位置のレール接線を直接求める。
-        // これを返さないと getYRot()(車体ヨー)になり、スクリプトの台車相対角が 0 → 台車が
+        // これを返さないと getYRot(車体ヨー)になり、スクリプトの台車相対角が 0 → 台車が
         // 車体と一緒に回ってしまう(独立しない)。本家RTMは台車エンティティの接線ヨーを返す。
         float railYaw = computeClientBogieRailYaw(bogieIndex);
         if (!Float.isNaN(railYaw)) {
@@ -4564,9 +4560,7 @@ public class TrainEntity extends Entity {
         return trailingCarCache;
     }
 
-    /**
-     * 描画は毎フレーム走るので、編成の走査は 1 tick に 1 回で足りる。
-     */
+    /** 描画は毎フレーム走るので、編成の走査は 1 tick に 1 回で足りる。 */
     private int formationPositionCacheTick = -1;
     private boolean leadingCarCache = true;
     private boolean trailingCarCache = true;
@@ -4578,12 +4572,12 @@ public class TrainEntity extends Entity {
         formationPositionCacheTick = tickCount;
         List<TrainEntity> formation = getFormationTrainsForDisplay();
         if (formation.size() <= 1) {
-            //単行は先頭かつ最後尾
+            // 単行は先頭かつ最後尾
             leadingCarCache = true;
             trailingCarCache = true;
             return;
         }
-        //連結リストの先頭 (index 0) が前進時の先頭。後進時は末尾が先頭になる。
+        // 連結リストの先頭 (index 0) が前進時の先頭。後進時は末尾が先頭になる。
         boolean forward = getReverser() >= 0;
         TrainEntity leading = forward ? formation.get(0) : formation.get(formation.size() - 1);
         TrainEntity trailing = forward ? formation.get(formation.size() - 1) : formation.get(0);
@@ -4591,7 +4585,7 @@ public class TrainEntity extends Entity {
         trailingCarCache = this == trailing;
     }
 
-    // 旧 RTM の Render スクリプトは entity.getRotation() で車体 yaw を取得する。
+    // 旧 RTM の Render スクリプトは entity.getRotation で車体 yaw を取得する。
     public float getRotation() {
         return getYRot();
     }
@@ -4676,7 +4670,7 @@ public class TrainEntity extends Entity {
         return func_70070_b();
     }
 
-    // ---- 追加互換API（E259系等で使用） ----
+    // ---- 追加互換API（等で使用） ----
     public Entity func_184207_aI() {
         Entity driver = getDriverPassenger();
         if (driver != null) {
@@ -4736,30 +4730,24 @@ public class TrainEntity extends Entity {
             this.train = train;
         }
 
-        /**
-         * Returns a typed map view used by old render scripts.
-         */
+        /** Returns a typed map view used by old render scripts. */
         public DataMapCompat getDataMap() {
             return new DataMapCompat(train);
         }
 
-        /**
-         * Returns the vehicle id for scripts that compare resource names.
-         */
+        /** Returns the vehicle id for scripts that compare resource names. */
         public String getResourceName() {
             return train.getVehicleId();
         }
 
-        // 旧 RTM スクリプトは getName() で列車名(カスタムネーム)を取得し、substring(0,4) 等で
+        // 旧 RTM スクリプトは getName で列車名(カスタムネーム)を取得し、substring(0,4) 等で
         // 列車番号を切り出す。少なくとも String が返れば pck_customNames は通る。
         public String getName() {
             String id = train.getVehicleId();
             return id == null ? "" : id;
         }
 
-        /**
-         * Returns a config holder compatible with old render scripts.
-         */
+        /** Returns a config holder compatible with old render scripts. */
         public ModelSetCompat getResourceSet() {
             return new ModelSetCompat(train.getVehicleId());
         }
@@ -4772,17 +4760,13 @@ public class TrainEntity extends Entity {
         private final TrainEntity train;
         private final Map<String, Object> values = new HashMap<>();
 
-        /**
-         * Creates a script-visible data map for a train.
-         */
+        /** Creates a script-visible data map for a train. */
         public DataMapCompat(TrainEntity train) {
             this.train = train;
             refresh();
         }
 
-        /**
-         * Returns a raw value by key.
-         */
+        /** Returns a raw value by key. */
         public Object get(String key) {
             refresh();
             Object value = values.get(key);
@@ -4797,9 +4781,7 @@ public class TrainEntity extends Entity {
             return values.containsKey(key) || train != null && train.scriptData.containsKey(key);
         }
 
-        /**
-         * Returns an integer value by key.
-         */
+        /** Returns an integer value by key. */
         public int getInt(String key) {
             Object value = get(key);
             if (value instanceof Number number) {
@@ -4825,9 +4807,7 @@ public class TrainEntity extends Entity {
             return getInt(key);
         }
 
-        /**
-         * Returns a boolean value by key.
-         */
+        /** Returns a boolean value by key. */
         public boolean getBoolean(String key) {
             Object value = get(key);
             if (value instanceof Boolean bool) {
@@ -4864,9 +4844,7 @@ public class TrainEntity extends Entity {
             return 0.0D;
         }
 
-        /**
-         * Stores a boolean value for the current script frame.
-         */
+        /** Stores a boolean value for the current script frame. */
         public void setBoolean(String key, boolean value, int syncType) {
             values.put(key, value);
             if (train != null) {
@@ -4875,9 +4853,7 @@ public class TrainEntity extends Entity {
             }
         }
 
-        /**
-         * Stores an integer value for the current script frame.
-         */
+        /** Stores an integer value for the current script frame. */
         public void setInt(String key, int value, int syncType) {
             values.put(key, value);
             if (train != null) {
@@ -4980,23 +4956,17 @@ public class TrainEntity extends Entity {
     public static final class FormationCompat {
         private final TrainEntity train;
 
-        /**
-         * Creates a script-visible formation view.
-         */
+        /** Creates a script-visible formation view. */
         public FormationCompat(TrainEntity train) {
             this.train = train;
         }
 
-        /**
-         * Returns the number of cars visible to this script.
-         */
+        /** Returns the number of cars visible to this script. */
         public int size() {
             return scriptFormationSize();
         }
 
-        /**
-         * Returns a formation entry by index.
-         */
+        /** Returns a formation entry by index. */
         public FormationEntryCompat get(int index) {
             List<TrainEntity> trains = train.getFormationTrainsForDisplay();
             if (index < 0 || index >= trains.size()) {
@@ -5066,13 +5036,11 @@ public class TrainEntity extends Entity {
         }
 
         private int scriptFormationSize() {
-            // 連結中の実両数(表示チェーン順)をそのまま返す。getEntry().entryId と同じソース。
+            // 連結中の実両数(表示チェーン順)をそのまま返す。getEntry.entryId と同じソース。
             return train.getFormationTrainsForDisplay().size();
         }
 
-        /**
-         * Placeholder for old packet refresh calls.
-         */
+        /** Placeholder for old packet refresh calls. */
         public void sendPacket() {
         }
     }
@@ -5082,9 +5050,7 @@ public class TrainEntity extends Entity {
         public final TrainEntity train;
         public final int dir;
 
-        /**
-         * Creates a script-visible formation entry.
-         */
+        /** Creates a script-visible formation entry. */
         public FormationEntryCompat(int entryId, TrainEntity train) {
             this(entryId, train, 0);
         }
@@ -5148,9 +5114,7 @@ public class TrainEntity extends Entity {
             return id;
         }
 
-        /**
-         * Returns a minimal config object used by old render scripts.
-         */
+        /** Returns a minimal config object used by old render scripts. */
         public ConfigCompat getConfig() {
             return new ConfigCompat(definition);
         }
@@ -5223,16 +5187,12 @@ public class TrainEntity extends Entity {
         private final TrainEntity train;
         public boolean field_72995_K;
 
-        /**
-         * Creates a script-visible world view.
-         */
+        /** Creates a script-visible world view. */
         public WorldCompat(TrainEntity train) {
             this.train = train;
         }
 
-        /**
-         * Returns whether the current level is client-side.
-         */
+        /** Returns whether the current level is client-side. */
         public boolean isClientSide() {
             field_72995_K = train != null && train.level().isClientSide();
             return field_72995_K;
@@ -5734,7 +5694,7 @@ public class TrainEntity extends Entity {
             setReverser(getDefaultReverserForSeat(def, seatIndex));
         }
         if (player.startRiding(seatEntity, true)) {
-            //転換クロスシート: 座った向きに合わせて編成全体の座席を転換する
+            // 転換クロスシート: 座った向きに合わせて編成全体の座席を転換する
             updateSeatDirectionFor(player);
             return InteractionResult.SUCCESS;
         }

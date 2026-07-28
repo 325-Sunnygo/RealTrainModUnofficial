@@ -14,11 +14,8 @@ public class InstalledObjectDefinition {
     private final String scriptPath;
     private final String buttonTexture;
     /**
-     * 本家 KaizPatchX の {@code customIconTexture} (ModelConfig)。
-     * <p>設定すると、アイテムの絵が既定のアイコンではなく<b>この画像</b>になる。
-     * 架線柱のように「同じアイテムで中身のモデルを選ぶ」物を、持ち物欄で見分けるための機能。
-     * {@code "rtm:textures/items/itemLinePole_1.png"} のように名前空間つきでも書ける。
-     * 未設定 (空) なら従来どおりバニラのアイテムモデルで描く。
+     * 本家 KaizPatchX の customIconTexture (ModelConfig)。
+     * 設定すると、アイテムの絵が既定のアイコンではなくこの画像になる。
      */
     private String customIconTexture = "";
     private final Map<String, String> textureOverrides;
@@ -42,8 +39,6 @@ public class InstalledObjectDefinition {
     private float deflectionCoefficient = 0.0F;
     // 看板用パラメータ(本家 SignboardConfig 相当)。コンストラクタ後に setSignboardParams で設定。
     // animationCycle: frame を1コマ進めるのに要する tick 数。
-    // color: 板の側面/背面の色 (0 のときは本家既定の 0x101010)。
-    // lightValue: 0以上=常時その明るさ / -16=ランダム点滅 / 負=レッドストーン通電時に -lightValue。
     private int animationCycle = 1;
     private int color = 0;
     private int lightValue = 0;
@@ -73,13 +68,9 @@ public class InstalledObjectDefinition {
     }
 
     /**
-     * 本家 ModelConfig.doCulling。<b>既定 false = 両面描画</b>。
-     *
-     * <p>本家 ModelObject.render は車両も設置オブジェクトも通る共通経路で、
-     * {@code if (!cfg.doCulling) GL11.glDisable(GL_CULL_FACE);} と一律に扱う。
-     * RTMU はこれを車両にしか移植しておらず、設置オブジェクトは常に片面カリングしていたため、
-     * 片面でモデリングされた架線や踏切のパネルが<b>裏側から見ると消えていた</b>
-     * (報告: W51 規格の架線、Hi03 ストラクチャパックの踏切)。
+     * 本家 ModelConfig.doCulling。既定 false = 両面描画。
+     * 本家 ModelObject.render は車両も設置オブジェクトも通る共通経路で、
+     * if (!cfg.doCulling) GL11.glDisable(GL_CULL_FACE); と一律に扱う。
      */
     public boolean isDoCulling() {
         return doCulling;
@@ -105,9 +96,7 @@ public class InstalledObjectDefinition {
         return lightValue;
     }
 
-    /**
-     * 本家 SignboardConfig.init() 準拠の既定値補正。
-     */
+    /** 本家 SignboardConfig.init 準拠の既定値補正。 */
     public void setSignboardParams(int animationCycle, int color, int lightValue) {
         this.animationCycle = animationCycle <= 0 ? 1 : animationCycle;
         this.color = color < 0 ? 0x101010 : color;
@@ -137,15 +126,15 @@ public class InstalledObjectDefinition {
         this.wireAttachPos = wireAttachPos == null ? Vec3.ZERO : wireAttachPos;
     }
 
-    //本家 ModelConnector_*.json の connectorType ("Relay" 等)。NGTO Builder の Wire ツールが
-    //碍子アイテムの getSubType()==="Relay" でリレー碍子を判定するのに使う。
+    // 本家 ModelConnector_*.json の connectorType ("Relay" 等)。NGTO Builder の Wire ツールが
+    // 碍子アイテムの getSubType==="Relay" でリレー碍子を判定するのに使う。
     private String subType = "";
 
     public String getSubType() {
         return subType;
     }
 
-    /** {@link #customIconTexture}。空なら既定のアイコン。 */
+    /** #customIconTexture。空なら既定のアイコン。 */
     public String getCustomIconTexture() {
         return customIconTexture;
     }

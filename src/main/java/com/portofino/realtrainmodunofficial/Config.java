@@ -36,7 +36,7 @@ public class Config {
             .comment("Do not evict cached polygon models that were used within this number of seconds.")
             .defineInRange("modelCacheProtectSeconds", 10, 0, 600);
 
-    //マーカー接続 (レール敷設) の探索範囲 = 一度に敷設できるレール長の上限。
+    // マーカー接続 (レール敷設) の探索範囲 = 一度に敷設できるレール長の上限。
     public static final ModConfigSpec.IntValue RAIL_MARKER_SEARCH_RANGE = BUILDER
             .comment("Horizontal search range (blocks) when connecting markers with a rail item.",
                      "This is the maximum rail length you can place at once. (default 50)",

@@ -5,9 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.model.GroupObject のスクリプト互換移植。
- */
+/** 本家 jp.ngt.ngtlib.renderer.model.GroupObject のスクリプト互換移植。 */
 public class GroupObject {
     public final String name;
     public final List<Face> faces = new ArrayList<>();

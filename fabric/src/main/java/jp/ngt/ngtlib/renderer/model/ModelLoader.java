@@ -13,7 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 本家 jp.ngt.ngtlib.renderer.model.ModelLoader のスクリプト互換移植。
  * パック内 .mqo/.mqoz を PolygonModel (グループ/面/頂点グラフ) として読む。
- * 頂点スケールは既存 MqoModelLoader と同じ 0.01 (座標系一致が必須)。
  */
 public final class ModelLoader {
     private static final Map<String, PolygonModel> CACHE = new ConcurrentHashMap<>();
@@ -25,9 +24,7 @@ public final class ModelLoader {
         return loadModel(resource, accuracy, null);
     }
 
-    /**
-     * スクリプト形: ModelLoader.loadModel(resource, VecAccuracy.LOW, [])
-     */
+    /** スクリプト形: ModelLoader.loadModel(resource, VecAccuracy.LOW, []) */
     public static PolygonModel loadModel(Object resource, VecAccuracy accuracy, Object options) {
         String path = pathOf(resource);
         if (path == null) {
@@ -36,7 +33,7 @@ public final class ModelLoader {
         return CACHE.computeIfAbsent(path.toLowerCase(Locale.ROOT), key -> {
             byte[] bytes = NGTFileLoader.findAsset(path);
             if (bytes == null) {
-                //models/ 接頭辞のゆれに対応
+                // models/ 接頭辞のゆれに対応
                 bytes = NGTFileLoader.findAsset("models/" + path);
             }
             if (bytes == null) {
@@ -52,17 +49,15 @@ public final class ModelLoader {
         });
     }
 
-    /**
-     * MQO テキストから直接 (VehicleScriptRenderers が車体モデルグラフ生成に使用)。
-     */
+    /** MQO テキストから直接 (VehicleScriptRenderers が車体モデルグラフ生成に使用)。 */
     public static PolygonModel parse(byte[] bytes, String name) throws IOException {
         String text = MqoReader.extractText(bytes, name);
         PolygonModel model = new PolygonModel();
         if (text == null) {
             return model;
         }
-        //★書式の解釈は MqoReader だけが持つ ([[MqoReader]])。ここは「スクリプトが見る
-        //グラフ」への組み立てに徹する: 座標は 0.01 倍、面の頂点は逆順格納。
+        // ★書式の解釈は MqoReader だけが持つ ([[MqoReader]])。ここは「スクリプトが見る
+        // グラフ」への組み立てに徹する: 座標は 0.01 倍、面の頂点は逆順格納。
         MqoReader.read(text, new MqoReader.Handler() {
             private GroupObject current;
             private final List<float[]> verts = new ArrayList<>();
@@ -98,10 +93,9 @@ public final class ModelLoader {
                 }
             }
         });
-        //本家 PolygonModel のコンストラクタは init() の直後に calcVertexNormals() を回す。
-        //★これが無いと face.vertexNormals が null のままで、スクリプト描画経路
-        //(drawModelGroup) が面法線だけで描く = 常にフラット陰影になる。
-        //文字入りモデル (ナンバープレート等) で「変な所が影になる」の正体がこれ。
+        // 本家 PolygonModel のコンストラクタは init の直後に calcVertexNormals を回す。
+        // ★これが無いと face.vertexNormals が null のままで、スクリプト描画経路
+        // (drawModelGroup) が面法線だけで描く = 常にフラット陰影になる。
         for (GroupObject group : model.groupObjects) {
             group.calcVertexNormals(VecAccuracy.MEDIUM);
         }
@@ -109,7 +103,7 @@ public final class ModelLoader {
     }
 
     /**
-     * 本家 MqoModel.parseFaceQuads は addVertex(3 - i, ...) で頂点/UV を<b>逆順</b>格納する。
+     * 本家 MqoModel.parseFaceQuads は addVertex(3 - i, ...) で頂点/UV を逆順格納する。
      * 法線 (= CustomAnimator の左右判定 / CustomMonitor の向き) がこれに依存するため必ず一致させる。
      */
     private static void addFace(GroupObject group, List<float[]> verts,
@@ -130,8 +124,8 @@ public final class ModelLoader {
             return;
         }
         Face face = new Face(faceVerts, revUvs, materialId);
-        //本家はロード時に法線計算済み — スクリプト (CustomAnimator 等) は
-        //face.faceNormal が非 null である前提で toVec() を呼ぶ
+        // 本家はロード時に法線計算済み — スクリプト (CustomAnimator 等) は
+        // face.faceNormal が非 null である前提で toVec を呼ぶ
         face.calculateFaceNormal(VecAccuracy.LOW);
         group.faces.add(face);
     }

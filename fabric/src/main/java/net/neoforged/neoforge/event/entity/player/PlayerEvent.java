@@ -5,8 +5,7 @@ import net.neoforged.bus.api.Event;
 
 /**
  * シム: プレイヤー関連イベント。
- * <p>Fabric の対応物は ServerPlayConnectionEvents / ServerPlayerEvents。
- * エントリポイントから post する。
+ * Fabric の対応物は ServerPlayConnectionEvents / ServerPlayerEvents。
  */
 public class PlayerEvent extends Event {
 

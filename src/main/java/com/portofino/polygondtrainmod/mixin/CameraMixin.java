@@ -12,12 +12,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * フリーカメラ ({@link FreeCameraController}) 用: {@code Camera.setup()} の末尾でカメラ位置と
+ * フリーカメラ (FreeCameraController) 用: Camera.setup の末尾でカメラ位置と
  * 向きを自由位置に上書きする。
- * <p>
- * {@code ViewportEvent.ComputeCameraAngles} イベントは setup 内で position を確定させる<b>前</b>に
- * 発火するため、そこで位置を上書きしても直後に {@code setPosition(entity位置)} で戻されてしまう。
- * setup の TAIL に注入すれば、三人称のズーム移動まで含めた確定後に上書きできる。
+ * ViewportEvent.ComputeCameraAngles イベントは setup 内で position を確定させる前に
+ * 発火するため、そこで位置を上書きしても直後に setPosition(entity位置) で戻されてしまう。
  */
 @Mixin(Camera.class)
 public abstract class CameraMixin {
@@ -36,7 +34,7 @@ public abstract class CameraMixin {
             return;
         }
         this.setPosition(p.x, p.y, p.z);
-        //向きはカメラ独自 (体は回さない = 視点追従オフ)。三人称のオフセット回転も打ち消す。
+        // 向きはカメラ独自 (体は回さない = 視点追従オフ)。三人称のオフセット回転も打ち消す。
         this.setRotation(FreeCameraController.getYaw(), FreeCameraController.getPitch());
     }
 }

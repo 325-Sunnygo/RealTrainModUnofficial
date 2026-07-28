@@ -10,14 +10,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * フィルタごとに<b>最後に使った設定</b>を覚えておく (neo mcte 追加)。
- *
- * <p>本家も MCTEU も、画面を閉じると設定は初期値へ戻る。同じブロック名を何度も打ち直すことになり、
- * 置換や埋めを繰り返す作業でいちばん手間がかかっていた。ここでは実行のたびに控え、
- * 次に同じフィルタを開いたときにそのまま出す。
- *
- * <p>保存先は {@code <ゲームフォルダ>/mcte/prefs.txt}。1 行 1 項目の素朴な形式で、
- * 壊れていても読める分だけ読む (設定が消えるだけで支障が無いため)。
+ * フィルタごとに最後に使った設定を覚えておく (neo mcte 追加)。
+ * 本家も MCTEU も、画面を閉じると設定は初期値へ戻る。
  */
 public final class EditorPrefs {
 
@@ -52,14 +46,14 @@ public final class EditorPrefs {
             try (BufferedWriter w = Files.newBufferedWriter(p)) {
                 for (var e : VALUES.entrySet()) {
                     for (var kv : e.getValue().entrySet()) {
-                        //値に改行やタブが入ることは無い (入力欄が 1 行のため)
+                        // 値に改行やタブが入ることは無い (入力欄が 1 行のため)
                         w.write(e.getKey() + "\t" + kv.getKey() + "\t" + kv.getValue());
                         w.newLine();
                     }
                 }
             }
         } catch (Exception ignored) {
-            //保存できなくても動作には影響しない
+            // 保存できなくても動作には影響しない
         }
     }
 
@@ -81,7 +75,7 @@ public final class EditorPrefs {
                 }
             }
         } catch (Exception ignored) {
-            //壊れていたら読めた分だけで進む
+            // 壊れていたら読めた分だけで進む
         }
     }
 }

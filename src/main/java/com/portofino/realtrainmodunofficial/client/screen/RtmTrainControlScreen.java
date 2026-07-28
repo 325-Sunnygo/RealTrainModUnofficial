@@ -22,7 +22,6 @@ import java.util.List;
 /**
  * jp.ngt 列車の運転台メニュー — 本家 GuiTrainCtrl 相当 (RTM 風テクスチャ付き)。
  * 旧 TrainControlScreen のレイアウト/テクスチャを EntityTrainBase (TrainState) 向けに移植。
- * 運転席乗車中にインベントリキーで開く。
  */
 public class RtmTrainControlScreen extends Screen {
     private static final ResourceLocation TAB_INVENTORY_TEXTURE =
@@ -67,10 +66,10 @@ public class RtmTrainControlScreen extends Screen {
             addArrowButton(left + 4, top + 52, "<", "toggle_chunk_loader", 0);
             addButton(left + 28, top + 52, 120, "チャンクロード" + (loaderOn ? " ON" : " OFF"), "toggle_chunk_loader", 0);
             addArrowButton(left + 152, top + 52, ">", "toggle_chunk_loader", 0);
-            //方向幕/種別/アナウンスの3行は、チャンクロードの下で行間を詰める (高さ18)。
-            //行を1つ増やした (種別) ぶん下がホットバー/インベントリに被らないように上へ寄せる。
+            // 方向幕/種別/アナウンスの3行は、チャンクロードの下で行間を詰める (高さ18)。
+            // 行を1つ増やした (種別) ぶん下がホットバー/インベントリに被らないように上へ寄せる。
             final int rowH = 18;
-            //方向幕: 持っていないパックでは null と出して押せなくする
+            // 方向幕: 持っていないパックでは null と出して押せなくする
             int destCount = rollsignNames().length;
             if (destCount == 0) {
                 addArrowButton(left + 4, top + 73, rowH, "<", "noop", 0);
@@ -86,7 +85,7 @@ public class RtmTrainControlScreen extends Screen {
                 addArrowButton(left + 152, top + 73, rowH, ">", "set_destination",
                         Math.floorMod(dest + 1, destCount));
             }
-            //RTMU 追加: 種別幕。方向幕のすぐ下に同じ操作感で並べる。持たないパックは null で押せなくする。
+            // RTMU 追加: 種別幕。方向幕のすぐ下に同じ操作感で並べる。持たないパックは null で押せなくする。
             int typeCount = typeSignNames().length;
             if (typeCount == 0) {
                 addArrowButton(left + 4, top + 92, rowH, "<", "noop", 0);
@@ -102,11 +101,11 @@ public class RtmTrainControlScreen extends Screen {
                 addArrowButton(left + 152, top + 92, rowH, ">", "set_type",
                         Math.floorMod(type + 1, typeCount));
             }
-            //アナウンスも方向幕と同じ回し方にする。
-            //以前は上限も循環も無く、パックのアナウンス数を超えて増え続けていた。
+            // アナウンスも方向幕と同じ回し方にする。
+            // 以前は上限も循環も無く、パックのアナウンス数を超えて増え続けていた。
             int announceCount = announcementCount();
             if (announceCount == 0) {
-                //アナウンスを持たないパック: 空欄ではなく null と出して、押せなくする
+                // アナウンスを持たないパック: 空欄ではなく null と出して、押せなくする
                 addArrowButton(left + 4, top + 111, rowH, "<", "noop", 0);
                 addButton(left + 28, top + 111, 120, rowH, "アナウンス null", "noop", 0);
                 addArrowButton(left + 152, top + 111, rowH, ">", "noop", 0);
@@ -129,8 +128,8 @@ public class RtmTrainControlScreen extends Screen {
                 int index = i;
                 int value = train.getResourceState().getDataMap().getInt("Button" + i);
                 List<String> optionList = options.get(i);
-                //スライダー型: customButtons のエントリを ["slider:名前"] と書くと
-                //0-100% のスライダーになる (値は DataMap Button{i}、0=未設定は 100% 扱い)
+                // スライダー型: customButtons のエントリを ["slider:名前"] と書くと
+                // 0-100% のスライダーになる (値は DataMap Button{i}、0=未設定は 100% 扱い)
                 if (optionList.size() == 1 && optionList.get(0).startsWith("slider:")) {
                     String label = optionList.get(0).substring("slider:".length());
                     int shown = value <= 0 ? 100 : Math.min(100, value);
@@ -144,31 +143,30 @@ public class RtmTrainControlScreen extends Screen {
                         .bounds(x, y, 52, 22).build());
             }
         } else if (selectedTab == ControlTab.DEDICATED) {
-            //速度設定タブ: 最高速度と加速度を車両ごとに決める。
-            //JSON (maxSpeed / acceleration) は読まなくなったので、性能はここで指定する。
-            //0 = 既定値 (最高 129km/h / 加速 3.5km/h/s 相当) にリセット。
+            // 速度設定タブ: 最高速度と加速度を車両ごとに決める。
+            // JSON (maxSpeed / acceleration) は読まなくなったので、性能はここで指定する。
             int maxSpeed = train.getConfiguredMaxSpeedKmh();
             int accelCenti = train.getConfiguredAccelCentiKmhS();
 
             graphics_maxSpeedLabel = maxSpeed > 0 ? String.valueOf(maxSpeed) : "既定";
-            //単位はラベル側に出さない (数値だけ)。"6.00 km/h/s" は 60px あり、
-            //左右のボタンに挟まれた 60px の隙間で右の +10 と重なる。
+            // 単位はラベル側に出さない (数値だけ)。"6.00 km/h/s" は 60px あり、
+            // 左右のボタンに挟まれた 60px の隙間で右の +10 と重なる。
             graphics_accelLabel = accelCenti > 0
                     ? String.format(java.util.Locale.ROOT, "%.2f", accelCenti / 100.0F) : "既定";
 
-            //--- 最高速度 ---
+            // --- 最高速度 ---
             addButton(left + 6, top + 22, 26, "-10", "set_max_speed", Math.max(0, effMaxSpeed(maxSpeed) - 10));
             addButton(left + 34, top + 22, 24, "-1", "set_max_speed", Math.max(0, effMaxSpeed(maxSpeed) - 1));
             addButton(left + 106, top + 22, 24, "+1", "set_max_speed", Math.min(1000, effMaxSpeed(maxSpeed) + 1));
             addButton(left + 132, top + 22, 26, "+10", "set_max_speed", Math.min(1000, effMaxSpeed(maxSpeed) + 10));
 
-            //--- 加速度 (km/h/s ×100 で保持) ---
+            // --- 加速度 (km/h/s ×100 で保持) ---
             addButton(left + 6, top + 62, 26, "-50", "set_acceleration", Math.max(0, effAccel(accelCenti) - 50));
             addButton(left + 34, top + 62, 24, "-10", "set_acceleration", Math.max(0, effAccel(accelCenti) - 10));
             addButton(left + 106, top + 62, 24, "+10", "set_acceleration", Math.min(10000, effAccel(accelCenti) + 10));
             addButton(left + 132, top + 62, 26, "+50", "set_acceleration", Math.min(10000, effAccel(accelCenti) + 50));
 
-            //--- それぞれを既定値へ戻す ---
+            // --- それぞれを既定値へ戻す ---
             addButton(left + 6, top + 96, PANEL_W - 12, 20, "速度を戻す", "set_max_speed", 0);
             addRenderableWidget(Button.builder(Component.literal("加速度を戻す"),
                     b -> send("set_acceleration", 0))
@@ -178,7 +176,7 @@ public class RtmTrainControlScreen extends Screen {
         addRenderableWidget(new DoorButton(left - 84, top + 20, true));
     }
 
-    //速度設定タブの表示ラベル (init で組み立て、render で描く)
+    // 速度設定タブの表示ラベル (init で組み立て、render で描く)
     private String graphics_maxSpeedLabel = "";
     private String graphics_accelLabel = "";
 
@@ -253,9 +251,8 @@ public class RtmTrainControlScreen extends Screen {
 
     /**
      * このパックが持つアナウンスの数。0 ならアナウンス機能なし。
-     * <p>
      * 表示名 (sound_Announcement の 1 列目) は省略されることがあるので、
-     * 数は<b>音声の数</b>で数える。名前だけで数えると、名前が無いアナウンスを取りこぼす。
+     * 数は音声の数で数える。名前だけで数えると、名前が無いアナウンスを取りこぼす。
      */
     private int announcementCount() {
         VehicleDefinition definition = VehicleRegistry.getById(train.getModelName());
@@ -287,7 +284,7 @@ public class RtmTrainControlScreen extends Screen {
         return "方向幕 " + names[dest];
     }
 
-    //RTMU 追加: 種別幕 (typeSignNames)。方向幕とは別の State_Type で選ぶ。
+    // RTMU 追加: 種別幕 (typeSignNames)。方向幕とは別の State_Type で選ぶ。
     private String[] typeSignNames() {
         VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
         return def == null ? new String[0] : def.getTypeSignNames().toArray(new String[0]);
@@ -306,7 +303,7 @@ public class RtmTrainControlScreen extends Screen {
         if ("noop".equals(action)) {
             return;
         }
-        //カスタムボタンは描画がクライアント DataMap を読むためローカルにも反映
+        // カスタムボタンは描画がクライアント DataMap を読むためローカルにも反映
         if ("cycle_custom_button".equals(action)) {
             int index = (value >>> 8) & 0xFF;
             int current = value & 0xFF;
@@ -320,16 +317,14 @@ public class RtmTrainControlScreen extends Screen {
             train.getResourceState().getDataMap().setInt("Button" + ((value >>> 8) & 0xFF), value & 0xFF, 0);
         }
         PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), action, value));
-        //スライダーはドラッグ中に毎回 applyValue が呼ばれる — 再構築すると
-        //ウィジェットが差し替わってドラッグが切れ、値が動かなくなる
+        // スライダーはドラッグ中に毎回 applyValue が呼ばれる — 再構築すると
+        // ウィジェットが差し替わってドラッグが切れ、値が動かなくなる
         if (!"set_custom_button".equals(action)) {
             rebuildTabWidgets();
         }
     }
 
-    /**
-     * スライダー型カスタムボタン (0-100%)。ドラッグ確定ごとに DataMap Button{i} を送信。
-     */
+    /** スライダー型カスタムボタン (0-100%)。ドラッグ確定ごとに DataMap Button{i} を送信。 */
     private class CustomSliderButton extends net.minecraft.client.gui.components.AbstractSliderButton {
         private final String label;
         private final int index;
@@ -347,7 +342,7 @@ public class RtmTrainControlScreen extends Screen {
 
         @Override
         protected void applyValue() {
-            //0 は「未設定=100%」の予約値なので最低 1
+            // 0 は「未設定=100%」の予約値なので最低 1
             int percent = Math.max(1, currentPercent());
             train.getResourceState().getDataMap().setInt("Button" + this.index, percent, 0);
             PacketDistributor.sendToServer(new TrainControlPayload(
@@ -359,13 +354,11 @@ public class RtmTrainControlScreen extends Screen {
         }
     }
 
-    /**
-     * TrainState はサーバー→クライアント同期のため、少し遅れてラベルへ反映する
-     */
+    /** TrainState はサーバー→クライアント同期のため、少し遅れてラベルへ反映する */
     @Override
     public void tick() {
         super.tick();
-        //スライダードラッグ中に再構築するとドラッグ状態が失われる
+        // スライダードラッグ中に再構築するとドラッグ状態が失われる
         if (this.isDragging()) {
             return;
         }
@@ -417,7 +410,7 @@ public class RtmTrainControlScreen extends Screen {
 
     private void renderTabContents(GuiGraphics graphics, int left, int top) {
         if (selectedTab == ControlTab.DEDICATED) {
-            //速度設定タブ: 見出しと現在値
+            // 速度設定タブ: 見出しと現在値
             graphics.drawString(this.font, Component.literal("最高速度 (km/h)"), left + 8, top + 8, 0xFF404040, false);
             graphics.drawString(this.font, Component.literal(graphics_maxSpeedLabel),
                     left + 62, top + 28, 0xFF202020, false);
@@ -429,8 +422,8 @@ public class RtmTrainControlScreen extends Screen {
         if (selectedTab != ControlTab.FORMATION) {
             return;
         }
-        //本家 GuiVehicleControlPanel の編成タブ移植: 連結中の各車両を tab_formation.png の
-        //車両スプライトで並べる。u=制御車で右へ+32、v=先頭(0)/中間(1)/最後尾(2)、5両で改行。
+        // 本家 GuiVehicleControlPanel の編成タブ移植: 連結中の各車両を tab_formation.png の
+        // 車両スプライトで並べる。u=制御車で右へ+32、v=先頭(0)/中間(1)/最後尾(2)、5両で改行。
         jp.ngt.rtm.entity.train.util.Formation formation = train.getFormation();
         int size = formation == null ? 0 : formation.size();
         if (size <= 0) {
@@ -448,11 +441,11 @@ public class RtmTrainControlScreen extends Screen {
             int x = left + 8 + (i % 5) * 32;
             int y = top + 25 + (i / 5) * 32;
             graphics.blit(TAB_FORMATION_TEXTURE, x, y, 192 + u * 32, v * 16, 32, 16, 256, 256);
-            //自分が乗っている(=このメニューを開いた)車両に「ここにいる」マーカー。
+            // 自分が乗っている(=このメニューを開いた)車両に「ここにいる」マーカー。
             if (entry.train == train) {
                 graphics.blit(TAB_FORMATION_TEXTURE, x + 12, y - 16, 180, 0, 10, 16, 256, 256);
             }
-            //号車番号を中央に。
+            // 号車番号を中央に。
             String num = String.valueOf(entry.entryId + 1);
             graphics.drawString(font, num, x + 16 - font.width(num) / 2, y + 4, 0x000000, false);
         }
@@ -538,16 +531,14 @@ public class RtmTrainControlScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    //タブのアイコン (左から順に並ぶ)。アイテムのテクスチャ自体は本家 RTM と同一なので
-    //触らない (入れ替えるとインベントリ内の全アイテムの見た目が変わってしまう)。
-    //ここで持たせるアイテムだけを差し替えて、タブの絵柄を変える。
-    //タブ並び順 (左→右): チェスト・バール・レンチ・列車・専用。
+    // タブのアイコン (左から順に並ぶ)。
+    // 触らない (入れ替えるとインベントリ内の全アイテムの見た目が変わってしまう)。
     private enum ControlTab {
         INVENTORY(TAB_INVENTORY_TEXTURE, new ItemStack(Blocks.CHEST)),
         SETTING(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.CROWBAR_ITEM.get())),
         FUNCTION(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.WRENCH_ITEM.get())),
         FORMATION(TAB_FORMATION_TEXTURE, new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get())),
-        //専用タブ: ドアカット・連結解除など運転士の追加操作。アイコンは鉄ドア (ドアカット由来)。
+        // 専用タブ: ドアカット・連結解除など運転士の追加操作。アイコンは鉄ドア (ドアカット由来)。
         DEDICATED(TAB_SETTING_TEXTURE, new ItemStack(net.minecraft.world.item.Items.IRON_DOOR));
 
         final ResourceLocation background;
@@ -572,8 +563,8 @@ public class RtmTrainControlScreen extends Screen {
         @Override
         protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             int doorState = train.getTrainStateData(TrainStateType.State_Door.id);
-            //車両自身のドア byte は常に「その車両の物理左右」(Formation が entry.dir で
-            //再配布済み)。運転士から見た左右は運転台向き (cabDir) だけで決まる。
+            // 車両自身のドア byte は常に「その車両の物理左右」(Formation が entry.dir で
+            // 再配布済み)。運転士から見た左右は運転台向き (cabDir) だけで決まる。
             boolean dir = (train.getCabDirection() & 1) == 0;
             int bit = leftDoor ? (dir ? 1 : 2) : (dir ? 2 : 1);
             boolean opened = (doorState & bit) == bit;

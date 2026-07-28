@@ -44,7 +44,7 @@ public final class Point {
         if (level == null) {
             return;
         }
-        //描画の partialTick 補間用に、この tick の変化前の値を控えておく。
+        // 描画の partialTick 補間用に、この tick の変化前の値を控えておく。
         this.prevMoveCount = this.moveCount;
         boolean powered = this.rpRoot.checkRSInput(level);
         if (powered) {
@@ -61,9 +61,8 @@ public final class Point {
     }
 
     /**
-     * partialTick 補間したトング移動量 (0.0〜1.0)。moveCount は tick 単位 (±1/tick) でしか
-     * 変わらないため、素の {@link #getMovement()} を描画に使うと 20Hz でカクつく。前 tick から
-     * 現 tick へ frame 間を補間して転てつアニメを滑らかにする。
+     * partialTick 補間したトング移動量 (0.0〜1.0)。
+     * 変わらないため、素の #getMovement を描画に使うと 20Hz でカクつく。
      */
     public float getMovement(float partialTick) {
         float t = partialTick < 0.0F ? 0.0F : (partialTick > 1.0F ? 1.0F : partialTick);
@@ -80,14 +79,10 @@ public final class Point {
 
     /**
      * スクリプト互換オーバーロード。
-     *
-     * <p>SRB3 の描画スクリプトは
-     * <pre>nearestPoint.getActiveRailMap(world)  // render_SuperRailBuilder3.js:2210</pre>
-     * と呼ぶが、この {@code world} は {@code entity.field_70170_p} = {@link jp.ngt.mccompat.WorldCompat}
-     * であり実 {@link Level} ではない。{@code Level} だけを取る形だと
-     * {@code ClassCastException: Cannot cast jp.ngt.mccompat.WorldCompat to net.minecraft.world.level.Level}
-     * で<b>描画スクリプト全体が落ち</b>、素のモデル描画へフォールバックする
-     * (= 補助線もカーソルも出ない)。ラッパーからも実 Level を取り出せるようにする。
+     * SRB3 の描画スクリプトは
+     * nearestPoint.getActiveRailMap(world)  // render_SuperRailBuilder3.js:2210
+     * と呼ぶが、この world は entity.field_70170_p = jp.ngt.mccompat.WorldCompat
+     * であり実 Level ではない。
      */
     public RailMap getActiveRailMap(Object levelLike) {
         return getActiveRailMap(jp.ngt.ngtlib.block.BlockUtil.toLevel(levelLike));

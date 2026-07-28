@@ -7,14 +7,8 @@ import jp.ngt.ngtlib.renderer.GLRecorder;
 
 /**
  * 本家 jp.ngt.rtm.render.WirePartsRenderer の移植。
- *
- * <p>架線・架線柱パック (ModelWire_*.json の rendererPath) はこのクラスを renderClass に指定し、
- * 描画を {@code renderWireStatic} / {@code renderWireDynamic} に書く。本家 RenderElectricalWiring は
- * <b>接続元の取付点 (wirePos) を原点にして</b>この 2 つを順に呼ぶ。
- *
- * <p>移植前は WirePartsRenderer 自体が存在せず、架線系はすべて自前の近似描画で描いていた。
- * そのため Baru's Pole のように<b>ビームを Fix / Loop / Fix に分割して長さに合わせて敷き詰める</b>
- * ような作り込んだパックが、まったく違う見た目 (モデルを等間隔で並べただけ) になっていた。
+ * 架線・架線柱パック (ModelWire_*.json の rendererPath) はこのクラスを renderClass に指定し、
+ * 描画を renderWireStatic / renderWireDynamic に書く。
  */
 public class WirePartsRenderer extends TileEntityPartsRenderer {
 
@@ -27,18 +21,14 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
     public float lengthCoefficient = 0.0F;
     public boolean smoothing;
 
-    /**
-     * モデルの全グループ名。parts 未指定 (本家 {@code model.renderAll()}) のときに使う。
-     */
+    /** モデルの全グループ名。parts 未指定 (本家 model.renderAll) のときに使う。 */
     public java.util.Set<String> modelGroupNames = java.util.Set.of();
 
     public WirePartsRenderer(String... par1) {
         super(par1);
     }
 
-    /**
-     * 本家 renderWire: static → dynamic の順に呼ぶ。
-     */
+    /** 本家 renderWire: static → dynamic の順に呼ぶ。 */
     public void renderWire(Object tile, Object connection, Object vec, float partialTicks, int pass) {
         this.renderWireStatic(tile, connection, vec, partialTicks, pass);
         this.renderWireDynamic(tile, connection, vec, partialTicks, pass);
@@ -56,9 +46,7 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
         }
     }
 
-    /**
-     * セクション i を描くか (端の間引き等)。スクリプトが未定義なら常に描く。
-     */
+    /** セクション i を描くか (端の間引き等)。スクリプトが未定義なら常に描く。 */
     public boolean shouldRenderObject(Object tile, int split, int index, int pass) {
         if (this.script == null) {
             return true;
@@ -70,9 +58,7 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
         return true;
     }
 
-    /**
-     * 本家 renderWireStraight: 取付点から相手までを sectionLength ごとに真っ直ぐ敷き詰める。
-     */
+    /** 本家 renderWireStraight: 取付点から相手までを sectionLength ごとに真っ直ぐ敷き詰める。 */
     public void renderWireStraight(Object tile, Object connection, Object vecObj, float partialTicks, int pass, Parts parts) {
         GLRecorder rec = GLRecorder.active();
         Vec3 target = toVec3(vecObj);
@@ -99,9 +85,7 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
         rec.pop();
     }
 
-    /**
-     * 本家 renderWireDeflection: 電線のたるみ (放物線) に沿って敷き詰める。
-     */
+    /** 本家 renderWireDeflection: 電線のたるみ (放物線) に沿って敷き詰める。 */
     public void renderWireDeflection(Object tile, Object connection, Object vecObj, float partialTicks, int pass, Parts parts) {
         GLRecorder rec = GLRecorder.active();
         Vec3 target = toVec3(vecObj);
@@ -147,9 +131,7 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
         rec.pop();
     }
 
-    /**
-     * parts 指定ならそのパーツ、無指定なら本家 {@code model.renderAll()} 相当でモデル全体。
-     */
+    /** parts 指定ならそのパーツ、無指定なら本家 model.renderAll 相当でモデル全体。 */
     private void renderPartsOrModel(Parts parts) {
         if (parts != null) {
             parts.render(this);

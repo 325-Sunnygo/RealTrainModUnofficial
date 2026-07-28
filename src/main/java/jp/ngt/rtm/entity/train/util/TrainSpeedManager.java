@@ -21,11 +21,11 @@ public final class TrainSpeedManager {
             if (prevSpeed >= cfg.maxSpeed[Math.min(cfg.maxSpeed.length - 1, notch)]) {
                 return 0.0F;
             } else {
-                //TODO(Phase 3): useVariableAcceleration → serverSE getAcceleration(train, prevSpeed)
+                // TODO(Phase 3): useVariableAcceleration → serverSE getAcceleration(train, prevSpeed)
                 return cfg.accelerateions[Math.min(cfg.accelerateions.length - 1, notch)];
             }
         } else {
-            //TODO(Phase 3): useVariableDeceleration → serverSE getDeceleration(train, prevSpeed)
+            // TODO(Phase 3): useVariableDeceleration → serverSE getDeceleration(train, prevSpeed)
             float deceleration = cfg.deccelerations[Math.min(cfg.deccelerations.length - 1, -notch)];
             if (prevSpeed + deceleration < 0.0F) {
                 return -prevSpeed;

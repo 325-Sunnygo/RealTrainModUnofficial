@@ -6,23 +6,17 @@ import jp.ngt.ngtlib.math.NGTMath;
 import jp.ngt.ngtlib.math.StraightLine;
 import net.minecraft.world.level.Level;
 
-/**
- * 本家 jp.ngt.rtm.rail.util.RailMapBasic (KaizPatchX) の忠実移植。
- */
+/** 本家 jp.ngt.rtm.rail.util.RailMapBasic (KaizPatchX) の忠実移植。 */
 public class RailMapBasic extends RailMap {
-    /**
-     * 水平方向の線形
-     */
+    /** 水平方向の線形 */
     protected ILine lineHorizontal;
-    /**
-     * 垂直方向の線形, 高さとPitch取得用のためXZは相対的な長さで計算
-     */
+    /** 垂直方向の線形, 高さとPitch取得用のためXZは相対的な長さで計算 */
     protected ILine lineVertical;
 
     protected RailPosition startRP;
     protected RailPosition endRP;
 
-    //本家準拠: RailMap.rails をシャドーイングしている (RailMapSlope が使用)
+    // 本家準拠: RailMap.rails をシャドーイングしている (RailMapSlope が使用)
     protected final java.util.List<int[]> rails = new java.util.ArrayList<>();
 
     protected double length;
@@ -31,9 +25,7 @@ public class RailMapBasic extends RailMap {
     public final int fixRTMRailMapVersion;
     public static int fixRTMRailMapVersionCurrent = 1;
 
-    /**
-     * @deprecated use {@link #RailMapBasic(RailPosition, RailPosition, int)}
-     */
+    /** @deprecated use #RailMapBasic(RailPosition, RailPosition, int) */
     @Deprecated
     public RailMapBasic(RailPosition par1, RailPosition par2) {
         this(par1, par2, 0);
@@ -96,7 +88,7 @@ public class RailMapBasic extends RailMap {
             this.lineHorizontal = new BezierCurve(z0, x0, z0 + d1, x0 + d2, z1 + d3, x1 + d4, z1, x1);
         }
 
-        //////////////////////////////////////////////////////////////////////////////////////////////////
+        // ////////////////////////////////////////////////////////////////////////////////////////////////
 
         double lenXZ = Math.sqrt(NGTMath.pow(x1 - x0, 2) + NGTMath.pow(z1 - z0, 2));
 
@@ -108,7 +100,7 @@ public class RailMapBasic extends RailMap {
             double d2 = NGTMath.sin(this.startRP.anchorPitch) * this.startRP.anchorLengthVertical;
             double d3 = NGTMath.cos(this.endRP.anchorPitch) * this.endRP.anchorLengthVertical;
             double d4 = NGTMath.sin(this.endRP.anchorPitch) * this.endRP.anchorLengthVertical;
-            //"lenXZ - d3"のみLineHと異なるので注意
+            // "lenXZ - d3"のみLineHと異なるので注意
             this.lineVertical = new BezierCurve(0.0D, y0, d1, y0 + d2, lenXZ - d3, y1 + d4, lenXZ, y1);
         }
     }
@@ -169,9 +161,7 @@ public class RailMapBasic extends RailMap {
         return height;
     }
 
-    /**
-     * @return 0~360
-     */
+    /** @return 0~360 */
     @Override
     public float getRailYaw(int par1, int par2) {
         return NGTMath.toDegrees((float) this.lineHorizontal.getSlope(par1, par2));
@@ -187,9 +177,7 @@ public class RailMapBasic extends RailMap {
         return NGTMath.toDegrees((float) this.lineVertical.getSlope(par1, par2));
     }
 
-    /**
-     * @return カント
-     */
+    /** @return カント */
     @Override
     public float getRailRoll(int split, int t) {
         float ft = 2.0F * t / split;
@@ -211,27 +199,21 @@ public class RailMapBasic extends RailMap {
         return flag1 || flag2;
     }
 
-    /**
-     * 両端にRS入力されてるか
-     */
+    /** 両端にRS入力されてるか */
     public boolean isGettingPowered(Level world) {
         return this.startRP.checkRSInput(world) && this.endRP.checkRSInput(world);
     }
 
     // ================= 以下は Remaster 暫定互換 API (Phase 2 で TrainEntity 刷新後に削除予定) =================
 
-    /**
-     * @deprecated Remaster 独自 API。本家に存在しない。
-     */
+    /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated
     @Override
     public boolean isStraightTrack() {
         return this.lineHorizontal instanceof StraightLine;
     }
 
-    /**
-     * @deprecated Remaster 独自 API。本家に存在しない。
-     */
+    /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated
     @Override
     public double getHorizontalPathLength() {

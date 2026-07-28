@@ -1,8 +1,6 @@
 package jp.ngt.ngtlib.util;
 
-/**
- * 本家 NGTLib jp.ngt.ngtlib.util.ObjectPool の忠実移植。
- */
+/** 本家 NGTLib jp.ngt.ngtlib.util.ObjectPool の忠実移植。 */
 public final class ObjectPool<T> {
     private final T[][] pool;
     private final int[] index = {0, 0};

@@ -3,7 +3,6 @@ package jp.ngt.rtm.modelpack;
 /**
  * 本家 jp.ngt.rtm.modelpack.ModelPackManager のスクリプト互換最小移植。
  * スクリプトは INSTANCE.getResource(domain, path) を呼ぶ。
- * TODO(Phase 4): 型システム (registerType/registerModelset) の本実装。
  */
 public final class ModelPackManager {
     public static final ModelPackManager INSTANCE = new ModelPackManager();
@@ -18,8 +17,7 @@ public final class ModelPackManager {
     /**
      * 本家 getResource(String): "domain:path" を分割 (既定 domain=minecraft)。
      * スクリプトの自前 include (eval(NGTText.readText(INSTANCE.getResource(path)))) が
-     * 単一引数で呼ぶため必須。無いと TypeError で include が全滅し、依存スクリプト
-     * (render_function.js 等) が読まれず MCVersionChecker 未定義などに連鎖する。
+     * 単一引数で呼ぶため必須。
      */
     public jp.ngt.mccompat.ResourceLocation getResource(String path) {
         String domain = "minecraft";
@@ -55,7 +53,7 @@ public final class ModelPackManager {
 
     /**
      * 本家 getModelSet(type, name)。NGTO Builder の Wire ツールが
-     * {@code getModelSet("ModelConnector", modelName).getConfig().wirePos} で碍子の電線取付点を読む
+     * getModelSet("ModelConnector", modelName).getConfig.wirePos で碍子の電線取付点を読む
      * (null ガード無しで参照するため、見つからなくても既定 wirePos を返す非 null が必須)。
      */
     public ModelSetShim getModelSet(String type, String name) {
@@ -65,7 +63,7 @@ public final class ModelPackManager {
         return new ModelSetShim(def);
     }
 
-    /** getModelSet の戻り値: getConfig().wirePos (double[3]) と getConfig().getName() を提供。 */
+    /** getModelSet の戻り値: getConfig.wirePos (double[3]) と getConfig.getName を提供。 */
     public static final class ModelSetShim {
         private final ConfigShim config;
 

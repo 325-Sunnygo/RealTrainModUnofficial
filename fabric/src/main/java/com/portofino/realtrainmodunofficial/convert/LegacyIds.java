@@ -5,13 +5,7 @@ import java.util.Map;
 
 /**
  * 旧 RTM の タイルエンティティ / エンティティ の登録名を、変換の種類に振り分ける。
- *
- * <p>保存される id はバージョンで書式が違う:
- * <ul>
- *   <li>1.7.10: タイルエンティティ = {@code "TERailCore"}、エンティティ = {@code "RTM.E.ElectricCar"}</li>
- *   <li>1.12.2: 名前空間付き ({@code "minecraft:TERailCore"} / {@code "rtm:electric_car"})</li>
- * </ul>
- * どちらでも通るように「名前空間を落として小文字化」した形で突き合わせる。
+ * 保存される id はバージョンで書式が違う:
  */
 public final class LegacyIds {
 
@@ -29,21 +23,21 @@ public final class LegacyIds {
         /** 自動車・船・飛行機などの車両。 */
         VEHICLE,
         /**
-         * 本家では<b>エンティティ</b>だが、RTMU では<b>設置物 (ブロック)</b> になっているもの。
+         * 本家ではエンティティだが、RTMU では設置物 (ブロック) になっているもの。
          * 車止め・列車検知器・ATC。
          */
         ENTITY_OBJECT
     }
 
-    /** タイルエンティティ登録名 → 種類。RTM が実際に {@code registerTileEntity} した名前。 */
+    /** タイルエンティティ登録名 → 種類。RTM が実際に registerTileEntity した名前。 */
     private static final Map<String, Kind> TILES = Map.ofEntries(
-            //--- レール ---
+            // --- レール ---
             Map.entry("terailcore", Kind.RAIL),
             Map.entry("terailswitchcore", Kind.RAIL_SWITCH),
             Map.entry("teturntablecore", Kind.TURNTABLE),
-            //レールの土台/マーカーはコアから作り直すので拾わない (terailbase / terailswitchbase / temarker)
+            // レールの土台/マーカーはコアから作り直すので拾わない (terailbase / terailswitchbase / temarker)
 
-            //--- モデル付き設置物 (すべて ResourceState を持つ) ---
+            // --- モデル付き設置物 (すべて ResourceState を持つ) ---
             Map.entry("tesignal", Kind.INSTALLED_OBJECT),
             Map.entry("tecrossinggate", Kind.INSTALLED_OBJECT),
             Map.entry("tepoint", Kind.INSTALLED_OBJECT),
@@ -82,14 +76,14 @@ public final class LegacyIds {
             Map.entry("car", Kind.VEHICLE),
             Map.entry("rtm.e.car", Kind.VEHICLE),
 
-            //本家はエンティティ、RTMU は設置物 (ブロック)
+            // 本家はエンティティ、RTMU は設置物 (ブロック)
             Map.entry("bumping_post", Kind.ENTITY_OBJECT),
             Map.entry("rtm.e.bumpingpost", Kind.ENTITY_OBJECT),
             Map.entry("train_detector", Kind.ENTITY_OBJECT),
             Map.entry("rtm.e.traindetector", Kind.ENTITY_OBJECT),
             Map.entry("atc", Kind.ENTITY_OBJECT),
             Map.entry("rtm.e.atc", Kind.ENTITY_OBJECT)
-            //台車 (bogie) と床 (floor) は列車から作り直されるので拾わない
+            // 台車 (bogie) と床 (floor) は列車から作り直されるので拾わない
     );
 
     private LegacyIds() {

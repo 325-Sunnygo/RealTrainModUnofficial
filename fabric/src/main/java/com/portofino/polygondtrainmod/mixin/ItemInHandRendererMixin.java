@@ -11,10 +11,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * {@code RenderHandEvent} の発火点。
- *
- * <p>RTMU は乗車中・カメラ使用中に手 (と持ち物) を消すためにこのイベントを取り消している。
- * 無いと運転中ずっと手が画面に出る。
+ * RenderHandEvent の発火点。
+ * RTMU は乗車中・カメラ使用中に手 (と持ち物) を消すためにこのイベントを取り消している。
  */
 @Mixin(ItemInHandRenderer.class)
 public class ItemInHandRendererMixin {

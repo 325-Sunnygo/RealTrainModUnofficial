@@ -8,9 +8,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
 
-/**
- * 分岐コアブロック (本家では BlockLargeRailCore のバリアント登録)。
- */
+/** 分岐コアブロック (本家では BlockLargeRailCore のバリアント登録)。 */
 public class BlockLargeRailSwitchCore extends BlockLargeRailBase {
     public static final MapCodec<BlockLargeRailSwitchCore> CODEC = simpleCodec(props -> new BlockLargeRailSwitchCore(2, props));
 

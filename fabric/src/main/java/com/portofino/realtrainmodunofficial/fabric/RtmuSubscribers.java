@@ -3,16 +3,9 @@ package com.portofino.realtrainmodunofficial.fabric;
 import net.neoforged.neoforge.common.NeoForge;
 
 /**
- * {@code @EventBusSubscriber} が付いたクラスの一覧。
- *
- * <p>NeoForge はアノテーションをロード時に走査して勝手に登録するが、Fabric にその仕組みは無い。
- * かといって実行時にクラスパスを舐めるのは遅く壊れやすいので、<b>ここに明示的に並べる</b>。
- *
- * <p>クラスを増やしたらここへ 1 行足すこと。足し忘れると「コンパイルは通るのにイベントが
- * 一切来ない」という追いにくい壊れ方をするので、名前は {@link #register} の失敗ログで分かるようにしてある。
- *
- * <p>★クライアント専用のものを共通側で触らないこと。専用サーバーで
- * NoClassDefFoundError になる (NeoForge 版でも同じ踏み方をしている)。
+ * @EventBusSubscriber が付いたクラスの一覧。
+ * NeoForge はアノテーションをロード時に走査して勝手に登録するが、Fabric にその仕組みは無い。
+ * ★クライアント専用のものを共通側で触らないこと。
  */
 public final class RtmuSubscribers {
 
@@ -62,21 +55,8 @@ public final class RtmuSubscribers {
     }
 
     /**
-     * ★<b>どちらのバスに載せるかは注釈から読む。</b>
-     *
-     * <p>NeoForge にはバスが 2 本ある。
-     *
-     * <pre>
-     *   MOD  … 起動時に 1 回だけ流れるもの (レンダラー登録・キー割り当て・シェーダー・属性)
-     *   GAME … 遊んでいる間ずっと流れるもの (tick・描画・入力・コマンド)
-     * </pre>
-     *
-     * <p>前は<b>全部 GAME バスへ登録していた</b>ため、{@code bus = MOD} が付いたクラスには
-     * イベントが一切届いていなかった。例外は出ず、ログにも何も出ないまま
-     * <b>車両のレンダラーもキー割り当ても登録されない</b>という壊れ方をする。
-     *
-     * <p>注釈は実行時まで残るので、ここで読んで振り分ける。こうしておけば
-     * クラスを足すときにバスを間違えようがない。
+     * ★どちらのバスに載せるかは注釈から読む。
+     * NeoForge にはバスが 2 本ある。
      */
     private static void register(String[] names) {
         for (String name : names) {
@@ -92,7 +72,7 @@ public final class RtmuSubscribers {
                     NeoForge.EVENT_BUS.register(clazz);
                 }
             } catch (Throwable t) {
-                //1 つ落ちても他は生かす。黙って消えると原因が分からないので必ず出す。
+                // 1 つ落ちても他は生かす。黙って消えると原因が分からないので必ず出す。
                 com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.error(
                     "[RTMU/Fabric] イベント購読の登録に失敗: {}", name, t);
             }

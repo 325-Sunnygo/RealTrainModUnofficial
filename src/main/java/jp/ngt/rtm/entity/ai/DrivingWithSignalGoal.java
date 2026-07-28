@@ -12,9 +12,6 @@ import java.util.EnumSet;
 /**
  * 本家 jp.ngt.rtm.entity.ai.EntityAIDrivingWithSignal の移植。
  * 列車に乗っている運転士が、信号現示に応じた速度までノッチを自動操作する。
- *
- * <p>軽量化: ノッチ判断は {@value #UPDATE_INTERVAL} tick おき (本家は毎tick。20Hzで
- * ノッチを更新する意味は無く、体感は変わらない)。
  */
 public class DrivingWithSignalGoal extends Goal {
 
@@ -73,7 +70,6 @@ public class DrivingWithSignalGoal extends Goal {
 
     /**
      * 本家 getSuitableNotch。
-     *
      * @param par1 目標の速度
      * @param par2 現在の速度
      */

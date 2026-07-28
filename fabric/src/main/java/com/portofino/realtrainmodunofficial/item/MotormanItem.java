@@ -12,12 +12,8 @@ import net.minecraft.world.level.Level;
 
 /**
  * 本家 jp.ngt.rtm.item.ItemNPC (運転士アイテム、damage=0) の移植。
- * <ul>
- *   <li>地面に使用 → 運転士が立って出現 (向きはプレイヤーの逆、15°刻み — 本家同様)</li>
- *   <li><b>列車に使用 → 運転士が運転台に乗車</b> (EntityTrainBase.interactTrain 側で処理)</li>
- * </ul>
- * 乗車した運転士は信号現示に従って自動運転する。素手右クリックでマクロ選択、
- * 「本と羽根ペン」でダイヤ運転。殴ると回収できる。
+ * 地面に使用 → 運転士が立って出現 (向きはプレイヤーの逆、15°刻み — 本家同様)
+ * 列車に使用 → 運転士が運転台に乗車 (EntityTrainBase.interactTrain 側で処理)
  */
 public class MotormanItem extends Item {
 
@@ -32,7 +28,7 @@ public class MotormanItem extends Item {
         if (level.isClientSide || player == null) {
             return InteractionResult.SUCCESS;
         }
-        //本家: プレイヤーの向きの逆を 15° 刻みにスナップ
+        // 本家: プレイヤーの向きの逆を 15° 刻みにスナップ
         float rotationInterval = 15.0F;
         int yaw = Mth.floor(Mth.wrapDegrees(-player.getYRot() + 180.0F + (rotationInterval / 2.0F)) / rotationInterval);
         float yawF = yaw * rotationInterval;

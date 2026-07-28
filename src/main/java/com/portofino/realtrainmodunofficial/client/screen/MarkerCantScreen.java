@@ -13,7 +13,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /**
  * レールのカント設定 (レンチでマーカーをシフト右クリック)。
  * 本家 1122 のカント線ドラッグの代わりに数値入力式 (度)。
- * cantEdge = このマーカー端のカント、cantCenter = 中央のカント。
  */
 public class MarkerCantScreen extends Screen {
     private final TileEntityMarker marker;
@@ -60,7 +59,7 @@ public class MarkerCantScreen extends Screen {
             rp.cantCenter = Float.parseFloat(fieldCantCenter.getValue().trim());
         } catch (Exception ignored) {
         }
-        //ローカルのプレビュー再構築 + サーバーへ RP 全体を送信 (アンカー編集と同じ経路)
+        // ローカルのプレビュー再構築 + サーバーへ RP 全体を送信 (アンカー編集と同じ経路)
         marker.onChangeRailShape();
         PacketDistributor.sendToServer(new MarkerAnchorPayload(marker.getBlockPos(), rp.writeToNBT()));
     }

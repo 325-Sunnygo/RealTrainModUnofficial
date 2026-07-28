@@ -4,9 +4,8 @@ import net.minecraft.world.item.Item;
 
 /**
  * 本家 jp.ngt.rtm.RTMItem のスクリプト互換。
- * SRB3 の getPlayerRail が item.func_77973_b() === RTMItem.itemLargeRail で手持ちレールを判定し、
- * NGTO Builder の Wire ツールが item.func_77973_b() === RTMItem.itemWire で手持ちワイヤーを判定する。
- * これらの static が未設定だと「手に持っていても認識されず無言で置けない」。
+ * SRB3 の getPlayerRail が item.func_77973_b === RTMItem.itemLargeRail で手持ちレールを判定し、
+ * NGTO Builder の Wire ツールが item.func_77973_b === RTMItem.itemWire で手持ちワイヤーを判定する。
  */
 @SuppressWarnings("unused")
 public final class RTMItem {
@@ -15,12 +14,12 @@ public final class RTMItem {
 
     public static Item itemLargeRail;
     public static Item itemWire;
-    //NGTO Builder の Wire ツールが ignoreItemList (碍子を持ったままの右クリックを無視) に使う。
+    // NGTO Builder の Wire ツールが ignoreItemList (碍子を持ったままの右クリックを無視) に使う。
     public static Item installedObject;
-    //hi03CatenaryPack の render_CatenaryConnector が ignoreItemList に使う。
+    // hi03CatenaryPack の render_CatenaryConnector が ignoreItemList に使う。
     public static Item crowbar;
 
-    //以下は本家と一対一で対応する RTMU のアイテム
+    // 以下は本家と一対一で対応する RTMU のアイテム
     public static Item itemtrain;
     public static Item itemVehicle;
     public static Item itemSignal;

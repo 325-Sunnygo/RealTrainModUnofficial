@@ -39,11 +39,11 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
     }
 
     /**
-     * 本家 KaizPatchX の {@code customIconTexture} 用の描画器。
-     * <p>実際に使われるのは、選択中のモデルが {@code customIconTexture} を持つときだけ
-     * ({@link com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel} が判定する)。
+     * 本家 KaizPatchX の customIconTexture 用の描画器。
+     * 実際に使われるのは、選択中のモデルが customIconTexture を持つときだけ
+     * (com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel が判定する)。
      */
-    //★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
+    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
         consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {
@@ -89,7 +89,7 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        //コネクタはモデル固定 (本家 Input01/Output01) — 選択画面を出さない
+        // コネクタはモデル固定 (本家 Input01/Output01) — 選択画面を出さない
         if (category == InstalledObjectCategory.CONNECTOR_INPUT
                 || category == InstalledObjectCategory.CONNECTOR_OUTPUT) {
             return InteractionResultHolder.pass(player.getItemInHand(hand));
@@ -100,9 +100,7 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         return InteractionResultHolder.success(player.getItemInHand(hand));
     }
 
-    /**
-     * コネクタのデフォルト定義 (Input01/Output01 優先、無ければ同カテゴリの先頭)
-     */
+    /** コネクタのデフォルト定義 (Input01/Output01 優先、無ければ同カテゴリの先頭) */
     private static InstalledObjectDefinition findDefaultConnector(InstalledObjectCategory category) {
         String defaultName = category == InstalledObjectCategory.CONNECTOR_INPUT ? "input01" : "output01";
         InstalledObjectDefinition fallback = null;
@@ -110,7 +108,7 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
             if (fallback == null) {
                 fallback = def;
             }
-            //定義 ID は "category:pack:name" 形式のため末尾名で判定
+            // 定義 ID は "category:pack:name" 形式のため末尾名で判定
             String id = def.getId().toLowerCase(java.util.Locale.ROOT);
             if (id.endsWith(":" + defaultName) || id.equals(defaultName)) {
                 return def;
@@ -121,7 +119,6 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
 
     /**
      * レールに載せる設置物 (列車検知器) の姿勢。
-     *
      * @param yaw            レールの向き
      * @param pitch          レールの勾配 (yaw の後に掛ける = モデル局所のX回転)
      * @param roll           レールのカント (yaw の後に掛ける = モデル局所のZ回転)
@@ -132,10 +129,8 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
 
     /**
      * 本家 ItemInstalledObject.setEntityOnRail の移植。
-     * <p>
      * クリックしたブロックがレールなら、そのレール曲線上で最も近い点を求め、そこへモデルを
-     * 載せる (位置・向き・勾配・カント)。本家は向きをプレイヤーの視線と揃うように反転させるので
-     * それも再現する。レールでなければ null (通常の設置になる)。
+     * 載せる (位置・向き・勾配・カント)。
      */
     @javax.annotation.Nullable
     private static RailSnap computeRailSnap(Level level, BlockPos railPos, BlockPos placePos, Player player) {
@@ -150,13 +145,13 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
             index = 0;
         }
         double[] rpos = rm.getRailPos(split, index);
-        //本家: getRailPos は {z, x} の順。レール面から少しだけ浮かせる。
+        // 本家: getRailPos は {z, x} の順。レール面から少しだけ浮かせる。
         double posX = rpos[1];
         double posZ = rpos[0];
         double posY = rm.getRailHeight(split, index) + 0.0625D;
 
-        //本家: プレイヤーの向きとレールの向きが 90°以上ずれていたら 180°反転させる
-        //(勾配とカントの符号も一緒に反転する)。
+        // 本家: プレイヤーの向きとレールの向きが 90°以上ずれていたら 180°反転させる
+        // (勾配とカントの符号も一緒に反転する)。
         float railYaw = rm.getRailYaw(split, index);
         float playerFacing = -player.getYRot() + 180.0F;
         boolean invert = Math.abs(net.minecraft.util.Mth.wrapDegrees(railYaw - playerFacing)) > 90.0F;
@@ -165,10 +160,10 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
             railYaw += 180.0F;
         }
 
-        //レール角と設置物レンダラの角度は座標系が違う。
-        //  列車 (レールに正しく沿う): YP(railYaw) → XP(-railPitch) → ZP(cant)
-        //  設置物:                    YP(180 - yaw) → XP(mountPitch) → ZP(mountRoll)
-        //同じ姿勢にするには yaw = 180 - railYaw を渡す (そのまま渡すと 180°ずれる)。
+        // レール角と設置物レンダラの角度は座標系が違う。
+        // 列車 (レールに正しく沿う): YP(railYaw) → XP(-railPitch) → ZP(cant)
+        // 設置物:                    YP(180 - yaw) → XP(mountPitch) → ZP(mountRoll)
+        // 同じ姿勢にするには yaw = 180 - railYaw を渡す (そのまま渡すと 180°ずれる)。
         float yaw = 180.0F - railYaw;
         float pitch = -rm.getRailPitch(split, index) * sign;
         float roll = rm.getRailRoll(split, index) * sign;
@@ -181,7 +176,7 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
 
     /**
      * 本家 ItemInstalledObject の看板向き:
-     * {@code floor(normalizeAngle(yaw + 180) / 90 + 0.5) & 3}
+     * floor(normalizeAngle(yaw + 180) / 90 + 0.5) & 3
      */
     private static byte signDirectionOf(float yaw) {
         float a = (yaw + 180.0F) % 360.0F;
@@ -204,7 +199,7 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         InstalledObjectDefinition definition = InstalledObjectRegistry.getById(selectedId);
         if (definition == null || definition.getCategory() != category) {
-            //コネクタは本家デフォルトモデル (Input01/Output01) 固定 — 選択画面は出さない
+            // コネクタは本家デフォルトモデル (Input01/Output01) 固定 — 選択画面は出さない
             if (category == InstalledObjectCategory.CONNECTOR_INPUT
                     || category == InstalledObjectCategory.CONNECTOR_OUTPUT) {
                 definition = findDefaultConnector(category);
@@ -230,45 +225,41 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
             return InteractionResult.FAIL;
         }
         // クリックした面で設置向きを決める(踏切などの設置系共通)。
-        //  ・ブロック下面(天井)に付けた → 逆さ(180°)
-        //  ・横面(壁)に付けた          → 横倒し(90°)、面から外向き(プレイヤー側)
-        //  ・上面/通常                 → プレイヤー向き(縦置き)
+        // ・ブロック下面(天井)に付けた → 逆さ(180°)
+        // ・横面(壁)に付けた          → 横倒し(90°)、面から外向き(プレイヤー側)
+        // ・上面/通常                 → プレイヤー向き(縦置き)
         // WIRE は専用描画、SIGNAL は柱への押し込み挙動を維持するため対象外。
         float placeYaw = player.getYRot();
         float placeMountPitch = 0.0F;
         boolean wallMounted = false;
         boolean upsideDown = false;
-        //碍子/看板: 本家 ItemInstalledObject 準拠 — クリック面 (meta 0-5) だけを保存し、
-        //描画は本家と同じ (ブロック中心ピボット+面回転)。
-        //持ち上げ/横倒しハックは廃止 (当たり判定に対してモデルがずれる原因だった)。
-        //看板は本家 BlockSignBoard も「面に貼り付くが板は立ったまま」なので、
-        //汎用の壁挿し(90°横倒し)ロジックに乗せてはいけない。
+        // 碍子/看板: 本家 ItemInstalledObject 準拠 — クリック面 (meta 0-5) だけを保存し、
+        // 描画は本家と同じ (ブロック中心ピボット+面回転)。
+        // 持ち上げ/横倒しハックは廃止 (当たり判定に対してモデルがずれる原因だった)。
         boolean honkeFaceMount = category == InstalledObjectCategory.INSULATOR
                 || category == InstalledObjectCategory.SIGNBOARD;
-        //本家で常に直立している設置物 (転轍機/券売機/標識)。壁挿し・逆さ設置はさせず、
-        //本家 setRotation(player, 15.0F, ...) と同じく向きを 15 度刻みに丸めるだけ。
+        // 本家で常に直立している設置物 (転轍機/券売機/標識)。壁挿し・逆さ設置はさせず、
+        // 本家 setRotation(player, 15.0F, ...) と同じく向きを 15 度刻みに丸めるだけ。
         boolean uprightOnly = category == InstalledObjectCategory.POINT
                 || category == InstalledObjectCategory.TICKET_VENDOR
                 || category == InstalledObjectCategory.RAILROAD_SIGN;
-        //照明 (本家 LIGHT + rotateByMetadata、サーチライト等): 本家 ItemInstalledObject は
-        //setBlock(..., sideIndex=クリック面, 3) + setRotation(player, 15.0F, true)。クリック面 (meta 0-5)
-        //だけを保存し、向きは 15 度刻みに丸める。壁挿し (横倒し+持ち上げ) には乗せない
-        //(それが「面から浮く」原因だった)。描画は RenderMachine と同じブロック中心ピボット+面回転+向き。
+        // 照明 (本家 LIGHT + rotateByMetadata、サーチライト等): 本家 ItemInstalledObject は
+        // setBlock(..., sideIndex=クリック面, 3) + setRotation(player, 15.0F, true)。
+        // だけを保存し、向きは 15 度刻みに丸める。
         boolean lightRotateByMeta = category == InstalledObjectCategory.LIGHT
                 && definition.isRotateByMetadata();
-        //蛍光灯: 本家 ItemInstalledObject は取付方向 (0..7) だけを持たせ、平行移動と回転は
-        //レンダースクリプト側でやる。汎用の壁挿し/逆さ設置には乗せない。
+        // 蛍光灯: 本家 ItemInstalledObject は取付方向 (0..7) だけを持たせ、平行移動と回転は
+        // レンダースクリプト側でやる。汎用の壁挿し/逆さ設置には乗せない。
         boolean fluorescent = category == InstalledObjectCategory.FLUORESCENT;
-        //架線柱: 本家 ItemInstalledObject は LINEPOLE に setRotation を一切呼ばず、
-        //ブロックと同じくグリッドに揃えて置くだけ。RenderConnectablePole.js が隣の柱を見て
-        //partXP / partXN / partZP / partZN を<b>ワールド軸で</b>出し分けるため、少しでも回すと
-        //腕の向きが実際の接続方向とずれる。よって斜め置きも壁挿しもさせない。
-        //パイプも RenderConnectablePipe.js が隣接パイプをワールド軸で見て腕を出すので、回さずグリッドに揃える。
+        // 架線柱: 本家 ItemInstalledObject は LINEPOLE に setRotation を一切呼ばず、
+        // ブロックと同じくグリッドに揃えて置くだけ。
+        // partXP / partXN / partZP / partZN をワールド軸で出し分けるため、少しでも回すと
+        // 腕の向きが実際の接続方向とずれる。よって斜め置きも壁挿しもさせない。
         boolean gridAligned = category == InstalledObjectCategory.OVERHEAD_LINE_POLE
                 || category == InstalledObjectCategory.PIPE;
-        //列車検知器・車止め・ATC 地上子: 本家 ItemInstalledObject.setEntityOnRail 準拠で、クリックした
-        //レールの曲線上に載せる (位置・向き・勾配・カント)。汎用の壁挿し/逆さ設置には乗せない。
-        //ATC 地上子は真下のレールに信号を書くので、検知器と同じくレールに吸着させる。
+        // 列車検知器・車止め・ATC 地上子: 本家 ItemInstalledObject.setEntityOnRail 準拠で、クリックした
+        // レールの曲線上に載せる (位置・向き・勾配・カント)。汎用の壁挿し/逆さ設置には乗せない。
+        // ATC 地上子は真下のレールに信号を書くので、検知器と同じくレールに吸着させる。
         boolean railMounted = category == InstalledObjectCategory.TRAIN_DETECTOR
                 || category == InstalledObjectCategory.BUMPING_POST
                 || category == InstalledObjectCategory.ATC;
@@ -293,12 +284,8 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
                 placeMountPitch = 90.0F;
             }
         }
-        //設置物 (改札機/踏切/券売機/標識/看板/照明 等) の向き:
-        //  通常設置 (Shift なし) = バニラの立て看板と同じ 22.5 度刻み (16 方向) にスナップ。
-        //  Shift 中     = 生の角度でそのまま置ける (細かく向きを調整したいとき)。
-        //プレイヤー向きで角度が決まるカテゴリのみ対象。レール載せ・グリッド整列・蛍光灯・壁面固定・
-        //信号・ワイヤーは独自の向き決めなので対象外 (この if に入らない)。
-        //生の getYRot() を 22.5 度で丸める (15 度丸め済みの値を再丸めすると二重丸めでずれるため生値を使う)。
+        // 設置物 (改札機/踏切/券売機/標識/看板/照明 等) の向き:
+        // 通常設置 (Shift なし) = バニラの立て看板と同じ 22.5 度刻み (16 方向) にスナップ。
         if (railSnap == null && !gridAligned && !fluorescent && !wallMounted
                 && category != InstalledObjectCategory.SIGNAL
                 && category != InstalledObjectCategory.WIRE) {
@@ -312,36 +299,34 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
                 blockEntity.setDefinition(definition.getId(), category, placeYaw);
                 blockEntity.setMountPitch(placeMountPitch);
                 if (railSnap != null) {
-                    //レール曲線上の点にモデルを載せる (レンダラの原点は placePos + (0.5, 0, 0.5))
+                    // レール曲線上の点にモデルを載せる (レンダラの原点は placePos + (0.5, 0, 0.5))
                     blockEntity.setRenderOffset(railSnap.offX(), railSnap.offY(), railSnap.offZ());
                     blockEntity.setMountRoll(railSnap.roll());
                 } else if (fluorescent) {
-                    //本家 ItemInstalledObject の蛍光灯: 取付方向 (0..7) だけを持たせる。
-                    //RenderFluorescent.js が getDir() を読んで自分で寄せて回す。
+                    // 本家 ItemInstalledObject の蛍光灯: 取付方向 (0..7) だけを持たせる。
+                    // RenderFluorescent.js が getDir を読んで自分で寄せて回す。
                     blockEntity.setFluorescentDir(fluorescentDir(clickedFace, player.getYRot()));
                     blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
                 } else if (lightRotateByMeta) {
-                    //本家 meta = クリック面 (0-5)。RenderMachine と同じ面回転+向きで描くための保存。
+                    // 本家 meta = クリック面 (0-5)。RenderMachine と同じ面回転+向きで描くための保存。
                     blockEntity.setMountFace(clickedFace.ordinal());
                     blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
                 } else if (honkeFaceMount) {
-                    //本家 meta = クリック面 (1.7.10 side と 1.21 Direction.ordinal は同一)
+                    // 本家 meta = クリック面 (1.7.10 side と 1.21 Direction.ordinal は同一)
                     blockEntity.setMountFace(clickedFace.ordinal());
                     blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
                     if (category == InstalledObjectCategory.SIGNBOARD) {
-                        //本家 ItemInstalledObject: direction = 設置したプレイヤーの向き (0-3)。
+                        // 本家 ItemInstalledObject: direction = 設置したプレイヤーの向き (0-3)。
                         blockEntity.setSignDirection(signDirectionOf(player.getYRot()));
                     }
                 } else if (category == InstalledObjectCategory.PIPE) {
-                    //パイプ: クリック面 (0-5) を保存する。RenderPipe.js は getAttachedSide() の軸に
-                    //真っ直ぐ描き、RenderConnectablePipe.js はその面へ向かう腕を出す。モデルはワールド軸で
-                    //描くのでモデル自体は回さない (gridAligned で placeYaw=0)。
+                    // パイプ: クリック面 (0-5) を保存する。
+                    // 真っ直ぐ描き、RenderConnectablePipe.js はその面へ向かう腕を出す。
                     blockEntity.setMountFace(clickedFace.ordinal());
                     blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
                 } else if (category == InstalledObjectCategory.SIGNAL) {
                     // 当たり判定はそのままで、見た目だけ「クリックした柱」の中へ押し込む。
                     // 本家は信号が柱ブロックを置き換えてそこに描くため、横面設置のみ押し込む。
-                    // 上面/下面設置で埋め込むとモデルが 1 ブロック下に出るため無効化。
                     if (clickedFace.getAxis().isHorizontal()) {
                         double yawRad = Math.toRadians(player.getYRot());
                         double faceX = context.getClickedFace().getStepX();
@@ -372,16 +357,12 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
 
     /**
      * 本家 ItemInstalledObject の蛍光灯の取付方向 (TileEntityFluorescent.dirF, 0..7)。
-     * <p>
      * クリックした面で「どこに貼るか」が決まり、天井/床のときだけプレイヤーの向きで
-     * 蛍光灯を走らせる軸 (Z か X か) が決まる。RenderFluorescent.js の switch と対になっている:
-     * <pre>
-     *   0=天井(Z向き) 1=北面 2=床(Z向き) 3=南面 4=天井(X向き) 5=西面 6=床(X向き) 7=東面
-     * </pre>
+     * 蛍光灯を走らせる軸 (Z か X か) が決まる。
      */
     private static byte fluorescentDir(net.minecraft.core.Direction clickedFace, float playerYaw) {
-        //本家: floor(yaw * 4 / 360 + 0.5) & 3 — プレイヤーの向きを4方位に丸める。
-        //偶数 (南/北) なら Z 軸、奇数 (西/東) なら X 軸に蛍光灯を寝かせる。
+        // 本家: floor(yaw * 4 / 360 + 0.5) & 3 — プレイヤーの向きを4方位に丸める。
+        // 偶数 (南/北) なら Z 軸、奇数 (西/東) なら X 軸に蛍光灯を寝かせる。
         int quadrant = net.minecraft.util.Mth.floor(playerYaw * 4.0F / 360.0F + 0.5F) & 3;
         boolean alongZ = quadrant == 0 || quadrant == 2;
         return switch (clickedFace) {

@@ -22,11 +22,9 @@ import java.util.Locale;
 
 /**
  * 本家 GuiMotorman の移植 + スキン選択。運転士を素手で右クリックで開く。
- * <ul>
- *   <li><b>スキン:</b> 既定(季節)/標準/サンタ/獅子舞 + {@code config/realtrainmodunofficial/npc_skins/*.png}</li>
- *   <li><b>マクロ:</b> {@code config/realtrainmodunofficial/macro/*.txt} を選んで実行
- *       (1 行 = {@code 時刻 コマンド:引数}。例: {@code 0 Notch:5} / {@code 300 Door:Door_OpenLeft})</li>
- * </ul>
+ * スキン: 既定(季節)/標準/サンタ/獅子舞 + config/realtrainmodunofficial/npc_skins/*.png
+ * マクロ: config/realtrainmodunofficial/macro/*.txt を選んで実行
+ * (1 行 = 時刻 コマンド:引数。例: 0 Notch:5 / 300 Door:Door_OpenLeft)
  */
 public class MotormanScreen extends Screen {
 
@@ -35,7 +33,7 @@ public class MotormanScreen extends Screen {
     private int page;
     private static final int PER_PAGE = 6;
 
-    //スキン: 内部値と表示名 (index を合わせる)
+    // スキン: 内部値と表示名 (index を合わせる)
     private final List<String> skinValues = new ArrayList<>();
     private final List<String> skinNames = new ArrayList<>();
     private int skinIndex;
@@ -52,7 +50,7 @@ public class MotormanScreen extends Screen {
 
     @Override
     protected void init() {
-        //--- スキン一覧 (同梱 + npc_skins/) ---
+        // --- スキン一覧 (同梱 + npc_skins/) ---
         skinValues.clear();
         skinNames.clear();
         skinValues.add("");        skinNames.add("既定 (季節)");
@@ -63,7 +61,7 @@ public class MotormanScreen extends Screen {
             skinValues.add(custom);
             skinNames.add(custom);
         }
-        //現在のスキンを初期選択にする
+        // 現在のスキンを初期選択にする
         skinIndex = 0;
         if (Minecraft.getInstance().level != null
                 && Minecraft.getInstance().level.getEntity(entityId) instanceof EntityMotorman motorman) {
@@ -73,7 +71,7 @@ public class MotormanScreen extends Screen {
             }
         }
 
-        //--- マクロ一覧 ---
+        // --- マクロ一覧 ---
         List<Path> found = new ArrayList<>();
         try {
             Path folder = macroFolder();
@@ -93,7 +91,7 @@ public class MotormanScreen extends Screen {
     private void rebuild() {
         clearWidgets();
 
-        //スキン切替 (◀ 名前 ▶) — 押した瞬間にサーバーへ送って見た目に反映
+        // スキン切替 (◀ 名前 ▶) — 押した瞬間にサーバーへ送って見た目に反映
         int sy = 34;
         addRenderableWidget(Button.builder(Component.literal("◀"), b -> cycleSkin(-1))
                 .bounds(this.width / 2 - 130, sy, 20, 20).build());
@@ -102,7 +100,7 @@ public class MotormanScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("▶"), b -> cycleSkin(1))
                 .bounds(this.width / 2 + 110, sy, 20, 20).build());
 
-        //マクロリスト
+        // マクロリスト
         int y = sy + 32;
         int from = page * PER_PAGE;
         int to = Math.min(macros.size(), from + PER_PAGE);

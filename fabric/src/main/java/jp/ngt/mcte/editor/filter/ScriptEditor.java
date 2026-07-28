@@ -11,22 +11,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
 /**
- * 独自フィルタのスクリプトへ渡す作業机 (neo mcte)。本家 MCTE {@code Editor} をスクリプトから
+ * 独自フィルタのスクリプトへ渡す作業机 (neo mcte)。
  * 触るためのもの。
- *
- * <p>スクリプトはここのメソッドだけでワールドを触る。<b>Undo の記録はここが受け持つ</b>ので、
- * スクリプト側は記録を意識しなくてよい。範囲外や上限超過も黙って弾く。
- *
- * <pre>
- * function getFilterName() { return "MyFilter"; }
- * function initFilter(cfg) { cfg.addInt("Height", 3, 1, 16); }
- * function edit(e, filter) {
- *     for (var x = e.minX; x &lt;= e.maxX; x++)
- *         for (var z = e.minZ; z &lt;= e.maxZ; z++)
- *             e.setBlock(x, e.minY, z, "minecraft:stone");
- *     return true;
- * }
- * </pre>
  */
 public class ScriptEditor {
 
@@ -60,7 +46,7 @@ public class ScriptEditor {
         return changed;
     }
 
-    /** その位置のブロック名 ({@code minecraft:stone} 等)。 */
+    /** その位置のブロック名 (minecraft:stone 等)。 */
     public String getBlock(int x, int y, int z) {
         return BuiltInRegistries.BLOCK.getKey(level.getBlockState(new BlockPos(x, y, z)).getBlock()).toString();
     }
@@ -71,14 +57,14 @@ public class ScriptEditor {
 
     /**
      * 置く。範囲外・不正なブロック名・上限超過は何もせず false。
-     * <p>Undo の記録はここで行う。
+     * Undo の記録はここで行う。
      */
     public boolean setBlock(int x, int y, int z, String id) {
         if (changed >= EditorOps.MAX_BLOCKS) {
             return false;
         }
         if (x < minX || x > maxX || y < minY || y > maxY || z < minZ || z > maxZ) {
-            //★選択範囲の外は触らせない。スクリプトの書き間違いでワールドを壊さないため。
+            // ★選択範囲の外は触らせない。スクリプトの書き間違いでワールドを壊さないため。
             return false;
         }
         BlockState to = parse(id);

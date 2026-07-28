@@ -5,17 +5,13 @@ import jp.ngt.ngtlib.block.NGTObject;
 
 /**
  * 本家 jp.ngt.ngtlib.world.NGTWorld の移植。
- *
- * <p>「NGTObject (ミニチュア) を仮想ワールドとして読む」ためのラッパ。
- * NGTO Builder の Prop ツールのプレビュー描画 (render_Prop.js の renderNGTO) が
- * {@code new NGTWorld(NGTUtil.getClientWorld(), ngto)} を作り、ブロック照会を
- * このクラス越しに行う。ブロック系は<b>実ワールドではなく NGTObject</b> を見る。
+ * 「NGTObject (ミニチュア) を仮想ワールドとして読む」ためのラッパ。
  */
 @SuppressWarnings("unused")
 public class NGTWorld {
     public final Object baseWorld;
     public final Object ngtObject;
-    /** 本家フィールド名。スクリプトは {@code ngtWorld.world} / {@code .blockObject} と書く。 */
+    /** 本家フィールド名。スクリプトは ngtWorld.world / .blockObject と書く。 */
     public final Object world;
     public final NGTObject blockObject;
     public final int posX, posY, posZ;

@@ -12,12 +12,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * 列車検知器の設定画面。検知器を素手で右クリックすると開く。
- * <p>
  * 列車を検知したときに、指定した座標のレッドストーンブロックを「置く」か「消す」かを決める。
- * 列車が居なくなったら逆の動作をするので、実質「その座標のレッドストーン出力の ON/OFF」になる。
- * <p>
- * 安全のため、置くのは対象が<b>空気のときだけ</b>、消すのは対象が<b>レッドストーンブロックの
- * ときだけ</b>で、それ以外のブロックには触れない (建築物を壊さない)。
  */
 public class TrainDetectorConfigScreen extends Screen {
     private final InstalledObjectBlockEntity blockEntity;
@@ -28,13 +23,9 @@ public class TrainDetectorConfigScreen extends Screen {
     private Button buttonMode;
     private Button buttonEnabled;
 
-    /**
-     * true = 検知したら置く / false = 検知したら消す
-     */
+    /** true = 検知したら置く / false = 検知したら消す */
     private boolean placeOnDetect;
-    /**
-     * 出力先を設定するか。false なら検知するだけで何もしない。
-     */
+    /** 出力先を設定するか。false なら検知するだけで何もしない。 */
     private boolean hasTarget;
 
     public TrainDetectorConfigScreen(InstalledObjectBlockEntity blockEntity) {
@@ -47,7 +38,7 @@ public class TrainDetectorConfigScreen extends Screen {
     @Override
     protected void init() {
         BlockPos target = blockEntity.getDetectorTarget();
-        //未設定なら検知器の1つ下を初期値にしておく (そこから編集してもらう)
+        // 未設定なら検知器の1つ下を初期値にしておく (そこから編集してもらう)
         BlockPos initial = target != null ? target : blockEntity.getBlockPos().below();
 
         int cx = this.width / 2;
@@ -120,7 +111,7 @@ public class TrainDetectorConfigScreen extends Screen {
         int top = this.height / 2 - 50;
         graphics.drawCenteredString(this.font, this.title, cx, top - 44, 0xFFFFFF);
 
-        //現在の在線状態 (サーバから同期されている)
+        // 現在の在線状態 (サーバから同期されている)
         boolean onRail = blockEntity.isDetectorTrainOnRail();
         graphics.drawCenteredString(this.font, Component.translatable(onRail
                         ? "screen.realtrainmodunofficial.train_detector.detected"

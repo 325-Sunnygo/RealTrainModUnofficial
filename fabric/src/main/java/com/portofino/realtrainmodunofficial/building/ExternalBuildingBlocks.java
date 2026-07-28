@@ -27,18 +27,9 @@ import java.util.zip.ZipFile;
 
 /**
  * mods フォルダに入れた 1.7.10 の建材 mod からブロックテクスチャ
- * ({@code assets/<ns>/textures/blocks/*.png}) をかき集め、フルキューブブロックとして登録する。
- *
- * <p>1.7.10 の Block クラス (Java バイトコード) は 1.21 では実行不可能なので、形状・機能・面別
- * テクスチャは再現できない。建材 (フルキューブ) だけを対象に、テクスチャを全6面 (cube_all) に
- * 貼ったブロックを生成する。読めない mod・壊れた/非正方形テクスチャはスキップ (best-effort)。
- *
- * <p>1.7.10 のブロックテクスチャは <b>複数形</b> {@code textures/blocks/} に置かれる (1.13+ は単数形
- * {@code textures/block/})。この複数形を検出条件にすることで、現行 mod や RTM パックを自然に除外する。
- *
- * <p>スキャンは {@code @Mod} コンストラクタから (ブロックレジストリ凍結前に) {@link #init} で呼ぶ。
- * 生成した {@link #ENTRIES} を {@code ExternalBuildingPackBridge} が
- * blockstate/model/texture/lang のランタイムリソースパックへ変換する。
+ * (assets/<ns>/textures/blocks/*.png) をかき集め、フルキューブブロックとして登録する。
+ * 1.7.10 の Block クラス (Java バイトコード) は 1.21 では実行不可能なので、形状・機能・面別
+ * テクスチャは再現できない。
  */
 public final class ExternalBuildingBlocks {
     /** 生成ブロック/リソースの名前空間 (RTMU 自身)。 */
@@ -65,7 +56,7 @@ public final class ExternalBuildingBlocks {
     }
 
     /**
-     * {@code @Mod} コンストラクタから呼ぶ。スキャン → ブロック/アイテム登録 → バス接続。
+     * @Mod コンストラクタから呼ぶ。スキャン → ブロック/アイテム登録 → バス接続。
      * ここで登録したものは、コンストラクタ後に発火する RegisterEvent (凍結前) で確定する。
      */
     public static void init(IEventBus modBus) {
@@ -82,7 +73,7 @@ public final class ExternalBuildingBlocks {
             DeferredBlock<Block> block = BLOCKS.register(e.blockId(), () -> {
                 BlockBehaviour.Properties props = BlockBehaviour.Properties.of()
                     .strength(1.5F).sound(SoundType.STONE);
-                //アルファ持ちテクスチャ (ガラス等) は隣面カリングの見え方バグを避けるため非遮蔽に。
+                // アルファ持ちテクスチャ (ガラス等) は隣面カリングの見え方バグを避けるため非遮蔽に。
                 if (e.transparent()) {
                     props = props.noOcclusion();
                 }
@@ -113,7 +104,7 @@ public final class ExternalBuildingBlocks {
         } catch (Exception e) {
             return;
         }
-        //決定的な順序 (レジストリ/リソースパックで ID が安定するように)。
+        // 決定的な順序 (レジストリ/リソースパックで ID が安定するように)。
         jars.sort(Comparator.comparing(p -> p.getFileName().toString().toLowerCase(Locale.ROOT)));
         Set<String> seen = new HashSet<>();
         for (Path jar : jars) {
@@ -142,7 +133,7 @@ public final class ExternalBuildingBlocks {
                 if (!lower.endsWith(".png")) {
                     continue;
                 }
-                //assets/<ns>/textures/blocks/<...>.png  (1.7.10 は複数形 blocks)
+                // assets/<ns>/textures/blocks/<...>.png  (1.7.10 は複数形 blocks)
                 String[] parts = name.split("/");
                 if (parts.length < 5
                         || !parts[0].equalsIgnoreCase("assets")
@@ -162,7 +153,7 @@ public final class ExternalBuildingBlocks {
                 if (mm != null) {
                     mcmeta = mm.getName();
                 }
-                //PNG ヘッダ (IHDR) を読んで 正方形か / アルファ有無 を判定 (フルデコードしない)。
+                // PNG ヘッダ (IHDR) を読んで 正方形か / アルファ有無 を判定 (フルデコードしない)。
                 int[] header = readPngHeader(zip, entry);
                 if (header == null) {
                     continue;
@@ -171,7 +162,7 @@ public final class ExternalBuildingBlocks {
                 int width = header[1];
                 int height = header[2];
                 boolean square = width == height && width > 0;
-                //非正方形テクスチャは .mcmeta (アニメ宣言) が無いとアトラス貼り付けで壊れるのでスキップ。
+                // 非正方形テクスチャは .mcmeta (アニメ宣言) が無いとアトラス貼り付けで壊れるのでスキップ。
                 if (!square && mcmeta == null) {
                     continue;
                 }
@@ -184,9 +175,8 @@ public final class ExternalBuildingBlocks {
     }
 
     /**
-     * PNG の IHDR チャンクから {@code {colorType, width, height}} を返す。フルデコードしない。
+     * PNG の IHDR チャンクから {colorType, width, height} を返す。フルデコードしない。
      * PNG レイアウト: signature(8) len(4) "IHDR"(4) width(4) height(4) bitDepth(1) colorType(1)。
-     * colorType 4/6 = アルファチャンネル有り。読めなければ null。
      */
     private static int[] readPngHeader(ZipFile zip, ZipEntry entry) {
         try (InputStream in = zip.getInputStream(entry)) {
@@ -203,7 +193,7 @@ public final class ExternalBuildingBlocks {
         }
     }
 
-    /** ResourceLocation パスに使える {@code [a-z0-9_]} へ正規化する。 */
+    /** ResourceLocation パスに使える [a-z0-9_] へ正規化する。 */
     static String sanitize(String s) {
         if (s == null) {
             return "";

@@ -3,9 +3,6 @@ package jp.ngt.rtm.render;
 /**
  * 本家 jp.ngt.rtm.render.NPCPartsRenderer の移植。
  * 人型 NPC (運転士・乗客) のモデルスクリプトが、各関節の角度を読んでパーツを回す。
- *
- * <p>角度はラジアン。本家は {@code setRotationAngles} で歩行/腕振り/しゃがみを計算して
- * これらのフィールドへ書き、スクリプトは {@code renderer.rightArmAngleX} のように読む。
  */
 @SuppressWarnings("unused")
 public class NPCPartsRenderer extends PartsRenderer {
@@ -39,7 +36,7 @@ public class NPCPartsRenderer extends PartsRenderer {
         this.headAngleY = (float) Math.toRadians(yawOffset);
         this.headAngleX = (float) Math.toRadians(pitch);
 
-        //腕と脚は歩行位相で前後に振る (本家と同じ cos/ちょうど半周ずれ)
+        // 腕と脚は歩行位相で前後に振る (本家と同じ cos/ちょうど半周ずれ)
         this.rightArmAngleX = (float) Math.cos(walkPos * 0.6662D + Math.PI) * 2.0F * walkSpeed * 0.5F;
         this.leftArmAngleX = (float) Math.cos(walkPos * 0.6662D) * 2.0F * walkSpeed * 0.5F;
         this.rightLegAngleX = (float) Math.cos(walkPos * 0.6662D) * 1.4F * walkSpeed;
@@ -49,7 +46,7 @@ public class NPCPartsRenderer extends PartsRenderer {
         this.leftArmAngleZ = 0.0F;
 
         if (living.isPassenger()) {
-            //座っている姿勢
+            // 座っている姿勢
             this.rightArmAngleX = (float) Math.toRadians(-45.0D);
             this.leftArmAngleX = (float) Math.toRadians(-45.0D);
             this.rightLegAngleX = (float) Math.toRadians(-75.0D);

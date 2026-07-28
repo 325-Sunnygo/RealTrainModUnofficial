@@ -8,8 +8,6 @@ import java.util.Map;
 /**
  * 本家 jp.ngt.rtm.entity.train.util.FormationManager (KaizPatchX) の忠実移植。
  * 本家は RTMCore.proxy が Side ごとのインスタンスを供給 → ここでは static 2 面で再現。
- * TODO: FormationData (SavedData) の永続化。現状は車両 NBT の FormationEntry からの再構築のみ
- * (本家でもエンティティ ID はセッション毎に変わるため、実質の復元経路は車両 NBT 側)。
  */
 public final class FormationManager {
     private static final FormationManager SERVER = new FormationManager(false);
@@ -60,9 +58,7 @@ public final class FormationManager {
         return id;
     }
 
-    /**
-     * 編成を新規に作成(車両設置時のみ使用)
-     */
+    /** 編成を新規に作成(車両設置時のみ使用) */
     public Formation createNewFormation(EntityTrainBase par1) {
         long newId = this.getNewFormationId();
         Formation formation = new Formation(newId, 1, this.isRemote);

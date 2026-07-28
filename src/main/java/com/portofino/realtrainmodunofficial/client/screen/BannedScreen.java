@@ -12,17 +12,14 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * BAN 画面。BAN されたユーザーが RTMU 入りで起動すると必ずこの画面になり、先へ進めない。
- * (BAN リストは RTMU 公式サイトの ban.txt — {@link com.portofino.realtrainmodunofficial.online.RtmuOnlineServices})
- *
- * <p>背景は {@code textures/gui/ban_background.png} (草原の壁紙) を画面いっぱいに敷き、
- * 描画時に少しぼかす (ずらし重ね描き)。テクスチャが無い場合は暗色にフォールバック。
+ * (BAN リストは RTMU 公式サイトの ban.txt — com.portofino.realtrainmodunofficial.online.RtmuOnlineServices)
  */
 public final class BannedScreen extends Screen {
 
     private static final ResourceLocation BACKGROUND =
             ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "textures/gui/ban_background.png");
 
-    //背景テクスチャの有無とサイズ (初回だけ調べてキャッシュ)
+    // 背景テクスチャの有無とサイズ (初回だけ調べてキャッシュ)
     private static Boolean backgroundExists;
     private static int texW = 1920;
     private static int texH = 1080;
@@ -42,7 +39,7 @@ public final class BannedScreen extends Screen {
             try {
                 var res = Minecraft.getInstance().getResourceManager().getResource(BACKGROUND);
                 if (res.isPresent()) {
-                    //実サイズを読む (どの解像度の画像を置いてもアスペクト比を保てるように)
+                    // 実サイズを読む (どの解像度の画像を置いてもアスペクト比を保てるように)
                     try (var in = res.get().open(); NativeImage img = NativeImage.read(in)) {
                         texW = img.getWidth();
                         texH = img.getHeight();
@@ -65,7 +62,7 @@ public final class BannedScreen extends Screen {
             g.fill(0, 0, this.width, this.height, 0xFF100000);
             return;
         }
-        //画面を覆うようにアスペクト比を保って拡大 (cover)
+        // 画面を覆うようにアスペクト比を保って拡大 (cover)
         float scale = Math.max((float) this.width / texW, (float) this.height / texH);
         int w = (int) Math.ceil(texW * scale);
         int h = (int) Math.ceil(texH * scale);
@@ -74,7 +71,7 @@ public final class BannedScreen extends Screen {
 
         g.blit(BACKGROUND, x, y, w, h, 0.0F, 0.0F, texW, texH, texW, texH);
 
-        //少しぼかす: 上下左右斜めへ 2px ずらして半透明で重ね描き (簡易ボックスブラー)。
+        // 少しぼかす: 上下左右斜めへ 2px ずらして半透明で重ね描き (簡易ボックスブラー)。
         RenderSystem.enableBlend();
         final int[][] offsets = {{2, 0}, {-2, 0}, {0, 2}, {0, -2}, {2, 2}, {-2, -2}, {2, -2}, {-2, 2}};
         g.setColor(1.0F, 1.0F, 1.0F, 0.15F);
@@ -84,14 +81,14 @@ public final class BannedScreen extends Screen {
         g.setColor(1.0F, 1.0F, 1.0F, 1.0F);
         RenderSystem.disableBlend();
 
-        //文字の可読性のため、うっすら暗くする
+        // 文字の可読性のため、うっすら暗くする
         g.fill(0, 0, this.width, this.height, 0x50000000);
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         super.render(g, mouseX, mouseY, partialTick);
-        //タイトルは 2 倍サイズで目立たせる
+        // タイトルは 2 倍サイズで目立たせる
         g.pose().pushPose();
         g.pose().translate(this.width / 2.0F, this.height / 2.0F - 40, 0);
         g.pose().scale(2.0F, 2.0F, 1.0F);
@@ -110,7 +107,7 @@ public final class BannedScreen extends Screen {
 
     @Override
     public void onClose() {
-        //閉じさせない (OnlineClientHooks が再度この画面へ強制する)。
+        // 閉じさせない (OnlineClientHooks が再度この画面へ強制する)。
     }
 
     @Override

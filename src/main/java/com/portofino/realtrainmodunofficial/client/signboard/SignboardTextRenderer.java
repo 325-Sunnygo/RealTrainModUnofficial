@@ -10,38 +10,22 @@ import java.util.WeakHashMap;
 
 /**
  * 本家 SignboardText の描画/アニメ部の移植 (クライアント専用)。
- * <p>
- * {@link SignboardText} はデータだけを持つので、こちらがフォント画像 ({@link FontImage}) の
- * 生成とアニメーションの進行を受け持つ。看板ブロックごとではなく SignboardText ごとに
- * 状態を持たせたいので、SignboardText を弱参照キーにしたキャッシュで対応付けている。
- * <p>
- * サーバから同期が来るたび (チャンク読み込みのたび) に BlockEntity は SignboardText を
- * 作り直すので、古い状態は GC に任せる必要がある。そのため
- * <b>この値クラスは SignboardText を一切参照しない</b> — WeakHashMap の値がキーを強参照
- * すると、キーが弱到達にならずエントリが永久に残ってしまうため。描画対象の SignboardText は
- * 毎回引数で受け取る。
+ * SignboardText はデータだけを持つので、こちらがフォント画像 (FontImage) の
+ * 生成とアニメーションの進行を受け持つ。
  */
 public final class SignboardTextRenderer {
     private static final Map<SignboardText, SignboardTextRenderer> CACHE =
             Collections.synchronizedMap(new WeakHashMap<>());
 
     private static final float TO_SEC = 0.001F;
-    /**
-     * フォント画像の高さ(px)。UV の切り出し幅の計算に使う。
-     */
+    /** フォント画像の高さ(px)。UV の切り出し幅の計算に使う。 */
     private static final float IMAGE_SIZE = SignboardText.IMAGE_SIZE;
 
-    /**
-     * 表示候補。通常は '|' 区切り、時刻表モードでは列車ごとの文字列 + 末尾に空白。
-     */
+    /** 表示候補。通常は '|' 区切り、時刻表モードでは列車ごとの文字列 + 末尾に空白。 */
     private FontImage[] images = new FontImage[0];
-    /**
-     * images を作ったときの見た目キー。変わったら焼き直す。
-     */
+    /** images を作ったときの見た目キー。変わったら焼き直す。 */
     private String builtKey = "";
-    /**
-     * images を作ったときの時刻表設定。変わったら焼き直す。
-     */
+    /** images を作ったときの時刻表設定。変わったら焼き直す。 */
     private String builtTtSetting = "";
     /**
      * images を作ったときの FontImage キャッシュ世代。ワールドを抜けてテクスチャが
@@ -59,7 +43,6 @@ public final class SignboardTextRenderer {
 
     /**
      * この文字の「今このフレームで描くべき内容」を返す。
-     *
      * @param ttSetting 看板の時刻表設定 ("tt=...,station=...,track=...")
      */
     public static Frame frameFor(SignboardText text, String ttSetting) {
@@ -81,7 +64,7 @@ public final class SignboardTextRenderer {
         boolean visible = true;
 
         if (text.animeType == SignboardAnimeType.SCROLL) {
-            //本家: animeSpeed 秒で UV を1周させる。
+            // 本家: animeSpeed 秒で UV を1周させる。
             float u = prevMinU + difSec / Math.max(0.001F, text.animeSpeed);
             minU = u % 1.0F;
             float tw = IMAGE_SIZE * text.width / text.size / image.getWidth();
@@ -89,7 +72,7 @@ public final class SignboardTextRenderer {
             prevTime = time;
             prevMinU = minU;
         } else if (text.animeType == SignboardAnimeType.FLASH) {
-            //本家: animeSpeed 秒 表示 → animeSpeed 秒 非表示 の繰り返し。
+            // 本家: animeSpeed 秒 表示 → animeSpeed 秒 非表示 の繰り返し。
             if (difSec >= text.animeSpeed) {
                 visible = false;
                 if (difSec >= text.animeSpeed * 2.0F) {
@@ -105,8 +88,8 @@ public final class SignboardTextRenderer {
                     return Frame.HIDDEN;
                 }
             }
-            //本家: 指定した幅に収まるぶんだけ UV を切り出す。文字が幅より短ければ
-            //自然な縦横比になるようにクアッド側を縮める。
+            // 本家: 指定した幅に収まるぶんだけ UV を切り出す。文字が幅より短ければ
+            // 自然な縦横比になるようにクアッド側を縮める。
             int tw = (int) (IMAGE_SIZE * text.width / text.size);
             maxU = (float) tw / image.getWidth();
             if (maxU > 1.0F) {
@@ -123,7 +106,7 @@ public final class SignboardTextRenderer {
             return null;
         }
         if (stationTimeTable != null) {
-            //時刻表モード: 「次に発車する列車」を基準に offset 本先を出す。
+            // 時刻表モード: 「次に発車する列車」を基準に offset 本先を出す。
             int idx = stationTimeTable.getMatchTrainIndex(stationTimeTable.track) + text.getTimeTableOffset();
             if (idx >= images.length) {
                 idx = images.length - 1;
@@ -160,7 +143,7 @@ public final class SignboardTextRenderer {
                 String s = stt.getData(i, col);
                 built[i] = FontImage.create(s, text.font, text.style, text.color, SignboardText.IMAGE_SIZE);
             }
-            //本家: 末尾は「該当列車なし」用の空白。
+            // 本家: 末尾は「該当列車なし」用の空白。
             built[size] = FontImage.create(" ", text.font, text.style, text.color, SignboardText.IMAGE_SIZE);
             this.images = built;
         } else {
@@ -176,7 +159,6 @@ public final class SignboardTextRenderer {
 
     /**
      * このフレームで描くべき内容。
-     *
      * @param image   貼るフォント画像
      * @param minU    UV の左端 (SCROLL で動く)
      * @param maxU    UV の右端

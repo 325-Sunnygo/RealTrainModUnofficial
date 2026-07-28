@@ -15,13 +15,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 
 /**
- * ミニチュアアイテムの描画 (neo mcte)。本家 MCTE {@code RenderItemMiniature} 相当。
- *
- * <p>インベントリや手元で<b>中身が見える</b>ようにする。ミニチュアを何個も持つと
- * 見分けがつかないのが本家からの不満点だったので、neo mcte では既定で中身を描く。
- *
- * <p>アイテム表示では設定の {@code Scale} は使わず、<b>スロットに収まる大きさへ自動で正規化</b>する。
- * 設定の縮尺は「ワールドに置いたときの大きさ」であって、アイコンの大きさとは別物のため。
+ * ミニチュアアイテムの描画 (neo mcte)。本家 MCTE RenderItemMiniature 相当。
+ * インベントリや手元で中身が見えるようにする。
  */
 public class MiniatureItemRenderer extends BlockEntityWithoutLevelRenderer {
 
@@ -49,9 +44,9 @@ public class MiniatureItemRenderer extends BlockEntityWithoutLevelRenderer {
         var dispatcher = Minecraft.getInstance().getBlockRenderer();
 
         poseStack.pushPose();
-        //アイテムの原点はモデル空間の (0,0,0)。中央へ寄せてから縮める。
+        // アイテムの原点はモデル空間の (0,0,0)。中央へ寄せてから縮める。
         poseStack.translate(0.5D, 0.5D, 0.5D);
-        //少し傾けて立体的に見せる (アイコンで正面から見ると板に見えるため)
+        // 少し傾けて立体的に見せる (アイコンで正面から見ると板に見えるため)
         if (context == ItemDisplayContext.GUI) {
             poseStack.mulPose(com.mojang.math.Axis.XP.rotationDegrees(30.0F));
             poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-45.0F));
@@ -72,7 +67,7 @@ public class MiniatureItemRenderer extends BlockEntityWithoutLevelRenderer {
             try {
                 dispatcher.renderSingleBlock(set.state, poseStack, buffer, packedLight, OverlayTexture.NO_OVERLAY);
             } catch (Throwable ignored) {
-                //描けないブロックは飛ばす。1 個の失敗でアイコンごと消さない。
+                // 描けないブロックは飛ばす。1 個の失敗でアイコンごと消さない。
             }
             poseStack.popPose();
         }

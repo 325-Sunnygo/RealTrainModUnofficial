@@ -13,7 +13,7 @@ import net.neoforged.neoforge.client.event.ScreenEvent;
 
 /**
  * ポーズメニュー (Esc) に「RTMU設定」ボタンを追加する。
- * 押すと {@link RtmuSettingsScreen} を開く。
+ * 押すと  を開く。
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class RtmuPauseMenuButton {
@@ -26,7 +26,7 @@ public final class RtmuPauseMenuButton {
         if (!(event.getScreen() instanceof PauseScreen pause)) {
             return;
         }
-        //中央の既存ボタン列と重ならないよう左下に配置する。
+        // 中央の既存ボタン列と重ならないよう左下に配置する。
         int x = 8;
         int y = pause.height - 28;
         Button button = Button.builder(Component.literal("RTMU設定"),

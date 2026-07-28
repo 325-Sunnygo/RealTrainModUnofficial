@@ -32,9 +32,7 @@ public final class MarkerManager {
         }
     }
 
-    /**
-     * 本家 loadedTileEntityList 走査の代替。
-     */
+    /** 本家 loadedTileEntityList 走査の代替。 */
     public static List<TileEntityMarker> getMarkers(Level level) {
         Set<TileEntityMarker> set = MARKERS.get(level);
         if (set == null) {

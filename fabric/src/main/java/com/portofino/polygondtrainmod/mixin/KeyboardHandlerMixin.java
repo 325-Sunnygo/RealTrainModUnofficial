@@ -9,14 +9,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * {@code InputEvent.Key} の発火点。
- *
- * <p>NeoForge はキー入力をイベントとして流すが、Fabric API に相当物が無い。RTMU は
- * マスコン・ブレーキ・レバーサ・エディタ操作を全部このイベントで受けているので、
- * これが無いと<b>起動はするが運転できない</b>状態になる。
- *
- * <p>NeoForge と同じく「ウィンドウのキーイベントを受けた時点」で流す。画面が開いている
- * ときも流れる点まで同じ (購読側が {@code mc.screen != null} で弾いている)。
+ * InputEvent.Key の発火点。
+ * NeoForge はキー入力をイベントとして流すが、Fabric API に相当物が無い。
  */
 @Mixin(KeyboardHandler.class)
 public class KeyboardHandlerMixin {
@@ -24,7 +18,7 @@ public class KeyboardHandlerMixin {
     @Inject(method = "keyPress", at = @At("HEAD"))
     private void rtmu$postKeyEvent(long window, int key, int scanCode, int action, int modifiers,
                                    CallbackInfo ci) {
-        //自分のウィンドウ以外 (デバッグ用の別ウィンドウ等) は無視する
+        // 自分のウィンドウ以外 (デバッグ用の別ウィンドウ等) は無視する
         if (window != net.minecraft.client.Minecraft.getInstance().getWindow().getWindow()) {
             return;
         }

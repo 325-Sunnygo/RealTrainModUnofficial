@@ -33,8 +33,8 @@ public class RailPackLoader {
         if (loaded) return;
         loaded = true;
         LOADED.clear();
-        //jar 同梱の本家レール定義。以前は loadFromModJar() がどこからも呼ばれておらず
-        //(デッドコード)、既定レールが 1 つも登録されていなかった。
+        // jar 同梱の本家レール定義。以前は loadFromModJar がどこからも呼ばれておらず
+        // (デッドコード)、既定レールが 1 つも登録されていなかった。
         loadFromModJar();
         loadFromExternalDirectories();
         loadFromGameDirectories();
@@ -54,10 +54,7 @@ public class RailPackLoader {
 
     /**
      * MOD の jar に同梱した本家レール定義 (assets/minecraft/models/json/ModelRail_*.json) を読む。
-     * <p>
-     * ここが無かったため、レール定義はパック zip からしか読めなかった。パックを入れていない
-     * 環境では選択できるレールが 1 つも無い状態になっていた
-     * (設置物 / 自動車は同じ場所を走査しているので、レールだけが取り残されていた)。
+     * ここが無かったため、レール定義はパック zip からしか読めなかった。
      */
     private static void loadBuiltinRailsFromModJar() {
         try {
@@ -127,7 +124,7 @@ public class RailPackLoader {
             // RTM 系 pack は zip / jar の両方で配られるので、入口は archive に寄せる。
             stream.filter(RailPackLoader::isSupportedArchive)
                 .forEach(zipPath -> {
-                    //README 同意ゲート: 未同意/拒否のパックはロードしない。
+                    // README 同意ゲート: 未同意/拒否のパックはロードしない。
                     if (!com.portofino.realtrainmodunofficial.pack.PackConsent.isAllowed(zipPath)) {
                         return;
                     }
@@ -145,8 +142,8 @@ public class RailPackLoader {
         if (!fileName.endsWith(".zip") && !fileName.endsWith(".jar")) {
             return false;
         }
-        //自分自身の jar を「パック」として読み直すと、jar 同梱の本家レール定義が
-        //二重登録される。ファイル名だけだとリネームされた jar をすり抜けるので実体でも見る。
+        // 自分自身の jar を「パック」として読み直すと、jar 同梱の本家レール定義が
+        // 二重登録される。ファイル名だけだとリネームされた jar をすり抜けるので実体でも見る。
         return !fileName.contains("realtrainmodunofficial")
             && !fileName.contains("rtm-official-assets")
             && !fileName.contains("kaizpatchx")
@@ -238,16 +235,11 @@ public class RailPackLoader {
                 modelFile = getString(model, "modelFile");
                 tex = parseTextures(model);
             } else {
-                //★ 旧形式 (本家 RailConfig.init): "model" オブジェクトが無いパックは
-                //   "railModel" (モデルのパス) と "railTexture" (テクスチャのパス) を
-                //   <b>文字列で直接</b>持っている。本家は model が無ければこの 2 つから組み立てる:
-                //
-                //     this.model.modelFile = this.railModel;
-                //     this.model.textures  = {{"default", this.railTexture}};
-                //
-                //   これを読めておらず、旧形式のレールを<b>黙って読み飛ばしていた</b>。
-                //   その結果、敷いてあるレールのモデルがレジストリに無く、レンダラーが
-                //   「今選択中のレール」にフォールバックして<b>まったく別のレールに見えていた</b>。
+                // ★ 旧形式 (本家 RailConfig.init): "model" オブジェクトが無いパックは
+                // "railModel" (モデルのパス) と "railTexture" (テクスチャのパス) を
+                // 文字列で直接持っている。
+                // this.model.modelFile = this.railModel;
+                // this.model.textures  = {{"default", this.railTexture}};
                 modelFile = getString(obj, "railModel");
                 if (modelFile == null || modelFile.isBlank()) {
                     return;
@@ -269,9 +261,6 @@ public class RailPackLoader {
             float scale = parseFloat(model, "scale", 1.0F);
             // ballastWidth / defaultBallast (RTM 公式パック互換) / model.ballastWidth のいずれか。
             // RTM 公式の defaultBallast は配列 [{blockName, blockMetadata, height}, ...]。
-            // ここを getAsInt() で読んでいたため配列だと例外→レールが丸ごとスキップされ、
-            // 公式レールがほぼ読み込まれず選択画面のボタンが数本に潰れていた (ユーザー報告)。
-            // 何も無くて軌間 (1067mm / 1435mm 等) 系の名前なら 3 をデフォルトにする。
             int ballast = 0;
             String ballastBlockId = "";
             if (obj.has("ballastWidth")) {
@@ -470,12 +459,10 @@ public class RailPackLoader {
             if (modJar != null) return modJar;
         }
         // packName が mod ID 自身 ("realtrainmodunofficial") のとき = MOD の jar に同梱した
-        // 本家定義 (assets/minecraft/models/json/*.json)。モデル本体も同じ jar の
+        // 本家定義 (assets/minecraft/models/json/*.json)。
         // assets/minecraft/models/ に入っているので、jar そのものをパックとして返す。
-        //
         // ★ここが null を返すと、定義は読めるのにモデルの実体が見つからず「当たり判定は
-        // あるのにモデルが透明」になる。以前は mods フォルダの RTM-Official-Assets*.zip しか
-        // 探しておらず、その zip を入れていない環境では本家の既定モデルが全て透明だった。
+        // あるのにモデルが透明」になる。
         if (com.portofino.realtrainmodunofficial.RealTrainModUnofficial.MODID.equalsIgnoreCase(packName)) {
             Path modJar = BundledPackStore.getModJarPath();
             if (modJar != null) {
@@ -512,9 +499,8 @@ public class RailPackLoader {
     /** スクリプトファイルの内容をパックZIPから読み込む。見つからない場合はnullを返す。 */
     public static String readScriptContent(RailDefinition definition) {
         if (definition == null || definition.getScriptPath() == null || definition.getScriptPath().isBlank()) return null;
-        //★同梱パック (mod jar) は resolvePackPath が null を返す。ここで打ち切ると
-        //同梱レールのスクリプトが永久に読めず、黙ってスクリプト無し描画に落ちていた。
-        //zip 走査は飛ばして、下の索引フォールバックへ進む。
+        // ★同梱パック (mod jar) は resolvePackPath が null を返す。
+        // 同梱レールのスクリプトが永久に読めず、黙ってスクリプト無し描画に落ちていた。
         Path packPath = resolvePackPath(definition.getPackName());
         String scriptPath = normalize(definition.getScriptPath());
         String scriptFileName = scriptPath.contains("/")
@@ -535,8 +521,8 @@ public class RailPackLoader {
             RealTrainModUnofficial.LOGGER.warn("Failed to read script {} from pack {}", definition.getScriptPath(), definition.getPackName(), e);
         }
         }
-        //自パックに無い: 前提/ベーススクリプトパックを横断する資産索引 (NGTFileLoader) から探す。
-        //車両スクリプトと同じく、レールの実体スクリプトが別の前提パックにある分割構成に対応する。
+        // 自パックに無い: 前提/ベーススクリプトパックを横断する資産索引 (NGTFileLoader) から探す。
+        // 車両スクリプトと同じく、レールの実体スクリプトが別の前提パックにある分割構成に対応する。
         try {
             byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(scriptPath);
             if (bytes != null) {

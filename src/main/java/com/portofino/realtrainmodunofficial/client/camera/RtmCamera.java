@@ -24,19 +24,8 @@ import java.time.format.DateTimeFormatter;
 
 /**
  * 撮り鉄用カメラ本体。本家 jp.ngt.rtm.gui.camera.Camera の作り直し。
- *
- * <p>本家は「ズーム倍率・感度・深度バッファのフォーカス値」を直接いじる作りだったが、
+ * 本家は「ズーム倍率・感度・深度バッファのフォーカス値」を直接いじる作りだったが、
  * ここは実際のカメラと同じ操作系にしてある:
- * <ul>
- *   <li>焦点距離 18〜840mm (望遠で圧縮効果)</li>
- *   <li>F値 f/1.4〜f/22 (背景のボケ量)</li>
- *   <li>シャッター速度 1/1000〜1/4 (遅くすると流し撮りになる)</li>
- *   <li>AF-S / <b>AF-C (列車追尾)</b> / MF (置きピン)</li>
- *   <li>三分割・対角・方眼グリッド / アスペクトガイド / 水平器</li>
- * </ul>
- *
- * <p>ピント合わせはレイキャストで行う (深度バッファを読むより確実で、
- * 「被写体に合わせる」という実機の挙動そのもの)。深度バッファはボケ量の計算だけに使う。
  */
 public final class RtmCamera {
 
@@ -107,7 +96,6 @@ public final class RtmCamera {
 
     /**
      * 本家 Camera.getFov 相当。焦点距離から実際の FOV を出す。
-     * <p>
      * 単純に fov/zoom にすると望遠側で画角が不自然になるので、本家と同じく
      * 「イメージセンサー上の像高が zoom 倍になる」= tan(fov/2) を割る、で計算する。
      */
@@ -117,9 +105,7 @@ public final class RtmCamera {
         return Math.toDegrees(Math.atan(t) * 2.0D);
     }
 
-    /**
-     * マウス感度をズームに合わせて落とす。800mm で等倍のままだと狙いが定まらない。
-     */
+    /** マウス感度をズームに合わせて落とす。800mm で等倍のままだと狙いが定まらない。 */
     public double getMouseSensitivityScale() {
         return 1.0D / Math.max(1.0D, Math.sqrt(state.getZoomScale()));
     }
@@ -133,7 +119,7 @@ public final class RtmCamera {
         if (!active || mc.level == null || mc.player == null) {
             return;
         }
-        //GUI を開いている間は操作しない (チャット等)
+        // GUI を開いている間は操作しない (チャット等)
         if (mc.screen != null) {
             return;
         }
@@ -156,7 +142,7 @@ public final class RtmCamera {
                 state.stepFocus(-1.0F);
             }
         }
-        //押しっぱなしで連続変化させたくないもの (段階的な設定) は consumeClick
+        // 押しっぱなしで連続変化させたくないもの (段階的な設定) は consumeClick
         while (CameraKeyMappings.APERTURE_OPEN.consumeClick()) {
             state.stepAperture(-1);
         }
@@ -201,13 +187,11 @@ public final class RtmCamera {
         if (state.getFocusMode() != CameraState.FocusMode.MF) {
             state.setFocusDistance(target);
         }
-        //実機のように少し遅れて合焦する (パッと切り替わると不自然、AF-C の追従感も出る)
+        // 実機のように少し遅れて合焦する (パッと切り替わると不自然、AF-C の追従感も出る)
         currentFocus = Mth.lerp(0.35F, currentFocus, state.getFocusDistance());
     }
 
-    /**
-     * AF-S: 画面中央にあるもの (ブロック / エンティティ) までの距離。
-     */
+    /** AF-S: 画面中央にあるもの (ブロック / エンティティ) までの距離。 */
     private float autofocusCenter(Minecraft mc) {
         LocalPlayer player = mc.player;
         if (player == null) {
@@ -247,9 +231,7 @@ public final class RtmCamera {
 
     /**
      * AF-C: 画角の中に入っている一番近い列車を掴んで追い続ける。
-     * <p>
      * 走ってくる列車を望遠で抜くときに、いちいちピントを送らなくて済むようにするための機能。
-     * 一度掴んだ列車は画角から外れるまで離さない (実機のコンティニュアス AF と同じ)。
      */
     private float autofocusTrain(Minecraft mc) {
         LocalPlayer player = mc.player;
@@ -259,7 +241,7 @@ public final class RtmCamera {
         Vec3 eye = player.getEyePosition(1.0F);
         Vec3 look = player.getViewVector(1.0F);
 
-        //掴んでいる列車がまだ生きていて画角の中にいるなら、それを追い続ける
+        // 掴んでいる列車がまだ生きていて画角の中にいるなら、それを追い続ける
         if (trackedTrain != null) {
             if (!trackedTrain.isAlive() || !inFrame(eye, look, trackedTrain)) {
                 trackedTrain = null;
@@ -270,7 +252,7 @@ public final class RtmCamera {
         }
         if (trackedTrain == null) {
             focusTarget = "追尾なし";
-            //列車がいなければ中央 AF にフォールバック (背景に合わせておく)
+            // 列車がいなければ中央 AF にフォールバック (背景に合わせておく)
             return autofocusCenterQuiet(mc);
         }
         focusTarget = displayName(trackedTrain) + " ●";
@@ -315,9 +297,9 @@ public final class RtmCamera {
             return false;
         }
         double cos = to.scale(1.0D / len).dot(look);
-        //ズームするほど画角が狭くなる = 追尾対象も絞られる
+        // ズームするほど画角が狭くなる = 追尾対象も絞られる
         double halfFovRad = Math.toRadians(Math.max(2.0D, 70.0D / state.getZoomScale()) * 0.5D);
-        //少し余裕を持たせる (画角ぎりぎりで見失うのを防ぐ)
+        // 少し余裕を持たせる (画角ぎりぎりで見失うのを防ぐ)
         return cos > Math.cos(halfFovRad * 1.6D);
     }
 
@@ -339,7 +321,7 @@ public final class RtmCamera {
 
     // ---- 撮影 ----
 
-    /** 撮影予約。実際の取り込みは GUI を描く直前 ({@link #captureIfPending}) に行う。 */
+    /** 撮影予約。実際の取り込みは GUI を描く直前 (#captureIfPending) に行う。 */
     private boolean pendingShot;
 
     private void shoot(Minecraft mc) {
@@ -352,11 +334,9 @@ public final class RtmCamera {
     }
 
     /**
-     * 画面の取り込み。<b>GUI を描く直前</b>に呼ぶこと。
-     * <p>
+     * 画面の取り込み。GUI を描く直前に呼ぶこと。
      * バニラの F2 は GUI ごと写るが、それだとファインダーのグリッドや設定表示が
-     * 写真に焼き込まれてしまう。メインターゲットにワールド (+ ボケ/流し撮り) だけが
-     * 入っていて、まだ GUI が乗っていないこの瞬間に撮る。
+     * 写真に焼き込まれてしまう。
      */
     public void captureIfPending(Minecraft mc) {
         if (!pendingShot) {

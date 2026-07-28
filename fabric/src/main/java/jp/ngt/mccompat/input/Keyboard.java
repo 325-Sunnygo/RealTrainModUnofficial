@@ -6,7 +6,6 @@ import org.lwjgl.glfw.GLFW;
 /**
  * LWJGL2 org.lwjgl.input.Keyboard のスクリプト互換 (GLFW ベース)。
  * SRB3/NGTO Builder が isKeyDown + KEY_* 定数を使用する。
- * 定数値は LWJGL2 のキーコード、内部で GLFW キーへ変換する。
  */
 public final class Keyboard {
     private Keyboard() {
@@ -41,9 +40,7 @@ public final class Keyboard {
     public static final int KEY_RETURN = 28;
     /**
      * KEY_NONE = 0。本家 LWJGL2 の「キー未割り当て」。
-     * <p>NGTO Builder 2 の InputManager が修飾キーの初期値に使う。未定義だと
-     * {@code Keyboard.isKeyDown(undefined)} になり、そこで入力処理ごと止まる
-     * (= どのキーも反応しない)。
+     * NGTO Builder 2 の InputManager が修飾キーの初期値に使う。
      */
     public static final int KEY_NONE = 0;
 
@@ -108,7 +105,7 @@ public final class Keyboard {
                     return name.toUpperCase(java.util.Locale.ROOT);
                 }
             } catch (Throwable ignored) {
-                //名前を持たないキー (ENTER 等) はここに来る
+                // 名前を持たないキー (ENTER 等) はここに来る
             }
             String fixed = fixedKeyName(glfwKey);
             if (fixed != null) {

@@ -15,9 +15,8 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * モデル選択画面 → サーバーの確定。modelId/dataMap に加えて、本家 GuiSelectModel と同じく
- * カスタム名 (State.Name) と色 (State.Color) も運ぶ。旧2フィールド版の呼び出しは
- * 互換コンストラクタで既定 (name="", color=0xFFFFFF) に落ちる。
+ * モデル選択画面 → サーバーの確定。
+ * カスタム名 (State.Name) と色 (State.Color) も運ぶ。
  */
 public record SelectModelPayload(String modelId, String dataMapValue, String customName, int color)
         implements CustomPacketPayload {
@@ -57,8 +56,8 @@ public record SelectModelPayload(String modelId, String dataMapValue, String cus
             String safeName = payload.customName() == null ? "" : payload.customName();
             int color = payload.color();
 
-            //専用サーバー保険: アイテムのコンポーネントが同期・保持されなくても選択が効くよう、
-            //サーバー側にプレイヤーごとの選択を控える (設置側が null のとき拾う)。
+            // 専用サーバー保険: アイテムのコンポーネントが同期・保持されなくても選択が効くよう、
+            // サーバー側にプレイヤーごとの選択を控える (設置側が null のとき拾う)。
             com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.set(player.getUUID(), safeModelId);
 
             for (InteractionHand hand : InteractionHand.values()) {

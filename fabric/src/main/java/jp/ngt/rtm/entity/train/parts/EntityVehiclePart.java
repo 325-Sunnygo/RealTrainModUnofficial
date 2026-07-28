@@ -26,9 +26,7 @@ public abstract class EntityVehiclePart extends Entity {
     private static final EntityDataAccessor<Float> DATA_VEC_Z =
             SynchedEntityData.defineId(EntityVehiclePart.class, EntityDataSerializers.FLOAT);
 
-    /**
-     * 設置してあるならtrue, 列車の上にあるならfalse
-     */
+    /** 設置してあるならtrue, 列車の上にあるならfalse */
     protected boolean isIndependent;
     private EntityVehicleBase<?> parent;
     private UUID unloadedParent;
@@ -89,9 +87,7 @@ public abstract class EntityVehiclePart extends Entity {
         return false;
     }
 
-    /**
-     * EntityVehicleBaseへ自身の登録を行う。(セーブデータからの読み込み時のみ)
-     */
+    /** EntityVehicleBaseへ自身の登録を行う。(セーブデータからの読み込み時のみ) */
     public abstract void onLoadVehicle();
 
     @Override
@@ -101,7 +97,7 @@ public abstract class EntityVehiclePart extends Entity {
 
     /**
      * 親を失ったパーツはクリック対象にしない。
-     * <p>掃除役が回収するまでの数 tick でも、取り残された当たり判定が本物の座席の
+     * 掃除役が回収するまでの数 tick でも、取り残された当たり判定が本物の座席の
      * 手前に居るとクリックを吸ってしまうため、両サイドで即座に無効化する。
      */
     @Override
@@ -124,29 +120,16 @@ public abstract class EntityVehiclePart extends Entity {
             if (vehicle != null) {
                 this.updatePartPos(vehicle);
             } else if (!this.level().isClientSide && this.isOrphan()) {
-                //親車両が居ないパーツは即座に消す。放置すると「車体から離れた場所に
-                //座れない当たり判定だけが残る」状態になる (ユーザー報告)。
-                //ここが回らない状況の保険として SeatCleanup が別途掃除する。
+                // 親車両が居ないパーツは即座に消す。
+                // 座れない当たり判定だけが残る」状態になる (ユーザー報告)。
                 this.discard();
             }
         }
     }
 
     /**
-     * 座席/床パーツは<b>ワールドに保存しない</b>。
-     * <p>
+     * 座席/床パーツはワールドに保存しない。
      * これらは車体の設定 (slotPos) から毎回作り直される派生データで、保存する意味が無い。
-     * 一方で保存していると次の経路で<b>幽霊座席</b>が量産される:
-     * <ol>
-     *   <li>{@code floorLoaded} は NBT に保存されないので、車体がチャンク再読込等で
-     *       作り直されるたび {@code setupFloors} が走り、座席を<b>新しく</b>湧かせる</li>
-     *   <li>そのとき捨てられるのは車体が実行時に持っている一覧だけで、
-     *       <b>セーブから復活した古い座席は対象外</b></li>
-     *   <li>古い座席は自分の tick で親を UUID から引き直せたときだけ自滅するので、
-     *       引き直せないと当たり判定だけがその場に残り続ける</li>
-     * </ol>
-     * 保存しなければこの経路ごと無くなる (既存ワールドに残っている分も、
-     * 一度読み込まれた後は上の親なしチェックで消える)。
      */
     @Override
     public boolean shouldBeSaved() {
@@ -167,25 +150,16 @@ public abstract class EntityVehiclePart extends Entity {
         this.setPos(vehicle.getX() + v3.getX(), vehicle.getY() + v3.getY(), vehicle.getZ() + v3.getZ());
     }
 
-    /**
-     * 乗員の視点回転には一切干渉しない
-     */
+    /** 乗員の視点回転には一切干渉しない */
     @Override
     public void onPassengerTurned(net.minecraft.world.entity.Entity rider) {
     }
 
     /**
-     * 本家 setPositionAndRotation2 相当。ただし<b>トラッカー座標をそのまま使わない</b>。
-     * <p>
+     * 本家 setPositionAndRotation2 相当。ただしトラッカー座標をそのまま使わない。
      * クライアントの車体は「最後に受けたサーバー位置へ数 tick かけて寄せる」補間なので、
-     * サーバーの座席座標をそのまま入れると<b>車体より数 tick 先</b>に飛んでガタつく。
-     * 代わりに<b>車体基準で計算し直す</b>。
-     * <p>
-     * ★これは追従の 3 本目の経路でもある。座席の追従は
-     * ①座席自身の tick ②車体の {@code updateFloorPositions} ③ここ (トラッカー更新ごと)
-     * の 3 経路で行う。座席のチャンクが tick していない等で ①② が止まっても、
-     * トラッカー更新は届くのでここで必ず車体位置へ復帰でき、<b>置いていかれたまま
-     * 戻らない状態にならない</b> (走行中に座席の当たり判定が取り残される不具合の対策)。
+     * サーバーの座席座標をそのまま入れると車体より数 tick 先に飛んでガタつく。
+     * ★これは追従の 3 本目の経路でもある。
      */
     @Override
     public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps) {
@@ -193,20 +167,17 @@ public abstract class EntityVehiclePart extends Entity {
         if (vehicle != null) {
             this.updatePartPos(vehicle);
         }
-        //★親が引けないときはトラッカー座標を<b>使わない</b>。パーツの位置は車体からの
-        //純粋な計算結果で、ネットワーク越しの座標は必ず数 tick 古い。ここで入れてしまうと
-        //車体に貼り付いていた当たり判定が過去の位置へ引き戻される。親が居ないなら
-        //どのみち掃除対象なので、その場に留めておけばよい。
+        // ★親が引けないときはトラッカー座標を使わない。
+        // 純粋な計算結果で、ネットワーク越しの座標は必ず数 tick 古い。
     }
 
     /**
      * ワールドに追加された時点で車体の一覧へ登録する。
-     * <p>tick 内で登録していると、座席が何らかの理由で tick しないとき車体側からも
-     * 押し出せず、取り残されたまま復帰できない。追加時に登録しておけば車体の
-     * {@code updateFloorPositions} が必ず面倒を見る。
+     * tick 内で登録していると、座席が何らかの理由で tick しないとき車体側からも
+     * 押し出せず、取り残されたまま復帰できない。
      */
     public void onAddedToLevel() {
-        //NeoForge 拡張の onAddedToLevel はバニラに無いので super 呼び出しは不要
+        // NeoForge 拡張の onAddedToLevel はバニラに無いので super 呼び出しは不要
         this.registerToVehicle();
     }
 
@@ -224,14 +195,9 @@ public abstract class EntityVehiclePart extends Entity {
     }
 
     /**
-     * 親車体。<b>居なくなっていたら必ず null を返す</b>。
-     * <p>
-     * ★以前はここで引き直しに失敗しても {@code parent} に削除済みの車体が
-     * 残ったままで、それをそのまま返していた。すると座席は「親は居る」と判断して
-     * <b>削除済み車体の最後の座標を書き続け</b>、その場に凍りついた当たり判定として
-     * 残り続ける (親なし判定にも引っ掛からないので自滅もしない)。
-     * 列車を壊した跡・チャンク再読込で車体だけ作り直された跡に、座れない座席が
-     * 取り残される不具合の原因。
+     * 親車体。居なくなっていたら必ず null を返す。
+     * ★以前はここで引き直しに失敗しても parent に削除済みの車体が
+     * 残ったままで、それをそのまま返していた。
      */
     public EntityVehicleBase<?> getVehicle() {
         if (this.parent == null || this.parent.isRemoved()) {
@@ -251,7 +217,7 @@ public abstract class EntityVehiclePart extends Entity {
 
     /**
      * 親を失っていて、もうワールドに居てはいけない状態か。
-     * <p>掃除役 ({@code SeatCleanup}) と当たり判定の有効/無効の両方がこれを見る。
+     * 掃除役 (SeatCleanup) と当たり判定の有効/無効の両方がこれを見る。
      */
     public boolean isOrphan() {
         if (this.isIndependent) {
@@ -263,25 +229,19 @@ public abstract class EntityVehiclePart extends Entity {
         if (this.getVehicle() != null) {
             return false;
         }
-        //★自分では親を引けなくても、車体が位置を押してくれているなら生きている。
-        //車体側の一覧に載っていれば追従は成立していて、当たり判定も正しい場所にある。
-        //ここを「親が引けない = 孤児」で切ってしまうと、追従できている座席まで
-        //クリック不可になる。
+        // ★自分では親を引けなくても、車体が位置を押してくれているなら生きている。
+        // 車体側の一覧に載っていれば追従は成立していて、当たり判定も正しい場所にある。
         return this.level().getGameTime() - this.lastFollowTick > 40L;
     }
 
-    /**
-     * EntityTrainとの相対位置を保存
-     */
+    /** EntityTrainとの相対位置を保存 */
     public void setPartPos(float x, float y, float z) {
         this.entityData.set(DATA_VEC_X, x);
         this.entityData.set(DATA_VEC_Y, y);
         this.entityData.set(DATA_VEC_Z, z);
     }
 
-    /**
-     * EntityTrainとの相対位置を取得
-     */
+    /** EntityTrainとの相対位置を取得 */
     public Vec3 getPartVec() {
         return new Vec3(this.entityData.get(DATA_VEC_X), this.entityData.get(DATA_VEC_Y), this.entityData.get(DATA_VEC_Z));
     }

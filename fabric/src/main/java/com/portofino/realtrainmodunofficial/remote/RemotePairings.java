@@ -13,20 +13,19 @@ import java.util.List;
 
 /**
  * リモコン (RemoteItem) で結んだブロックのペア一覧 (SavedData)。
- * 各ペアは 2 つのブロック座標。片方がレッドストーンを受ける/出すと、もう片方が無線給電される
- * ({@link RemoteRedstoneHandler} が毎 tick 反映)。どちらかのブロックが壊れたらペアは自動解除。
+ * 各ペアは 2 つのブロック座標。
  */
 public final class RemotePairings extends SavedData {
 
     private static final String NAME = "rtmu_remote_pairings";
 
-    /** {a.asLong(), b.asLong()} のリスト。 */
+    /** {a.asLong, b.asLong} のリスト。 */
     private final List<long[]> pairs = new ArrayList<>();
 
     public static RemotePairings get(ServerLevel level) {
         return level.getDataStorage().computeIfAbsent(
-                //★バニラの Factory は引数 3 つ。3 つ目 (変換種別) は RTMU 独自の中身なので null。
-                //  null を許すのは DimensionDataStorageMixin。
+                // ★バニラの Factory は引数 3 つ。3 つ目 (変換種別) は RTMU 独自の中身なので null。
+                // null を許すのは DimensionDataStorageMixin。
                 new SavedData.Factory<>(RemotePairings::new, RemotePairings::load, null), NAME);
     }
 
@@ -79,7 +78,7 @@ public final class RemotePairings extends SavedData {
         if (this.pairs.remove(pair)) {
             setDirty();
         } else {
-            //snapshot 経由だと参照が違うので値で消す
+            // snapshot 経由だと参照が違うので値で消す
             this.pairs.removeIf(p -> p[0] == pair[0] && p[1] == pair[1]);
             setDirty();
         }

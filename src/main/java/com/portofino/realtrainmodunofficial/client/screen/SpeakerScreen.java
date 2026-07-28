@@ -19,12 +19,7 @@ import java.util.Locale;
 
 /**
  * スピーカー設定GUI（本家 RTM GuiSpeaker 風のスロット選択方式）。
- * <ul>
- *   <li>左: レッドストーン信号強度 1〜15 のスロット一覧（縦スクロール可）。各行に「select」ボタン。</li>
- *   <li>select を押すと右にサウンド一覧（検索付き・スクロール可）が出て、クリックでそのスロットに割り当てる。</li>
- *   <li>上に可聴範囲(ブロック)。</li>
- * </ul>
- * バックエンド（ConfigureSpeakerPayload / InstalledObjectBlockEntity の per-block 音・範囲）は従来通り。
+ * 左: レッドストーン信号強度 1〜15 のスロット一覧（縦スクロール可）。各行に「select」ボタン。
  */
 public class SpeakerScreen extends Screen {
     private static final int SLOT_COUNT = 15;

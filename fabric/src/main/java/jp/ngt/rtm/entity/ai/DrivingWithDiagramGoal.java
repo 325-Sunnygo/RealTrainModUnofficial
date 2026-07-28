@@ -14,13 +14,7 @@ import java.util.stream.Collectors;
 
 /**
  * 本家 jp.ngt.rtm.entity.ai.EntityAIDrivingWithDiagram の移植。
- * 「本と羽根ペン」に書いたダイヤ (1 行 = {@code 時刻 コマンド x y z}) に従って運転する。
- * <pre>
- *   3000 start 0 0 0        … ワールド時刻 3000 に発車 (信号が開いていれば)
- *   4000 pass 120 64 -40    … 時刻 4000 に地点 (120,-40) を通過するよう加減速
- *   5000 stop 300 64 -40    … 時刻 5000 に地点 (300,-40) に停車
- * </pre>
- * コマンドを消化したら次の行へ。信号現示による制限速度は常に優先される。
+ * 「本と羽根ペン」に書いたダイヤ (1 行 = 時刻 コマンド x y z) に従って運転する。
  */
 public class DrivingWithDiagramGoal extends DrivingWithSignalGoal {
 

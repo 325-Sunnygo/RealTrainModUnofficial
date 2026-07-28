@@ -21,19 +21,13 @@ import java.util.List;
 /**
  * 看板エディタ (SignboardScreen) の保存。
  * 本家 PacketSelectResource (ResourceStateSignboard の同期) に相当する。
- * 本家のパケットは「選んだテクスチャ + 文字 + 時刻表設定」を丸ごと送っていたので、
- * こちらも definitionId (= テクスチャ) を含める。
  */
 public record SaveSignboardPayload(BlockPos pos, String definitionId, String ttSetting, List<SignboardText> texts)
         implements CustomPacketPayload {
 
-    /**
-     * 1枚の看板に貼れる文字数の上限 (壊れた/悪意あるパケットで際限なく食わないように)。
-     */
+    /** 1枚の看板に貼れる文字数の上限 (壊れた/悪意あるパケットで際限なく食わないように)。 */
     private static final int MAX_TEXTS = 64;
-    /**
-     * 到達距離の上限 (本家は距離判定なし)。
-     */
+    /** 到達距離の上限 (本家は距離判定なし)。 */
     private static final double MAX_REACH_SQ = 64.0D * 64.0D;
 
     public static final Type<SaveSignboardPayload> TYPE = new Type<>(
@@ -73,7 +67,7 @@ public record SaveSignboardPayload(BlockPos pos, String definitionId, String ttS
                     text.font = buf.readUtf();
                     text.style = buf.readVarInt() & 3;
                     text.color = buf.readInt() & 0xFFFFFF;
-                    //壊れた値 (0 や NaN) が入ると描画側で 0 除算や不正な頂点になるので、ここで潰す。
+                    // 壊れた値 (0 や NaN) が入ると描画側で 0 除算や不正な頂点になるので、ここで潰す。
                     text.posU = finite(buf.readFloat(), 0.0F);
                     text.posV = finite(buf.readFloat(), 0.0F);
                     text.size = positive(buf.readFloat(), 0.25F);
@@ -111,7 +105,7 @@ public record SaveSignboardPayload(BlockPos pos, String definitionId, String ttS
                     || be.getCategory() != InstalledObjectCategory.SIGNBOARD) {
                 return;
             }
-            //エディタでテクスチャを選び直していたら差し替える。存在しない/別カテゴリの ID は無視。
+            // エディタでテクスチャを選び直していたら差し替える。存在しない/別カテゴリの ID は無視。
             String definitionId = payload.definitionId();
             if (definitionId != null && !definitionId.isBlank() && !definitionId.equals(be.getDefinitionId())) {
                 InstalledObjectDefinition def = InstalledObjectRegistry.getById(definitionId);

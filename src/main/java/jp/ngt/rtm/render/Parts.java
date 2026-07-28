@@ -7,15 +7,12 @@ import java.util.Set;
 /**
  * 本家 jp.ngt.rtm.render.Parts の移植。
  * スクリプト用法:
- *   pf = renderer.registerParts(new Parts("PF_01"));            //単一
- *   ba = renderer.registerParts(new Parts("Ba1","Ba2",...));    //複数 (可変長)
- *   pf.render(renderer); ba.containsName(objName);
  */
 public class Parts {
     private final String[] names;
     private final Set<String> nameSet;
-    //正規化済み (小文字) 名前 Set。GLRecorder 再生側の IdentityHashMap キャッシュに
-    //毎フレーム同一インスタンスでヒットさせるため、生成時に確定して使い回す。
+    // 正規化済み (小文字) 名前 Set。GLRecorder 再生側の IdentityHashMap キャッシュに
+    // 毎フレーム同一インスタンスでヒットさせるため、生成時に確定して使い回す。
     private final Set<String> normalizedNames;
     private jp.ngt.ngtlib.renderer.model.GroupObject[] objs;
     /** 本家 ActionParts.id: registerParts で 1 始まりで振られるピッキング ID。 */
@@ -42,9 +39,7 @@ public class Parts {
         return this.names;
     }
 
-    /**
-     * 本家 objNames フィールド互換 (スクリプトが直接参照する)。
-     */
+    /** 本家 objNames フィールド互換 (スクリプトが直接参照する)。 */
     public String[] getObjNames() {
         return this.names;
     }
@@ -52,9 +47,7 @@ public class Parts {
     public void init(PartsRenderer renderer) {
     }
 
-    /**
-     * 本家 getObjects(IModelNGT) 互換 — PolygonModel からグループ取得 (CustomAnimator 等)。
-     */
+    /** 本家 getObjects(IModelNGT) 互換 — PolygonModel からグループ取得 (CustomAnimator 等)。 */
     public jp.ngt.ngtlib.renderer.model.GroupObject[] getObjects(Object model) {
         if (this.objs == null) {
             if (model instanceof jp.ngt.ngtlib.renderer.model.PolygonModel pm) {
@@ -80,8 +73,8 @@ public class Parts {
     }
 
     public void render(PartsRenderer renderer) {
-        //名前ごとの記録ではなく正規化済み Set を 1 コマンドで記録する
-        //(再生側キャッシュに同一インスタンスでヒットさせる + コマンド数削減)
+        // 名前ごとの記録ではなく正規化済み Set を 1 コマンドで記録する
+        // (再生側キャッシュに同一インスタンスでヒットさせる + コマンド数削減)
         renderer.recordRenderPartsSet(this.normalizedNames);
     }
 

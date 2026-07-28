@@ -4,8 +4,8 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * 1.7.10 ItemStack のスクリプト互換ラッパー。
- * SRB3/NGTO は item.func_77973_b() (getItem) を RTMItem.itemLargeRail 等と
- * 同一性比較し、func_77978_p() (NBT) をミニチュア読取に使う。
+ * SRB3/NGTO は item.func_77973_b (getItem) を RTMItem.itemLargeRail 等と
+ * 同一性比較し、func_77978_p (NBT) をミニチュア読取に使う。
  */
 public final class ItemStackCompat {
     public final ItemStack stack;
@@ -26,16 +26,8 @@ public final class ItemStackCompat {
 
     /**
      * func_77973_b = getItem。
-     *
-     * <p><b>1.7.10 に 1 個しか無かったアイテムが RTMU で 2 個に分かれている場合は、
-     * 本家側の 1 個へ正規化して返す。</b> スクリプトは
-     * <pre>item.func_77973_b() !== RTMItem.itemLargeRail</pre>
-     * のように<b>厳密な同一性</b>で持ち物を判定するため、片方を持っているときだけ
-     * 判定が通り「敷設できたりできなかったり」する。
-     *
-     * <p>レールは {@code rail} (RTMU のモデル選択式 = RTMItem.itemLargeRail が指す方) と
-     * {@code item_large_rail} (本家忠実な {@link jp.ngt.rtm.item.ItemRail}) の 2 つがあり、
-     * スクリプトから見れば同じ「大型レール」なので同一に見せる。
+     * 1.7.10 に 1 個しか無かったアイテムが RTMU で 2 個に分かれている場合は、
+     * 本家側の 1 個へ正規化して返す。
      */
     public net.minecraft.world.item.Item func_77973_b() {
         net.minecraft.world.item.Item item = stack.getItem();

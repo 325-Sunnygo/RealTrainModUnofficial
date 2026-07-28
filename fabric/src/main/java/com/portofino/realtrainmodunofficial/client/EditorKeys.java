@@ -20,23 +20,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * エディタのキー操作 (neo mcte)。本家 MCTE {@code MCTEKeyHandlerClient} の移植。
- *
- * <p><b>既定キーは本家と同じ</b>にしてある (本家は LWJGL2 のコード指定):
- * <pre>
- *   K      メニュー        (本家 37)
- *   M      編集モード切替  (本家 50)
- *   Delete 削除            (本家 211)
- *   Z      元に戻す        (本家 44)
- *   X      切り取り        (本家 45)
- *   C      コピー          (本家 46)
- *   V      貼り付け        (本家 47)
- *   B      埋める          (本家 48)
- *   N      選択解除        (本家 49)
- * </pre>
- *
- * <p>編集モード中は<b>視点の先に合わせて範囲が伸びる</b> (本家 {@code EditorTransform} 相当)。
- * 見ている先のブロックが変わったときだけサーバへ送るので、通信量は増えない。
+ * エディタのキー操作 (neo mcte)。本家 MCTE MCTEKeyHandlerClient の移植。
+ * 既定キーは本家と同じにしてある (本家は LWJGL2 のコード指定):
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class EditorKeys {
@@ -94,19 +79,19 @@ public final class EditorKeys {
         if (player == null || mc.level == null || mc.screen != null) {
             return;
         }
-        //エディタを持っているときだけ効かせる (本家と同じ。他の操作を邪魔しない)
+        // エディタを持っているときだけ効かせる (本家と同じ。他の操作を邪魔しない)
         if (!(player.getMainHandItem().getItem() instanceof EditorItem)) {
             followPoint = -1;
             return;
         }
 
         while (MENU.consumeClick()) {
-            //エディタが無ければサーバ側で作らせてから開く
+            // エディタが無ければサーバ側で作らせてから開く
             PacketDistributor.sendToServer(new RunFilterPayload(RunFilterPayload.OPEN, ""));
             com.portofino.realtrainmodunofficial.ClientHooks.openEditorScreen();
         }
         while (MODE.consumeClick()) {
-            //-1 (追従なし) → 0 (始点) → 1 (終点) → -1 …
+            // -1 (追従なし) → 0 (始点) → 1 (終点) → -1 …
             followPoint = followPoint >= 1 ? -1 : followPoint + 1;
             lastSent = null;
             mc.gui.setOverlayMessage(net.minecraft.network.chat.Component.translatable(
@@ -146,7 +131,7 @@ public final class EditorKeys {
             PacketDistributor.sendToServer(new RunFilterPayload("Fill", ""));
         }
         while (CLEAR.consumeClick()) {
-            //★実際に解除する。以前はここで追従を切るだけで、キーが効かないように見えていた。
+            // ★実際に解除する。以前はここで追従を切るだけで、キーが効かないように見えていた。
             followPoint = -1;
             lastSent = null;
             PacketDistributor.sendToServer(new RunFilterPayload(RunFilterPayload.CLEAR, ""));
@@ -154,7 +139,7 @@ public final class EditorKeys {
             com.portofino.realtrainmodunofficial.client.render.SelectionRenderer.forget();
         }
 
-        //視点追従
+        // 視点追従
         if (followPoint < 0) {
             return;
         }
@@ -175,10 +160,8 @@ public final class EditorKeys {
     }
 
     /**
-     * スニーク + ホイールで、<b>見ている面</b>を 1 ブロック伸縮する。
-     *
-     * <p>本家 MCTE の {@code EditorTransform} 相当。座標欄を打ち直さずに範囲を詰められる。
-     * スニークを条件にしているのは、素のホイールはホットバー切り替えで潰せないため。
+     * スニーク + ホイールで、見ている面を 1 ブロック伸縮する。
+     * 本家 MCTE の EditorTransform 相当。座標欄を打ち直さずに範囲を詰められる。
      */
     @SubscribeEvent
     public static void onScroll(net.neoforged.neoforge.client.event.InputEvent.MouseScrollingEvent event) {
@@ -199,7 +182,7 @@ public final class EditorKeys {
             return;
         }
 
-        //視線を選択範囲の箱に当てて、どの面を見ているかを決める
+        // 視線を選択範囲の箱に当てて、どの面を見ているかを決める
         net.minecraft.world.phys.Vec3 eye = player.getEyePosition(1.0F);
         net.minecraft.world.phys.Vec3 to = eye.add(player.getViewVector(1.0F).scale(128.0D));
         var hit = selBox.clip(eye, to);
@@ -211,7 +194,7 @@ public final class EditorKeys {
             return;
         }
 
-        //その面を持っている側の点だけを動かす
+        // その面を持っている側の点だけを動かす
         BlockPos start = com.portofino.realtrainmodunofficial.client.ClientSelection.pos1();
         BlockPos endPos = com.portofino.realtrainmodunofficial.client.ClientSelection.pos2();
         int axis = face.getAxis().ordinal();

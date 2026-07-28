@@ -22,20 +22,8 @@ public class VehicleDefinition {
     }
 
     /**
-     * 本家 {@code VehicleBaseConfig.VehicleParts} と同じ形。
-     * <p>
+     * 本家 VehicleBaseConfig.VehicleParts と同じ形。
      * ドア・パンタグラフなど「開度 (0..1) に応じて動く部品」の定義。
-     * <ul>
-     *   <li>{@code objects} … 動かすモデルグループ名</li>
-     *   <li>{@code closedPosition} … 変換の原点 (本家 {@code pos})。本家は
-     *       {@code translate(pos) → 各 transform → translate(-pos)} の順で適用するので、
-     *       回転はこの点を軸に回る</li>
-     *   <li>{@code transforms} … 本家 {@code transform}。要素数 <b>3 = 平行移動</b> {x,y,z}、
-     *       <b>4 = 回転</b> {angle, vecX, vecY, vecZ}。<b>並び順に全て適用する</b></li>
-     *   <li>{@code childParts} … 本家 {@code childParts}。親の変換を受けた上で
-     *       同じ開度で自分の変換も適用される (パンタの菱形リンク等)</li>
-     * </ul>
-     * {@code openTranslation} は最初の平行移動。ドア位置の推定 (乗客 NPC) が使う。
      */
     public record DoorAnimationDefinition(List<String> objects, Vec3 closedPosition, Vec3 openTranslation,
                                           List<float[]> transforms, List<DoorAnimationDefinition> childParts) {
@@ -58,9 +46,8 @@ public class VehicleDefinition {
     private final String modelFile;
     private final String buttonTexture;
     /**
-     * 本家 KaizPatchX の {@code customIconTexture} (ModelConfig)。
-     * <p>持ち物欄のアイテムの絵をこの画像に差し替える。未設定 (空) ならバニラのアイテムモデル。
-     * 設置物と同じ扱い ({@code InstalledObjectDefinition.customIconTexture})。
+     * 本家 KaizPatchX の customIconTexture (ModelConfig)。
+     * 持ち物欄のアイテムの絵をこの画像に差し替える。未設定 (空) ならバニラのアイテムモデル。
      */
     private String customIconTexture = "";
     private final Map<String, String> textureOverrides;
@@ -107,8 +94,8 @@ public class VehicleDefinition {
     private String soundBrakeRelease = "";
     /** 本家 sound_BrakeRelease2: 同上 (弱、ノッチ -1 以外から戻したとき)。 */
     private String soundBrakeRelease2 = "";
-    /** 本家 sound_DoorOpen / sound_DoorClose: ドア開閉時にエンジンが鳴らす音。
-     *  多くのパック (209/125 系等) はサウンドスクリプトでドア音を鳴らさず、この設定に頼る。 */
+    /**
+     */
     private String soundDoorOpen = "";
     private String soundDoorClose = "";
     private final boolean doCulling;
@@ -291,7 +278,7 @@ public class VehicleDefinition {
     public String getModelFile() { return modelFile; }
     public String getButtonTexture() { return buttonTexture; }
 
-    /** {@link #customIconTexture}。空なら既定のアイコン。 */
+    /** #customIconTexture。空なら既定のアイコン。 */
     public String getCustomIconTexture() { return customIconTexture; }
 
     public void setCustomIconTexture(String customIconTexture) {
@@ -487,7 +474,7 @@ public class VehicleDefinition {
     }
 
     // --- RTMU 追加: 種別幕 (方向幕/rollsign とは別レイヤー) ---
-    // 既存の巨大コンストラクタを崩さないよう、構築後に setTypeSign() で注入する
+    // 既存の巨大コンストラクタを崩さないよう、構築後に setTypeSign で注入する
     // (setWireAttachPos と同じ後付けパターン)。パネル定義は rollsign と同じ RollsignDefinition を流用。
     private List<String> typeSignNames = List.of();
     private String typeSignTexture = "";

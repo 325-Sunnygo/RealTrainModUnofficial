@@ -6,15 +6,9 @@ import net.minecraft.core.particles.ParticleTypes;
 import java.util.Map;
 
 /**
- * 1.7.10 {@code net.minecraft.util.EnumParticleTypes} の互換。
- *
- * <p>SL パック (RTM Taiwan SL Pack 等) の描画スクリプトは蒸気/煙の演出で
- * {@code entity.field_70170_p.func_175688_a(EnumParticleTypes.EXPLOSION_NORMAL, ...)} を呼ぶ。
- * 各定数に 1.21 のバニラ {@link ParticleOptions} を持たせ、{@link WorldCompat#func_175688_a}
- * がそのまま {@code level.addParticle} へ渡せるようにする。
- *
- * <p>1.7.10 の粒子名 ({@code "explode"} など、文字列で渡す旧経路
- * {@code func_72869_a}/{@code renderer.spawnParticle}) との対応も {@link #byLegacyName} で持つ。
+ * 1.7.10 net.minecraft.util.EnumParticleTypes の互換。
+ * SL パック (RTM Taiwan SL Pack 等) の描画スクリプトは蒸気/煙の演出で
+ * entity.field_70170_p.func_175688_a(EnumParticleTypes.EXPLOSION_NORMAL, ...) を呼ぶ。
  */
 public enum EnumParticleTypes {
     EXPLOSION_NORMAL(ParticleTypes.POOF, "explode"),
@@ -53,7 +47,7 @@ public enum EnumParticleTypes {
     }
 
     /**
-     * 1.7.10 の粒子名 ({@code "explode"} 等) から {@link ParticleOptions} を引く。
+     * 1.7.10 の粒子名 ("explode" 等) から ParticleOptions を引く。
      * 未知の名前は煙 (SMOKE) にフォールバック (エラーで描画を止めないため)。
      */
     public static ParticleOptions particleByLegacyName(String name) {

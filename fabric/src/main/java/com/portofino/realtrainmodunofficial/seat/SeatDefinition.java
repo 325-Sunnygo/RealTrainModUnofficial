@@ -50,9 +50,7 @@ public class SeatDefinition {
     public boolean isDriver() { return isDriver; }
     public void setDriver(boolean driver) { isDriver = driver; }
     
-    /**
-     * Check if a point is within the seat polygon area
-     */
+    /** Check if a point is within the seat polygon area */
     public boolean isPointInPolygon(Vec3 point) {
         if (polygon == null || polygon.size() < 3) {
             return false;
@@ -76,9 +74,7 @@ public class SeatDefinition {
         return inside;
     }
     
-    /**
-     * Check if a point is within the seat bounds (including height)
-     */
+    /** Check if a point is within the seat bounds (including height) */
     public boolean isPointInSeat(Vec3 point) {
         if (!isPointInPolygon(point)) {
             return false;

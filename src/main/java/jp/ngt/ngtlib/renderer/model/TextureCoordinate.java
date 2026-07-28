@@ -3,7 +3,7 @@ package jp.ngt.ngtlib.renderer.model;
 /**
  * 本家 jp.ngt.ngtlib.renderer.model.TextureCoordinate。
  * RTMU の Face は UV を float[] で持つため、スクリプトが
- * {@code face.textureCoordinates[i].getU()} と書けるようにするビュー。
+ * face.textureCoordinates[i].getU と書けるようにするビュー。
  */
 public class TextureCoordinate {
     private float u;

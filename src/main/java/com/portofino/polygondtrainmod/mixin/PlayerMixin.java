@@ -9,13 +9,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * フリーカメラ中はスニーク (シフト) で列車から降りないようにする。
- * <p>
- * バニラは {@code LocalPlayer.rideTick()} で {@code wantsToStopRiding()} が true なら
- * 降車する。フリーカメラ中はシフトをカメラ下降に使うため、ここで false を返して
- * 降車をキャンセルする ({@code V} キーでフリーカメラを抜けるまで座席に残る)。
- * <p>
- * {@link FreeCameraState} は client 依存の無いフラグホルダーなので、専用サーバーでも
- * 安全にロードできる (サーバーでは常に false = 影響なし)。
+ * バニラは LocalPlayer.rideTick で wantsToStopRiding が true なら
+ * 降車する。
  */
 @Mixin(Player.class)
 public abstract class PlayerMixin {

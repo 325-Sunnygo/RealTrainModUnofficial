@@ -17,9 +17,8 @@ import org.jetbrains.annotations.NotNull;
 import static com.portofino.realtrainmodunofficial.RealTrainModUnofficial.MODID;
 
 /**
- * 自動車の描画。列車と同じ MQO パイプライン(MqoModelLoader)を使い、
+ * 自動車の描画。
  * エンティティの vehicleId が指す車両定義のモデル/テクスチャ/レンダースクリプトを描画する。
- * これにより RTM 標準車(CV33 等)や追加パックの車(SuperRailBuilder3 等)が正しく表示される。
  */
 @OnlyIn(Dist.CLIENT)
 public final class CarRenderer extends EntityRenderer<CarEntity> {
@@ -51,20 +50,17 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
         }
 
         // 本家式: rendererPath スクリプトを Nashorn (VehicleScriptRenderers) で実行。
-        // SRB3/NGTO Builder の GUI・マーカー・入力処理はこの render() 内で動く。
-        // 重要: 新パイプラインのレンダラーが存在する車両では旧パイプライン (レガシー
-        // GraalJS スクリプト) を絶対に走らせない — DataMap/入力の二重処理や
-        // __SRB__ クライアント敷設の誤発動を起こすため。
+        // SRB3/NGTO Builder の GUI・マーカー・入力処理はこの render 内で動く。
         var scripted = com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
         boolean scriptRendered = false;
         if (scripted != null) {
             poseStack.pushPose();
             try {
                 poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
-                //ボディモデルはスクリプト無しロード (レガシースクリプトを起動させない)
+                // ボディモデルはスクリプト無しロード (レガシースクリプトを起動させない)
                 MqoModelLoader.MqoModel bodyModel = MqoModelLoader.loadModelForVehicleNoScript(def);
-                //戻り値 = スクリプトが実際にジオメトリを描いたか。false のとき (render() が
-                //何も描かず終わる / 例外で落ちる) は下の素モデル描画にフォールバックする。
+                // 戻り値 = スクリプトが実際にジオメトリを描いたか。false のとき (render が
+                // 何も描かず終わる / 例外で落ちる) は下の素モデル描画にフォールバックする。
                 scriptRendered = scripted.render(entity, partialTick, poseStack, bufferSource,
                         packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, bodyModel);
             } catch (Throwable ignored) {
@@ -72,10 +68,8 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
                 poseStack.popPose();
             }
         }
-        //スクリプトが無い or スクリプト描画に失敗した車両: 旧 MQO パイプライン (ベイクドモデル)。
-        //本家系の列車レンダラ (RtmTrainRenderer) と同じフォールバック。これが無いと、レンダー
-        //スクリプトが RTMU の Nashorn 環境で geometry を出せなかった自動車 (MFCP パトカー等) が
-        //「当たり判定はあるのにモデルが出ない」= 透明になっていた。
+        // スクリプトが無い or スクリプト描画に失敗した車両: 旧 MQO パイプライン (ベイクドモデル)。
+        // 本家系の列車レンダラ (RtmTrainRenderer) と同じフォールバック。
         if (!scriptRendered) {
             MqoModelLoader.MqoModel model = MqoModelLoader.loadModelForVehicle(def);
             if (model != null) {

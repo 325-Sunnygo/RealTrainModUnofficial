@@ -13,29 +13,8 @@ import java.util.WeakHashMap;
 
 /**
  * 立ち乗り (standing-ride): 走行中の列車の床に立っているプレイヤーを、列車の移動・旋回に
- * 合わせて毎 tick 運ぶ「動く床 (moving platform)」。座席に着く (mount/startRiding) のではなく
- * <b>位置だけを追従</b>させるので、プレイヤーは車内を自由に歩き回れる。
- *
- * <p>元は AppleExtended (fixRTM 派生) の {@code jp.apple.train.TrainPlatformHandler}。それを
- * 1.21.1 / NeoForge のクライアント権限モデルに移植し、次の点を改良した:
- * <ul>
- *   <li><b>クライアント権限</b>: 1.21 はプレイヤー位置がクライアント権限。<b>ローカル
- *       プレイヤーだけを自分のクライアントで運ぶ</b> (各クライアントが自機を運ぶ)。結果は
- *       通常の移動パケットでサーバー→他クライアントへ伝播する。apple は両サイドで全
- *       プレイヤーを動かしていたが、1.21 ではサーバー側の移動はクライアント予測に
- *       上書きされて成立しない。</li>
- *   <li><b>自前の前 tick 位置キャッシュ</b> ({@link #PREV}) で列車の per-tick 差分を算出。
- *       {@code xOld} の更新タイミングに依存しない。</li>
- *   <li><b>連結対策</b>: 1 game tick に複数車両が同じローカルプレイヤーを運ぶ二重加算を
- *       防ぐ ({@link #lastCarriedGameTime})。連結車は同じ差分で動くので最初の 1 両で足りる。</li>
- *   <li><b>ヒステリシス</b>: 取得は厳しめ ({@link #SURFACE_MARGIN})・保持は緩め
- *       ({@link #RIDE_MARGIN}) で、段差や車体の揺れで不意に落ちない。</li>
- * </ul>
- *
- * <p>クライアント専用クラス ({@code Minecraft} を参照) なので、{@link EntityTrainBase#tick()}
- * からは {@code level().isClientSide()} ガード下でのみ呼ぶ。専用サーバーではこのクラスは
- * 一切ロードされない ({@code EntityVehicleBase.rotateRiders} が {@code FreeCameraController} を
- * 同様に呼ぶ前例と同じ)。
+ * 合わせて毎 tick 運ぶ「動く床 (moving platform)」。
+ * 位置だけを追従させるので、プレイヤーは車内を自由に歩き回れる。
  */
 public final class StandingRideClient {
 
@@ -60,7 +39,7 @@ public final class StandingRideClient {
     }
 
     /**
-     * {@link EntityTrainBase#tick()} (クライアント) から毎 tick 呼ぶ。この車両の床に
+     * EntityTrainBase#tick (クライアント) から毎 tick 呼ぶ。この車両の床に
      * ローカルプレイヤーが立っていれば、車両の移動・旋回ぶんだけプレイヤーを運ぶ。
      */
     public static void tick(EntityTrainBase train) {
@@ -71,7 +50,7 @@ public final class StandingRideClient {
 
         double[] prev = PREV.get(train);
         if (prev == null) {
-            //初回は差分ゼロ。次 tick から追従開始。
+            // 初回は差分ゼロ。次 tick から追従開始。
             PREV.put(train, new double[]{curX, curY, curZ, curYaw});
             return;
         }
@@ -100,7 +79,7 @@ public final class StandingRideClient {
         if (!isStandingOn(train, player, rideHold, yMargin)) {
             return;
         }
-        //連結: 同じ game tick で別車両が既に運んでいたら二重加算しない。
+        // 連結: 同じ game tick で別車両が既に運んでいたら二重加算しない。
         if (lastCarriedGameTime == now) {
             return;
         }
@@ -118,7 +97,7 @@ public final class StandingRideClient {
         double rad = Math.toRadians(train.getYRot());
         double sin = Math.sin(rad);
         double cos = Math.cos(rad);
-        //車体ローカル座標: length = 進行方向, width = 幅方向
+        // 車体ローカル座標: length = 進行方向, width = 幅方向
         double localLength = relX * sin + relZ * cos;
         double localWidth = relX * cos - relZ * sin;
 
@@ -151,8 +130,8 @@ public final class StandingRideClient {
         double addX;
         double addZ;
         if (dYaw != 0.0F) {
-            //車体中心 (前 tick) まわりにプレイヤー相対位置を回す。並進 (dx/dz) も
-            //現在の車体中心を基準に取ることで同時に含まれる。
+            // 車体中心 (前 tick) まわりにプレイヤー相対位置を回す。並進 (dx/dz) も
+            // 現在の車体中心を基準に取ることで同時に含まれる。
             double relX = player.getX() - prevX;
             double relZ = player.getZ() - prevZ;
             double rad = Math.toRadians(dYaw);
@@ -171,10 +150,10 @@ public final class StandingRideClient {
         double yError = floorY - player.getY();
         double yCorrection = Mth.clamp(yError * Y_CORRECTION_FACTOR, -MAX_Y_CORRECTION, MAX_Y_CORRECTION);
 
-        //SELF: プレイヤー自身の歩行入力 (別途 travel で適用済み) に上乗せして運ぶ。
+        // SELF: プレイヤー自身の歩行入力 (別途 travel で適用済み) に上乗せして運ぶ。
         player.move(MoverType.SELF, new Vec3(addX, dy + yCorrection, addZ));
 
-        //床に貼り付け: 落下加速を殺し、落下ダメージ・浮遊を防ぐ。
+        // 床に貼り付け: 落下加速を殺し、落下ダメージ・浮遊を防ぐ。
         Vec3 dm = player.getDeltaMovement();
         player.setDeltaMovement(dm.x, 0.0D, dm.z);
         player.fallDistance = 0.0F;

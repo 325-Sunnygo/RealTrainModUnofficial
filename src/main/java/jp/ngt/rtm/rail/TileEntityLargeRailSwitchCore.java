@@ -80,8 +80,7 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
      * ブロック更新時。
      * 注意: ここでフル NBT 再同期 (markBlockForUpdate) を行うとクライアントの
      * SwitchType/Point が再生成され moveCount=0 にリセットされて転てつアニメが
-     * 破綻する (OFF 時に即戻り)。クライアントは自前の tick + RS 参照でアニメする
-     * ため、サーバー側の開通状態更新のみ行う。
+     * 破綻する (OFF 時に即戻り)。
      */
     public void onBlockChanged() {
         if (this.getSwitch() != null && this.level != null) {
@@ -132,9 +131,7 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
         return new int[]{minX, minY, minZ, maxX, maxY, maxZ};
     }
 
-    /**
-     * @deprecated Remaster 暫定互換 (旧レンダラ用)。
-     */
+    /** @deprecated Remaster 暫定互換 (旧レンダラ用)。 */
     @Deprecated
     @Override
     public jp.ngt.rtm.rail.util.Point[] getSwitchPoints() {
@@ -142,9 +139,7 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
         return st != null ? st.getPoints() : null;
     }
 
-    /**
-     * @deprecated Remaster 暫定互換 (旧レンダラ用)。
-     */
+    /** @deprecated Remaster 暫定互換 (旧レンダラ用)。 */
     @Deprecated
     @Override
     public int getActiveSegmentIndex() {
@@ -152,9 +147,7 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
         return st != null ? st.firstOpenRailIndex() : 0;
     }
 
-    /**
-     * @deprecated Remaster 暫定互換 (旧レンダラ用)。
-     */
+    /** @deprecated Remaster 暫定互換 (旧レンダラ用)。 */
     @Deprecated
     @Override
     public int getPreviousSegmentIndex() {

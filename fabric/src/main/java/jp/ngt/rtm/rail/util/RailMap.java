@@ -28,10 +28,6 @@ import java.util.List;
 /**
  * 本家 jp.ngt.rtm.rail.util.RailMap (KaizPatchX) の忠実移植。
  * 道床(レールベース)ブロックの生成/破壊を担う抽象基底。
- * 座標順は本家どおり {z, x}。metadata は 1.21 に存在しないため BlockState で代替。
- *
- * ファイル末尾に Remaster 旧システム (RailCollisionBlock 方式) 向けの暫定互換 API を残している。
- * Phase 1 flip (旧 MarkerBlock/LargeRailCoreBlockEntity 削除) 完了時に暫定部は削除する。
  */
 public abstract class RailMap {
     protected final List<int[]> rails = new ArrayList<>();
@@ -79,9 +75,8 @@ public abstract class RailMap {
     }
 
     /**
-     * RailMapの端同士が繋げられるかどうか(=連続した曲線になるか)<br>
+     * RailMapの端同士が繋げられるかどうか(=連続した曲線になるか)
      * 同一RailMapの場合はtrue
-     *
      * @param railMap null可
      */
     public boolean canConnect(RailMap railMap) {
@@ -94,13 +89,11 @@ public abstract class RailMap {
         if (railMap instanceof RailMapTurntable) {
             return railMap.canConnect(this);
         }
-        //端点間距離で接続判定 (本家は 1e-5 完全一致。分岐の計算誤差ぶんだけ緩和)
+        // 端点間距離で接続判定 (本家は 1e-5 完全一致。分岐の計算誤差ぶんだけ緩和)
         return minEndpointGap(railMap) <= CONNECT_TOLERANCE;
     }
 
-    /**
-     * 端点同士の最短距離。
-     */
+    /** 端点同士の最短距離。 */
     public double minEndpointGap(RailMap railMap) {
         double best = Double.MAX_VALUE;
         for (int i = 0; i < 2; i++) {
@@ -118,13 +111,11 @@ public abstract class RailMap {
         return best;
     }
 
-    /**
-     * 接続とみなす端点間距離。緩めると近接する別レールへ列車が飛ぶ。
-     */
+    /** 接続とみなす端点間距離。緩めると近接する別レールへ列車が飛ぶ。 */
     private static final double CONNECT_TOLERANCE = 0.001D;
 
     /**
-     * 道床ブロックのリストを作成<br>
+     * 道床ブロックのリストを作成
      * レールの生成時と破壊時に呼ばれる
      */
     protected void createRailList(RailProperty prop) {
@@ -139,21 +130,12 @@ public abstract class RailMap {
             double z = point[0];
             double slope = Math.toRadians(this.getRailYaw(split, j));
             double height = this.getRailHeight(split, j);
-            //本家 RailMap.createRailList と同じく「レール面のあるブロック」に置く。
-            //
-            //以前は -1 して1ブロック下に埋めていたが、当たり判定の高さは
-            //  BlockLargeRailBase.getRailShape → TileEntityLargeRailBase.getBlockHeights
-            //  = (レール面Y − ブロックY)
-            //で決まるため、ブロックを1つ下げるとその分だけ箱が丸ごと1ブロック高くなる。
-            //平坦なレールでは地面を食うので気付きにくいが、坂ではブロック境界をまたぐ列で
-            //2ブロック近い高さの箱になり、「坂の当たり判定がブロック」になっていた。
-            //
-            //★ (int) キャストは使わない。0 方向への切り捨てなので、負の Y で 1 つ上を指す。
-            //   本家は MC 1.12.2 (最低 y=0) だったため (int) と floor が同じで問題にならなかったが、
-            //   1.21 は y=-64 まである。フラットワールドの地表は y=-60 台なので、
-            //     height = -59.9375 → (int) = -59 (1ブロック上!) / floor = -60 (正しい)
-            //   となり、道床ブロックが丸ごと 1 ブロック上に置かれて当たり判定だけが浮いていた
-            //   (描画は railHeight を直に使うのでズレない → 「当たり判定だけ浮く」)。
+            // 本家 RailMap.createRailList と同じく「レール面のあるブロック」に置く。
+            // 以前は -1 して1ブロック下に埋めていたが、当たり判定の高さは
+            // BlockLargeRailBase.getRailShape → TileEntityLargeRailBase.getBlockHeights
+            // = (レール面Y − ブロックY)
+            // で決まるため、ブロックを1つ下げるとその分だけ箱が丸ごと1ブロック高くなる。
+            // ★ (int) キャストは使わない。0 方向への切り捨てなので、負の Y で 1 つ上を指す。
             int y = Mth.floor(height);
             int x0 = Mth.floor(x);
             int z0 = Mth.floor(z);
@@ -193,9 +175,7 @@ public abstract class RailMap {
         }
     }
 
-    /**
-     * スクリプト互換: WorldCompat (entity.field_70170_p) を渡す SRB3 等の呼び出しを受ける。
-     */
+    /** スクリプト互換: WorldCompat (entity.field_70170_p) を渡す SRB3 等の呼び出しを受ける。 */
     public void setRail(Object world, Object block, int x0, int y0, int z0, RailProperty prop) {
         Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
         if (level != null && block instanceof Block b) {
@@ -203,17 +183,13 @@ public abstract class RailMap {
         }
     }
 
-    /**
-     * スクリプト互換 canPlaceRail (WorldCompat 版)
-     */
+    /** スクリプト互換 canPlaceRail (WorldCompat 版) */
     public boolean canPlaceRail(Object world, boolean isCreative, RailProperty prop) {
         Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
         return level != null && this.canPlaceRail(level, isCreative, prop);
     }
 
-    /**
-     * スクリプト互換 breakRail (WorldCompat 版)
-     */
+    /** スクリプト互換 breakRail (WorldCompat 版) */
     public void breakRail(Object world, RailProperty prop, TileEntityLargeRailCore core) {
         Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
         if (level != null) {
@@ -223,12 +199,8 @@ public abstract class RailMap {
 
     /**
      * スクリプト互換オーバーロード。
-     *
-     * <p>スクリプトの {@code world} は {@code entity.field_70170_p} =
-     * {@link jp.ngt.mccompat.WorldCompat} であり実 {@link Level} ではない。
-     * {@code Level} だけを取る形だと ClassCastException でスクリプトが丸ごと落ちる。
-     * {@code BlockUtil.setBlock/getBlock} が既に採っている「Object で受けて解く」規約に揃える。
-     * <pre>SuperRailBuilder3!server_SuperRailBuilder3.js:346  railMap.setRail(world, RTMRail.largeRailBase0, ...)</pre>
+     * スクリプトの world は entity.field_70170_p =
+     * jp.ngt.mccompat.WorldCompat であり実 Level ではない。
      */
     public void setRail(Object world, Block block, int x0, int y0, int z0, RailProperty prop) {
         Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
@@ -237,9 +209,7 @@ public abstract class RailMap {
         }
     }
 
-    /**
-     * ブロックの設置
-     */
+    /** ブロックの設置 */
     public void setRail(Level world, Block block, int x0, int y0, int z0, RailProperty prop) {
         this.createRailList(prop);
         BlockEntity tile = world.getBlockEntity(new BlockPos(x0, y0, z0));
@@ -304,14 +274,12 @@ public abstract class RailMap {
         }
     }
 
-    /**
-     * ブロックの破壊
-     */
+    /** ブロックの破壊 */
     public void breakRail(Level world, RailProperty prop, TileEntityLargeRailCore core) {
         this.createRailList(prop);
         List<BlockPos> posList = new ArrayList<>();
         this.rails.forEach(anInt -> {
-            //ベッド行の算出オフセットがビルド間で変わっても連鎖するよう ±1 行も確認する
+            // ベッド行の算出オフセットがビルド間で変わっても連鎖するよう ±1 行も確認する
             for (int dy = -1; dy <= 1; dy++) {
                 BlockPos pos = new BlockPos(anInt[0], anInt[1] + dy, anInt[2]);
                 BlockEntity rail = world.getBlockEntity(pos);
@@ -320,8 +288,8 @@ public abstract class RailMap {
                         continue;
                     }
 
-                    //重なっている他レールを破壊しないように
-                    //coreが既に破壊さている場合は続行
+                    // 重なっている他レールを破壊しないように
+                    // coreが既に破壊さている場合は続行
                     TileEntityLargeRailCore core2 = ((TileEntityLargeRailBase) rail).getRailCore();
                     if (core2 == null || core2 == core) {
                         posList.add(pos);
@@ -344,9 +312,8 @@ public abstract class RailMap {
         this.createRailList(prop);
         boolean flag = true;
         for (int[] rail : this.rails) {
-            //本家 canPlaceRail と同じく、レールブロックを置く位置そのもので障害物を見る。
-            //(以前はレールブロックを1つ下に埋めていたので +1 してレール面を見ていた。
-            // createRailList を本家準拠 (= レール面のブロックに置く) に戻したので +1 は不要)
+            // 本家 canPlaceRail と同じく、レールブロックを置く位置そのもので障害物を見る。
+            // (以前はレールブロックを1つ下に埋めていたので +1 してレール面を見ていた。
             BlockPos pos = new BlockPos(rail[0], rail[1], rail[2]);
             BlockState state = world.getBlockState(pos);
             Block block = state.getBlock();
@@ -377,41 +344,30 @@ public abstract class RailMap {
     // ==================================================================================
     // 以下は Remaster 旧システム (RailCollisionBlock 方式) 向けの暫定互換 API。
     // Phase 1 flip 完了時に削除する。
-    // ==================================================================================
 
-    /**
-     * @deprecated Remaster 独自。
-     */
+    /** @deprecated Remaster 独自。 */
     @Deprecated
     public static boolean suppressRailRemoval = false;
 
-    /**
-     * @deprecated Remaster 独自 API。本家に存在しない。
-     */
+    /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated
     public boolean isStraightTrack() {
         return false;
     }
 
-    /**
-     * @deprecated Remaster 独自 API。本家に存在しない。
-     */
+    /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated
     public double getHorizontalPathLength() {
         return this.getLength();
     }
 
-    /**
-     * @deprecated Remaster 独自 API。本家に存在しない。
-     */
+    /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated
     public static int curveSplitForLength(double length) {
         return BezierCurve.splitForLength(length);
     }
 
-    /**
-     * @deprecated 旧 RailCollisionBlock 方式。
-     */
+    /** @deprecated 旧 RailCollisionBlock 方式。 */
     @Deprecated
     protected void createRailListLegacy(RailProperties prop) {
         this.rails.clear();
@@ -497,9 +453,7 @@ public abstract class RailMap {
         this.rails.add(new int[]{x, y, z, surfaceOffset16});
     }
 
-    /**
-     * @deprecated 旧 RailCollisionBlock 方式。
-     */
+    /** @deprecated 旧 RailCollisionBlock 方式。 */
     @Deprecated
     public void setRail(Level level, Block ballastBlock, int x0, int y0, int z0, RailProperties prop) {
         if (level == null || prop == null) {
@@ -533,9 +487,7 @@ public abstract class RailMap {
         this.rails.clear();
     }
 
-    /**
-     * @deprecated 旧 RailCollisionBlock 方式。
-     */
+    /** @deprecated 旧 RailCollisionBlock 方式。 */
     @Deprecated
     public boolean canPlaceRail(Level level, boolean isCreative, RailProperties prop) {
         double len = this.getLength();
@@ -570,9 +522,7 @@ public abstract class RailMap {
         return isCreative || allClear;
     }
 
-    /**
-     * @deprecated 旧 RailCollisionBlock 方式。
-     */
+    /** @deprecated 旧 RailCollisionBlock 方式。 */
     @Deprecated
     public List<int[]> getRailBlockList(RailProperties prop, boolean regenerate) {
         if (this.rails.isEmpty() || regenerate) {
@@ -581,9 +531,7 @@ public abstract class RailMap {
         return new ArrayList<>(this.rails);
     }
 
-    /**
-     * @deprecated 旧 RailCollisionBlock 方式。
-     */
+    /** @deprecated 旧 RailCollisionBlock 方式。 */
     @Deprecated
     public void removeRailBlocks(Level level) {
         double len = this.getLength();

@@ -64,9 +64,7 @@ import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import org.w3c.dom.Node;
 
-/**
- * Metasequoia (.mqo) loader aligned with legacy model library {@code MqoModel}: 0.01 vertex scale, triangulation and quad handling.
- */
+/** Metasequoia (.mqo) loader aligned with legacy model library MqoModel: 0.01 vertex scale, triangulation and quad handling. */
 public final class MqoModelLoader {
     /** メッシュ捕獲モード。焼き込み中はVBO経路を使わず頂点をVertexConsumerへ流す。 */
     public static boolean captureMode;
@@ -76,7 +74,7 @@ public final class MqoModelLoader {
     /** 描画フレーム番号。pass1の対策をpass0とペアの時だけ適用する判定に使う。 */
     private static long renderFrame;
 
-    /** 毎フレーム 1 回進める ({@code DeferredTranslucentRenderer} の AFTER_LEVEL から)。 */
+    /** 毎フレーム 1 回進める (DeferredTranslucentRenderer の AFTER_LEVEL から)。 */
     public static void advanceRenderFrame() {
         renderFrame++;
     }
@@ -131,11 +129,9 @@ public final class MqoModelLoader {
             model = loadFallbackRailModel();
         }
         if (model != null) {
-            //★OpList 経路 (系統B) へはスクリプトを積まない。
-            //描画スクリプトは VehicleScriptRenderers / RailScriptRenderers (系統A) が
-            //GLRecorder + replay で実行する。ここで同じ .js をもう一つのエンジンへ
-            //読み込むと 1 つの車両が 2 系統の描画意味論を持つ (調査で D18 として検出)。
-            //系統B は本家に無い RTMU 独自経路なので、投入をやめて一本化する。
+            // ★OpList 経路 (系統B) へはスクリプトを積まない。
+            // 描画スクリプトは VehicleScriptRenderers / RailScriptRenderers (系統A) が
+            // GLRecorder + replay で実行する。
 
             cacheModel(key, model);
         } else {
@@ -175,7 +171,7 @@ public final class MqoModelLoader {
         }
         String scriptPath = resolveVehicleRenderScriptPath(packPath, def);
         String soundScriptPath = def.getSoundScriptPath() != null ? def.getSoundScriptPath() : "";
-        // legacy script は init() で trainName/modelName ごとの差分を固定するため、車両ID単位で分離する
+        // legacy script は init で trainName/modelName ごとの差分を固定するため、車両ID単位で分離する
         String key = "v|" + def.getId() + "|" + def.getPackName() + "|" + def.getModelFile() + "|" + def.getTextureOverrides().hashCode() + "|" + scriptPath.hashCode() + "|" + soundScriptPath.hashCode() + "|smooth";
         if (FAILED_MODEL_KEYS.contains(key)) {
             return null;
@@ -356,13 +352,12 @@ public final class MqoModelLoader {
     }
 
     /**
-     * 本家の Java 実装モデル ({@code ModelBogie.class} 等) を、MQO と同じバッチ表現へ組み立てる。
-     * <p>頂点は {@link ClassModelGeometry} がバニラの {@code ModelPart} に焼かせた物をそのまま使う。
-     * 材質は 1 つ (テクスチャ 1 枚) だけなのでバッチも 1 つ。
+     * 本家の Java 実装モデル (ModelBogie.class 等) を、MQO と同じバッチ表現へ組み立てる。
+     * 頂点は ClassModelGeometry がバニラの ModelPart に焼かせた物をそのまま使う。
      */
     /**
-     * 本家の {@code .ngto} (ボクセル) モデルをバッチ表現へ組み立てる。
-     * <p>テクスチャはブロックアトラス 1 枚。ガラス等は別バッチ (半透明) に分ける。
+     * 本家の .ngto (ボクセル) モデルをバッチ表現へ組み立てる。
+     * テクスチャはブロックアトラス 1 枚。ガラス等は別バッチ (半透明) に分ける。
      */
     private static MqoModel buildNgtoModel(ResourceSearchResult resource, String modelFile, float voxelScale) {
         try {
@@ -374,7 +369,7 @@ public final class MqoModelLoader {
             ResourceLocation atlas = net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS;
             List<Batch> batches = new ArrayList<>();
             for (NgtoModelGeometry.Part part : parts) {
-                //.ngtz はパーツ名でスクリプトから部分描画される。グループ名に使う。
+                // .ngtz はパーツ名でスクリプトから部分描画される。グループ名に使う。
                 addNgtoBatch(batches, part.opaque(), atlas, part.name(), false);
                 addNgtoBatch(batches, part.translucent(), atlas, part.name(), true);
             }
@@ -445,15 +440,13 @@ public final class MqoModelLoader {
         if (texturePath == null || texturePath.isBlank()) {
             texturePath = ClassModelGeometry.defaultTexture(modelFile);
         }
-        //★材質オプションはパスに "|ptmeta=..." として埋め込まれている
-        //(VehiclePackLoader.encodeTextureDescriptor)。MQO 経路は TextureBinding.parse で
-        //剥がしているが、ここは素通しだったためファイルが見つからずフォールバックになり、
-        //<b>オプション付きの材質だけテクスチャが化ける</b>。
-        //実機では 'Light' を持つ kiha600 だけが暗くなり、オプション無しの kiha600_rusty は正常、
-        //という形で出た。パスとオプションを分離してから解決する。
+        // ★材質オプションはパスに "|ptmeta=..." として埋め込まれている
+        // (VehiclePackLoader.encodeTextureDescriptor)。
+        // 剥がしているが、ここは素通しだったためファイルが見つからずフォールバックになり、
+        // オプション付きの材質だけテクスチャが化ける。
         TextureBinding classBinding = TextureBinding.parse(texturePath);
         ResourceLocation texture = resolveClassModelTexture(packPath, classBinding.path());
-        //Light 材質なら本家どおり ***_light0/1/2 を引く (従来は空配列で発光パスが効かなかった)。
+        // Light 材質なら本家どおり ***_light0/1/2 を引く (従来は空配列で発光パスが効かなかった)。
         ResourceLocation[] classEmissive = resolveLegacyLightTextures(classBinding, new TextureOpener() {
             @Override
             public InputStream open(String rel) throws Exception {
@@ -488,7 +481,7 @@ public final class MqoModelLoader {
         return b != null && !b.isBlank() ? b : null;
     }
 
-    /** {@code minecraft:textures/entity/minecart.png} のような名前空間付きも受ける。 */
+    /** minecraft:textures/entity/minecart.png のような名前空間付きも受ける。 */
     private static ResourceLocation resolveClassModelTexture(Path packPath, String texturePath) {
         if (texturePath == null || texturePath.isBlank()) {
             return fallbackTexture();
@@ -503,9 +496,8 @@ public final class MqoModelLoader {
         if (resolved != null && !resolved.equals(fallbackTexture())) {
             return resolved;
         }
-        //パックに無いならバニラのリソースとして引く。minecart は
-        //"textures/entity/minecart.png" = バニラのテクスチャで、パック内には存在しない。
-        //ここを通さないと 4x4 の白テクスチャになる (真っ白な面として出る)。
+        // パックに無いならバニラのリソースとして引く。
+        // "textures/entity/minecart.png" = バニラのテクスチャで、パック内には存在しない。
         ResourceLocation vanilla = ResourceLocation.tryParse("minecraft:" + texturePath);
         if (vanilla != null && Minecraft.getInstance() != null
                 && Minecraft.getInstance().getResourceManager().getResource(vanilla).isPresent()) {
@@ -525,13 +517,13 @@ public final class MqoModelLoader {
         return resolvePackTexture(packPath, texturePath);
     }
 
-    /** パス直指定版。パック名を持たない経路 ({@link #loadInternal}) から使う。 */
+    /** パス直指定版。パック名を持たない経路 (#loadInternal) から使う。 */
     private static ResourceLocation resolvePackTexture(Path packPath, String texturePath) {
         if (packPath == null || texturePath == null || texturePath.isBlank()) {
             return fallbackTexture();
         }
-        //RTMU 追加: アニメーション GIF を方向幕/種別幕などに直接使えるようにする。
-        //拡張子 .gif は ImageIO でフレーム分解し、毎 tick 貼り替わる DynamicTexture を返す。
+        // RTMU 追加: アニメーション GIF を方向幕/種別幕などに直接使えるようにする。
+        // 拡張子 .gif は ImageIO でフレーム分解し、毎 tick 貼り替わる DynamicTexture を返す。
         if (texturePath.toLowerCase(Locale.ROOT).endsWith(".gif")) {
             final String gifRel = texturePath;
             ResourceLocation gif = GifTextures.resolve(packPath + "|gif|" + gifRel,
@@ -539,7 +531,7 @@ public final class MqoModelLoader {
             if (gif != null) {
                 return gif;
             }
-            //デコード失敗時のみ下の静止経路へフォールバック
+            // デコード失敗時のみ下の静止経路へフォールバック
         }
         TextureBinding binding = TextureBinding.parse(texturePath);
         String cacheKey = packPath + "|" + binding.cacheKey();
@@ -586,9 +578,8 @@ public final class MqoModelLoader {
     }
 
     /**
-     * スクリプトへ渡すモデルへ、本家 {@code ModelObject.model} 相当のグラフを載せる。
-     * <p>解決は {@code VehicleScriptRenderers.buildModelObject} と同じ全パック横断の索引。
-     * 失敗しても描画自体は続くので、警告だけ出して黙って進む。
+     * スクリプトへ渡すモデルへ、本家 ModelObject.model 相当のグラフを載せる。
+     * 解決は VehicleScriptRenderers.buildModelObject と同じ全パック横断の索引。
      */
     private static void attachScriptModelGraph(MqoModel model, String modelFile) {
         if (model == null || modelFile == null || modelFile.isBlank()) {
@@ -620,19 +611,17 @@ public final class MqoModelLoader {
     }
 
     /**
-     * @param voxelScale ボクセルモデル (.ngto/.ngtz) の縮尺。本家 {@code NGTOParts.render} は
-     *                   {@code glScalef(scale)} を<b>パーツの形状の内側だけ</b>に掛ける。
-     *                   描画の最上位で掛けると、スクリプトが台車/ドアを置くための
-     *                   {@code glTranslatef} まで縮んで<b>全部が車両中央に寄る</b>。
-     *                   なのでここで形状へ焼き込み、描画側では掛けない。
+     * glScalef(scale) をパーツの形状の内側だけに掛ける。
+     * 描画の最上位で掛けると、スクリプトが台車/ドアを置くための
+     * glTranslatef まで縮んで全部が車両中央に寄る。
+     * @param voxelScale ボクセルモデル (.ngto/.ngtz) の縮尺。本家 NGTOParts.render は
      */
     private static MqoModel loadInternal(Path packPath, String modelFile, Map<String, String> textureOverrides,
                                          boolean smoothing, float voxelScale) {
-        //本家 Java 実装モデル (ModelBogie.class / ModelTrain_kiha600.class / ModelTrain_Minecart.class)。
-        //ファイルとして存在しないので、パックを探す前にここで組み立てる。
-        //★車体・台車・プレビューで入口が違う (loadModelForVehicle / loadModelForVehiclePart /
-        //  loadModelFromPack) ので、<b>共通の底</b>であるここで受ける。入口ごとに足すと
-        //  必ず取りこぼす (実際、台車だけ出て車体が出ない状態になった)。
+        // 本家 Java 実装モデル (ModelBogie.class / ModelTrain_kiha600.class / ModelTrain_Minecart.class)。
+        // ファイルとして存在しないので、パックを探す前にここで組み立てる。
+        // ★車体・台車・プレビューで入口が違う (loadModelForVehicle / loadModelForVehiclePart /
+        // loadModelFromPack) ので、共通の底であるここで受ける。
         if (ClassModelGeometry.isSupported(modelFile)) {
             return buildClassModel(packPath, modelFile, textureOverrides);
         }
@@ -663,7 +652,7 @@ public final class MqoModelLoader {
                     }
                 };
                 if (lowerModelFile.endsWith(".ngto") || lowerModelFile.endsWith(".ngtz")) {
-                    //本家の .ngto/.ngtz はボクセル。ブロックの焼き済みモデルから面を組む。
+                    // 本家の .ngto/.ngtz はボクセル。ブロックの焼き済みモデルから面を組む。
                     return buildNgtoModel(modelResource, modelFile, voxelScale);
                 }
                 if (lowerModelFile.endsWith(".obj")) {
@@ -698,7 +687,7 @@ public final class MqoModelLoader {
                     }
                 };
                 if (lowerModelFile.endsWith(".ngto") || lowerModelFile.endsWith(".ngtz")) {
-                    //本家の .ngto/.ngtz はボクセル。ブロックの焼き済みモデルから面を組む。
+                    // 本家の .ngto/.ngtz はボクセル。ブロックの焼き済みモデルから面を組む。
                     return buildNgtoModel(modelResource, modelFile, voxelScale);
                 }
                 if (lowerModelFile.endsWith(".obj")) {
@@ -747,9 +736,8 @@ public final class MqoModelLoader {
         if (fallback == null || packPath.equals(fallback.packPath())) {
             return null;
         }
-        //別パックから引いた時だけ 1 回記録する。分割パック (定義とテクスチャが別 zip) で
-        //「どのパックの絵が実際に使われたか」を後から確認できるようにする。
-        //同名ファイルを多数持つパックの取り違えは、これを見ないと切り分けられない。
+        // 別パックから引いた時だけ 1 回記録する。
+        // 「どのパックの絵が実際に使われたか」を後から確認できるようにする。
         if (CROSS_PACK_LOGGED.add(packPath + "|" + relative)) {
             RealTrainModUnofficial.LOGGER.info("[RTMU] テクスチャ/資産を別パックから解決: {} → {} ({})",
                 relative,
@@ -803,8 +791,8 @@ public final class MqoModelLoader {
             CachedModel previous = MODEL_CACHE.remove(key);
             if (previous != null) {
                 modelCacheBytes -= previous.estimatedBytes();
-                //古いモデルを差し替える時は GPU VBO を解放 (リーク防止)。ただし同じ
-                //オブジェクトを再登録する場合は、今から使う VBO を閉じないようスキップ。
+                // 古いモデルを差し替える時は GPU VBO を解放 (リーク防止)。ただし同じ
+                // オブジェクトを再登録する場合は、今から使う VBO を閉じないようスキップ。
                 if (previous.model != model) {
                     previous.model.closeGpuResources();
                 }
@@ -832,8 +820,8 @@ public final class MqoModelLoader {
             }
             modelCacheBytes -= cached.estimatedBytes();
             iterator.remove();
-            //追い出したモデルの GPU VBO を解放する。これを怠ると VertexBuffer が native の
-            //まま残り、巡回中に GPU メモリがリークして徐々に重くなっていた (今回の主因)。
+            // 追い出したモデルの GPU VBO を解放する。これを怠ると VertexBuffer が native の
+            // まま残り、巡回中に GPU メモリがリークして徐々に重くなっていた (今回の主因)。
             cached.model.closeGpuResources();
         }
     }
@@ -847,8 +835,8 @@ public final class MqoModelLoader {
                 return candidate;
             }
         }
-        //★zip 版 (findEntry) と同じく<b>ファイル名だけの一致は取らない</b>。
-        //assets/<domain>/ を基準にした完全パス (サフィックス) 一致のみ。
+        // ★zip 版 (findEntry) と同じくファイル名だけの一致は取らない。
+        // assets/<domain>/ を基準にした完全パス (サフィックス) 一致のみ。
         String suffix = ("/" + norm).toLowerCase(Locale.ROOT);
         try (var stream = Files.walk(root)) {
             for (Path file : (Iterable<Path>) stream::iterator) {
@@ -878,13 +866,8 @@ public final class MqoModelLoader {
                 return direct;
             }
         }
-        //★<b>ファイル名だけの一致は取らない</b>。本家 ModelPackManager.getResource は
-        //assets/<domain>/<path> の完全一致でしか引かない。
-        //以前は「そのパック内に同名が 1 個しか無ければ採用」としていたが、パックが複数ある
-        //環境では<b>正しいパックを見る前に別パックの同名ファイルで確定</b>してしまう。
-        //実例: 相模線の `205_main_mi/SG/205m.png` が、鶴見線パックに 1 個だけある
-        //`205_main_mi/TR/205m.png` に化けていた (中間車だけ鶴見線の色になる)。
-        //サフィックス一致は assets/<domain>/ を基準にした完全パス解決なので残す。
+        // ★ファイル名だけの一致は取らない。
+        // assets/<domain>/<path> の完全一致でしか引かない。
         String suffixLower = ("/" + norm).toLowerCase(Locale.ROOT);
         ZipEntry suffixMatch = null;
         java.util.Enumeration<? extends ZipEntry> en = zf.entries();
@@ -949,12 +932,9 @@ public final class MqoModelLoader {
             candidates.add(preferredPackPath.toAbsolutePath().normalize());
         }
         candidates.addAll(getSharedPackCandidates());
-        //★本家と同じく<b>完全パスだけ</b>で解決する。
-        //本家 ModelPackManager.getResource は ResourceLocationCustom(domain, path) を作るだけで
-        //探索しない (MC のリソースパック機構が assets/&lt;domain&gt;/&lt;path&gt; を完全一致で引く)。
-        //RTMU にはファイル名だけで探すフォールバックがあったが、JRCT パックのように
-        //全系列で `.../button/1.png` と同名のボタン画像を持つパックでは<b>別系列の絵</b>を
-        //掴む (同名 5 個)。車両とボタンが一致しない原因だったので撤去した。
+        // ★本家と同じく完全パスだけで解決する。
+        // 本家 ModelPackManager.getResource は ResourceLocationCustom(domain, path) を作るだけで
+        // 探索しない (MC のリソースパック機構が assets/<domain>/<path> を完全一致で引く)。
         for (Path candidate : candidates) {
             logModelLoadDetail("resource-scan", "relative={} candidatePack={}", normalized, candidate);
             ResourceSearchResult found = findResourceInPack(candidate, normalized);
@@ -1109,10 +1089,8 @@ public final class MqoModelLoader {
         // key = groupName + "|" + matKey so each object×material pair is a separate batch
         Map<String, BatchBuilder> byGroup = new LinkedHashMap<>();
 
-        //★MQO 書式の解釈は jp.ngt.ngtlib.renderer.model.MqoReader に一本化してある。
-        //ここは読み取った内容を描画バッチへ組むだけ (座標 0.01 倍・頂点順はそのまま)。
-        //以前はこのメソッドが独自に同じ書式を舐めており、スクリプト側の ModelLoader と
-        //解釈が二重管理になっていた。
+        // ★MQO 書式の解釈は jp.ngt.ngtlib.renderer.model.MqoReader に一本化してある。
+        // ここは読み取った内容を描画バッチへ組むだけ (座標 0.01 倍・頂点順はそのまま)。
         final int[] mirrorType = {-1};
         final float[] facetAngle = {RTM_DEFAULT_SMOOTHING_ANGLE};
         final String[] groupName = {"default"};
@@ -1141,7 +1119,7 @@ public final class MqoModelLoader {
 
             @Override
             public void mirrorAxis(int axis) {
-                //mirror_axis はビットマスク(1=X,2=Y,4=Z)。ビット判定で取りこぼしを防ぐ
+                // mirror_axis はビットマスク(1=X,2=Y,4=Z)。ビット判定で取りこぼしを防ぐ
                 mirrorType[0] = (axis & 1) != 0 ? 0 : (axis & 2) != 0 ? 1 : (axis & 4) != 0 ? 2 : -1;
             }
 
@@ -1182,8 +1160,8 @@ public final class MqoModelLoader {
         StringBuilder mapping = new StringBuilder();
         for (int i = 0; i < materialOrder.size(); i++) {
             materialTextures.add(resolveTexture((byte) i, materialOrder, materialTexPaths, textureOverrides, opener).location);
-            //どの材質にどのテクスチャが載ったかを 1 モデル 1 回だけ残す。
-            //「材質名は JSON にあるのに別の材質の絵が貼られる」類は、これが無いと追えない。
+            // どの材質にどのテクスチャが載ったかを 1 モデル 1 回だけ残す。
+            // 「材質名は JSON にあるのに別の材質の絵が貼られる」類は、これが無いと追えない。
             mapping.append(i == 0 ? "" : ", ")
                    .append(materialOrder.get(i)).append("->").append(resolveTexturePath(
                        (byte) i, materialOrder, materialTexPaths, textureOverrides));
@@ -1491,7 +1469,7 @@ public final class MqoModelLoader {
 
 
     /**
-     * 面 1 枚をバッチへ足す。書式の解釈は {@link jp.ngt.ngtlib.renderer.model.MqoReader} 側で
+     * 面 1 枚をバッチへ足す。書式の解釈は jp.ngt.ngtlib.renderer.model.MqoReader 側で
      * 済んでおり、ここへは解析済みの値だけが渡る。
      */
     private static void addFace(
@@ -1598,7 +1576,7 @@ public final class MqoModelLoader {
         // 車体下「影板」は元MQO上で y=-98 / z=±900 付近なので、ここでは -0.98 / ±9.0
         // として判定する。
         boolean underBody = faceMinY < -0.10F;
-        //影板判定の高さ閾値。内装床を巻き込まない範囲に限定
+        // 影板判定の高さ閾値。内装床を巻き込まない範囲に限定
         boolean broadHorizontalPlate = faceMinY < -0.55F && dy < 0.035F && dx > 0.45F && dz > 1.20F;
         boolean veryLowFlatPlate = faceMinY < -0.75F && dy < 0.05F && (dz > 0.45F || dx > 0.80F);
         boolean lowUnderbodyPlate = faceMinY < -0.62F && dy < 0.012F && dx > 0.42F && dz > 0.62F;
@@ -1606,7 +1584,7 @@ public final class MqoModelLoader {
         if (unnamedLegacyShadowPlate) {
             return true;
         }
-        //車体グループ内の偽影板(大きく平坦・車体下)だけを間引く
+        // 車体グループ内の偽影板(大きく平坦・車体下)だけを間引く
         if ((veryLowFlatPlate || lowUnderbodyPlate || broadHorizontalPlate) && (lower.equals("obj1") || lower.equals("obj2") || lower.equals("obj3")
                 || lower.equals("body") || lower.startsWith("body_"))) {
             return true;
@@ -1652,8 +1630,8 @@ public final class MqoModelLoader {
         Vector3f e1 = new Vector3f((float) (p1.x - p0.x), (float) (p1.y - p0.y), (float) (p1.z - p0.z));
         Vector3f e2 = new Vector3f((float) (p2.x - p0.x), (float) (p2.y - p0.y), (float) (p2.z - p0.z));
         Vector3f n = e1.cross(e2);
-        //★大きさで捨てない。文字のような細かい三角形は |n|^2 が 1e-10 台になるので、
-        //閾値を置くと正常な面まで法線が真上へ差し替わる ([[FaceNormals]])。
+        // ★大きさで捨てない。文字のような細かい三角形は |n|^2 が 1e-10 台になるので、
+        // 閾値を置くと正常な面まで法線が真上へ差し替わる ([[FaceNormals]])。
         FaceNormals.normalize(n);
         bb.put(p0, n, u0, v0);
         bb.put(p1, n, u1, v1);
@@ -1706,8 +1684,8 @@ public final class MqoModelLoader {
         Vector3f e1 = new Vector3f((float) (p1.x - p0.x), (float) (p1.y - p0.y), (float) (p1.z - p0.z));
         Vector3f e2 = new Vector3f((float) (p2.x - p0.x), (float) (p2.y - p0.y), (float) (p2.z - p0.z));
         Vector3f n = e1.cross(e2);
-        //★大きさで捨てない。文字のような細かい三角形は |n|^2 が 1e-10 台になるので、
-        //閾値を置くと正常な面まで法線が真上へ差し替わる ([[FaceNormals]])。
+        // ★大きさで捨てない。文字のような細かい三角形は |n|^2 が 1e-10 台になるので、
+        // 閾値を置くと正常な面まで法線が真上へ差し替わる ([[FaceNormals]])。
         FaceNormals.normalize(n);
         // QUADSモードは4頂点/面が必要 → 3頂点の三角形は縮退クワッドとして扱う (v0,v1,v2,v2)
         bb.put(p0, n, u0, v0);
@@ -1771,9 +1749,7 @@ public final class MqoModelLoader {
         return mm.find() ? mm.group(1) : null;
     }
 
-    /**
-     * {@link #resolveTexture} と同じ順序でパスだけ決める (ログ用・読み込みはしない)。
-     */
+    /** #resolveTexture と同じ順序でパスだけ決める (ログ用・読み込みはしない)。 */
     private static String resolveTexturePath(byte matId, List<String> materialOrder, List<String> materialTexPaths,
                                              Map<String, String> overrides) {
         int idx = matId & 0xFF;
@@ -1801,12 +1777,9 @@ public final class MqoModelLoader {
         if (path == null) path = overrides.get(String.valueOf(idx));
         // 3. "default" 上書き — MQO埋め込みtexより優先
         if (path == null) path = overrides.get("default");
-        //★「どれでもいいから overrides の先頭」という代替は<b>やらない</b> (本家に無い)。
-        //`VehicleDefinition` の overrides は `Map.copyOf` の不変マップで、その反復順は
-        //JVM 起動ごとに変わる (ImmutableCollections の SALT)。つまり先頭を採ると
-        //<b>起動するたびに別の材質のテクスチャ</b>が貼られ、鼻先だけ車体の絵になる、
-        //といった再現性の無い化け方をする。見つからないものは見つからないままにして、
-        //下の MQO 埋め込み tex("...") → 白、という本家と同じ順に落とす。
+        // ★「どれでもいいから overrides の先頭」という代替はやらない (本家に無い)。
+        // `VehicleDefinition` の overrides は `Map.copyOf` の不変マップで、その反復順は
+        // JVM 起動ごとに変わる (ImmutableCollections の SALT)。
         if (path == null && !overrides.isEmpty()) {
             RealTrainModUnofficial.LOGGER.warn(
                 "[RTMU] 材質 {} (index {}) に対応するテクスチャ指定がありません。JSON にあるのは {}",
@@ -1830,7 +1803,7 @@ public final class MqoModelLoader {
         });
     }
 
-    //★loadScriptForModel は撤去。OpList 経路 (系統B) へのスクリプト投入をやめたため。
+    // ★loadScriptForModel は撤去。OpList 経路 (系統B) へのスクリプト投入をやめたため。
 
     private static ScriptEngine loadStandaloneScript(Path packPath, String scriptPath, String modelName) {
         if (packPath == null) {
@@ -1959,7 +1932,7 @@ public final class MqoModelLoader {
             return content;
         }
         if (!visiting.add(scriptIdentifier)) {
-            //循環: 内容は循環元で展開済み。空で打ち切る (再スキャンしないので無限ループしない)。
+            // 循環: 内容は循環元で展開済み。空で打ち切る (再スキャンしないので無限ループしない)。
             return "";
         }
         try {
@@ -2036,7 +2009,7 @@ public final class MqoModelLoader {
             relative = findEntry(zipFile, normalizedInclude);
         }
         if (relative == null) {
-            //親相対/生パスで見つからなければassetsルートから解決
+            // 親相対/生パスで見つからなければassetsルートから解決
             String assetsRoot = assetsNamespaceRoot(current);
             if (!assetsRoot.isEmpty()) {
                 relative = findEntry(zipFile, assetsRoot + normalizedInclude);
@@ -2136,7 +2109,7 @@ public final class MqoModelLoader {
     /** pass1 マスクの解像度 (縦横)。粗くてよい: 判定は面の UV 範囲を「含むか」だけ。 */
     private static final int PASS1_MASK_RES = 128;
 
-    //小バッチのバッファ経路化は実測悪化のため不採用
+    // 小バッチのバッファ経路化は実測悪化のため不採用
 
     /** pass1で色が出るテクセルの粗いマスクを作る。過大評価側に倒す。 */
     private static java.util.BitSet buildPass1Mask(com.mojang.blaze3d.platform.NativeImage img) {
@@ -2151,7 +2124,7 @@ public final class MqoModelLoader {
             }
             java.util.BitSet mask = new java.util.BitSet(PASS1_MASK_RES * PASS1_MASK_RES);
             for (int y = 0; y < h; y++) {
-                //テクセルが覆うマス範囲を全部塗る(小テクスチャで面が間引かれるのを防ぐ)
+                // テクセルが覆うマス範囲を全部塗る(小テクスチャで面が間引かれるのを防ぐ)
                 int my0 = y * PASS1_MASK_RES / h;
                 int my1 = Math.min(PASS1_MASK_RES - 1, ((y + 1) * PASS1_MASK_RES - 1) / h);
                 for (int x = 0; x < w; x++) {
@@ -2224,8 +2197,8 @@ public final class MqoModelLoader {
             for (int x = 0; x < w; x++) {
                 int p = img.getPixelRGBA(x, y);            // 0xAABBGGRR (リトルエンディアン)
                 int a = (p >>> 24) & 0xFF;
-                //本家 renderBodyNormal は glAlphaFunc(GL_EQUAL, 1.0) = alpha が完全に 1.0 (255)
-                //のピクセルだけを pass0 で描く。254 以下は全て pass1 (LESS 1.0 + blend) 側。
+                // 本家 renderBodyNormal は glAlphaFunc(GL_EQUAL, 1.0) = alpha が完全に 1.0 (255)
+                // のピクセルだけを pass0 で描く。254 以下は全て pass1 (LESS 1.0 + blend) 側。
                 int na = a >= 0xFF ? 0xFF : 0x00;
                 dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
             }
@@ -2306,29 +2279,28 @@ public final class MqoModelLoader {
                     opaqueLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_opq");
                     Minecraft.getInstance().getTextureManager().register(opaqueLoc, opaqueTex);
-                    //pass1用: 半透明ピクセルだけ残し、不透明部分の再描画を防ぐ
+                    // pass1用: 半透明ピクセルだけ残し、不透明部分の再描画を防ぐ
                     com.mojang.blaze3d.platform.NativeImage windowImg = copyNonOpaqueAlpha(img);
                     DynamicTexture windowTex = new DynamicTexture(windowImg);
                     windowLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_win");
                     Minecraft.getInstance().getTextureManager().register(windowLoc, windowTex);
-                    //スクリプト経路からも引けるようにする (opaqueVariantOf / windowVariantOf)
+                    // スクリプト経路からも引けるようにする (opaqueVariantOf / windowVariantOf)
                     TEXTURE_ALPHA_SPLIT.put(baseLoc, new ResourceLocation[]{opaqueLoc, windowLoc});
                 }
                 // 発光解決はサブライトテクスチャがあるときのみ(無条件だと二重描画)
                 TextureInfo info = new TextureInfo(baseLoc, resolveLegacyLightTextures(binding, opener, img), alphaBlendOption || partialAlpha || glassBand, partialAlpha, glassBand, opaqueLoc, windowLoc);
                 info.lightOptionDeclared = binding.hasLightTextures();
                 info.noSubTextures = binding.noSubTextures();
-                //割合判定 (3%/1.5%) は運転席窓のような小さなガラス領域を見逃すため、正確な全画素判定で上書き
+                // 割合判定 (3%/1.5%) は運転席窓のような小さなガラス領域を見逃すため、正確な全画素判定で上書き
                 info.hasAnyTranslucentPixel = hasAnyTranslucentPixel(img);
-                //pass1 で実際に色が出るテクセルの位置。面ごとの提出要否をこれで判定する。
+                // pass1 で実際に色が出るテクセルの位置。面ごとの提出要否をこれで判定する。
                 info.pass1Mask = buildPass1Mask(img);
                 return info;
             }
         } catch (Exception e) {
-            //★黙って握り潰さない。ここで落ちると 4x4 の白が貼られ、車体の一部が
-            //「均一な白い面」になる (923/922 の鼻先など)。原因のパスが分からないと
-            //テクスチャの問題なのか描画パスの問題なのか切り分けられない。
+            // ★黙って握り潰さない。
+            // 「均一な白い面」になる /の鼻先など)。
             RealTrainModUnofficial.LOGGER.warn("[RTMU] テクスチャを読めませんでした (白で代替): {} ({})",
                 binding.path(), e.toString());
             return new TextureInfo(fallbackTexture(), new ResourceLocation[0], false);
@@ -2346,13 +2318,11 @@ public final class MqoModelLoader {
         if (binding == null || !binding.hasLightTextures()) {
             return new ResourceLocation[0];
         }
-        //★本家 TextureSet は subTextures[pass.id - 2] と<b>位置で</b>引く。
-        //  i=0 → LIGHT(室内灯) / i=1 → LIGHT_FRONT(前照灯) / i=2 → LIGHT_BACK(尾灯)
-        //以前はここで「見つかったものだけ詰めて」配列を作っていたため、
-        //例えば _light0 が無く _light1/_light2 だけある材質で添字が 1 つずつ手前へずれ、
-        //前照灯用テクスチャが室内灯パスに回っていた。前照灯・尾灯 (mode 2) では
-        //pass3 と pass4 の両方が走るので、同じ面が二重に描かれて「重なって見える」。
-        //本家と同じく<b>位置は固定し、無いものは null のまま</b>にする。
+        // ★本家 TextureSet は subTextures[pass.id - 2] と位置で引く。
+        // i=0 → LIGHT(室内灯) / i=1 → LIGHT_FRONT(前照灯) / i=2 → LIGHT_BACK(尾灯)
+        // 以前はここで「見つかったものだけ詰めて」配列を作っていたため、
+        // 例えば _light0 が無く _light1/_light2 だけある材質で添字が 1 つずつ手前へずれ、
+        // 前照灯用テクスチャが室内灯パスに回っていた。
         List<String> explicitPaths = binding.lightTexturePaths();
         int count = Math.max(3, explicitPaths.size());
         ResourceLocation[] slots = new ResourceLocation[count];
@@ -2363,7 +2333,7 @@ public final class MqoModelLoader {
             }
             slots[i] = tryLoadOptionalTexture(candidate, opener, binding.cacheKey() + "#light" + i, baseImg);
         }
-        //末尾が全部 null なら配列ごと縮める (「発光材質でない」判定を変えないため)
+        // 末尾が全部 null なら配列ごと縮める (「発光材質でない」判定を変えないため)
         int last = -1;
         for (int i = 0; i < count; i++) {
             if (slots[i] != null) {
@@ -2408,25 +2378,20 @@ public final class MqoModelLoader {
 
     /**
      * 「ベーステクスチャの不透明部分を覆える」と判明した発光テクスチャ。
-     *
-     * <p>pass0 が実際に描くのは<b>ベースの α==255 の画素だけ</b> (本家 renderBodyNormal の
-     * {@code glAlphaFunc(GL_EQUAL, 1.0)})。したがって pass0 を省略してよい条件は
-     * 「_light0 が完全不透明」ではなく<b>「ベースが α==255 の場所で _light0 も α==255」</b>。
-     *
-     * <p>内装テクスチャは窓などに α を持つため前者では落ちてしまい、
-     * 内装だけ二重描画が残ってちらついた。</p>
+     * pass0 が実際に描くのはベースの α==255 の画素だけ (本家 renderBodyNormal の
+     * glAlphaFunc(GL_EQUAL, 1.0))。
      */
     private static final java.util.Set<ResourceLocation> EMISSIVE_COVERS_BASE =
         java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    /** {@link #EMISSIVE_COVERS_BASE} の問い合わせ。 */
+    /** #EMISSIVE_COVERS_BASE の問い合わせ。 */
     static boolean isFullyOpaqueEmissive(ResourceLocation loc) {
         return loc != null && EMISSIVE_COVERS_BASE.contains(loc);
     }
 
     /**
      * ベースが α==255 の全画素で発光テクスチャも α==255 か。
-     * <p>解像度が違う場合は正規化座標の最近傍で引く。
+     * 解像度が違う場合は正規化座標の最近傍で引く。
      */
     private static boolean emissiveCoversBase(com.mojang.blaze3d.platform.NativeImage base,
                                               com.mojang.blaze3d.platform.NativeImage light) {
@@ -2455,9 +2420,7 @@ public final class MqoModelLoader {
 
     /**
      * 「この車両の発光パス (RenderPass.LIGHT) が今フレーム実際に描くグループ名」。
-     * <p>{@link VehicleScriptRenderers} が NORMAL パスの再生前後で設定/解除する。
-     * 設定されている間、{@code renderNamedGroups} は「発光パスが不透明な {@code _light0} で
-     * 描き直すグループ」を pass0 で描かない。同じ面を 2 回描かなくなるので z-fighting が消える。
+     * VehicleScriptRenderers が NORMAL パスの再生前後で設定/解除する。
      */
     private static java.util.Set<String> lightCoveredGroups;
 
@@ -2485,7 +2448,7 @@ public final class MqoModelLoader {
                 "dynamic/mqo/" + Integer.toHexString(cacheKeySuffix.hashCode())
             );
             Minecraft.getInstance().getTextureManager().register(loc, tex);
-            //ベースの不透明部分を覆えるなら pass0 を省略できる。
+            // ベースの不透明部分を覆えるなら pass0 を省略できる。
             if (baseImg != null && emissiveCoversBase(baseImg, img)) {
                 EMISSIVE_COVERS_BASE.add(loc);
             }
@@ -2497,29 +2460,15 @@ public final class MqoModelLoader {
 
 
     /**
-     * 基本テクスチャ → {@code {α==255 のみ, α<255 のみ}} の貼り分け。
-     *
-     * <p>本家は 1 枚のテクスチャをアルファ関数でパスごとに切り分ける。
-     *
-     * <pre>
-     *   pass0  glAlphaFunc(GL_EQUAL, 1.0)  → α==255 の画素だけ
-     *   pass1  glAlphaFunc(GL_LESS,  1.0)  → α&lt;255 の画素だけ (ブレンド)
-     * </pre>
-     *
-     * <p>RTMU は 1.21 にアルファ関数が無いので、<b>読み込み時に 2 枚へ焼き分けて</b>
-     * 同じことをしている。バッチ経路 ({@code Batch.opaqueTexture/windowTexture}) は
-     * 既にこれを使っているが、<b>スクリプト経路が使えていなかった</b>。
-     *
-     * <p>そのためスクリプトが描く物は「1 枚を全部ブレンドで描く」になり、
-     * 本家なら pass1 でうっすら乗るだけの<b>偽の影ポリゴン (α&lt;255) が
-     * 真っ黒な板として台車を覆う</b>、といったことが起きていた。
+     * 基本テクスチャ → {α==255 のみ, α<255 のみ} の貼り分け。
+     * 本家は 1 枚のテクスチャをアルファ関数でパスごとに切り分ける。
      */
     public static ResourceLocation opaqueVariantOf(ResourceLocation base) {
         ResourceLocation[] pair = base == null ? null : TEXTURE_ALPHA_SPLIT.get(base);
         return pair == null ? base : pair[0];
     }
 
-    /** {@link #opaqueVariantOf} の pass1 側。分割が無い (= α<255 が無い) なら null。 */
+    /** #opaqueVariantOf の pass1 側。分割が無い (= α<255 が無い) なら null。 */
     public static ResourceLocation windowVariantOf(ResourceLocation base) {
         ResourceLocation[] pair = base == null ? null : TEXTURE_ALPHA_SPLIT.get(base);
         return pair == null ? null : pair[1];
@@ -2564,57 +2513,34 @@ public final class MqoModelLoader {
     }
 
     /**
-     * 車体の頂点変換を<b>CPU 側に固定</b>するか。
-     *
-     * <p><b>これは「死んだ定数」ではない。</b>いま生きている
-     * {@code drawBatchWithEntityVbo} (ライトマップを持つ VBO 経路) も、
-     * これが true の間は<b>一切使われない</b>。false にすると挙動が変わる。
-     * 以前ここに「fullbright が false なので実質無効」と書いてあったが、
-     * <b>誤り</b>だった (その説明は撤去した fullbright 経路の話)。
-     *
-     * <h2>なぜ固定しているか</h2>
-     * VBO 経路は {@code mv = ModelView × pose} を CPU で合成して<b>頂点変換を GPU</b>で行うが、
-     * 発光パスやスクリプト描画は<b>CPU</b>で pose を掛けてから提出する。
-     * {@code (A·B)·v} と {@code A·(B·v)} は float32 で数 ULP ずれるため、
-     * 同一面でも深度が一致せず z-fighting する (内装がまだら状にちらつく)。
-     *
-     * <p>さらに VBO を使うかの判定には<b>フレームごとに変わる条件</b>が含まれる
-     * (室内灯・ドア/パンタの変換・スクリプトの色や UV)。そのため
-     * 「動いている間は CPU / 止まると VBO」と経路が入れ替わり、
-     * 切り替わった瞬間だけ深度がずれて一瞬重なって見える。
-     *
-     * <p>本家は変換経路が 1 つしかないので、この問題自体が存在しない。
-     *
-     * <h2>外すなら</h2>
-     * 経路を 2 つ持つのをやめる (全部 VBO にする) しかない。
-     * その場合は発光パスも VBO 側へ寄せて、変換の順番を揃えること。
-     * 片方だけ動かすと必ず z-fighting が戻る。
+     * 車体の頂点変換をCPU 側に固定するか。
+     * これは「死んだ定数」ではない。
      */
     private static final boolean PIN_CPU_TRANSFORM = true;
 
     /** 描画中の車両の doCulling。スクリプト経路 (VehicleScriptRenderers) からも使う。 */
     public static boolean shouldCullModelFaces(Object rawEntity) {
-        //replay経路はentityがnullのため、描画中の車両からdoCullingを引く
+        // replay経路はentityがnullのため、描画中の車両からdoCullingを引く
         Object entity = rawEntity != null ? rawEntity
             : com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.currentVehicle();
         if (entity instanceof TrainEntity train) {
             VehicleDefinition def = VehicleRegistry.getById(train.getVehicleId());
             return def != null && def.isDoCulling();
         }
-        //本家 RenderVehicleBase: doCulling はモデル設定に従う (既定 false = 両面描画)。
-        //以前は本家系列車 (EntityTrainBase) だけ常に true にしていたが、doCulling=false 前提で
-        //作られたパック (片面モデリングの内装等) の面が裏から消える。本家に合わせる。
+        // 本家 RenderVehicleBase: doCulling はモデル設定に従う (既定 false = 両面描画)。
+        // 以前は本家系列車 (EntityTrainBase) だけ常に true にしていたが、doCulling=false 前提で
+        // 作られたパック (片面モデリングの内装等) の面が裏から消える。本家に合わせる。
         if (entity instanceof jp.ngt.rtm.entity.train.EntityTrainBase train) {
             VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
             return def != null && def.isDoCulling();
         }
-        //設置オブジェクト (架線/踏切/ポール/信号) も本家は同じ ModelObject.render を通り、
-        //doCulling に従う。定義から引く。
+        // 設置オブジェクト (架線/踏切/ポール/信号) も本家は同じ ModelObject.render を通り、
+        // doCulling に従う。定義から引く。
         if (entity instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity io) {
             com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def = io.getDefinition();
             return def != null && def.isDoCulling();
         }
-        //既定はfalse(両面)。本家のdoCulling既定に合わせる
+        // 既定はfalse(両面)。本家のdoCulling既定に合わせる
         return false;
     }
 
@@ -2987,15 +2913,11 @@ public final class MqoModelLoader {
         /** pass1で色が出るテクセルの粗いマスク。null=全面描画。 */
         java.util.BitSet pass1Mask;
         /**
-         * テクスチャ指定に {@code Light} オプションが書かれていたか。
-         * <p>本家 {@code ModelObject.light} 相当。{@code ***_light0.png} が実在するかとは<b>別</b>で、
-         * ファイルが 1 つも無くても Light 指定があれば true。223 のようにライトを
-         * テクスチャ差し替えではなく<b>ジオメトリ</b>(head_light_on 等) で描くパックは
-         * この状態になる。{@link #emissiveTextures} の長さで代用してはいけない
-         * (あちらは VBO/CPU 変換の分岐にも使われている)。
+         * テクスチャ指定に Light オプションが書かれていたか。
+         * 本家 ModelObject.light 相当。
          */
         boolean lightOptionDeclared;
-        /** {@link TextureBinding#noSubTextures()} (本家 subTextures == null) の引き継ぎ。 */
+        /** TextureBinding#noSubTextures (本家 subTextures == null) の引き継ぎ。 */
         boolean noSubTextures;
 
         TextureInfo(ResourceLocation location, ResourceLocation[] emissiveTextures, boolean isTranslucent) {
@@ -3047,17 +2969,9 @@ public final class MqoModelLoader {
             }
             Set<String> options = new LinkedHashSet<>();
             List<String> lightTexturePaths = new ArrayList<>();
-            //★オプション語は<b>部分一致</b>で拾うこと。本家 ModelObject は
-            //  texOption.contains("Light") / texOption.contains("OneTex") と、
-            //  オプション文字列全体に対する部分一致で判定している。
-            //  RTMU はカンマで割ってから equals で見ていたため、区切りがカンマ以外だと
-            //  1 つも認識できなかった。同梱パックにも実在する:
-            //    ModelMachine_RevolvingLight_Red.json → "Light_AlphaBlend"
-            //  こうなると hasLightTextures() が false になり、その材質は発光材質と見なされず、
-            //  VehicleScriptRenderers.renderBodyLight のゲートで<b>発光パスごと落ちる</b>。
-            //  スクリプトの if(pass > 1) が一度も呼ばれないので、パック側からは
-            //  「スクリプトが動かない/特殊発光しない」に見える。
-            //  テクスチャのパスだけは位置で持つ必要があるので先に分ける。
+            // ★オプション語は部分一致で拾うこと。
+            // texOption.contains("Light") / texOption.contains("OneTex") と、
+            // オプション文字列全体に対する部分一致で判定している。
             StringBuilder optionText = new StringBuilder();
             for (String token : metadata.split(",")) {
                 String trimmed = token.trim();
@@ -3083,12 +2997,12 @@ public final class MqoModelLoader {
             if (optionLine.contains("glassalpha")) {
                 options.add("glassalpha");
             }
-            //★本家 ModelObject:56-59 (1.12.2)
-            //  boolean disableSubTex = texOption.contains("OneTex");
-            //  int texSize = flagLight && !disableSubTex ? 3 : 0;
-            //OneTex = サブテクスチャを作らない (TextureSet.subTextures == null)。
-            //捨ててしまうと「_light を引かない材質」と「_light を引けなかった材質」を
-            //区別できなくなる。前者は素テクスチャで描き、後者は描かないのが本家。
+            // ★本家 ModelObject:56-59 (1.12.2)
+            // boolean disableSubTex = texOption.contains("OneTex");
+            // int texSize = flagLight && !disableSubTex ? 3 : 0;
+            // OneTex = サブテクスチャを作らない (TextureSet.subTextures == null)。
+            // 捨ててしまうと「_light を引かない材質」と「_light を引けなかった材質」を
+            // 区別できなくなる。前者は素テクスチャで描き、後者は描かないのが本家。
             if (optionLine.contains("onetex") || optionLine.contains("one_tex")) {
                 options.add("onetex");
             }
@@ -3097,9 +3011,8 @@ public final class MqoModelLoader {
 
         /**
          * 発光テクスチャのパスか (オプション語か、の裏返し)。
-         *
-         * <p>オプション語は部分一致で拾うので、パスを混ぜると
-         * {@code textures/machine/turnstile_light0.png} の "light" を
+         * オプション語は部分一致で拾うので、パスを混ぜると
+         * textures/machine/turnstile_light0.png の "light" を
          * オプションとして拾ってしまう。位置ではなく形で分ける。
          */
         private static boolean looksLikeTexturePath(String token) {
@@ -3116,9 +3029,9 @@ public final class MqoModelLoader {
         }
 
         /**
-         * 本家 {@code TextureSet.subTextures == null} 相当。
-         * <p>本家は明示的なライトテクスチャ名 (textures 配列の 4 要素目以降) があれば
-         * {@code texSize} をそちらで上書きするので、その場合は subTextures を持つ。
+         * 本家 TextureSet.subTextures == null 相当。
+         * 本家は明示的なライトテクスチャ名 (textures 配列の 4 要素目以降) があれば
+         * texSize をそちらで上書きするので、その場合は subTextures を持つ。
          */
         boolean noSubTextures() {
             return options.contains("onetex") && lightTexturePaths.isEmpty();
@@ -3155,8 +3068,8 @@ public final class MqoModelLoader {
         if (builders == null || builders.isEmpty()) {
             return;
         }
-        //smoothing=false でも必ず回す: depthBias 用の「位置共有バイアス法線」は
-        //フラットモデルにも必要 (無いと light/display の押し出しで面が割れて隙間が開く)。
+        // smoothing=false でも必ず回す: depthBias 用の「位置共有バイアス法線」は
+        // フラットモデルにも必要 (無いと light/display の押し出しで面が割れて隙間が開く)。
         Map<String, List<BatchBuilder>> byObject = new LinkedHashMap<>();
         for (BatchBuilder bb : builders) {
             if (bb != null && !bb.positions.isEmpty()) {
@@ -3177,8 +3090,8 @@ public final class MqoModelLoader {
             return;
         }
         List<SmoothFace> faces = new ArrayList<>();
-        //陰影用: 本家と同じ「座標が完全に一致する頂点だけを同一視」。
-        //押し出し用: 従来どおり 1mm グリッド (下の bias の説明を参照)。
+        // 陰影用: 本家と同じ「座標が完全に一致する頂点だけを同一視」。
+        // 押し出し用: 従来どおり 1mm グリッド (下の bias の説明を参照)。
         Map<PosKey, List<SmoothFace>> byExactPosition = new HashMap<>();
         Map<PosKey, List<SmoothFace>> byGridPosition = new HashMap<>();
         for (BatchBuilder builder : builders) {
@@ -3211,16 +3124,16 @@ public final class MqoModelLoader {
             ? faces.parallelStream()
             : faces.stream();
         stream.forEach(face -> {
-            //本家: angleCos = cos(smoothingAngle)。facet の値をそのまま使う。
+            // 本家: angleCos = cos(smoothingAngle)。facet の値をそのまま使う。
             float cosThreshold = (float) Math.cos(Math.toRadians(face.builder.smoothingAngle));
             for (int k = 0; k < 4; k++) {
                 int vi = face.firstVertex + k;
                 int o = vi * 8;
-                //本家: vec = 自面の法線から開始し、他の面は面法線角が facet 以下なら加算
+                // 本家: vec = 自面の法線から開始し、他の面は面法線角が facet 以下なら加算
                 Vector3f shade = new Vector3f(face.normal);
-                //depthBias の押し出し方向: 同位置の全面の平均 (facet 閾値なし)。
-                //閾値ありの法線で押すと硬いエッジで同位置の頂点が別方向に動き、
-                //light/display グループの押し出しで面が割れて隙間が開く。
+                // depthBias の押し出し方向: 同位置の全面の平均 (facet 閾値なし)。
+                // 閾値ありの法線で押すと硬いエッジで同位置の頂点が別方向に動き、
+                // light/display グループの押し出しで面が割れて隙間が開く。
                 Vector3f bias = new Vector3f(face.normal);
                 List<SmoothFace> exact = byExactPosition.get(exactPositionKey(face.builder.positions, o));
                 if (exact != null && smoothing) {
@@ -3243,7 +3156,7 @@ public final class MqoModelLoader {
                 } else {
                     bias.set(face.normal);
                 }
-                //読みはスナップショット (SmoothFace.normal) のみなので、書き込みは競合しない
+                // 読みはスナップショット (SmoothFace.normal) のみなので、書き込みは競合しない
                 face.builder.biasNormals[vi * 3] = bias.x;
                 face.builder.biasNormals[vi * 3 + 1] = bias.y;
                 face.builder.biasNormals[vi * 3 + 2] = bias.z;
@@ -3266,25 +3179,18 @@ public final class MqoModelLoader {
 
     private static void register(Map<PosKey, List<SmoothFace>> map, PosKey key, SmoothFace face) {
         List<SmoothFace> list = map.computeIfAbsent(key, ignored -> new ArrayList<>());
-        //本家 !list.contains(face): 同じ面は同じ位置に 1 回だけ (縮退 p2==p3 の二重登録防止)。
-        //1 面の 4 頂点は連続して登録するので、重複は必ず末尾に居る。
+        // 本家 !list.contains(face): 同じ面は同じ位置に 1 回だけ (縮退 p2==p3 の二重登録防止)。
+        // 1 面の 4 頂点は連続して登録するので、重複は必ず末尾に居る。
         if (list.isEmpty() || list.get(list.size() - 1) != face) {
             list.add(face);
         }
     }
 
     /**
-     * 陰影用の頂点キー。<b>本家と同じく座標の完全一致</b>で同一視する。
-     * <p>本家 {@code Vertex} は {@code hashCode} が生ビット由来・{@code equals} が 1e-4 許容なので、
+     * 陰影用の頂点キー。本家と同じく座標の完全一致で同一視する。
+     * 本家 Vertex は hashCode が生ビット由来・equals が 1e-4 許容なので、
      * HashMap 上では実質「ビットが同じ頂点だけが同じ束」になる。これに合わせる。
-     * <p>★以前はここが {@code round(x*1000)} の <b>1mm グリッド</b>だった。1mm 未満しか離れていない
-     * 別頂点まで束ねてしまうため、ナンバープレートの文字のように細かい面が集まる所で、
-     * 本来混ざらない面の法線が混ざって<b>変な位置に影が出ていた</b>。D51 (D51-498_1.mqoz) の
-     * body-2 で実測すると、本家アルゴリズムとの差は<b>頂点の 8.28% が 5°以上・最大 58.5°</b>。
-     * 完全一致にすると 0% になる (0.1mm グリッドでも 0.19% 残る) ので、グリッドではなく完全一致にする。
-     * <p>{@code -0.0F} は {@code 0.0F} へ寄せる。ミラー生成は座標に -1 を掛けるので、鏡像面上の
-     * 頂点が {@code -0.0F} になり、寄せないとミラーの継ぎ目で法線が繋がらない
-     * (本家は {@code x == 0.0F} の頂点を元の {@code Vertex} のまま使うので繋がる)。
+     * ★以前はここが round(x*1000) の 1mm グリッドだった。
      */
     private static PosKey exactPositionKey(List<Float> positions, int offset) {
         return new PosKey(
@@ -3295,9 +3201,8 @@ public final class MqoModelLoader {
 
     /**
      * depthBias の押し出し方向用の頂点キー。こちらは従来どおり 1mm グリッド。
-     * <p>用途が「重なっている面を一緒に押し出して隙間を作らない」で、本家に対応物が無い
-     * RTMU 独自処理なので、陰影とは別の粒度で構わない。むしろ完全一致にすると、
-     * わずかにズレた頂点が別方向へ押されて light/display グループに隙間が開く。
+     * 用途が「重なっている面を一緒に押し出して隙間を作らない」で、本家に対応物が無い
+     * RTMU 独自処理なので、陰影とは別の粒度で構わない。
      */
     private static PosKey gridPositionKey(List<Float> positions, int offset) {
         return new PosKey(
@@ -3328,7 +3233,7 @@ public final class MqoModelLoader {
         boolean glassTranslucent = false;
         /** テクスチャに中間アルファのピクセル (ガラス帯/網等) があるか。無ければ pass1 は描く物が無い。 */
         boolean texHasTranslucentPixels = false;
-        /** pass1 で色が出るテクセルの粗いマスク ({@link MqoModelLoader#buildPass1Mask})。 */
+        /** pass1 で色が出るテクセルの粗いマスク (MqoModelLoader#buildPass1Mask)。 */
         java.util.BitSet pass1Mask = null;
         /** depthBias押し出し用の頂点法線(同位置全面の平均)。 */
         float[] biasNormals = null;
@@ -3343,9 +3248,9 @@ public final class MqoModelLoader {
         float minV = Float.POSITIVE_INFINITY;
         float maxV = Float.NEGATIVE_INFINITY;
 
-        /** {@link TextureInfo#lightOptionDeclared} の引き継ぎ。 */
+        /** TextureInfo#lightOptionDeclared の引き継ぎ。 */
         boolean lightOptionDeclared;
-        /** {@link TextureInfo#noSubTextures} の引き継ぎ。 */
+        /** TextureInfo#noSubTextures の引き継ぎ。 */
         boolean noSubTextures;
 
         BatchBuilder(int order, String groupName, ResourceLocation texture, ResourceLocation[] emissiveTextures, int materialId, boolean translucent, float smoothingAngle) {
@@ -3389,8 +3294,8 @@ public final class MqoModelLoader {
             return faceSignatures.add(builder.toString());
         }
 
-        //スムージングは applyObjectWideSmoothing (オブジェクト単位・本家準拠) で済ませてある。
-        //バッチ単位でやり直すと材質の境目で法線が切れるので、ここではやらない。
+        // スムージングは applyObjectWideSmoothing (オブジェクト単位・本家準拠) で済ませてある。
+        // バッチ単位でやり直すと材質の境目で法線が切れるので、ここではやらない。
         Batch bake() {
             float[] data = new float[positions.size()];
             for (int i = 0; i < positions.size(); i++) data[i] = positions.get(i);
@@ -3422,10 +3327,10 @@ public final class MqoModelLoader {
 
         /** 発光パスを描くか。先頭=前照灯、最後尾=尾灯、mode2=両灯。 */
         private static boolean shouldRenderEmissivePass(Object entity, int pass) {
-            //本家 RenderVehicleBase.renderBodyLight と同じ条件 (本家系列車)。
-            //  i=0(室内灯) mode==0||mode==1 / i=1(前照灯) mode==1&&isFrontEmpty||mode==2
-            //  i=2(尾灯)   mode==1&&!isFrontEmpty&&isBackEmpty||mode==2
-            //  単行(isSingleTrain かつ前後とも空)は進行方向で前照灯/尾灯を出し分ける。
+            // 本家 RenderVehicleBase.renderBodyLight と同じ条件 (本家系列車)。
+            // i=0(室内灯) mode==0||mode==1 / i=1(前照灯) mode==1&&isFrontEmpty||mode==2
+            // i=2(尾灯)   mode==1&&!isFrontEmpty&&isBackEmpty||mode==2
+            // 単行(isSingleTrain かつ前後とも空)は進行方向で前照灯/尾灯を出し分ける。
             if (entity instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain) {
                 int mode = rtmTrain.getTrainStateData(
                         jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Light.id);
@@ -3444,19 +3349,19 @@ public final class MqoModelLoader {
                 };
             }
             if (!(entity instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity train)) {
-                //列車以外 (車/設置物) は従来どおり
+                // 列車以外 (車/設置物) は従来どおり
                 return true;
             }
             int mode = train.getLightMode();
             switch (pass) {
                 case 2:
-                    //室内灯
+                    // 室内灯
                     return train.isInteriorLightOn();
                 case 3:
-                    //前照灯
+                    // 前照灯
                     return mode == 2 || (mode == 1 && train.isLeadingCar());
                 case 4:
-                    //尾灯
+                    // 尾灯
                     return mode == 2 || (mode == 1 && !train.isLeadingCar() && train.isTrailingCar());
                 default:
                     return true;
@@ -3477,12 +3382,10 @@ public final class MqoModelLoader {
         private volatile boolean bodyCapComputed;
 
         public MqoModel(List<Batch> batches, List<ResourceLocation> materialTextures) {
-            //★提出順を本家に合わせる: 本家 ModelObject.renderWithTexture は
-            //  for (材質 i) { currentMatId = i; renderer.render(...) }
-            //で<b>材質が外側</b>。RTMU は (グループ, 材質) の初出順に持っていたので
-            //実質「グループが外側」で、重なった面の<b>どちらが後に描かれるか</b>が本家と逆になる。
-            //深度が同値な重なり面は「後に描いた方が残る」ので、順が違うと本家では見えない面が
-            //手前に出る (D51 の「動かず貼り付いた斑」)。材質→初出順で並べ替えて本家と揃える。
+            // ★提出順を本家に合わせる: 本家 ModelObject.renderWithTexture は
+            // for (材質 i) { currentMatId = i; renderer.render(...) }
+            // で材質が外側。
+            // 実質「グループが外側」で、重なった面のどちらが後に描かれるかが本家と逆になる。
             batches = new ArrayList<>(batches);
             batches.sort(java.util.Comparator.<Batch>comparingInt(b -> b.materialId)
                 .thenComparingInt(b -> b.order));
@@ -3799,19 +3702,14 @@ public final class MqoModelLoader {
         }
 
         /**
-         * 本体モデルが<b>自前の台車パーツ</b>を持つか。
-         * <p>.ngtz の車両は台車を {@code bogieM_F} のようなパーツとしてモデルに内蔵しつつ、
-         * JSON では {@code ModelBogie.class} を指していることがある。その場合に組込台車を
-         * 重ねると二重になるので、こちらを優先する。
-         * <p>{@link #hasOwnWheelGroups()} と分けてあるのは、あちらが「SL の動輪」判定で、
-         * 実ファイルの台車モデルを持つ車両にも効いてしまうと本物の台車が消えるため。
+         * 本体モデルが自前の台車パーツを持つか。
+         * .ngtz の車両は台車を bogieM_F のようなパーツとしてモデルに内蔵しつつ、
+         * JSON では ModelBogie.class を指していることがある。
          */
         /**
          * ボクセルモデル (.ngto/.ngtz) か。
-         * <p>本家 {@code NGTZModel} はパーツごとに<b>自分のグリッドの中央</b>へ寄せて描き、
-         * 実際の位置決めはパックのスクリプトが {@code glTranslatef} で行う。
-         * そのためスクリプトが走っている間、ベイク済みモデルを別に描いてはいけない
-         * (台車やドアが車両の中央に出る / 本体が二重になってチカチカする)。
+         * 本家 NGTZModel はパーツごとに自分のグリッドの中央へ寄せて描き、
+         * 実際の位置決めはパックのスクリプトが glTranslatef で行う。
          */
         public boolean isVoxelModel() {
             return this.voxelModel;
@@ -3905,7 +3803,7 @@ public final class MqoModelLoader {
             if (n.contains("影") || n.contains("shadow")) {
                 return true;
             }
-            //_msは実グループに使われるため除去しない。影は shadow/影/_kage のみ
+            // _msは実グループに使われるため除去しない。影は shadow/影/_kage のみ
             if (n.endsWith("_kage") || n.contains("_kage_")) {
                 return true;
             }
@@ -3943,9 +3841,9 @@ public final class MqoModelLoader {
         }
 
         /**
+         * RTM 標準スクリプトはドアの開閉をこれで表現する
+         * (開いた側の扉パーツを除外リストに入れて消す)。null/空なら除外なし。
          * @param excludedGroups 本家 ResourceState.exclusionParts (正規化済み)。
-         *                       RTM 標準スクリプトはドアの開閉をこれで表現する
-         *                       (開いた側の扉パーツを除外リストに入れて消す)。null/空なら除外なし。
          */
         public void renderNamedGroups(PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
                                       boolean translucent, Set<String> normalizedGroupNames,
@@ -3959,7 +3857,7 @@ public final class MqoModelLoader {
             if (ordered == null) {
                 Set<Batch> selected = new LinkedHashSet<>();
                 for (String name : normalizedGroupNames) {
-                    //ヘルパー除外は影のみ(角度異体まで消すと本体を巻き込む)
+                    // ヘルパー除外は影のみ(角度異体まで消すと本体を巻き込む)
                     if (isShadowHelperGroup(name)) {
                         continue;
                     }
@@ -3981,13 +3879,9 @@ public final class MqoModelLoader {
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GROUPS, secStart);
                 return;
             }
-            //★発光パスが不透明な _light0 で描き直すグループは pass0 で描かない。
-            //本家は即時描画で「後に描いた発光パスが必ず残る」ため 2 回描いても問題ないが、
-            //1.21 では同一深度の勝敗が画素ごとに揺れて可動部 (座席) がちらつく。
-            //深度をずらして勝たせると、今度は遠方・浅い角度で内装が車体を突き抜ける
-            //(ポリゴンオフセットは傾き比例なので遠方ほど効く)。
-            //_light0 が不透明なら pass0 の描画は完全に覆われて見えないので、
-            //描かなければ良い。1 枚しか描かないので z-fighting は原理的に起きない。
+            // ★発光パスが不透明な _light0 で描き直すグループは pass0 で描かない。
+            // 本家は即時描画で「後に描いた発光パスが必ず残る」ため 2 回描いても問題ないが、
+            // 1.21 では同一深度の勝敗が画素ごとに揺れて可動部 (座席) がちらつく。
             java.util.Set<String> covered = lightCoveredGroups;
             if (covered != null && !translucent) {
                 List<Batch> filtered = null;
@@ -4011,7 +3905,7 @@ public final class MqoModelLoader {
                 }
             }
             Object entity = scriptRenderer != null ? scriptRenderer.getCurrentEntity() : null;
-            //door_*は除外を無視して常に描く(スライドで開閉を表現)
+            // door_*は除外を無視して常に描く(スライドで開閉を表現)
             GroupPredicate exclusionFilter = (excludedGroups == null || excludedGroups.isEmpty())
                 ? null
                 : groupName -> {
@@ -4039,11 +3933,11 @@ public final class MqoModelLoader {
         }
 
         /**
+         * ★本家 BasicVehiclePartsRenderer.render(entity, pass, …) は
+         * 全パスで同じ変換を通す。ここに渡さないと、発光パスだけ可動部が
+         * 閉じた位置に描かれる — 室内灯を点けた E131 で「ドアは開いているのに
+         * 内装のドアが開かない」ように見えたのはこれ (光る側だけ元位置に残る)。
          * @param groupTransform ドア/パンタ等の可動部変換。
-         *        <p>★本家 {@code BasicVehiclePartsRenderer.render(entity, pass, …)} は
-         *        <b>全パスで同じ変換</b>を通す。ここに渡さないと、発光パスだけ可動部が
-         *        閉じた位置に描かれる — 室内灯を点けた E131 で「ドアは開いているのに
-         *        内装のドアが開かない」ように見えたのはこれ (光る側だけ元位置に残る)。
          */
         public void renderNamedGroupsEmissive(PoseStack poseStack, MultiBufferSource buffer,
                                               int packedLight, int overlay,
@@ -4054,18 +3948,10 @@ public final class MqoModelLoader {
             }
             long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
             // 本家 jp.ngt.rtm.render.ModelObject#render の発光ブロック:
-            //     GLHelper.disableLighting();
-            //     GLHelper.setLightmapMaxBrightness();
-            //     this.renderWithTexture(entity, 2, par3);
-            //★本家 RenderVehicleBase.renderBodyLight の忠実移植。
-            //  isLightON = (i > 0) のときだけ
-            //      disableLighting() + glEnable(GL_BLEND) + glBlendFunc(SRC_ALPHA, ONE_MINUS_SRC_ALPHA)
-            //      + glColor4f(1,1,1,0.8) + setLightmapMaxBrightness()
-            //  i == 0 (RenderPass.LIGHT) は<b>状態を一切変えない</b> = 通常ライティング・
-            //  周囲の明るさ・ブレンド無し・深度書き込みあり。
-            //  本家は頂点を押し出さないので depthBias も持たない。
-            //  「LIGHT は NORMAL/TRANSPARENT の後」という順序は、1.21 の遅延バッファでは
-            //  提出順では保証されないので renderReal 側でパスの区切りに flush を入れて担保する。
+            // GLHelper.disableLighting;
+            // GLHelper.setLightmapMaxBrightness;
+            // this.renderWithTexture(entity, 2, par3);
+            // ★本家 RenderVehicleBase.renderBodyLight の忠実移植。
             boolean isLightON = legacyPass > 2;
             int light = isLightON ? net.minecraft.client.renderer.LightTexture.FULL_BRIGHT : packedLight;
             float alpha = isLightON ? 0.8F : 1.0F;
@@ -4076,7 +3962,7 @@ public final class MqoModelLoader {
                 if (groupBatches == null || groupBatches.isEmpty()) {
                     continue;
                 }
-                //可動部は変換を掛けた行列で描く (グループごとに push/pop)
+                // 可動部は変換を掛けた行列で描く (グループごとに push/pop)
                 String rawGroupName = groupBatches.get(0).groupName;
                 boolean willTransform = groupTransform != null && groupTransform.mayModify(rawGroupName);
                 if (willTransform) {
@@ -4088,61 +3974,42 @@ public final class MqoModelLoader {
                 Matrix4f mat = pose.pose();
                 Matrix3f norm = pose.normal();
                 for (Batch batch : groupBatches) {
-                    //★本家 ModelObject.renderWithTexture (1.12.2 jp/ngt/rtm/render/ModelObject.java:216-227)
-                    //の忠実移植。LIGHT/LIGHT_FRONT/LIGHT_BACK では:
-                    //
-                    //  if (!textures[i].doLighting) continue;                  // Light 指定の無い材質は飛ばす
-                    //  if (textures[i].subTextures != null) {
-                    //      texture = textures[i].subTextures[pass.id - 2];     // _light0/1/2 を貼る
-                    //  } else {
-                    //      texture = textures[i].material.texture;             // ★無ければ素テクスチャ
-                    //  }
-                    //
-                    //RTMU は「発光テクスチャが引けない = 描かない」にしていたため、
-                    //Light 指定はあるが ***_light*.png を 1 枚も持たないパックのライトが
-                    //まるごと消えていた。223 が該当する: 指定は "AlphaBlend, Light, OneTex" で
-                    //_light テクスチャは無く、前照灯/尾灯/室内灯を head_light_on / room_light と
-                    //いう<b>ジオメトリ</b>で描く (Render223.js:89-92,158-164)。
-                    //本家はこの場合 223.png のまま描くので、ライトが出る。
-                    //本家 `if (!this.textures[i].doLighting) continue;`
-                    //Light 指定の無い材質は LIGHT パスで描かない。
+                    // ★本家 ModelObject.renderWithTexture (1.12.2 jp/ngt/rtm/render/ModelObject.java:216-227)
+                    // の忠実移植。
+                    // if (!textures[i].doLighting) continue;                  // Light 指定の無い材質は飛ばす
+                    // if (textures[i].subTextures != null) {
+                    // texture = textures[i].subTextures[pass.id - 2];     // _light0/1/2 を貼る
+                    // } else {
+                    // texture = textures[i].material.texture;             // ★無ければ素テクスチャ
+                    // }
                     if (!batch.lightOptionDeclared) {
                         continue;
                     }
                     ResourceLocation tex;
                     if (batch.noSubTextures) {
-                        //本家 subTextures == null の枝 = <b>OneTex 指定</b>。
-                        //223 (AlphaBlend, Light, OneTex) がこれ。本家は _light の実在を見ず
-                        //素テクスチャのまま LIGHT パスを描くので、ライトはスクリプトが
-                        //ジオメトリ (head_light_on / room_light) で出す。
+                        // 本家 subTextures == null の枝 = OneTex 指定。
+                        // (AlphaBlend, Light, OneTex) がこれ。
                         tex = batch.texture;
                     } else {
-                        //本家 subTextures != null の枝。位置で引く (pass.id - 2)。
+                        // 本家 subTextures != null の枝。位置で引く (pass.id - 2)。
                         tex = batch.emissiveTextureForPass(legacyPass);
                         if (tex == null) {
-                            //Light と書いてあるのに ***_light*.png を同梱していないパック
-                            //(JRCT_Keyo/Sagami/Tsurumi の 205 系など、導入パックで 41 材質)。
-                            //ここで素テクスチャに落とすと pass3/4 の FULL_BRIGHT + α0.8 で
-                            //車体そのものが光り、通常描画と重なって見える。描かないのが正しい。
+                            // Light と書いてあるのに ***_light*.png を同梱していないパック
+                            // (JRCT_Keyo/Sagami/Tsurumi の 205 系など、導入パックで 41 材質)。
+                            // ここで素テクスチャに落とすと pass3/4 の FULL_BRIGHT + α0.8 で
+                            // 車体そのものが光り、通常描画と重なって見える。描かないのが正しい。
                             continue;
                         }
                     }
-                    //★本家 RenderVehicleBase.renderBodyLight の忠実移植。
-                    //  isLightON = (i > 0) のときだけ disableLighting + glEnable(GL_BLEND)
-                    //  + glColor4f(1,1,1,0.8) + setLightmapMaxBrightness を掛ける。
-                    //  i == 0 (RenderPass.LIGHT) は<b>何も変更せず</b>描く = 通常ライティング・
-                    //  ブレンド無し・depthMask は既定の ON、つまり単なる不透明テクスチャ差し替え。
-                    //  基本テクスチャが透明で実体が ***_light0.png 側にある面 (0系の鼻) は
-                    //  この不透明描画が深度を書くことで、後から描くレールに突き抜かれなくなる。
-                    //描画順は renderReal の flush で本家の即時描画と同じに保証されるので、
-                    //深度をずらす細工は要らない。本家と同じ描画状態だけを使う。
-                    //★前照灯/尾灯 (i>0) はポリゴンオフセット付き。同じ頂点に複数のライトパスが
-                    //重なると 1.21 では勝敗が定まらず、ポリゴンが重なったように見えるため。
+                    // ★本家 RenderVehicleBase.renderBodyLight の忠実移植。
+                    // isLightON = (i > 0) のときだけ disableLighting + glEnable(GL_BLEND)
+                    // + glColor4f(1,1,1,0.8) + setLightmapMaxBrightness を掛ける。
+                    // ★前照灯/尾灯 (i>0) はポリゴンオフセット付き。
                     VertexConsumer vc = isLightON
                         ? buffer.getBuffer(com.portofino.realtrainmodunofficial.client.render
                             .RtmuRenderTypes.emissiveBlendLayered(tex, legacyPass, cullFaces))
-                        //室内灯パスも本体と同一平面なので、深度だけずらしてちらつきを止める
-                        //(本家は即時描画で「後勝ち」が保証されるため不要な処理)。
+                        // 室内灯パスも本体と同一平面なので、深度だけずらしてちらつきを止める
+                        // (本家は即時描画で「後勝ち」が保証されるため不要な処理)。
                         : buffer.getBuffer(com.portofino.realtrainmodunofficial.client.render
                             .RtmuRenderTypes.emissiveCutoutLayered(tex, cullFaces));
                     for (int i = 0; i < batch.vertexCount; i++) {
@@ -4150,8 +4017,8 @@ public final class MqoModelLoader {
                         float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
                         float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
                         float u = batch.data[o + 6], v = batch.data[o + 7];
-                        //★本家は発光パスで頂点を押し出さない。手前に出す必要は
-                        //ポリゴンオフセット (RenderType 側) で満たしている。
+                        // ★本家は発光パスで頂点を押し出さない。手前に出す必要は
+                        // ポリゴンオフセット (RenderType 側) で満たしている。
                         float tnx = norm.m00() * nx + norm.m10() * ny + norm.m20() * nz;
                         float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
                         float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
@@ -4212,7 +4079,7 @@ public final class MqoModelLoader {
                     float dy = batch.data[o + 1] - cy;
                     float dz = batch.data[o + 2] - cz;
                     float dist = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
-                    //拡大は倍率と絶対上限の小さい方 (巨大な発光帯が筋状に伸びるのを防ぐ)
+                    // 拡大は倍率と絶対上限の小さい方 (巨大な発光帯が筋状に伸びるのを防ぐ)
                     float grow = Math.min(dist * (scale - 1.0F), GLOW_MAX_EXPAND);
                     float factor = dist > 1.0E-4F ? (dist + grow) / dist : 1.0F;
                     float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
@@ -4237,10 +4104,8 @@ public final class MqoModelLoader {
 
         /** このモデルに発光 (Light) マテリアルのバッチが 1 つでもあるか。 */
         /**
-         * どれかの材質が {@code Light} オプションを宣言しているか (本家 {@code modelObj.light})。
-         * <p>本家 RenderVehicleBase:92 のライトパスのゲートはこれ。{@code ***_light*.png} の
-         * 実在ではない。スクリプトがジオメトリでライトを描くパック (223 の head_light_on 等) は
-         * 発光テクスチャを 1 つも持たないので、{@link #hasEmissiveBatches()} では拾えない。
+         * どれかの材質が Light オプションを宣言しているか (本家 modelObj.light)。
+         * 本家 RenderVehicleBase:92 のライトパスのゲートはこれ。
          */
         public boolean hasLightOption() {
             for (Batch b : batches) {
@@ -4261,10 +4126,9 @@ public final class MqoModelLoader {
         }
 
         /**
-         * 全グループの発光パス。本家 RenderVehicleBase.renderBodyLight は
+         * 全グループの発光パス。
          * Light マテリアルの面を ***_light0/1/2.png へ差し替えて車体ごと描き直す処理で、
-         * スクリプトの有無とは無関係に走る。RTMU はこれをスクリプト経路にしか通しておらず、
-         * rendererPath を持たないパック (100系等) でライトを点けても何も出なかった。
+         * スクリプトの有無とは無関係に走る。
          */
         public void renderAllGroupsEmissive(PoseStack poseStack, MultiBufferSource buffer,
                                             int packedLight, int overlay, int legacyPass,
@@ -4344,12 +4208,9 @@ public final class MqoModelLoader {
                 if (scriptModel != null && scriptRenderer != null) {
                     scriptModel.setActiveRenderer(scriptRenderer);
                 }
-                //★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
-                //以前はここで記録済み描画の再生キャッシュを使い、状態シグネチャが変わらない限り
-                //JS を呼ばずに済ませていた。しかしシグネチャは RTMU が知っている状態
-                //(速度/ドア/パンタ等) しか見られず、スクリプトが自前で進めるアニメは検出できない。
-                //その結果 SR1 のパンタのように「スクリプトが動かしているのに静止扱い」となり、
-                //再記録間隔ぶんカクついていた。毎フレーム素直に実行する。
+                // ★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
+                // 以前はここで記録済み描画の再生キャッシュを使い、状態シグネチャが変わらない限り
+                // JS を呼ばずに済ませていた。
                 if (scriptEngine instanceof ScriptEngine engine) {
                     int renderedBatchesBefore = scriptRenderer != null ? scriptRenderer.getRenderedBatchCount() : 0;
                     // RTMレガシースクリプトは entity.getBogie(n) / entity.field_70177_z 等
@@ -4439,9 +4300,9 @@ public final class MqoModelLoader {
         private void renderSelectedBatches(List<Batch> selectedBatches, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
                                            boolean translucent, GroupPredicate groupFilter, GroupTransform groupTransform,
                                            TrainScriptSystem.ScriptModelRenderer scriptRenderer, Object entity) {
-            //★以前ここには「フラットな直接 GL 経路 (fullbright)」があり、影 mod のときだけ
-            //  バッファ経路へ切り替えていた。その経路は<b>呼び出し元が全て false</b> で
-            //  到達不能なまま残っていたので撤去した。今はバッファ経路の 1 本だけ。
+            // ★以前ここには「フラットな直接 GL 経路 (fullbright)」があり、影 mod のときだけ
+            // バッファ経路へ切り替えていた。その経路は呼び出し元が全て false で
+            // 到達不能なまま残っていたので撤去した。今はバッファ経路の 1 本だけ。
             long secLoop = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
             // ループ全体で保持する直近値。再設定を skip するため。
             int gr = scriptRenderer != null ? scriptRenderer.getColorRed255()   : 255;
@@ -4463,9 +4324,9 @@ public final class MqoModelLoader {
                 }
                 int scriptPassNow = scriptRenderer != null ? scriptRenderer.getCurrentPass() : 0;
                 if (translucent && !batch.translucent && scriptPassNow < 2) continue;
-                //本家 renderBodyNormal (pass0) は glAlphaFunc(GL_EQUAL, 1.0)。フラグメント α は
-                //「テクスチャ α × マテリアル col α」なので、col α < 1 のバッチ (色付き半透明ガラス) は
-                //pass0 では 1 ピクセルも α==1.0 にならず何も描かれない = バッチごとスキップと等価。
+                // 本家 renderBodyNormal (pass0) は glAlphaFunc(GL_EQUAL, 1.0)。フラグメント α は
+                // 「テクスチャ α × マテリアル col α」なので、col α < 1 のバッチ (色付き半透明ガラス) は
+                // pass0 では 1 ピクセルも α==1.0 にならず何も描かれない = バッチごとスキップと等価。
                 boolean colAlphaGlass = batch.translucent && batch.baseAlpha < 0.999F;
                 if (!translucent && scriptPassNow < 2 && colAlphaGlass) {
                     continue;
@@ -4490,18 +4351,11 @@ public final class MqoModelLoader {
                         continue;
                     }
                     String lowerGroupName = batch.groupNameLower;
-                    //★本家 jp.ngt.rtm.entity.vehicle.RenderVehicleBase (1.12.2) の忠実移植。
-                    //  renderBodyNormal      : glAlphaFunc(GL_EQUAL, 1.0) → <b>α==1.0 のピクセルだけ</b>
-                    //  renderBodyTransparent : glAlphaFunc(GL_LESS,  1.0) → <b>α<1.0 のピクセルだけ</b> + ブレンド
-                    //  (どちらも終了時に glAlphaFunc(GL_GEQUAL, 0.1) へ戻す)
-                    //つまり pass0 と pass1 はアルファで<b>正確に相補</b>に分割される。
-                    //1.21 には固定機能のアルファテストが無いので、同じことをテクスチャの
-                    //貼り分け (opaqueTexture = α==255 のみ / windowTexture = α<255 のみ) で行う。
-                    //
-                    //以前ここを「元テクスチャをそのまま使う」へ変えたことがあるが、根拠にした
-                    //「本家にその指定は無い」は<b>誤り</b>だった。KaizPatchX の ModelObject には
-                    //確かに無いが、アルファ関数を設定しているのは<b>車両レンダラ側</b>である。
-                    //分割を外すと pass1 が不透明部分まで重ねてブレンドし、窓が黒く潰れる (E257)。
+                    // ★本家 jp.ngt.rtm.entity.vehicle.RenderVehicleBase (1.12.2) の忠実移植。
+                    // renderBodyNormal      : glAlphaFunc(GL_EQUAL, 1.0) → α==1.0 のピクセルだけ
+                    // renderBodyTransparent : glAlphaFunc(GL_LESS,  1.0) → α<1.0 のピクセルだけ + ブレンド
+                    // (どちらも終了時に glAlphaFunc(GL_GEQUAL, 0.1) へ戻す)
+                    // つまり pass0 と pass1 はアルファで正確に相補に分割される。
                     ResourceLocation texture = scriptTexture
                         ? scriptRenderer.getBoundTexture()
                         : (emissiveTexture != null ? emissiveTexture
@@ -4531,7 +4385,7 @@ public final class MqoModelLoader {
                             || shouldForceShaderSafeCutout(entity, batch, lowerGroupName, false);
                         depthBias = batch.cachedDepthBiasNoScriptTex;
                     }
-                    //調査用: /rtm hidegroup で隠した部品は描かない
+                    // 調査用: /rtm hidegroup で隠した部品は描かない
                     if (com.portofino.realtrainmodunofficial.client.DebugHiddenGroups.isHidden(batch.groupName)) {
                         continue;
                     }
@@ -4555,33 +4409,19 @@ public final class MqoModelLoader {
                     }
 
                     // Lightmap-aware path: block entities (rails, installed objects)
-                    //本家厳密移植 (ユーザー選択): カリングは doCulling 一括 (不透明も半透明も同じ)。
-                    //doCulling=false で両面、true で片面。「半透明だけ両面」は本家に無い。
+                    // 本家厳密移植 (ユーザー選択): カリングは doCulling 一括 (不透明も半透明も同じ)。
+                    // doCulling=false で両面、true で片面。「半透明だけ両面」は本家に無い。
                     boolean cullThisBatch = useCull;
-                    //pass1 も深度は書く (本家 depthMask 既定 ON)。書かないと後で描くレールが透ける。
+                    // pass1 も深度は書く (本家 depthMask 既定 ON)。書かないと後で描くレールが透ける。
                     RenderType renderType;
-                    //★シェーダーパック使用中は<b>不透明を三角形で</b>送る。
-                    //Iris の MixinBufferBuilder.fillExtendedData は、四角形かつワールド描画中のとき
-                    //面法線を計算して全頂点の法線に memPutInt で書き戻す。こちらが送った
-                    //スムージング済みの頂点法線が塗り潰され、丸みが消える (影は座標由来なので出る)。
-                    //三角形の枝は法線を読むだけで書き戻さないので、そちらへ逃がす。
-                    //半透明はソートを失うと窓の重なりが崩れるため四角形のまま。
+                    // ★シェーダーパック使用中は不透明を三角形で送る。
+                    // Iris の MixinBufferBuilder.fillExtendedData は、四角形かつワールド描画中のとき
+                    // 面法線を計算して全頂点の法線に memPutInt で書き戻す。
                     boolean useTriangles = !needsBlend
                         && com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
                     if (needsBlend) {
-                        //★<b>半透明は深度を書かない</b> (シェーダーの有無に関わらず)。
-                        //
-                        //以前はシェーダー使用時だけ深度を書かないようにしていた。理由は
-                        //「ガラスはレールより先に描かれるので、深度を書くと後から来るレールが
-                        //落ちて車内から線路が見えなくなる」から。同じことが<b>台車</b>でも起きる:
-                        //ガラスや、パックが車体下に持つ半透明の板が先に深度を書くと、
-                        //後から描かれる台車が深度テストで落ちて<b>丸ごと消える</b>
-                        //(半透明の窓と、車体下に持つ半透明の板で実際に発生)。
-                        //
-                        //バニラは「半透明を後回し」で解決するが、後回し経路は Iris だと
-                        //ガラスが空へ飛ぶ (RtmuRenderTypes.glassNoDepthWrite の説明を参照)。
-                        //深度を書かないのは半透明の描き方として普通で、重なりの前後は
-                        //提出順 (NoSort) が決めるので従来どおり安定する。
+                        // ★半透明は深度を書かない (シェーダーの有無に関わらず)。
+                        // 以前はシェーダー使用時だけ深度を書かないようにしていた。
                         renderType = cullThisBatch
                             ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWriteCull(texture)
                             : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWrite(texture);
@@ -4593,10 +4433,10 @@ public final class MqoModelLoader {
                         renderType = cullThisBatch ? RenderType.entityCutout(texture)
                             : RenderType.entityCutoutNoCull(texture);
                     }
-                    //静的VBO高速経路。落ちたゲートを記録する(F8のVBO行)
+                    // 静的VBO高速経路。落ちたゲートを記録する(F8のVBO行)
                     int vboReason;
                     if (PIN_CPU_TRANSFORM) {
-                        //経路固定 (PIN_CPU_TRANSFORM 参照)。VBO は使わない。
+                        // 経路固定 (PIN_CPU_TRANSFORM 参照)。VBO は使わない。
                         vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
                     } else if (captureMode) {
                         vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_CAPTURE;
@@ -4607,14 +4447,10 @@ public final class MqoModelLoader {
                     } else if (depthBias != 0.0F) {
                         vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
                     } else if (batch.emissiveTextures.length > 0) {
-                        //★発光する材質は VBO 経路に載せない。
-                        //VBO は mv = ModelView × pose を CPU 合成して<b>頂点変換を GPU</b>で行うが、
-                        //発光パス (renderNamedGroupsEmissive) は<b>CPU</b>で pose を掛けてから提出する。
-                        //(A·B)·v と A·(B·v) は float32 で数 ULP ずれるため、同一面でも深度が一致せず、
-                        //pass0 と発光パスが画素単位で z-fighting する (内装がまだら状にちらつく)。
-                        //本家は変換経路が 1 つしかないのでこの問題自体が存在しない。経路を CPU 側へ揃える。
-                        //★判定は<b>バッチ単位</b>。モデル単位にすると発光しない面まで CPU 変換になり、
-                        //発光を持つ車両の描画負荷が上がる (実機で悪化を確認)。
+                        // ★発光する材質は VBO 経路に載せない。
+                        // VBO は mv = ModelView × pose を CPU 合成して頂点変換を GPUで行うが、
+                        // 発光パス (renderNamedGroupsEmissive) はCPUで pose を掛けてから提出する。
+                        // ★判定はバッチ単位。
                         vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
                     } else if (overlay != net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY) {
                         vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OVERLAY;
@@ -4632,7 +4468,7 @@ public final class MqoModelLoader {
                         if (vboDrawn) {
                             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countVbo(
                                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK);
-                            //VBO 経路もドローコール数は同じだけ掛かる。重複描画が無いか一緒に数える。
+                            // VBO 経路もドローコール数は同じだけ掛かる。重複描画が無いか一緒に数える。
                             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatch(
                                 batch.groupName, batch.vertexCount,
                                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK);
@@ -4646,20 +4482,18 @@ public final class MqoModelLoader {
                     }
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countVbo(vboReason);
                     MultiBufferSource targetBuffer = buffer;
-                    //★pass1 は<b>面を間引かない</b>。
-                    //以前は「窓テクセルを踏む面だけ提出する」独自最適化を入れていたが、
-                    //テクスチャの解像度や UV の取り方によっては車体の面まで落ちてしまい、
-                    //そこが穴になって手前に描いてあるレールが覗く。本家 pass1 は
-                    //材質の面を全部描いて alpha で抜くだけなので、そちらに合わせる。
+                    // ★pass1 は面を間引かない。
+                    // 以前は「窓テクセルを踏む面だけ提出する」独自最適化を入れていたが、
+                    // テクスチャの解像度や UV の取り方によっては車体の面まで落ちてしまい、
+                    // そこが穴になって手前に描いてあるレールが覗く。
                     float[] vData = batch.data;
                     float[] vBias = batch.biasNormals;
                     int vCount = batch.vertexCount;
                     if (vCount <= 0) {
                         continue;
                     }
-                    //どのグループが CPU 経路に落ちているかをログに出す。
-                    //※間引き<b>後</b>の実提出数を渡すこと。batch.vertexCount を渡していたときは
-                    //  最適化が効いても数字が動かず、効果を読み違えた。
+                    // どのグループが CPU 経路に落ちているかをログに出す。
+                    // ※間引き後の実提出数を渡すこと。
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatch(
                         batch.groupName, vCount, vboReason);
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatchIdentity(
@@ -4668,14 +4502,14 @@ public final class MqoModelLoader {
                     VertexConsumer consumer = targetBuffer.getBuffer(renderType);
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
                         com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GETBUF, secBuf);
-                    //計測: CPU が毎フレーム流している頂点数 (F8 オーバーレイに出す)
+                    // 計測: CPU が毎フレーム流している頂点数 (F8 オーバーレイに出す)
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.addVertices(vCount);
                     long secSub = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
                     PoseStack.Pose pose = poseStack.last();
                     Matrix4f mat = pose.pose();
                     Matrix3f norm = pose.normal();
                     float[] normalOut = new float[3];
-                    //三角形で送るときは四角形 4 頂点を 6 頂点へ並べ替える (中身は同じ)。
+                    // 三角形で送るときは四角形 4 頂点を 6 頂点へ並べ替える (中身は同じ)。
                     int submitCount = useTriangles ? (vCount / 4) * 6 : vCount;
                     for (int vi = 0; vi < submitCount; vi++) {
                         int i = useTriangles
@@ -4687,7 +4521,7 @@ public final class MqoModelLoader {
                         float nx = vData[o + 3], ny = vData[o + 4], nz = vData[o + 5];
                         float u = vData[o + 6], v = vData[o + 7];
                         if (depthBias != 0.0F) {
-                            //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
+                            // 押し出しは biasNormals (同位置の全面平均)。面割れ防止。
                             float bnx = nx, bny = ny, bnz = nz;
                             if (vBias != null) {
                                 int bo = i * 3;
@@ -4704,8 +4538,8 @@ public final class MqoModelLoader {
                         float tny = norm.m01()*nx + norm.m11()*ny + norm.m21()*nz;
                         float tnz = norm.m02()*nx + norm.m12()*ny + norm.m22()*nz;
                         normalizeNormal(tnx, tny, tnz, normalOut);
-                        //頂点ごとのVector3f確保を避ける(GC削減)
-                        //本家 enableCustomLighting 相当: 室内灯の方を向いた面を明るくする。
+                        // 頂点ごとのVector3f確保を避ける(GC削減)
+                        // 本家 enableCustomLighting 相当: 室内灯の方を向いた面を明るくする。
                         int vr = scriptRed;
                         int vg = scriptGreen;
                         int vb = scriptBlue;
@@ -4761,19 +4595,13 @@ public final class MqoModelLoader {
                     scriptRenderer.setDeferTranslucent(true);
                 }
                 if (hasScript) {
-                    // scriptのrender()を全pass(0/1/2/3)で呼ぶ。重複は再描画チェックで防ぐ
+                    // scriptのrenderを全pass(0/1/2/3)で呼ぶ。重複は再描画チェックで防ぐ
                     for (int pass = 0; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
-                        //★パスの取捨も RTMU では判断しない (スクリプト任せ)。
-                        //以前は「一度走らせて 1 バッチも出さなかったパスは以後スキップ」していたが、
-                        //スクリプトは状態でパスごとの出力を変える (改札は通行可のときだけ pass 2 で
-                        //矢印を描く)。出さなかった瞬間に見て切ると、その後どれだけ状態が変わっても
-                        //二度と描かれない。RTM 標準の自動改札の矢印が出なかったのはこれ。
-                        //★発光パスを RTMU の推測でスキップしない (スクリプト任せ)。
-                        //以前は「light/dest/type… という名前のグループを持つか」で判定していたが、
-                        //これは列車向けの名前の一覧でしかない。RTM 標準の自動改札は通行可の矢印を
-                        //sign_F/sign_B という名前で pass 2 に描くため、この一覧に当たらず
-                        //矢印が一切出なかった。何を pass 2 で描くかはスクリプトが決めること。
-                        //室内灯/前照灯/尾灯は、点いているものだけ描く
+                        // ★パスの取捨も RTMU では判断しない (スクリプト任せ)。
+                        // 以前は「一度走らせて 1 バッチも出さなかったパスは以後スキップ」していたが、
+                        // スクリプトは状態でパスごとの出力を変える (改札は通行可のときだけ pass 2 で
+                        // 矢印を描く)。
+                        // ★発光パスを RTMU の推測でスキップしない (スクリプト任せ)。
                         if (pass >= 2 && !shouldRenderEmissivePass(entity, pass)) continue;
                         poseStack.pushPose();
                         try {
@@ -4801,14 +4629,14 @@ public final class MqoModelLoader {
                 if (scriptRenderer != null) {
                     scriptRenderer.clearRenderContext();
                 }
-                //pass0は全マテリアルを描く(hasOpaqueBatchesだけでゲートしない)
+                // pass0は全マテリアルを描く(hasOpaqueBatchesだけでゲートしない)
                 if (hasOpaqueBatches() || hasTranslucentBatches()) {
                     renderInternal(poseStack, buffer, packedLight, overlay, false, opaqueFilter, groupTransform, scriptRenderer, entity);
                 }
                 if (hasTranslucentBatches() || (scriptRenderer != null && scriptRenderer.hasAlphaPassContent())) {
                     renderInternal(poseStack, buffer, packedLight, overlay, true, translucentFilter, groupTransform, scriptRenderer, entity);
                 }
-                //スクリプトを持たない車両の発光パス (室内灯/前照灯/尾灯)。
+                // スクリプトを持たない車両の発光パス (室内灯/前照灯/尾灯)。
                 if (!hasScript && hasEmissiveBatches()) {
                     for (int pass = 2; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
                         if (!shouldRenderEmissivePass(entity, pass)) {
@@ -4854,8 +4682,8 @@ public final class MqoModelLoader {
                 }
                 if (hasScript) {
                     for (int pass = 0; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
-                        //発光パスは RTMU の推測でスキップしない (何を描くかはスクリプトが決める)
-                        //室内灯/前照灯/尾灯は、点いているものだけ描く
+                        // 発光パスは RTMU の推測でスキップしない (何を描くかはスクリプトが決める)
+                        // 室内灯/前照灯/尾灯は、点いているものだけ描く
                         if (pass >= 2 && !shouldRenderEmissivePass(entity, pass)) continue;
                         // スクリプトが poseStack を破壊する事例 (rotate/translate を push/pop なしで多用、
                         // NaN を渡す等) に対する安全網。push/pop で囲んで corruption を局所化する。
@@ -4886,16 +4714,16 @@ public final class MqoModelLoader {
                     (groupFilter == null || groupFilter.shouldRender(groupName))
                         && scriptRenderer.shouldRenderBakedGroup(groupName, true);
             }
-            //本家 pass0 は AlphaBlend 材質の不透明ピクセル (α==255) も描く。全 AlphaBlend の
-            //モデル (KQ 台車等) で pass0 が飛ぶと台車が消えるため、バッチがあれば必ず回す。
+            // 本家 pass0 は AlphaBlend 材質の不透明ピクセル (α==255) も描く。全 AlphaBlend の
+            // モデル (KQ 台車等) で pass0 が飛ぶと台車が消えるため、バッチがあれば必ず回す。
             if (hasOpaqueBatches() || hasTranslucentBatches()) {
                 renderInternal(poseStack, buffer, packedLight, overlay, false, opaqueFilter, groupTransform, scriptRenderer, entity);
             }
             if (hasTranslucentBatches() || (scriptRenderer != null && scriptRenderer.hasAlphaPassContent())) {
                 renderInternal(poseStack, buffer, packedLight, overlay, true, translucentFilter, groupTransform, scriptRenderer, entity);
             }
-            //スクリプトを持たない車両の発光パス (室内灯/前照灯/尾灯)。
-            //本家はスクリプトと無関係に Light マテリアルを ***_light0/1/2.png で描き直す。
+            // スクリプトを持たない車両の発光パス (室内灯/前照灯/尾灯)。
+            // 本家はスクリプトと無関係に Light マテリアルを ***_light0/1/2.png で描き直す。
             if (!hasScript && hasEmissiveBatches()) {
                 for (int pass = 2; pass < LEGACY_SCRIPT_PASS_COUNT; pass++) {
                     if (!shouldRenderEmissivePass(entity, pass)) {
@@ -4931,7 +4759,7 @@ public final class MqoModelLoader {
                     float nx = batch.data[o + 3];
                     float ny = batch.data[o + 4];
                     float nz = batch.data[o + 5];
-                    //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
+                    // 押し出しは biasNormals (同位置の全面平均)。面割れ防止。
                     float bnx = nx, bny = ny, bnz = nz;
                     if (batch.biasNormals != null) {
                         int bo = i * 3;
@@ -4944,9 +4772,9 @@ public final class MqoModelLoader {
                         vy += bny * scale;
                         vz += bnz * scale;
                     }
-                    //発光オーバーレイ: 実法線だと diffuse シェーディングで側面/下面が
-                    //最大 40% 減光して「昼でも夜でも暗い」ため、上向き法線 (×1.0) で描く
-                    //(本家は GL_LIGHTING 無効の全光量描画 — softenNormalForVanilla と同じ理由)
+                    // 発光オーバーレイ: 実法線だと diffuse シェーディングで側面/下面が
+                    // 最大 40% 減光して「昼でも夜でも暗い」ため、上向き法線 (×1.0) で描く
+                    // (本家は GL_LIGHTING 無効の全光量描画 — softenNormalForVanilla と同じ理由)
                     VertexWriter.addVertex(consumer, mat, vx, vy, vz)
                         .setColor(red, green, blue, alpha)
                         .setUv(batch.data[o + 6], batch.data[o + 7])
@@ -5202,25 +5030,9 @@ public final class MqoModelLoader {
         }
 
         private static float getDepthBias(Batch batch, String lowerGroupName, boolean scriptTexture) {
-            //★本家は頂点を<b>一切</b>動かさない。
-            //
-            //本家 RenderVehicleBase / ModelObject には glPolygonOffset も頂点押し出しも無い
-            //(rtm_src を全走査して確認。glDepthMask はライトのグロー描画にしか出てこない)。
-            //面の前後は「同じジオメトリを同じ深度で描き、後から描いた方が残る」(GL_LEQUAL) で
-            //決まり、パスの中身は
-            //  pass0: glAlphaFunc(GL_EQUAL, 1.0) = α==255 の画素だけ   (renderBodyNormal:160)
-            //  pass1: glAlphaFunc(GL_LESS,  1.0) = α<255 の画素だけ    (renderBodyTransparent)
-            //と<b>排他</b>なので、そもそも重ならない。
-            //
-            //RTMU はグループ名で表示器 (方向幕/速度計) や alpha グループを見つけて
-            //法線方向へ 0.2mm / 1.2mm 押し出していた。これは本家に無い処理で、
-            //・押し出した面が隣の面を突き抜ける
-            //・見る角度で浮いて二重に見える
-            //という「重なって見える」現象そのものを作っていた。
-            //
-            //元々これを入れた理由 (VBO の GPU 変換と発光パスの CPU 変換で深度が数 ULP ずれ、
-            //同一面が z-fighting する) は PIN_CPU_TRANSFORM=true で全バッチを CPU 変換に
-            //固定した時点で消えている。押し出しは撤去して本家と同じ「動かさない」に戻す。
+            // ★本家は頂点を一切動かさない。
+            // 本家 RenderVehicleBase / ModelObject には glPolygonOffset も頂点押し出しも無い
+            // (rtm_src を全走査して確認。glDepthMask はライトのグロー描画にしか出てこない)。
             return 0.0F;
         }
 
@@ -5406,7 +5218,7 @@ public final class MqoModelLoader {
         boolean glassTranslucent = false;
         /** テクスチャに中間アルファのピクセル (ガラス帯/網等) があるか。無ければ pass1 は描く物が無い。 */
         boolean texHasTranslucentPixels = false;
-        /** pass1 で色が出るテクセルの粗いマスク ({@link MqoModelLoader#buildPass1Mask})。 */
+        /** pass1 で色が出るテクセルの粗いマスク (MqoModelLoader#buildPass1Mask)。 */
         java.util.BitSet pass1Mask = null;
         /** depthBias押し出し用の頂点法線。nullなら頂点法線で押す。 */
         float[] biasNormals = null;
@@ -5433,14 +5245,14 @@ public final class MqoModelLoader {
         // ビルドしていた CPU コストを 1 回ビルド + GPU 側 modelview 変換に
         // 置き換える。scriptRenderer のテクスチャ/UV/色変更が無い場合のみ使用。
 
-        /** {@link TextureInfo#lightOptionDeclared} の引き継ぎ。 */
+        /** TextureInfo#lightOptionDeclared の引き継ぎ。 */
         boolean lightOptionDeclared;
-        /** {@link TextureInfo#noSubTextures} の引き継ぎ。 */
+        /** TextureInfo#noSubTextures の引き継ぎ。 */
         boolean noSubTextures;
 
         /** 正規化グループ名 (発光パスが描いたグループとの突合用)。遅延計算。 */
         private String normalizedKeyCached;
-        /** {@code _light0} が完全不透明か。遅延計算。 */
+        /** _light0 が完全不透明か。遅延計算。 */
         private Boolean light0OpaqueCached;
 
         String normalizedKey() {
@@ -5453,10 +5265,9 @@ public final class MqoModelLoader {
         }
 
         /**
-         * このバッチの {@code _light0} が完全不透明か。
-         * <p>true なら発光パス (RenderPass.LIGHT) の描画が pass0 の描画を<b>完全に覆う</b>ので、
-         * pass0 側を省略しても見た目が変わらない。省略すれば同じ面が 2 回描かれなくなり、
-         * z-fighting (座席のちらつき) が原理的に起きなくなる。
+         * このバッチの _light0 が完全不透明か。
+         * true なら発光パス (RenderPass.LIGHT) の描画が pass0 の描画を完全に覆うので、
+         * pass0 側を省略しても見た目が変わらない。
          */
         boolean isLight0FullyOpaque() {
             Boolean c = light0OpaqueCached;
@@ -5494,12 +5305,12 @@ public final class MqoModelLoader {
         }
 
         /** フルブライト経路用VBO。bias値ごとにキャッシュ。 */
-        //エンティティ経路の静的VBO。ライト値は頂点に焼く
+        // エンティティ経路の静的VBO。ライト値は頂点に焼く
         private com.mojang.blaze3d.vertex.VertexBuffer entityVbo;
         private int entityVboLight = Integer.MIN_VALUE;
         private boolean entityVboFailed;
 
-        /** pass1 で実際に描かれる面だけを抜いた頂点列 (遅延生成)。{@link #pass1VertexCount} が -1 なら未計算。 */
+        /** pass1 で実際に描かれる面だけを抜いた頂点列 (遅延生成)。#pass1VertexCount が -1 なら未計算。 */
         private float[] pass1Data;
         private float[] pass1BiasNormals;
         private int pass1VertexCount = -1;
@@ -5509,7 +5320,7 @@ public final class MqoModelLoader {
             return pass1Data;
         }
 
-        /** {@link #pass1Data()} と添字が対応する biasNormals (深度押し出し用)。 */
+        /** #pass1Data と添字が対応する biasNormals (深度押し出し用)。 */
         float[] pass1BiasNormals() {
             ensurePass1();
             return pass1BiasNormals;
@@ -5565,7 +5376,7 @@ public final class MqoModelLoader {
         }
 
         private boolean pass1MaskHits(float u0, float u1, float v0, float v1) {
-            //タイリング等で UV が [0,1] を外れる面はマスクを引けない → 安全側で描く
+            // タイリング等で UV が [0,1] を外れる面はマスクを引けない → 安全側で描く
             if (!(u0 >= -0.001F && u1 <= 1.001F && v0 >= -0.001F && v1 <= 1.001F)) {
                 return true;
             }
@@ -5670,11 +5481,9 @@ public final class MqoModelLoader {
     public static final class ScriptModel {
         public final ScriptMaterialTexture[] textures;
         /**
-         * 本家 {@code jp.ngt.rtm.render.ModelObject.model} 相当のモデルグラフ。
-         * <p>本家のレンダースクリプトは {@code init(modelSet, modelObj)} の第2引数から
-         * {@code modelObj.model.groupObjects} でオブジェクト名を列挙する (E257 等)。
-         * ここが無いと init が TypeError で落ち、Parts が 1 つも登録されないまま
-         * render が即 return して車体が本来の形で描かれない。
+         * 本家 jp.ngt.rtm.render.ModelObject.model 相当のモデルグラフ。
+         * 本家のレンダースクリプトは init(modelSet, modelObj) の第2引数から
+         * modelObj.model.groupObjects でオブジェクト名を列挙する 等)。
          */
         public jp.ngt.ngtlib.renderer.model.PolygonModel model;
         // レンダー中のrendererを保持(スクリプトからの部品描画委譲用)

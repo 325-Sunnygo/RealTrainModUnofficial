@@ -5,27 +5,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.Entity;
 
 /**
- * サウンドスクリプト (sound_*.js) に渡される {@code su} オブジェクト。
- * 本家 {@code jp.ngt.rtm.sound.SoundUpdaterVehicle / SoundUpdaterTrain} 相当。
- *
- * <p>本家のサウンドスクリプトは {@code onUpdate(su)} 一本で、su に対して使うのは
- * 以下だけ (本家同梱スクリプト全数を調査した結果):
- * <pre>
- *   su.playSound(domain, name, vol, pitch)   su.stopSound(domain, name)
- *   su.getSpeed()   su.getNotch()   su.inTunnel()
- *   su.isComplessorActive()   su.complessorCount()   su.getEntity()
- * </pre>
- *
- * <p>従来はこの su に {@code LegacyScriptExecutor} を渡していたが、あれは旧
- * {@code TrainEntity} 専用で、<b>列車アイテムが実際に出す本家系エンティティ
- * ({@link jp.ngt.rtm.entity.train.EntityTrainBase}) では null になっていた</b>。
- * その結果スクリプトは {@code su = 列車エンティティ} で呼ばれ、{@code su.playSound} が
- * 存在せず例外 → スクリプトごと無効化 → 走行音が一切鳴らない状態だった。
- *
- * <p><b>単位に注意</b>: エンティティの {@code getSpeed()} は「ブロック/tick」だが、
- * スクリプトが見る {@code su.getSpeed()} は <b>km/h</b> (本家も {@code * 72.0F} している)。
- * ここを合わせないと、スクリプトから見た速度が常に 0〜0.3 程度になり、
- * 走行音の閾値 (223 系なら 8/12/20 km/h) に一生届かず無音になる。
+ * サウンドスクリプト (sound_*.js) に渡される su オブジェクト。
+ * 本家 jp.ngt.rtm.sound.SoundUpdaterVehicle / SoundUpdaterTrain 相当。
  */
 public final class SoundScriptExecutor {
 
@@ -43,14 +24,8 @@ public final class SoundScriptExecutor {
     }
 
     /**
-     * スクリプトが見る速度 (km/h)。<b>常に絶対値 (0 以上)</b>。
-     * <p>
-     * 列車の内部速度 {@code getSpeed()} は進行方向 (リバーサ) で符号が付き、後進時は<b>負</b>になる。
-     * 一方サウンドスクリプトは {@code if (speed < 0.1) 停車} / {@code if (speed < 14) 低速}
-     * のように<b>非負の閾値</b>としか比較しない。符号付きのまま渡すと、後ろ向きに走らせた瞬間
-     * speed が負 → 「speed < 0.1 = 停車」と誤判定され、走行音が止まって停車音に切り替わっていた。
-     * 本家 SoundUpdater も絶対速度を渡すため、ここで abs して合わせる (JSON 走行音経路は
-     * すでに {@code Math.abs(speedOf(...))} 済み)。
+     * スクリプトが見る速度 (km/h)。常に絶対値 (0 以上)。
+     * 列車の内部速度 getSpeed は進行方向 (リバーサ) で符号が付き、後進時は負になる。
      */
     public float getSpeed() {
         return Math.abs(this.rawSpeed()) * SPEED_TO_KMH;
@@ -67,9 +42,7 @@ public final class SoundScriptExecutor {
         return 0.0F;
     }
 
-    /**
-     * ノッチ。本家は編成 (Formation) のノッチを見る (先頭車のマスコンが編成全体に効くため)。
-     */
+    /** ノッチ。本家は編成 (Formation) のノッチを見る (先頭車のマスコンが編成全体に効くため)。 */
     public int getNotch() {
         if (this.train instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
             jp.ngt.rtm.entity.train.util.Formation formation = t.getFormation();
@@ -115,7 +88,7 @@ public final class SoundScriptExecutor {
 
     /**
      * トンネル内か。本家は車体の四隅 (x±1, z±1) がいずれも空を見上げられないときに true
-     * (橋の下や木の下で誤爆しないよう 4 点見る)。223 系はこれで走行音を切り替える。
+     * (橋の下や木の下で誤爆しないよう 4 点見る)。はこれで走行音を切り替える。
      */
     public boolean inTunnel() {
         if (this.train == null) {
@@ -144,7 +117,7 @@ public final class SoundScriptExecutor {
             return t.complessorActive;
         }
         if (this.train instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity t) {
-            //旧エンティティは圧縮機の状態を持たないので、停車中に周期で回す近似
+            // 旧エンティティは圧縮機の状態を持たないので、停車中に周期で回す近似
             return Math.abs(t.getSpeed()) <= 0.03F && t.getNotch() <= 0
                 && Math.floorMod(t.tickCount, 240) < 55;
         }
@@ -162,7 +135,7 @@ public final class SoundScriptExecutor {
         return 0;
     }
 
-    //綴り違い (compressor) でも通るように
+    // 綴り違い (compressor) でも通るように
     public boolean isCompressorActive() {
         return this.isComplessorActive();
     }

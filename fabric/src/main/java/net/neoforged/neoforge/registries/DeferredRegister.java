@@ -15,7 +15,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * シム: Fabric では登録タイミングの制約が無いため、register() 呼び出しで
+ * シム: Fabric では登録タイミングの制約が無いため、register 呼び出しで
  * 即座にバニラ Registry へ登録する。register(IEventBus) は no-op。
  */
 public class DeferredRegister<T> {
@@ -51,8 +51,8 @@ public class DeferredRegister<T> {
 
     /**
      * データコンポーネント用。NeoForge は専用サブクラスを返すので形を合わせる。
-     * <p>第 1 引数のレジストリキーは NeoForge 版の呼び出しに合わせて受けるだけで、
-     * 実体は常に {@code BuiltInRegistries.DATA_COMPONENT_TYPE}。
+     * 第 1 引数のレジストリキーは NeoForge 版の呼び出しに合わせて受けるだけで、
+     * 実体は常に BuiltInRegistries.DATA_COMPONENT_TYPE。
      */
     public static DataComponents createDataComponents(
             ResourceKey<? extends Registry<net.minecraft.core.component.DataComponentType<?>>> key,
@@ -93,8 +93,8 @@ public class DeferredRegister<T> {
         }
 
         /**
-         * NeoForge の {@code registerComponentType(name, builderOp)} 相当。
-         * <p>ビルダーを渡して型を組み立てさせる形なので、こちらで新しいビルダーを用意して渡す。
+         * NeoForge の registerComponentType(name, builderOp) 相当。
+         * ビルダーを渡して型を組み立てさせる形なので、こちらで新しいビルダーを用意して渡す。
          */
         @SuppressWarnings({"unchecked", "rawtypes"})
         public <D> DeferredHolder<net.minecraft.core.component.DataComponentType<?>,

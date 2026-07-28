@@ -16,12 +16,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * ミニチュアの設定変更 (neo mcte)。クライアントの設定画面 → サーバ。
- *
- * <p>★変更は<b>手に持っているそのスタック</b>にしか効かない。
- * MCTEU は {@code miniatureId} で外部テーブルを引いていたため、
- * 同じ ID を共有する他のミニチュアまで一緒に変わっていた。
- * ここは対象を「手に持っているスタック」に限定し、書き込み先もそのスタックの NBT なので、
- * インベントリ内の他のミニチュアには<b>触れようがない</b>。
+ * ★変更は手に持っているそのスタックにしか効かない。
  */
 public record MiniatureSettingsPayload(
     boolean offHand,
@@ -38,7 +33,7 @@ public record MiniatureSettingsPayload(
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "miniature_settings")
     );
 
-    //composite は 6 要素までなので手書き。順序は encode/decode で必ず一致させること。
+    // composite は 6 要素までなので手書き。順序は encode/decode で必ず一致させること。
     public static final StreamCodec<ByteBuf, MiniatureSettingsPayload> STREAM_CODEC =
         StreamCodec.of((buf, p) -> {
             buf.writeBoolean(p.offHand());
@@ -77,7 +72,7 @@ public record MiniatureSettingsPayload(
             CustomData data = stack.get(DataComponents.CUSTOM_DATA);
             CompoundTag tag = data != null ? data.copyTag() : new CompoundTag();
 
-            //値域を必ずサーバ側で締める (クライアントの値をそのまま信じない)
+            // 値域を必ずサーバ側で締める (クライアントの値をそのまま信じない)
             float scale = clamp(payload.scale(), 0.001F, 16.0F);
             ItemMiniature.setScale(scale, tag);
             ItemMiniature.setOffset(tag,
@@ -89,7 +84,7 @@ public record MiniatureSettingsPayload(
 
             stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 
-            //本家 GuiItemMiniature は名前も編集できる
+            // 本家 GuiItemMiniature は名前も編集できる
             String name = payload.name() == null ? "" : payload.name().trim();
             if (name.isEmpty()) {
                 stack.remove(DataComponents.CUSTOM_NAME);

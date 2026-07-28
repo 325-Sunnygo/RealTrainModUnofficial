@@ -7,9 +7,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 本家 jp.ngt.rtm.rail.TileEntityLargeRailSlopeCore の忠実移植。
- */
+/** 本家 jp.ngt.rtm.rail.TileEntityLargeRailSlopeCore の忠実移植。 */
 public class TileEntityLargeRailSlopeCore extends TileEntityLargeRailCore {
     private byte slopeType;
 

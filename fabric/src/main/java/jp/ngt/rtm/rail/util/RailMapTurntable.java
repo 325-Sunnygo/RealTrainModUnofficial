@@ -4,16 +4,12 @@ import jp.ngt.ngtlib.math.PooledVec3;
 import jp.ngt.ngtlib.math.StraightLine;
 import jp.ngt.ngtlib.math.Vec3;
 
-/**
- * 本家 jp.ngt.rtm.rail.util.RailMapTurntable (KaizPatchX) の忠実移植。
- */
+/** 本家 jp.ngt.rtm.rail.util.RailMapTurntable (KaizPatchX) の忠実移植。 */
 public final class RailMapTurntable extends RailMapBasic {
     public final int centerX, centerY, centerZ, radius;
     private float rotation;
 
-    /**
-     * @deprecated use {@link #RailMapTurntable(RailPosition, RailPosition, int, int, int, int, int)}
-     */
+    /** @deprecated use #RailMapTurntable(RailPosition, RailPosition, int, int, int, int, int) */
     @Deprecated
     public RailMapTurntable(RailPosition par1, RailPosition par2, int x, int y, int z, int r) {
         this(par1, par2, x, y, z, r, 0);
@@ -53,7 +49,7 @@ public final class RailMapTurntable extends RailMapBasic {
         double ex = this.endRP.posX - cx;
         double ez = this.endRP.posZ - cz;
         double gain = 0.5D;
-        //見た目より若干長めにすることで斜め時に隣接RMと隙間が空くの回避
+        // 見た目より若干長めにすることで斜め時に隣接RMと隙間が空くの回避
         if (this.startRP.blockX == this.endRP.blockX) {
             sz += (sz > ez) ? gain : -gain;
             ez += (ez > sz) ? gain : -gain;
@@ -74,7 +70,7 @@ public final class RailMapTurntable extends RailMapBasic {
         for (int i = -this.radius; i < this.radius + 1; ++i) {
             for (int j = -this.radius; j < this.radius + 1; ++j) {
                 double radSq = i * i + j * j;
-                //端の接続辺を幅3以上にするため
+                // 端の接続辺を幅3以上にするため
                 if (radSq <= (this.radius + 0.4999F) * (this.radius + 0.4999F)) {
                     this.addRailBlock(this.centerX + i, this.centerY, this.centerZ + j);
                 }

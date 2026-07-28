@@ -60,7 +60,7 @@ public class TrainControlScreen extends Screen {
             addArrowButton(left + 4, top + 52, "<", "noop");
             addButton(left + 28, top + 52, 120, "チャンクロード", "noop", 0);
             addArrowButton(left + 152, top + 52, ">", "noop");
-            //方向幕: 持っていないパックでは null と出して押せなくする
+            // 方向幕: 持っていないパックでは null と出して押せなくする
             if (rollsignCount() == 0) {
                 addArrowButton(left + 4, top + 76, "<", "noop");
                 addButton(left + 28, top + 76, 120, "方向幕 null", "noop", 0);
@@ -70,8 +70,8 @@ public class TrainControlScreen extends Screen {
                 addButton(left + 28, top + 76, 120, destinationLabel(), "next_destination", 0);
                 addArrowButton(left + 152, top + 76, ">", "next_destination");
             }
-            //アナウンスも方向幕と同じ回し方にする (最後まで行ったら最初に戻る)。
-            //アナウンスを持たないパックでは null と出して、押せなくする。
+            // アナウンスも方向幕と同じ回し方にする (最後まで行ったら最初に戻る)。
+            // アナウンスを持たないパックでは null と出して、押せなくする。
             if (announcementCount() == 0) {
                 addArrowButton(left + 4, top + 100, "<", "noop");
                 addButton(left + 28, top + 100, 120, "アナウンス null", "noop", 0);
@@ -212,8 +212,7 @@ public class TrainControlScreen extends Screen {
 
     /**
      * このパックが持つアナウンスの数。0 ならアナウンス機能なし。
-     * <p>
-     * 表示名 (sound_Announcement の 1 列目) は省略されることがあるので、数は<b>音声の数</b>で
+     * 表示名 (sound_Announcement の 1 列目) は省略されることがあるので、数は音声の数で
      * 数える。名前だけで数えると、名前が無いアナウンスを取りこぼす。
      */
     private int announcementCount() {
@@ -316,7 +315,7 @@ public class TrainControlScreen extends Screen {
     private int resolveNextSoundIndex(int delta) {
         int size = announcementCount();
         if (size <= 0) {
-            //アナウンスが無いパックで番号だけが際限なく増えないようにする
+            // アナウンスが無いパックで番号だけが際限なく増えないようにする
             return 0;
         }
         return Math.floorMod(train.getSoundIndex() + delta, size);

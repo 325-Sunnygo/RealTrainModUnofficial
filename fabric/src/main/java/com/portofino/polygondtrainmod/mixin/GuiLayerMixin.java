@@ -12,13 +12,8 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * {@code RenderGuiLayerEvent.Pre} の発火点 (ホットバーとクロスヘア)。
- *
- * <p>NeoForge は HUD を「層」に分けて各層の前後にイベントを流す。バニラにその区切りは無いので、
- * RTMU が実際に消している層だけを個別に取る。
- *
- * <p>用途はモデル選択画面で HUD を隠すこと ({@code SelectScreenHudHider})。
- * 全層を再現する必要は無いので、要るものだけに絞ってある。
+ * RenderGuiLayerEvent.Pre の発火点 (ホットバーとクロスヘア)。
+ * NeoForge は HUD を「層」に分けて各層の前後にイベントを流す。
  */
 @Mixin(Gui.class)
 public class GuiLayerMixin {

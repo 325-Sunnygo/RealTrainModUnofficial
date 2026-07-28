@@ -21,19 +21,15 @@ import java.util.List;
 
 /**
  * SuperRailBuilder3 の 1.12.2 RTM レール API を RTMU のネイティブ敷設へ橋渡しする。
- *
- * <p>スクリプト本体は改変できないため、{@code createRailPosition}/{@code getPlayerRail}/
- * {@code buildNormalRail}/{@code buildBranchRail}/{@code deleteRail} の各関数を後注入の JS で
- * このブリッジ呼び出しへ差し替える(TrainScriptSystem)。GUI・制御フロー・render はそのまま。</p>
+ * スクリプト本体は改変できないため、createRailPosition/getPlayerRail/
+ * buildNormalRail/buildBranchRail/deleteRail の各関数を後注入の JS で
+ * このブリッジ呼び出しへ差し替える(TrainScriptSystem)。GUI・制御フロー・render はそのまま。
  */
 public final class SrbRailBridge {
 
     /**
      * SRB が敷設に使うレールマップの版。
-     * <p>SRB は非 fixRTM 環境では {@code new RailMapBasic(start, end)} = <b>版 0</b> で敷く。
-     * 版 1 以上には「アンカーの向きが dir から導かれる値と違えば必ずベジェにする」条件が入り、
-     * SRB 独自のアンカー規約と噛み合わない。マーカー用の版 (現行) を渡していたため、
-     * 直線 61 ブロックの区間が 83.75 に膨らみ、分岐のトング付近が潰れていた。
+     * SRB は非 fixRTM 環境では new RailMapBasic(start, end) = 版 0 で敷く。
      */
     private static final int RAIL_MAP_VERSION = 0;
 
@@ -41,11 +37,9 @@ public final class SrbRailBridge {
     public RailPosition createRailPosition(int blockX, int blockY, int blockZ, int markerDir,
                                            double switchType, double anchorLength, double anchorPitch,
                                            double anchorYaw, double cantCenter, double cantEdge, double height) {
-        //★SRB が渡す値は<b>そのまま使う</b>。補正しない。
-        //以前はアンカー長や向きを RTM の流儀へ「直して」いたが、それは敷設に使う
-        //レールマップの版が違っていたのを辻褄合わせしていただけだった (下の RAIL_MAP_VERSION)。
-        //版さえ合えば SRB の値は最初から正しく、補正するとかえって形が悪くなる
-        //(実測: 直線区間 61.00 が正、補正ありだと分岐が 41.60 → 56.05 に伸びる)。
+        // ★SRB が渡す値はそのまま使う。補正しない。
+        // 以前はアンカー長や向きを RTM の流儀へ「直して」いたが、それは敷設に使う
+        // レールマップの版が違っていたのを辻褄合わせしていただけだった (下の RAIL_MAP_VERSION)。
         RailPosition rp = new RailPosition(blockX, blockY, blockZ, markerDir, (int) switchType);
         rp.anchorLengthHorizontal = (float) anchorLength;
         rp.anchorLengthVertical = (float) anchorLength;
@@ -108,7 +102,7 @@ public final class SrbRailBridge {
 
     /**
      * 敷設に失敗したことをその場のプレイヤーへ伝える。
-     * <p>SRB 自身のメッセージは「An error occurred while generating rails」だけで、
+     * SRB 自身のメッセージは「An error occurred while generating rails」だけで、
      * 何が起きたのか分からない。RTMU 側で分かっている理由はチャットにも出す。
      */
     private static void notifyFailure(Level level, String reason) {
@@ -118,7 +112,7 @@ public final class SrbRailBridge {
                     net.minecraft.network.chat.Component.literal("§c[RTMU] " + reason), false);
             }
         } catch (Throwable ignored) {
-            //通知に失敗しても敷設処理には影響させない
+            // 通知に失敗しても敷設処理には影響させない
         }
     }
 
@@ -155,10 +149,8 @@ public final class SrbRailBridge {
 
     /**
      * レールアイテムのモデル ID。
-     * <p>★アイテム個別の選択が入っていなければ<b>選択中のレール</b>へ落とす
-     * (マーカーで敷くときと同じ既定: {@code BlockMarker.getRailProperty})。
-     * ここで空文字を返すと SRB 側は「レールを持っていない」と判断して敷設処理を
-     * 丸ごと飛ばすため、レールを持っているのに何も建たなくなる。
+     * ★アイテム個別の選択が入っていなければ選択中のレールへ落とす
+     * (マーカーで敷くときと同じ既定: BlockMarker.getRailProperty)。
      */
     private static String modelIdOf(ItemStack stack) {
         String id = LegacyItemStackBridge.getSelectedModelId(stack);
@@ -205,10 +197,9 @@ public final class SrbRailBridge {
 
     /** SRB の getPlayerRail 相当。プレイヤーが持つレールアイテムの選択モデルIDを返す(無ければ "")。 */
     public String heldRailModelId(Object playerObj) {
-        //★スクリプトへ渡るプレイヤーは RTMU のラッパー (jp.ngt.mccompat.PlayerCompat) のことがある。
-        //1.12 のフィールド名 (field_71071_by など) をスクリプトへ見せるための包みで、
-        //生の Player ではない。ここで剥がさないと「レールを持っていない」と誤判定し、
-        //SRB の敷設条件から外れて何も建たなくなる (Q も敷設ブロックの後ろなので効かなく見える)。
+        // ★スクリプトへ渡るプレイヤーは RTMU のラッパー (jp.ngt.mccompat.PlayerCompat) のことがある。
+        // 1.12 のフィールド名 (field_71071_by など) をスクリプトへ見せるための包みで、
+        // 生の Player ではない。
         Player player = jp.ngt.mccompat.PlayerCompat.unwrap(playerObj);
         if (player == null) {
             debug("手持ち判定: プレイヤーが取れない → "
@@ -238,13 +229,8 @@ public final class SrbRailBridge {
 
     /**
      * (x,y,z) のレール関連ブロックをレールコア(LargeRailCoreBlockEntity)に解決して返す。
-     *
-     * <p>RTMU はレールコアを始点1ブロックにしか置かず、レール沿いは当たり判定(RailCollisionBlock)
-     * /道床(BallastBlock)が並ぶ。SRB の接続検出 getAroundTileEntity は {@code instanceof
-     * TileEntityLargeRailBase} でコアしか拾えないため、コアから離れた位置(レール終端側など)では
-     * 接続が検出されず、接続マーカーが接線ロックされない(本家では端のどちらでも接続できる)。
-     * そこで当たり判定/道床ブロックは getCorePos からコアを辿って返し、レール全長で接続検出を効かせる。
-     * レール以外の BlockEntity(看板等)はそのまま返す。</p>
+     * RTMU はレールコアを始点1ブロックにしか置かず、レール沿いは当たり判定(RailCollisionBlock)
+     * /道床(BallastBlock)が並ぶ。
      */
     public Object railCoreAt(Object world, int x, int y, int z) {
         Level level = toLevel(world);
@@ -324,9 +310,8 @@ public final class SrbRailBridge {
 
     /**
      * SRB から渡された「レール」からモデル ID を取り出す。
-     * <p>差し替え後の {@code getPlayerRail} は ID の文字列を返すが、差し替えが効いていない
-     * 経路から本家の状態オブジェクトが来ることもあるので両方受ける。どちらでも読めなければ
-     * <b>選択中のレール</b>へ落とす (マーカーで敷くときと同じ既定)。
+     * 差し替え後の getPlayerRail は ID の文字列を返すが、差し替えが効いていない
+     * 経路から本家の状態オブジェクトが来ることもあるので両方受ける。
      */
     private static String toModelId(Object modelId) {
         if (modelId instanceof CharSequence cs) {

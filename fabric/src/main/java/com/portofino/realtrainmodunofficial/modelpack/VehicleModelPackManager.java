@@ -45,9 +45,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
     
     private VehicleModelPackManager() {}
     
-    /**
-     * Initialize the model pack manager
-     */
+    /** Initialize the model pack manager */
     public void initialize(ResourceManager resourceManager) {
         if (initialized) return;
         
@@ -70,9 +68,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         }
     }
     
-    /**
-     * Scan for vehicle configuration files (legacy-style)
-     */
+    /** Scan for vehicle configuration files (legacy-style) */
     private void scanVehicleConfigs(ResourceManager resourceManager) {
         try {
             Map<ResourceLocation, Resource> resources = resourceManager.listResources(
@@ -92,9 +88,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         }
     }
     
-    /**
-     * Load vehicle configuration from resource
-     */
+    /** Load vehicle configuration from resource */
     private void loadVehicleConfig(ResourceLocation location, Resource resource) throws IOException {
         try (InputStream is = resource.open()) {
             String jsonContent = PackTextDecoder.decodeJson(is.readAllBytes());
@@ -113,9 +107,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         }
     }
     
-    /**
-     * Extract pack ID from resource location
-     */
+    /** Extract pack ID from resource location */
     private String extractPackId(ResourceLocation location) {
         String path = location.getPath();
         Matcher matcher = VEHICLE_JSON_PATTERN.matcher(path);
@@ -129,9 +121,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return path.substring(lastSlash + 1, lastDot);
     }
     
-    /**
-     * Parse resource configuration with legacy-style validation
-     */
+    /** Parse resource configuration with legacy-style validation */
     private ResourceConfig parseResourceConfig(JsonObject configObj, String packId) {
         ResourceConfig config = new ResourceConfig();
         config.packId = packId;
@@ -168,9 +158,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return config;
     }
     
-    /**
-     * Parse vehicle configurations array
-     */
+    /** Parse vehicle configurations array */
     private List<VehicleConfig> parseVehicleConfigs(com.google.gson.JsonArray vehiclesArray) {
         List<VehicleConfig> vehicles = new ArrayList<>();
         
@@ -217,9 +205,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return vehicles;
     }
     
-    /**
-     * Parse legacy-style seat positions with multiple field support
-     */
+    /** Parse legacy-style seat positions with multiple field support */
     private List<net.minecraft.world.phys.Vec3> parselegacySeatPositions(JsonObject obj) {
         List<net.minecraft.world.phys.Vec3> seats = new ArrayList<>();
 
@@ -238,9 +224,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return players;
     }
     
-    /**
-     * Parse legacy-style bogie positions
-     */
+    /** Parse legacy-style bogie positions */
     private List<net.minecraft.world.phys.Vec3> parselegacyBogiePositions(JsonObject obj) {
         List<net.minecraft.world.phys.Vec3> bogies = new ArrayList<>();
 
@@ -253,9 +237,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return bogies;
     }
     
-    /**
-     * Parse legacy-style bogie models
-     */
+    /** Parse legacy-style bogie models */
     private List<BogieModelConfig> parselegacyBogieModels(JsonObject obj) {
         List<BogieModelConfig> bogieModels = new ArrayList<>();
         
@@ -293,9 +275,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return bogieModels;
     }
     
-    /**
-     * Parse legacy-style textures with array format
-     */
+    /** Parse legacy-style textures with array format */
     private Map<String, String> parselegacyTextures(JsonObject modelObj) {
         Map<String, String> textures = new HashMap<>();
         
@@ -341,9 +321,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return texture + "|ptmeta=" + String.join(",", flags);
     }
     
-    /**
-     * Append Vec3 array from JSON object to list
-     */
+    /** Append Vec3 array from JSON object to list */
     private void appendVec3Array(JsonObject obj, String key, List<net.minecraft.world.phys.Vec3> out, double scale) {
         if (!obj.has(key) || !obj.get(key).isJsonArray()) return;
         
@@ -364,9 +342,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         }
     }
     
-    /**
-     * Load model packs from resources
-     */
+    /** Load model packs from resources */
     private void loadModelPacks(ResourceManager resourceManager) {
         for (String packId : resourceConfigs.keySet()) {
             ResourceConfig config = resourceConfigs.get(packId);
@@ -382,9 +358,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         }
     }
     
-    /**
-     * Validate and register all resources
-     */
+    /** Validate and register all resources */
     private void validateAndRegisterResources() {
         for (ModelPack pack : loadedPacks.values()) {
             try {
@@ -397,9 +371,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         }
     }
     
-    /**
-     * Get resource location with caching
-     */
+    /** Get resource location with caching */
     public ResourceLocation getResource(String path) {
         return resourceLocationCache.computeIfAbsent(path, p -> {
             String domain = "minecraft";
@@ -413,16 +385,12 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         });
     }
     
-    /**
-     * Get script content with include processing
-     */
+    /** Get script content with include processing */
     public String getScript(String fileName) throws IOException {
         return scriptCache.computeIfAbsent(fileName, this::loadScriptWithIncludes);
     }
     
-    /**
-     * Load script with include processing (legacy-style)
-     */
+    /** Load script with include processing (legacy-style) */
     private String loadScriptWithIncludes(String fileName) {
         try {
             String rawScript = loadScriptFile(fileName);
@@ -432,9 +400,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         }
     }
     
-    /**
-     * Process script includes recursively
-     */
+    /** Process script includes recursively */
     private String processScriptIncludes(String rawScript) {
         Matcher matcher = SCRIPT_INCLUDE_PATTERN.matcher(rawScript);
         
@@ -453,9 +419,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return rawScript;
     }
 
-    /**
-     * Load script file
-     */
+    /** Load script file */
     private String loadScriptFile(String fileName) throws IOException {
         if (resourceManager == null) {
             throw new IOException("legacy model pack resource manager is not initialized");
@@ -494,7 +458,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         loadedPacks.clear();
         activePacks.clear();
 
-        // Reinitialization guard must be reset, otherwise initialize() returns early.
+        // Reinitialization guard must be reset, otherwise initialize returns early.
         initialized = false;
 
         // Reinitialize

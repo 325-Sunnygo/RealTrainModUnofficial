@@ -11,22 +11,14 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import java.util.List;
 
 /**
- * 座席 ({@link EntityFloor}) の後始末。
- *
- * <p>座席は車体に追従するだけの当たり判定で、単独で存在してよいものではない。
- * ところが「車体が消えたら座席も消える」を座席自身の tick に任せると、その tick が
- * 回らない状況 (チャンクのエンティティ tick 対象外など) で座席だけがワールドに
- * 取り残される。取り残された座席は車体から離れた場所に浮いたまま、クリックしても
- * 座れない当たり判定になり、本物の座席を隠してしまう。
- *
- * <p>そこで掃除はサーバー tick 側から行う。座席自身が動いているかどうかに関係なく、
- * 親を失った座席を確実に回収できる。</p>
+ * 座席 (EntityFloor) の後始末。
+ * 座席は車体に追従するだけの当たり判定で、単独で存在してよいものではない。
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID)
 public final class SeatCleanup {
     /**
      * 掃除の間隔 (tick)。5 秒に 1 回。
-     * <p>取り残された座席は見つかり次第クリック不可 ({@code isPickable}) になるので、
+     * 取り残された座席は見つかり次第クリック不可 (isPickable) になるので、
      * ここは実体を片付けるだけの後片付け。頻繁に回す必要はない。
      */
     private static final int INTERVAL = 100;

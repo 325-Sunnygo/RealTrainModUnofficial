@@ -8,14 +8,10 @@ import javax.script.ScriptEngine;
 /**
  * 本家 jp.ngt.rtm.rail.util.RailMapCustom (KaizPatchX) の忠実移植。
  * スクリプト駆動の自由形状レール。
- * TODO(Phase 4): スクリプト取得は本家では ModelPackManager.INSTANCE.getScript(name)。
- * 移植完了までは loadScript フックで直接ソースを渡す。
  */
 public final class RailMapCustom extends RailMap {
 
-    /**
-     * スクリプトソース解決フック (Phase 4 で ModelPackManager に置換)。
-     */
+    /** スクリプトソース解決フック (Phase 4 で ModelPackManager に置換)。 */
     public interface ScriptResolver {
         String getScript(String scriptName);
     }

@@ -17,7 +17,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 @OnlyIn(Dist.CLIENT)
 public class TicketVendorScreen extends Screen {
 
-    //本家 VendorScreenSelectTicket のボタン (100x50 を2つ横並び)
+    // 本家 VendorScreenSelectTicket のボタン (100x50 を2つ横並び)
     private static final int BTN_W = 100;
     private static final int BTN_H = 50;
     private static final int GAP = 8;

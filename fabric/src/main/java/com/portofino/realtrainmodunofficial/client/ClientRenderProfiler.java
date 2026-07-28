@@ -28,8 +28,8 @@ public final class ClientRenderProfiler {
     private static final long[] displayTotalsNs = new long[CATEGORY_NAMES.length];
     private static final int[] displayCounts = new int[CATEGORY_NAMES.length];
 
-    //CPU が 1 秒間に VertexConsumer へ書き込んだ頂点数 / バッチ数。
-    //「重さの正体は頂点スループット」なのかを数字で確定させるための計測。
+    // CPU が 1 秒間に VertexConsumer へ書き込んだ頂点数 / バッチ数。
+    // 「重さの正体は頂点スループット」なのかを数字で確定させるための計測。
     private static long verticesThisSecond;
     private static long batchesThisSecond;
     private static long displayVertices;
@@ -37,13 +37,13 @@ public final class ClientRenderProfiler {
     private static int framesThisSecond;
     private static int displayFrames;
 
-    //レールが「統合メッシュ (1本=1VBO)」で描けているか、それとも逐次描画に落ちているか。
-    //レールが重いときの切り分け用: fallback が多ければ焼き込みが効いていない。
+    // レールが「統合メッシュ (1本=1VBO)」で描けているか、それとも逐次描画に落ちているか。
+    // レールが重いときの切り分け用: fallback が多ければ焼き込みが効いていない。
     private static int railMergedThisSecond;
     private static int railFallbackThisSecond;
     private static int railBakeThisSecond;
-    //GL ステートを切り替えた回数と VBO を描いた回数。重さは「描画回数」より
-    //「ステート切替の回数」で決まるので、両方を出して効果を見る。
+    // GL ステートを切り替えた回数と VBO を描いた回数。重さは「描画回数」より
+    // 「ステート切替の回数」で決まるので、両方を出して効果を見る。
     private static int railStateSetupThisSecond;
     private static int railVboDrawThisSecond;
     private static int displayRailMerged;
@@ -75,9 +75,7 @@ public final class ClientRenderProfiler {
     private static long lastSnapshotNs = System.nanoTime();
     private static boolean overlayEnabled;
 
-    /**
-     * 1 バッチ (= 1 回の描画呼び出し) 分の頂点数を計上する。
-     */
+    /** 1 バッチ (= 1 回の描画呼び出し) 分の頂点数を計上する。 */
     public static void addVertices(int vertexCount) {
         verticesThisSecond += vertexCount;
         batchesThisSecond++;
@@ -89,10 +87,8 @@ public final class ClientRenderProfiler {
 
     /**
      * 列車描画中フラグ。addVertices を「列車ぶん」と「それ以外」に分けて数えるために使う。
-     * <p>
-     * E259 の実測で、列車を見た瞬間に batches が 96→232 (+136)、頂点が +24000 に増える一方
-     * スクリプト時間はほぼ変わらなかった。<b>ドローコール数がコストの主体かどうか</b>を
-     * 切り分けるには列車ぶんだけを分離して数える必要がある。
+     * の実測で、列車を見た瞬間に batches が 96→232 (+136)、頂点が +24000 に増える一方
+     * スクリプト時間はほぼ変わらなかった。
      */
     private static boolean inTrain;
     private static long trainVerticesThisSecond;
@@ -110,10 +106,7 @@ public final class ClientRenderProfiler {
 
     /**
      * 静的 VBO 経路をどの条件で落ちたかの内訳。
-     * <p>
      * 実測で「7 バッチ・31,564 頂点・14ms/frame」= 全バッチが CPU 頂点提出に落ちていた。
-     * ゲート条件は 8 個あり、コードを読むだけでは<b>どれで落ちているか特定できなかった</b>ため
-     * 実際に数える。1 回テストすれば犯人が確定する。
      */
     public static final String[] VBO_SKIP_NAMES = {
         "OK(VBO使用)", "capture", "blend", "transform", "depthBias",
@@ -145,16 +138,13 @@ public final class ClientRenderProfiler {
 
     /**
      * VBO 経路を落ちたバッチの内訳 (グループ名 → 頂点数)。
-     * <p>
-     * 「1 両で 17,704 頂点が半透明扱い」は窓にしては多すぎるため、<b>本当にガラスなのか、
-     * 不透明な内装/車体が誤って半透明に分類されているのか</b>を名前で確かめる。
-     * 前者なら半透明用 VBO の新設 (ガラスの描画順に触るので危険)、後者なら分類を直すだけで済む。
+     * 「1 両で 17,704 頂点が半透明扱い」は窓にしては多すぎるため、本当にガラスなのか、
+     * 不透明な内装/車体が誤って半透明に分類されているのかを名前で確かめる。
      */
     private static final java.util.Map<String, int[]> slowBatches = new java.util.HashMap<>();
 
     /**
-     * グループごとの「実体バッチ数」。1 秒間に現れた<b>異なる</b>バッチインスタンスを数える。
-     * <p>
+     * グループごとの「実体バッチ数」。1 秒間に現れた異なるバッチインスタンスを数える。
      * 描画回数だけでは「小バッチが多数ある」のか「同じバッチを何度も描いている」のか区別できず、
      * 打つ手が正反対 (バッチ併合 vs 重複描画の除去) になるため、実体数も併せて数える。
      */
@@ -170,7 +160,7 @@ public final class ClientRenderProfiler {
         v[1]++;
     }
 
-    /** {@link #countSlowBatch} と対で呼ぶ。batch の identity で実体数を数える。 */
+    /** #countSlowBatch と対で呼ぶ。batch の identity で実体数を数える。 */
     public static void countSlowBatchIdentity(String groupName, int reason, int identity) {
         if (!overlayEnabled || groupName == null) {
             return;
@@ -200,7 +190,7 @@ public final class ClientRenderProfiler {
               .append("  ").append(e.getValue()[0] / frames).append(" 頂点/f")
               .append("  描画 ").append(drawsPerFrame).append(" 回/f")
               .append("  実体 ").append(distinct).append(" 個")
-              //実体数より描画回数が多い = 同じバッチを何度も描いている (重複描画)
+              // 実体数より描画回数が多い = 同じバッチを何度も描いている (重複描画)
               .append(distinct > 0 && drawsPerFrame > distinct
                   ? "  → 重複 x" + (drawsPerFrame / distinct) : "");
         }
@@ -210,29 +200,8 @@ public final class ClientRenderProfiler {
     }
 
     /**
-     * 列車描画 (Train=約5ms/両) の<b>内側</b>の区間計測。
-     * <p>
-     * スクリプト/頂点数/ドローコール数は実測でシロだった (2026-07-20)。残る容疑は
-     * 「バッチループ自体の CPU オーバーヘッド」だが、推測で 7 回試して当たり 1 回
-     * だったので、どこで 5ms が消えているかを先に区間で確定させる。
-     * <p>
-     * 入れ子関係 (親は子を含む):
-     * <pre>
-     *   renderTrain 全体 (Train カテゴリ)
-     *     ├ lookup   … 車両定義/モデル解決 + 台車 stream 判定
-     *     ├ riders   … 乗員の先行描画
-     *     ├ scripted … スクリプト描画全体
-     *     │    ├ record … Nashorn 実行 + GLRecorder 記録 (Script 行との差 = 記録コスト)
-     *     │    └ replay … 記録の再生 (差分 = 姿勢変換/tess 描画)
-     *     │         └ groups … renderNamedGroups(+Emissive)
-     *     │              └ loop … renderSelectedBatches 全体
-     *     │                   ├ vbo    … drawBatchWithEntityVbo (state setup + GL draw)
-     *     │                   ├ getBuf … MultiBufferSource.getBuffer
-     *     │                   └ submit … CPU 頂点提出ループ
-     *     ├ baked … スクリプト無し車両のモデル描画 (loop はここにもぶら下がる)
-     *     └ signs … 方向幕/種別幕
-     * </pre>
-     * 列車以外 (レール/設置物) も同じメソッドを通るため、{@link #inTrain} 中だけ数える。
+     * 列車描画 (Train=約5ms/両) の内側の区間計測。
+     * スクリプト/頂点数/ドローコール数は実測でシロだった (2026-07-20)。
      */
     public static final String[] SECTION_NAMES = {
         "lookup", "riders", "scripted", "baked", "signs",
@@ -253,8 +222,8 @@ public final class ClientRenderProfiler {
     public static final int SEC_SUBMIT = 11;
     /** replay 内の DRAW_TESS (drawTess = 方向幕/モニタ等の tessellator 描画)。 */
     public static final int SEC_TESS = 12;
-    /** replay 内の drawModelGroup (DRAW_MODEL_GROUP と RENDER_PARTS テクスチャ差し替え)。
-     *  毎フレーム線形探索 + CPU 頂点提出をしている疑いの本命。 */
+    /**
+     */
     public static final int SEC_MODELGRP = 13;
 
     private static final long[] sectionNs = new long[SECTION_NAMES.length];
@@ -262,12 +231,12 @@ public final class ClientRenderProfiler {
     private static final long[] displaySectionNs = new long[SECTION_NAMES.length];
     private static final int[] displaySectionCounts = new int[SECTION_NAMES.length];
 
-    /** 区間開始。計測 OFF 中は 0 を返し {@link #secEnd} は何もしない (通常プレイ無負荷)。 */
+    /** 区間開始。計測 OFF 中は 0 を返し #secEnd は何もしない (通常プレイ無負荷)。 */
     public static long sec() {
         return overlayEnabled ? System.nanoTime() : 0L;
     }
 
-    /** 区間終了。列車描画中 ({@link #inTrain}) のぶんだけ数える。 */
+    /** 区間終了。列車描画中 (#inTrain) のぶんだけ数える。 */
     public static void secEnd(int section, long startNs) {
         if (startNs == 0L || !inTrain) {
             return;
@@ -285,8 +254,8 @@ public final class ClientRenderProfiler {
 
     public static void toggleOverlay() {
         overlayEnabled = !overlayEnabled;
-        //スクリプト計測 (共通側カウンタ) も連動させる。計測点の ScriptUtil は共通コードなので
-        //クライアント専用のこのクラスを直接参照できず、カウンタだけ別クラスに分けてある。
+        // スクリプト計測 (共通側カウンタ) も連動させる。計測点の ScriptUtil は共通コードなので
+        // クライアント専用のこのクラスを直接参照できず、カウンタだけ別クラスに分けてある。
         com.portofino.realtrainmodunofficial.perf.RtmuProfiler.enabled = overlayEnabled;
         if (!overlayEnabled) {
             com.portofino.realtrainmodunofficial.perf.RtmuProfiler.reset();
@@ -360,8 +329,8 @@ public final class ClientRenderProfiler {
         railVboDrawThisSecond = 0;
         lastSnapshotNs = now;
 
-        //画面のオーバーレイと同じ内容をログにも残す。
-        //スクリーンショットを撮らなくても、ログを見れば負荷の内訳が分かるようにする。
+        // 画面のオーバーレイと同じ内容をログにも残す。
+        // スクリーンショットを撮らなくても、ログを見れば負荷の内訳が分かるようにする。
         if (overlayEnabled) {
             logSnapshot();
         }
@@ -378,8 +347,8 @@ public final class ClientRenderProfiler {
         long vertsPerFrame = displayFrames > 0 ? displayVertices / displayFrames : 0L;
         int setupPerFrame = displayFrames > 0 ? displayRailStateSetup / displayFrames : 0;
         int drawPerFrame = displayFrames > 0 ? displayRailVboDraw / displayFrames : 0;
-        //Nashorn の実行時間だけを切り出したもの。「レールが重い」と言われたときに
-        //スクリプトなのかそれ以外なのかを、ログだけで切り分けられるようにしておく。
+        // Nashorn の実行時間だけを切り出したもの。「レールが重い」と言われたときに
+        // スクリプトなのかそれ以外なのかを、ログだけで切り分けられるようにしておく。
         double scriptMsPerFrame = displayFrames > 0
             ? com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastScriptMillis() / displayFrames
             : 0.0D;
@@ -408,7 +377,7 @@ public final class ClientRenderProfiler {
             ms[i] = displaySectionNs[i] / 1_000_000.0D / f;
         }
         double trainTotal = displayTotalsNs[CATEGORY_TRAIN] / 1_000_000.0D / f;
-        //親から子を引いた残差。負になったら入れ子の理解が間違っている合図なのでそのまま出す。
+        // 親から子を引いた残差。負になったら入れ子の理解が間違っている合図なのでそのまま出す。
         double unattributed = trainTotal
             - (ms[SEC_LOOKUP] + ms[SEC_RIDERS] + ms[SEC_SCRIPTED] + ms[SEC_BAKED] + ms[SEC_SIGNS]);
         double scriptedOther = ms[SEC_SCRIPTED] - ms[SEC_RECORD] - ms[SEC_REPLAY];
@@ -461,7 +430,7 @@ public final class ClientRenderProfiler {
                 + String.format(java.util.Locale.ROOT, "%.2f avg", avgMs)
                 + " (" + displayCounts[i] + ")";
         }
-        //CPU が毎フレーム VertexConsumer に流している頂点数 (= 重さの正体)
+        // CPU が毎フレーム VertexConsumer に流している頂点数 (= 重さの正体)
         long vertsPerFrame = displayFrames > 0 ? displayVertices / displayFrames : 0L;
         long batchesPerFrame = displayFrames > 0 ? displayBatches / displayFrames : 0L;
         int setupPerFrame = displayFrames > 0 ? displayRailStateSetup / displayFrames : 0;
@@ -476,9 +445,8 @@ public final class ClientRenderProfiler {
             + "  (batches " + batchesPerFrame + ", fps " + displayFrames + ")"
             + "  [列車ぶん " + trainVertsPerFrame + " / batch " + trainBatchesPerFrame + "]";
 
-        //★スクリプト実行の内訳 (軽量化の主指標)。
-        //Train カテゴリの時間には描画も含まれるため、Nashorn 実行だけを切り出して見る。
-        //cache 実行 = その フレームに Nashorn を回した数。走行中の車両は必ずここに乗る。
+        // ★スクリプト実行の内訳 (軽量化の主指標)。
+        // Train カテゴリの時間には描画も含まれるため、Nashorn 実行だけを切り出して見る。
         double scriptMs = com.portofino.realtrainmodunofficial.perf.RtmuProfiler.avgScriptMillis();
         lines[CATEGORY_NAMES.length + 3] = "Script: "
             + String.format(java.util.Locale.ROOT, "%.2f ms/f", scriptMs)
@@ -490,7 +458,7 @@ public final class ClientRenderProfiler {
             + " / 実行 " + com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastVehicleCacheMisses()
             + "  設置物 hit " + com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastObjectCacheHits()
             + " / 実行 " + com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastObjectCacheMisses();
-        //VBO 経路の内訳: 0 でないものだけを多い順に並べる (どのゲートで落ちているかの特定用)
+        // VBO 経路の内訳: 0 でないものだけを多い順に並べる (どのゲートで落ちているかの特定用)
         StringBuilder vbo = new StringBuilder("VBO: ");
         int shown = 0;
         for (int pass = 0; pass < VBO_SKIP_NAMES.length && shown < 4; pass++) {
@@ -512,7 +480,7 @@ public final class ClientRenderProfiler {
         java.util.Arrays.fill(usedVboIndex, false);
         lines[CATEGORY_NAMES.length + 5] = vbo.toString();
 
-        //Train区間の要約 (詳細はログの [Profiler] Train区間 行)。単位 ms/f。
+        // Train区間の要約 (詳細はログの [Profiler] Train区間 行)。単位 ms/f。
         double secF = Math.max(1, displayFrames);
         double msScripted = displaySectionNs[SEC_SCRIPTED] / 1_000_000.0D / secF;
         double msRecord = displaySectionNs[SEC_RECORD] / 1_000_000.0D / secF;
@@ -531,7 +499,7 @@ public final class ClientRenderProfiler {
             "  loop %.2f = vbo %.2f + buf %.2f + sub %.2f + 判定 %.2f",
             msLoop, msVbo, msGetBuf, msSubmit, msLoop - msVbo - msGetBuf - msSubmit);
 
-        //フレーム境界を確定 (この描画イベントは 1 フレームに 1 回)
+        // フレーム境界を確定 (この描画イベントは 1 フレームに 1 回)
         com.portofino.realtrainmodunofficial.perf.RtmuProfiler.endFrame();
 
         for (String line : lines) {

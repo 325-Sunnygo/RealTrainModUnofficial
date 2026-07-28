@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import javax.sound.sampled.AudioFormat;
 import java.nio.ByteBuffer;
 
-/** {@link SoundBuffer} の private フィールドへアクセスする (ステレオ→モノラル変換用)。 */
+/** SoundBuffer の private フィールドへアクセスする (ステレオ→モノラル変換用)。 */
 @Mixin(SoundBuffer.class)
 public interface SoundBufferAccessor {
 

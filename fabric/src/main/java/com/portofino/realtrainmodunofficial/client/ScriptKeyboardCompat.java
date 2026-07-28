@@ -4,11 +4,10 @@ import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * 1.12.2 RTM スクリプト(SuperRailBuilder3 等)が使う LWJGL2 の {@code Keyboard.isKeyDown(code)} を、
+ * 1.12.2 RTM スクリプト(SuperRailBuilder3 等)が使う LWJGL2 の Keyboard.isKeyDown(code) を、
  * 1.21.1 の GLFW 実キー状態に橋渡しするクライアント専用ヘルパー。
- *
- * <p>SRB の GUI はキー駆動(KeyMaps: LCONTROL/UP/DOWN/F/LEFT/RIGHT/RETURN/C/P/O/I/DELETE/H/Q 等)で、
- * 旧 RTMU の Keyboard スタブは常に false を返していたため操作が一切効かなかった。ここで実入力に繋ぐ。</p>
+ * SRB の GUI はキー駆動(KeyMaps: LCONTROL/UP/DOWN/F/LEFT/RIGHT/RETURN/C/P/O/I/DELETE/H/Q 等)で、
+ * 旧 RTMU の Keyboard スタブは常に false を返していたため操作が一切効かなかった。ここで実入力に繋ぐ。
  */
 public final class ScriptKeyboardCompat {
 

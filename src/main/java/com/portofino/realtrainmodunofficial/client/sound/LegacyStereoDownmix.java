@@ -14,20 +14,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * レガシー音源パック (MugenSoundLib 等) の<b>ステレオ音源をロード時にモノラルへ落とす</b>。
- * <p>
- * <b>なぜ必要か:</b> OpenAL は<b>ステレオ音源を距離減衰・3D定位しない</b> (モノラルのみ)。
- * MugenSoundLib は 399 音中 385 音がステレオ録音で、減衰設定 (LINEAR/16blk) が正しくても
- * 「どんなに離れても両耳フル音量で聞こえる」状態だった。バニラの定位音が全てモノラルなのは
- * このため。ここで L/R 平均のモノラルに変換すると、通常の距離減衰がそのまま効く。
- * <p>
- * 対象は生成サウンドパックの名前空間 ({@link ExternalSoundPackBridge#generatedNamespaces()})
- * のみ。BGM・レコード等 (minecraft:) はストリーム再生でここを通らず、通ってもステレオのまま。
- * 変換は同じ ByteBuffer 内で行う (モノラルは半分のサイズなので前詰め) — 追加確保なし。
- * <p>
- * {@code SoundBufferLibrary} のキャッシュは<b>元の (ステレオの) future</b> を保持し続けるため、
- * 呼び出しごとに thenApply すると同じバッファを二重変換して壊す。ここで ResourceLocation
- * キーの自前キャッシュを持ち、変換は 1 音につき 1 回だけ行う。
+ * レガシー音源パック (MugenSoundLib 等) のステレオ音源をロード時にモノラルへ落とす。
+ * なぜ必要か: OpenAL はステレオ音源を距離減衰・3D定位しない (モノラルのみ)。
  */
 public final class LegacyStereoDownmix {
 
@@ -36,7 +24,7 @@ public final class LegacyStereoDownmix {
     private LegacyStereoDownmix() {
     }
 
-    /** {@code SoundBufferLibrary.getCompleteBuffer} の戻り値を包む (Mixin から)。 */
+    /** SoundBufferLibrary.getCompleteBuffer の戻り値を包む (Mixin から)。 */
     public static CompletableFuture<SoundBuffer> wrap(ResourceLocation id, CompletableFuture<SoundBuffer> original) {
         if (id == null || original == null || !isLegacySoundNamespace(id.getNamespace())) {
             return original;
@@ -44,7 +32,7 @@ public final class LegacyStereoDownmix {
         return CACHE.computeIfAbsent(id, key -> original.thenApply(buffer -> downmixIfStereo(key, buffer)));
     }
 
-    /** {@code SoundBufferLibrary.clear} に合わせて自前キャッシュも破棄 (リソースリロード時)。 */
+    /** SoundBufferLibrary.clear に合わせて自前キャッシュも破棄 (リソースリロード時)。 */
     public static void clearCache() {
         for (CompletableFuture<SoundBuffer> future : CACHE.values()) {
             if (future.isDone() && !future.isCompletedExceptionally()) {
@@ -65,7 +53,7 @@ public final class LegacyStereoDownmix {
         if (!generated.isEmpty()) {
             return generated.contains(namespace);
         }
-        //パック未生成 (初回起動前など) のフォールバック: 既知のレガシー命名だけ対象にする
+        // パック未生成 (初回起動前など) のフォールバック: 既知のレガシー命名だけ対象にする
         return "rtm".equals(namespace) || namespace.startsWith("sound_");
     }
 

@@ -37,7 +37,7 @@ public record SetStationTagsPayload(BlockPos pos, int bits) implements CustomPac
             if (player == null || !(player.level() instanceof ServerLevel sl)) {
                 return;
             }
-            //操作距離チェック (別の駅を遠隔で書き換えられないように)。
+            // 操作距離チェック (別の駅を遠隔で書き換えられないように)。
             if (player.distanceToSqr(payload.pos().getX() + 0.5D, payload.pos().getY() + 0.5D,
                     payload.pos().getZ() + 0.5D) > 64.0D) {
                 return;

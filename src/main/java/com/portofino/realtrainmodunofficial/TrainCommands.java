@@ -51,7 +51,7 @@ public final class TrainCommands {
                     .requires(source -> source.hasPermission(2))
                     .executes(context -> executeDeleteTrain(context.getSource()))
                 )
-                //小文字表記でも効くように (コマンドリテラルは大文字小文字を区別する)
+                // 小文字表記でも効くように (コマンドリテラルは大文字小文字を区別する)
                 .then(Commands.literal("delalltrain")
                     .requires(source -> source.hasPermission(2))
                     .executes(context -> executeDeleteTrain(context.getSource()))
@@ -87,9 +87,8 @@ public final class TrainCommands {
                         ))
                     )
                 )
-                //本家 MacroRecorder: 運転操作 (ノッチ/ドア/警笛) をマクロとして録画する。
-                //start → 列車を運転 → stop で config/realtrainmodunofficial/macro/日時.txt へ保存。
-                //保存したマクロは運転士 (素手右クリック) が再生できる。
+                // 本家 MacroRecorder: 運転操作 (ノッチ/ドア/警笛) をマクロとして録画する。
+                // start → 列車を運転 → stop で config/realtrainmodunofficial/macro/日時.txt へ保存。
                 .then(Commands.literal("macro")
                     .then(Commands.literal("start")
                         .executes(context -> {
@@ -118,12 +117,12 @@ public final class TrainCommands {
     }
 
     /**
-     * KaizPatchX {@code CommandMCtrl} / {@code ModelCtrl} の移植。
-     * <pre>/mctrl &lt;target&gt; notch &lt;-8~5&gt;
-     * /mctrl &lt;target&gt; dir &lt;0|1&gt;
-     * /mctrl &lt;target&gt; dm &lt;dataName&gt; &lt;value&gt;
-     * /mctrl &lt;target&gt; state &lt;TrainStateType&gt; &lt;TrainState&gt;</pre>
-     * target = {@code @a}(全列車) / {@code @n}(最寄り) / {@code @r:NN}(半径NN) / {@code @s}(搭乗中) / 列車名。
+     * KaizPatchX CommandMCtrl / ModelCtrl の移植。
+     * /mctrl <target> notch <-8~5>
+     * /mctrl <target> dir <0|1>
+     * /mctrl <target> dm <dataName> <value>
+     * /mctrl <target> state <TrainStateType> <TrainState>
+     * target = @a(全列車) / @n(最寄り) / @r:NN(半径NN) / @s(搭乗中) / 列車名。
      */
     private static void registerMctrl(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
@@ -208,7 +207,7 @@ public final class TrainCommands {
             }
             return out;
         }
-        //名前一致 (表示名 or カスタム名)
+        // 名前一致 (表示名 or カスタム名)
         List<jp.ngt.rtm.entity.train.EntityTrainBase> out = new ArrayList<>();
         for (var tr : all) {
             if (tr.getName().getString().equals(t)
@@ -344,13 +343,9 @@ public final class TrainCommands {
 
 
     /**
-     * 車両のサーバースクリプトを<b>その場で読み込ませて</b>結果を出す。
-     *
-     * <p>サーバースクリプトは車を置いたときに初めて読まれるので、失敗しても
+     * 車両のサーバースクリプトをその場で読み込ませて結果を出す。
+     * サーバースクリプトは車を置いたときに初めて読まれるので、失敗しても
      * 「本来の機能が使えない」としか分からず、原因の切り分けができなかった。
-     * このコマンドなら<b>置かずに</b>読み込みだけ試せる。
-     *
-     * <p>使い方: {@code /rtm serverscript NGTOBuilder2_Flat}
      */
     private static int executeServerScriptTest(CommandSourceStack source, String id) {
         var definition = com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(id);
@@ -363,7 +358,7 @@ public final class TrainCommands {
                 id + " はサーバースクリプトを持っていません"), false);
             return 1;
         }
-        //キャッシュ済みだと 2 回目以降が素通りするので、必ず読み直す
+        // キャッシュ済みだと 2 回目以降が素通りするので、必ず読み直す
         com.portofino.realtrainmodunofficial.script.CarServerScripts.forget(id);
         var entry = com.portofino.realtrainmodunofficial.script.CarServerScripts.get(definition);
         if (entry == null) {
@@ -380,12 +375,7 @@ public final class TrainCommands {
 
     /**
      * 調査用: モデルのグループを名前で隠す / 戻す。引数なしで一覧と全解除。
-     *
-     * <p>「変な板が出ている」の類は<b>どの部品かを先に確定させないと直せない</b>。
-     * 描画経路を当てずっぽうで変えても当たらず、確認の往復が増えるだけになる。
-     *
-     * <p>{@code /rtm hidegroup glass} のように使う。隠れれば犯人が確定する。
-     * 保存はしないのでワールドを出れば戻る。
+     * 「変な板が出ている」の類はどの部品かを先に確定させないと直せない。
      */
     private static int executeHideGroup(CommandSourceStack source, String name) {
         if (name == null || name.isBlank()) {

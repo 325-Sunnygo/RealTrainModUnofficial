@@ -12,13 +12,9 @@ import net.minecraft.world.level.Level;
  * (本家 jp.ngt.rtm.rail.util.RailPosition の忠実移植)
  */
 public final class RailPosition {
-    /**
-     * 補正値、デフォルト長=これ*マーカー間距離最小値
-     */
+    /** 補正値、デフォルト長=これ*マーカー間距離最小値 */
     protected static final float Anchor_Correction_Value = 0.55228475F;//(√(2)-1)*4/3
-    /**
-     * 向きごとのベジェ曲線開始位置への補正値
-     */
+    /** 向きごとのベジェ曲線開始位置への補正値 */
     public static final float[][] REVISION = new float[][]{
         {0.0F, -0.5F}, {-0.5F, -0.5F}, {-0.5F, 0.0F}, {-0.5F, 0.499999F},
         {0.0F, 0.499999F}, {0.499999F, 0.499999F}, {0.499999F, 0.0F}, {0.499999F, -0.5F}
@@ -51,15 +47,8 @@ public final class RailPosition {
 
     /**
      * 自由配置 (ペンマーカー) の点か。
-     * <p>
-     * 通常のマーカーは「ブロック + 8方向」で置くので、{@link #init()} が
-     * {@code blockX/Z + REVISION[direction]} から posX/posZ を導出できる。ペンマーカーは
-     * ブロック内の任意の位置に点を打つため、posX/posY/posZ が<b>一次情報</b>になる。
-     * このフラグが立っている間は init() が posX/posY/posZ を上書きしない。
-     * <p>
-     * 曲線 ({@link RailMapBasic}) は元々 posX/posY/posZ だけを見ているので、
-     * ここさえ守れば下流はそのまま動く。blockX/Y/Z は floor(pos) を入れておき、
-     * コアブロックの設置位置や始終点の隣接判定に使う。
+     * 通常のマーカーは「ブロック + 8方向」で置くので、#init が
+     * blockX/Z + REVISION[direction] から posX/posZ を導出できる。
      */
     public boolean freePos;
 
@@ -81,7 +70,7 @@ public final class RailPosition {
 
     public void init() {
         if (this.freePos) {
-            //ペンマーカーの点は posX/posY/posZ が一次情報。ここで潰さない。
+            // ペンマーカーの点は posX/posY/posZ が一次情報。ここで潰さない。
             return;
         }
         this.posX = (double) this.blockX + 0.5D + (double) REVISION[this.direction & 7][0];
@@ -91,7 +80,6 @@ public final class RailPosition {
 
     /**
      * ペンマーカー用: ブロック内の任意の位置に点を打つ。
-     *
      * @param x     レール面のワールド座標
      * @param yaw   曲線の接線 (度)。プレイヤーの視線、または吸着したレールから引き継ぐ
      * @param pitch 接線の勾配 (度)
@@ -100,8 +88,8 @@ public final class RailPosition {
         int bx = Mth.floor(x);
         int by = Mth.floor(y);
         int bz = Mth.floor(z);
-        //direction は 8 方向しか無いので、互換のため最も近い方向を入れておく
-        //(曲線そのものは anchorYaw を使うので、丸めの誤差は形に出ない)
+        // direction は 8 方向しか無いので、互換のため最も近い方向を入れておく
+        // (曲線そのものは anchorYaw を使うので、丸めの誤差は形に出ない)
         int dir = Math.floorMod(Math.round(NGTMath.wrapAngle(yaw) / 45.0F), 8);
         RailPosition rp = new RailPosition(bx, by, bz, dir, switchType);
         rp.freePos = true;
@@ -138,8 +126,8 @@ public final class RailPosition {
         rp.constLimitWP = nbt.getFloat("Const_Limit_WP");
         rp.constLimitWN = nbt.getFloat("Const_Limit_WN");
         rp.anchorManual = nbt.getBoolean("A_Manual");
-        //ペンマーカーの点は posX/posY/posZ が一次情報なので、init() より先に復元して
-        //freePos を立てる (立っていれば init() は上書きしない)。
+        // ペンマーカーの点は posX/posY/posZ が一次情報なので、init より先に復元して
+        // freePos を立てる (立っていれば init は上書きしない)。
         if (nbt.getBoolean("FreePos")) {
             rp.freePos = true;
             rp.posX = nbt.getDouble("PosX");
@@ -182,9 +170,7 @@ public final class RailPosition {
         this.posY = (double) this.blockY + (double) (par1 + 1) * 0.0625D;
     }
 
-    /**
-     * 与えられた距離だけ平行移動
-     */
+    /** 与えられた距離だけ平行移動 */
     public void movePos(int x, int y, int z) {
         this.blockX += x;
         this.blockY += y;

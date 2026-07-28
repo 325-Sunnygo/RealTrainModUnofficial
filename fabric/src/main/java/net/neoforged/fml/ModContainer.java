@@ -21,22 +21,21 @@ public class ModContainer {
         return fabric;
     }
 
-    /** NeoForge の ModContainer#getModInfo().getVersion() 相当の簡易版。 */
+    /** NeoForge の ModContainer#getModInfo.getVersion 相当の簡易版。 */
     public String getVersionString() {
         return fabric.getMetadata().getVersion().getFriendlyString();
     }
 
     /**
-     * NeoForge の {@code getModInfo()} 相当。
-     * <p>共有コードが {@code c.getModInfo().getVersion().toString()} の形で書いてあるので、
-     * <b>その形のまま通す</b>ために用意している。ここを削ると呼び出し側を書き換えることになり、
-     * NeoForge 版との差分が増えて次の取り込みで衝突する。
+     * NeoForge の getModInfo 相当。
+     * 共有コードが c.getModInfo.getVersion.toString の形で書いてあるので、
+     * その形のまま通すために用意している。
      */
     public ModInfo getModInfo() {
         return new ModInfo(this.fabric);
     }
 
-    /** {@link #getModInfo()} 用。バージョンだけ持つ。 */
+    /** #getModInfo 用。バージョンだけ持つ。 */
     public static final class ModInfo {
         private final net.fabricmc.loader.api.ModContainer fabric;
 
@@ -44,7 +43,7 @@ public class ModContainer {
             this.fabric = fabric;
         }
 
-        /** {@code toString()} でそのまま版番号になる (NeoForge の ArtifactVersion と同じ使い方)。 */
+        /** toString でそのまま版番号になる (NeoForge の ArtifactVersion と同じ使い方)。 */
         public String getVersion() {
             return this.fabric.getMetadata().getVersion().getFriendlyString();
         }
@@ -52,7 +51,7 @@ public class ModContainer {
 
     /**
      * config 画面登録等の NeoForge 専用フック。Fabric に相当物が無いので受けるだけ。
-     * <p>ラムダを直接渡せるよう Supplier で受ける (Object だと関数型として解決できない)。
+     * ラムダを直接渡せるよう Supplier で受ける (Object だと関数型として解決できない)。
      */
     public <T> void registerExtensionPoint(Class<T> point, java.util.function.Supplier<? extends T> factory) {
     }

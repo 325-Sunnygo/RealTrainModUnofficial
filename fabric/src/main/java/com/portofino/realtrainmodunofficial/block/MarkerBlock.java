@@ -149,9 +149,8 @@ public class MarkerBlock extends BaseEntityBlock {
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult) {
         // RTM本家互換の使い方: マーカーをレールアイテムで右クリックすると、範囲内の全マーカーを
-        // 探索して個数に応じたレール(2個=通常/3個以上=分岐)を生成する。プレビューや WrenchMode は
+        // 探索して個数に応じたレール(2個=通常/3個以上=分岐)を生成する。
         // 使わない (RTM の BlockMarker.onBlockActivated → onMarkerActivated と同じ挙動)。
-        // RTM互換: マーカーをマーカーアイテムで右クリック → 設定GUI(カント/曲線アンカー)を開く。
         if (stack.getItem() instanceof MarkerItem) {
             if (level.isClientSide()) {
                 com.portofino.realtrainmodunofficial.ClientHooks.openMarkerConfigScreen(pos);
@@ -295,9 +294,7 @@ public class MarkerBlock extends BaseEntityBlock {
         return createdAny;
     }
 
-    /**
-     * 地面に右クリックしたコピー済みレールを、その位置へ平行移動して復元する。
-     */
+    /** 地面に右クリックしたコピー済みレールを、その位置へ平行移動して復元する。 */
     public static boolean placeCopiedRailAt(Level level, BlockPos targetPos, Player player, ItemStack stack,
                                             @Nullable String selectedModelId) {
         CompoundTag startTag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
@@ -389,8 +386,6 @@ public class MarkerBlock extends BaseEntityBlock {
     /**
      * legacy BlockMarker.onMarkerActivated に相当。
      * 範囲内の全マーカーを収集し、個数に応じてレール種別を決定する:
-     *  2個 → 通常レール
-     *  3個以上 → 分岐レール（各マーカーペアで通常レールを複数生成）
      */
     public boolean onMarkerActivated(Level level, BlockPos pos, @Nullable Player player, boolean makeRail, @Nullable String selectedModelId) {
         List<RailPosition> rps = searchAllMarkers(level, pos);
@@ -406,19 +401,16 @@ public class MarkerBlock extends BaseEntityBlock {
     /**
      * legacy BlockMarker.searchAllMarker に相当。
      * 範囲内にある全マーカー（自分自身を含む）をスキャンし、legacy と同じ優先度でソートして返す:
-     *  1. switchType 降順（分岐マーカー優先）
-     *  2. Y 昇順
-     *  3. hashCode 昇順（同一 Y のタイブレーカー）
      */
     private List<RailPosition> searchAllMarkers(Level level, BlockPos origin) {
         List<RailPosition> list = new ArrayList<>();
         int ox = origin.getX(), oy = origin.getY(), oz = origin.getZ();
-        //探索範囲 = 一度に敷設できるレール長の上限 (コンフィグ railMarkerSearchRange/Height で変更可)
+        // 探索範囲 = 一度に敷設できるレール長の上限 (コンフィグ railMarkerSearchRange/Height で変更可)
         int range = com.portofino.realtrainmodunofficial.Config.railMarkerSearchRange();
         int height = com.portofino.realtrainmodunofficial.Config.railMarkerSearchHeight();
 
-        //ブロック総当たり (旧実装は range=50 で 101×101×21 回の getBlockEntity) ではなく、
-        //範囲内チャンクの BlockEntity 一覧を走査する。範囲を広げても軽い。
+        // ブロック総当たり (旧実装は range=50 で 101×101×21 回の getBlockEntity) ではなく、
+        // 範囲内チャンクの BlockEntity 一覧を走査する。範囲を広げても軽い。
         int minCX = (ox - range) >> 4, maxCX = (ox + range) >> 4;
         int minCZ = (oz - range) >> 4, maxCZ = (oz + range) >> 4;
         for (int cx = minCX; cx <= maxCX; cx++) {
@@ -506,8 +498,8 @@ public class MarkerBlock extends BaseEntityBlock {
 
     /**
      * legacy BlockMarker.createRail に相当。
-     *  2個 → createNormalRail
-     *  3個以上 → createSwitchRail（分岐: 最初のマーカーを起点に各ペアへ通常レールを生成）
+     * 2個 → createNormalRail
+     * 3個以上 → createSwitchRail（分岐: 最初のマーカーを起点に各ペアへ通常レールを生成）
      */
     public static boolean createRail(Level level, BlockPos originPos, List<RailPosition> rps, RailProperties prop, boolean makeRail, boolean isCreative, @Nullable String selectedModelId) {
         if (rps.size() == 2) {
@@ -524,9 +516,7 @@ public class MarkerBlock extends BaseEntityBlock {
         return false;
     }
 
-    /**
-     * 2マーカー間に1本の通常レールを敷設する。legacy createNormalRail 相当。
-     */
+    /** 2マーカー間に1本の通常レールを敷設する。legacy createNormalRail 相当。 */
     private static boolean createNormalRail(Level level, RailPosition start, RailPosition end,
                                             RailProperties prop, boolean makeRail, boolean isCreative,
                                             @Nullable String selectedModelId) {
@@ -686,10 +676,9 @@ public class MarkerBlock extends BaseEntityBlock {
             int railDir = Math.floorMod(Math.round(railMap.getRailYaw(split, j) / 45.0F), 8);
             int sideDir = (railDir + 2) & 7;
 
-            // コリジョン(レール判定)はレール高さ(y)に置く。道床は y-1 に下げたため、
+            // コリジョン(レール判定)はレール高さ(y)に置く。
             // y-1 に置くと道床に塞がれて判定ブロックが置けず、レール中央で列車設置判定が
-            // 効かなくなる (ユーザー報告「端だけ判定される」)。y に置けば道床と競合せず
-            // カーブ全長に不可視の判定ブロックが並び、どこでもレール判定される。
+            // 効かなくなる (ユーザー報告「端だけ判定される」)。
             placeCollisionBlock(level, corePos, placed, new BlockPos(x, y, z));
             placeCollisionBlock(level, corePos, placed,
                 new BlockPos(x + getDirStepX(sideDir), y, z + getDirStepZ(sideDir)));
@@ -747,9 +736,8 @@ public class MarkerBlock extends BaseEntityBlock {
     }
 
     /**
-     * 道床ブロックを解決する。道床はカーペット厚(1px)の薄板にしたいので、フルブロックである
+     * 道床ブロックを解決する。
      * バニラ gravel 等ではなく、砂利テクスチャの薄板 BallastBlock を常に使う。
-     * (レール定義の ballastBlockId は道床を敷くか否か = ballastWidth>0 の判定にのみ利用)
      */
     private static Block resolveBallastBlock(@Nullable RailDefinition def) {
         return RealTrainModUnofficialBlocks.BALLAST.get();

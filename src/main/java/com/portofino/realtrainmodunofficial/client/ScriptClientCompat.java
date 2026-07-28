@@ -5,14 +5,14 @@ import org.lwjgl.glfw.GLFW;
 
 /**
  * 1.12.2 RTM スクリプト(SuperRailBuilder3 の render スクリプト等)が使う
- * {@code NGTUtilClient.getMinecraft()} / {@code MCWrapperClient.getPlayer()} 系を
+ * NGTUtilClient.getMinecraft / MCWrapperClient.getPlayer 系を
  * 1.21.1 のクライアント実体へ橋渡しするクライアント専用ヘルパー。
  */
 public final class ScriptClientCompat {
 
     /**
      * 現在レンダリング中の partialTick。CarRenderer.render が毎フレーム設定する。
-     * EntityRenderDispatcher が PoseStack 原点を lerp(partialTick, xOld, getX()) に置くので、
+     * EntityRenderDispatcher が PoseStack 原点を lerp(partialTick, xOld, getX) に置くので、
      * renderPosX も同じ partialTick を使うことで原点と完全に相殺し、固定マーカーが真の
      * ワールド座標に固定される(getTimer の別 partialTick を使うと僅かにズレて荒ぶる)。
      */

@@ -5,9 +5,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.util.FormationEntry (KaizPatchX) の忠実移植。
- */
+/** 本家 jp.ngt.rtm.entity.train.util.FormationEntry (KaizPatchX) の忠実移植。 */
 public class FormationEntry implements Comparable<FormationEntry> {
     public final EntityTrainBase train;
     public byte entryId;
@@ -41,9 +39,7 @@ public class FormationEntry implements Comparable<FormationEntry> {
         nbt.putByte("EntryDir", this.dir);
     }
 
-    /**
-     * 編成データ更新(Entity側も)
-     */
+    /** 編成データ更新(Entity側も) */
     public void updateFormationData(Formation par1, int i) {
         this.entryId = (byte) i;
         this.train.setFormation(par1);

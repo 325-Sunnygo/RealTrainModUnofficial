@@ -26,13 +26,12 @@ import java.util.List;
 /**
  * RTM-style wrench: 2-click rail connection + wrench-mode curve adjustment.
  * First click on a marker selects it; second click on another marker creates the rail.
- * Shift+click on a marker enters WrenchMode for curve handle adjustment.
  */
 public class WrenchItem extends Item {
     /** Radius for finding a second marker when entering WrenchMode (reduced from 50 to avoid watchdog). */
-    //★探索範囲は設定 (railMarkerSearchRange / Height) を見る。
-    //以前はここだけ 64/32 の決め打ちで、設定を伸ばしてもレンチ経路だけ 64 で頭打ちだった
-    //(マーカー右クリック経路は設定を見ていたので「変えても変わらない」に見える)。
+    // ★探索範囲は設定 (railMarkerSearchRange / Height) を見る。
+    // 以前はここだけ 64/32 の決め打ちで、設定を伸ばしてもレンチ経路だけ 64 で頭打ちだった
+    // (マーカー右クリック経路は設定を見ていたので「変えても変わらない」に見える)。
     private static int wrenchSearchDistance() {
         return com.portofino.realtrainmodunofficial.Config.railMarkerSearchRange();
     }
@@ -98,7 +97,6 @@ public class WrenchItem extends Item {
         if (level.isClientSide()) {
             // 追従中(編集中)はどこを右クリックしても、その時点の形で「固定」する。
             // ただし編集開始から少し経たないと確定しない (開始クリックの連発で即確定するのを防ぐ)。
-            // 緑線は消えず残り続ける (レール設置/破壊/リログまで)。視点の先＝緑線の先端。
             if (editingMarker != null && followMode) {
                 if (System.currentTimeMillis() - editStartTime < 400L) {
                     return InteractionResult.SUCCESS; // クールダウン中は無視 (まず視点で動かす)
@@ -162,8 +160,8 @@ public class WrenchItem extends Item {
     private static BlockPos findNearestMarkerPos(Level level, BlockPos origin) {
         BlockPos[] best = {null};
         double[] bestSq = {Double.MAX_VALUE};
-        //★総当たりではなく範囲内チャンクの BlockEntity を走査する。
-        //設定を 1024 まで伸ばせるので、決め打ちの 3 重ループだと現実的な時間で終わらない。
+        // ★総当たりではなく範囲内チャンクの BlockEntity を走査する。
+        // 設定を 1024 まで伸ばせるので、決め打ちの 3 重ループだと現実的な時間で終わらない。
         forEachMarkerInRange(level, origin, (p, marker) -> {
             if (p.equals(origin)) {
                 return;
@@ -224,9 +222,7 @@ public class WrenchItem extends Item {
         return InteractionResultHolder.pass(player.getItemInHand(hand));
     }
 
-    /**
-     * Moves the nearest rail preview control handle to a world-space point.
-     */
+    /** Moves the nearest rail preview control handle to a world-space point. */
     public static boolean moveControlTo(ItemStack stack, Vec3 hit) {
         CompoundTag tag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
         if (tag == null || !tag.contains("StartRP")) return false;
@@ -353,9 +349,7 @@ public class WrenchItem extends Item {
 
     /**
      * 設定範囲内のマーカーを列挙する。
-     *
-     * <p>{@code MarkerBlock.searchAllMarkers} と同じ作り。範囲内チャンクの BlockEntity 一覧を
-     * 舐めるので、範囲を広げても探索コストがほとんど増えない。
+     * MarkerBlock.searchAllMarkers と同じ作り。
      */
     private static void forEachMarkerInRange(Level level, BlockPos origin,
                                              java.util.function.BiConsumer<BlockPos, MarkerBlockEntity> action) {

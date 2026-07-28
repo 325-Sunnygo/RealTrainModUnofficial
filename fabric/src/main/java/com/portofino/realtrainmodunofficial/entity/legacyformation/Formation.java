@@ -32,8 +32,8 @@ public final class Formation {
     /**
      * 引数は TrainEntity でも、レガシー JS が渡す LegacyScriptExecutor ラッパーでも受け付ける。
      * ★TrainEntity 専用オーバーロードを作らないこと: Nashorn はオーバーロードがあると
-     *   getEntry(TrainEntity) を選び、ラッパー引数を TrainEntity へキャストして ClassCastException に
-     *   なる。Object 1 本にして内部で getTrain() で中身を取り出す(スクリプト互換)。
+     * getEntry(TrainEntity) を選び、ラッパー引数を TrainEntity へキャストして ClassCastException に
+     * なる。Object 1 本にして内部で getTrain で中身を取り出す(スクリプト互換)。
      */
     public FormationEntry getEntry(Object obj) {
         TrainEntity train = asTrainEntity(obj);
@@ -142,9 +142,7 @@ public final class Formation {
         FormationManager.getInstance().remove(par5.id);
     }
 
-    /**
-     * Called when a train is removed (died/discarded).
-     */
+    /** Called when a train is removed (died/discarded). */
     public void onRemovedTrain(TrainEntity train) {
         if (entries.length <= 1) {
             FormationManager.getInstance().remove(id);
@@ -173,8 +171,7 @@ public final class Formation {
 
     /**
      * Called by crowbar: disconnect at the given side of the given train.
-     * RTM faithful port of Formation.onDisconnectedTrain().
-     * side: bogieIndex that was interacted with (0 or 1)
+     * RTM faithful port of Formation.onDisconnectedTrain.
      */
     public void onDisconnectedTrain(TrainEntity train, int side) {
         FormationEntry entry = getEntry(train);
@@ -228,9 +225,7 @@ public final class Formation {
         }
     }
 
-    /**
-     * Returns true if this formation contains the given train
-     */
+    /** Returns true if this formation contains the given train */
     public boolean containsTrain(TrainEntity train) {
         return trainStream().anyMatch(t -> t == train);
     }

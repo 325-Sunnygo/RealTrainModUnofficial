@@ -5,23 +5,8 @@ import java.util.List;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 
 /**
- * 本家 {@code RenderVehicleBase.preRenderBody} → {@code RenderUtil.enableCustomLighting} の移植。
- *
- * <p>本家は室内灯の座標ごとに GL の点光源を有効化して車体を照らす。
- * <pre>
- * glLight(id, GL_POSITION, (x, y, z, 1.0F));   // w=1 = 位置指定の光源
- * glLight(id, GL_DIFFUSE,  (0.7, 0.7, 0.7, 1));
- * glLight(id, GL_AMBIENT,  (0.2, 0.2, 0.2, 1));
- * glLight(id, GL_SPECULAR, (r, g, b, 1));      // r &lt; 0 なら時間で色が回る (レインボー)
- * </pre>
- * <b>減衰は設定していない</b> (既定の constant=1 / linear=0 / quadratic=0) ので、距離では
- * 弱まらず<b>面の向きだけ</b>で効く。つまり実質「室内灯の方を向いた面が明るくなる」。
- *
- * <p>1.21 には固定機能ライトが無いので、頂点の法線と光源方向から同じ係数を出して
- * <b>頂点色</b>へ掛ける。lightmap を最大にするのは呼び出し側 ({@code applyInteriorLighting})。
- *
- * <p>本家の GL ライトがグローバル状態で preRenderBody/postRenderBody に挟まれているのと同じく、
- * ここも {@link #begin}/{@link #end} で囲む形にしてある (描画スレッド専用)。
+ * 本家 RenderVehicleBase.preRenderBody → RenderUtil.enableCustomLighting の移植。
+ * 本家は室内灯の座標ごとに GL の点光源を有効化して車体を照らす。
  */
 public final class InteriorLighting {
 
@@ -44,7 +29,7 @@ public final class InteriorLighting {
 
     /**
      * @param lights   室内灯 (モデル座標)
-     * @param rainbow  本家の {@code r < 0.0F} 相当 (InteriorLight_Rainbow)。時間で色が回る
+     * @param rainbow  本家の r < 0.0F 相当 (InteriorLight_Rainbow)。時間で色が回る
      */
     public static void begin(List<VehicleDefinition.LightDefinition> lights, boolean rainbow, long timeMillis) {
         if (lights == null || lights.isEmpty()) {
@@ -60,7 +45,7 @@ public final class InteriorLighting {
         }
         positions = pos;
         if (rainbow) {
-            //本家: hue = (int)(millis / 50 % 24000 * 15) % 360 / 360
+            // 本家: hue = (int)(millis / 50 % 24000 * 15) % 360 / 360
             float hue = (float) ((int) ((timeMillis / 50L % 24000L) * 15L) % 360) / 360.0F;
             float[] rgb = hueToRgb(hue);
             colorR = rgb[0];
@@ -94,8 +79,7 @@ public final class InteriorLighting {
 
     /**
      * 頂点 1 個分の明るさ係数。本家の GL ライティングと同じく
-     * {@code ambient + diffuse * max(0, dot(N, L))} を光源ごとに足す (距離減衰なし)。
-     *
+     * ambient + diffuse * max(0, dot(N, L)) を光源ごとに足す (距離減衰なし)。
      * @return 1.0 以上になり得る (本家も複数光源で飽和する)。呼び出し側で clamp すること
      */
     public static float factor(float x, float y, float z, float nx, float ny, float nz) {

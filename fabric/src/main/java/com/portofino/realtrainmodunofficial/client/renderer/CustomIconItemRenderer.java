@@ -24,20 +24,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 本家 KaizPatchX の {@code customIconTexture} — アイテムの絵をモデル定義の画像に差し替える。
- *
- * <p>本家 {@code RenderItemWithModel} の移植。架線柱や信号柱のように<b>1 つのアイテムで
- * 中身のモデルを選ぶ</b>物は、既定のアイコンだと持ち物欄で見分けがつかない。
- * モデルの JSON に {@code "customIconTexture": "rtm:textures/items/itemLinePole_1.png"} と
- * 書いておくと、選択中のモデルに応じてアイテムの絵が変わる。
- *
- * <p><b>設定されていないアイテムには一切触らない。</b>
- * 差し替えの判定は {@link CustomIconItemModel} が {@code ItemOverrides} で行い、
- * 未設定ならバニラのアイテムモデルがそのまま使われる。ここへは来ない。
- *
- * <p>本家は {@code ItemRenderer.renderItemIn2D} で厚みのある板を描くが、こちらは
- * <b>表裏 2 枚の平面</b>にしている。1.21 では厚み付きの板を出すのに専用の頂点生成が要る一方、
- * アイコンとしての見え方は変わらないため。
+ * 本家 KaizPatchX の customIconTexture — アイテムの絵をモデル定義の画像に差し替える。
+ * 本家 RenderItemWithModel の移植。
  */
 public class CustomIconItemRenderer extends BlockEntityWithoutLevelRenderer {
 
@@ -53,24 +41,24 @@ public class CustomIconItemRenderer extends BlockEntityWithoutLevelRenderer {
         if (texture == null) {
             return;
         }
-        //持ち物欄は影を付けたくないのでフルブライト。手元/地面は周囲の明るさに従う。
+        // 持ち物欄は影を付けたくないのでフルブライト。手元/地面は周囲の明るさに従う。
         int light = context == ItemDisplayContext.GUI ? 0x00F000F0 : packedLight;
         VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucentCull(texture));
         Matrix4f m = poseStack.last().pose();
         var normal = poseStack.last();
 
-        //バニラの item/generated と同じ 0..1 の枠に収める。z は板の中心。
+        // バニラの item/generated と同じ 0..1 の枠に収める。z は板の中心。
         final float z = 0.5F;
-        //表 (+Z 向き)
+        // 表 (+Z 向き)
         quad(vc, m, normal, z, 0.0F, 0.0F, 1.0F, 1.0F, light, packedOverlay, 1.0F);
-        //裏 (-Z 向き)。平面 1 枚だと真横や裏から見えなくなる
+        // 裏 (-Z 向き)。平面 1 枚だと真横や裏から見えなくなる
         quad(vc, m, normal, z, 1.0F, 0.0F, 0.0F, 1.0F, light, packedOverlay, -1.0F);
     }
 
     private static void quad(VertexConsumer vc, Matrix4f m, PoseStack.Pose pose, float z,
                              float x0, float v0, float x1, float v1, int light, int overlay,
                              float nz) {
-        //UV は左上原点。x0>x1 のときは裏面なので巻き順が反転する
+        // UV は左上原点。x0>x1 のときは裏面なので巻き順が反転する
         float u0 = nz > 0 ? 0.0F : 1.0F;
         float u1 = nz > 0 ? 1.0F : 0.0F;
         vc.addVertex(m, x0, 0.0F, z).setColor(0xFFFFFFFF).setUv(u0, 1.0F)
@@ -87,7 +75,7 @@ public class CustomIconItemRenderer extends BlockEntityWithoutLevelRenderer {
           .setLight(light).setNormal(pose, 0.0F, 0.0F, nz);
     }
 
-    /** その ItemStack が指すモデル定義の {@code customIconTexture}。無ければ空。 */
+    /** その ItemStack が指すモデル定義の customIconTexture。無ければ空。 */
     public static String iconPathOf(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return "";
@@ -101,7 +89,7 @@ public class CustomIconItemRenderer extends BlockEntityWithoutLevelRenderer {
         if (def != null && !def.getCustomIconTexture().isEmpty()) {
             return def.getCustomIconTexture();
         }
-        //自動車・列車も同じ仕組み (1 つのアイテムで中身のモデルを選ぶ形は同じ)
+        // 自動車・列車も同じ仕組み (1 つのアイテムで中身のモデルを選ぶ形は同じ)
         com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition vehicle =
             com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(id);
         if (vehicle != null && !vehicle.getCustomIconTexture().isEmpty()) {
@@ -119,11 +107,10 @@ public class CustomIconItemRenderer extends BlockEntityWithoutLevelRenderer {
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "dynamic/icon/none");
 
     /**
-     * {@code "rtm:textures/items/itemLinePole_1.png"} のような指定を実テクスチャへ。
-     *
-     * <p>本家は名前空間つきなら {@code ResourceLocation} をそのまま使うが、RTMU はパックの中身を
-     * バニラのリソースパックには載せていないので、{@code assets/<名前空間>/<パス>} として
-     * {@link NGTFileLoader} で探す。名前空間なしならそのままのパスで探す。
+     * "rtm:textures/items/itemLinePole_1.png" のような指定を実テクスチャへ。
+     * 本家は名前空間つきなら ResourceLocation をそのまま使うが、RTMU はパックの中身を
+     * バニラのリソースパックには載せていないので、assets/<名前空間>/<パス> として
+     * NGTFileLoader で探す。名前空間なしならそのままのパスで探す。
      */
     private static synchronized ResourceLocation resolve(String path) {
         if (path == null || path.isBlank()) {
@@ -158,7 +145,7 @@ public class CustomIconItemRenderer extends BlockEntityWithoutLevelRenderer {
                 "dynamic/icon/" + sanitize(path));
             DynamicTexture tex = new DynamicTexture(image);
             Minecraft.getInstance().getTextureManager().register(loc, tex);
-            //アイコンはピクセル等倍で見せたい (拡大でにじむと本家と違う見え方になる)
+            // アイコンはピクセル等倍で見せたい (拡大でにじむと本家と違う見え方になる)
             tex.setFilter(false, false);
             CACHE.put(path, loc);
             return loc;

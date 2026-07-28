@@ -88,11 +88,9 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     }
 
     /**
-     * <b>置いた物ごとの明るさ</b> (0-15)。
-     *
-     * <p>NeoForge は {@code getLightEmission(state, level, pos)} から、
-     * Fabric は光源計算の mixin ({@code BlockLightEngineMixin}) から呼ぶ。
-     * 判定を 1 箇所に集めておかないと<b>両版で明るさが食い違う</b>。
+     * 置いた物ごとの明るさ (0-15)。
+     * NeoForge は getLightEmission(state, level, pos) から、
+     * Fabric は光源計算の mixin (BlockLightEngineMixin) から呼ぶ。
      */
     public static int dynamicLightEmission(InstalledObjectBlockEntity be) {
         if (be == null) {
@@ -104,8 +102,8 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         if (be.getCategory() == InstalledObjectCategory.SIGNBOARD) {
             return be.getSignboardLightEmission();
         }
-        //本家 BlockFluorescent.getLightValue: 蛍光灯は常時 15
-        //(壊れた蛍光灯は 0/4/8/12 で明滅)。レッドストーン不要。
+        // 本家 BlockFluorescent.getLightValue: 蛍光灯は常時 15
+        // (壊れた蛍光灯は 0/4/8/12 で明滅)。レッドストーン不要。
         if (be.getCategory() == InstalledObjectCategory.FLUORESCENT) {
             return be.getFluorescentLightValue();
         }
@@ -125,18 +123,9 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     }
 
     /**
-     * <b>設置物は本家と同じく 1 ブロックぶんの当たり判定を持つ。</b>
-     *
-     * <p>本家 RTM の設置物は {@code BlockContainerCustom} を継承しており、
-     * 既定の当たり判定が {@code (0,0,0)-(1,1,1)} のまま使われている。
-     * 車止めに列車が突っ込めてしまう・信号機をすり抜けるといった報告はここが空だったため。
-     *
-     * <p>通り抜けるのは 2 つだけ:
-     * <ul>
-     *   <li><b>架線</b> — 電柱と電柱の間に張った線。線の下は歩ける必要がある
-     *       (選択判定 {@link #getShape} も同じ条件で空にしている)</li>
-     *   <li><b>開いている改札</b> — 閉じている間だけ塞ぐ (本家 BlockTurnstile と同じ)</li>
-     * </ul>
+     * 設置物は本家と同じく 1 ブロックぶんの当たり判定を持つ。
+     * 本家 RTM の設置物は BlockContainerCustom を継承しており、
+     * 既定の当たり判定が (0,0,0)-(1,1,1) のまま使われている。
      */
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
@@ -174,20 +163,20 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
-        //切符での改札通過 (本家 BlockTurnstile.onEntityCollidedWithBlock 相当)。
+        // 切符での改札通過 (本家 BlockTurnstile.onEntityCollidedWithBlock 相当)。
         if (stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.TicketItem ticket
             && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
             && be.getCategory() == InstalledObjectCategory.TICKET_GATE) {
             if (!level.isClientSide) {
                 ItemStack remainder = ticket.consume(stack);
-                //本家: 使い切ったら消える。残りがあれば「入場済み」印を付けて返す。
+                // 本家: 使い切ったら消える。残りがあれば「入場済み」印を付けて返す。
                 player.setItemInHand(hand, remainder);
                 be.activateTicketGate();
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
-        //本家 BlockPoint.onBlockActivated: バールで右クリックすると move の符号が反転し、
-        //転轍機の本体が線路の反対側に移る。
+        // 本家 BlockPoint.onBlockActivated: バールで右クリックすると move の符号が反転し、
+        // 転轍機の本体が線路の反対側に移る。
         if (stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.CrowbarItem
             && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity point
             && point.getCategory() == InstalledObjectCategory.POINT) {
@@ -196,8 +185,8 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
-        //本家 BlockMachineBase.clickMachine: バールで右クリック → 微調整 GUI (GuiChangeOffset)。
-        //レンチのシフト右クリックでも開けるようにする (ユーザー要望)。
+        // 本家 BlockMachineBase.clickMachine: バールで右クリック → 微調整 GUI (GuiChangeOffset)。
+        // レンチのシフト右クリックでも開けるようにする (ユーザー要望)。
         boolean crowbar = stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.CrowbarItem;
         boolean wrenchSneak = player.isShiftKeyDown()
             && stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.RtmWrenchItem;
@@ -219,7 +208,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }
-        //本家 BlockSignBoard.onBlockActivated: 素手で右クリック → 看板エディタ (GuiSignboard)。
+        // 本家 BlockSignBoard.onBlockActivated: 素手で右クリック → 看板エディタ (GuiSignboard)。
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
             && be.getCategory() == InstalledObjectCategory.SIGNBOARD) {
             if (level.isClientSide) {
@@ -227,7 +216,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }
-        //列車検知器: 素手で右クリック → 出力先の座標と動作(置く/消す)の設定 GUI。
+        // 列車検知器: 素手で右クリック → 出力先の座標と動作(置く/消す)の設定 GUI。
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
             && be.getCategory() == InstalledObjectCategory.TRAIN_DETECTOR) {
             if (level.isClientSide) {
@@ -235,13 +224,13 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }
-        //本家 BlockPoint.onBlockActivated: 素手で右クリック → 転てつを切り替える。
-        //レッドストーン出力が反転するので、隣接する分岐器がそのまま動く。
+        // 本家 BlockPoint.onBlockActivated: 素手で右クリック → 転てつを切り替える。
+        // レッドストーン出力が反転するので、隣接する分岐器がそのまま動く。
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
             && be.getCategory() == InstalledObjectCategory.POINT) {
             if (!level.isClientSide) {
                 be.setPointActivated(!be.isPointActivated());
-                //本家: 自分と真下の両方に更新を通知する (真下のブロック越しに信号を伝えるため)。
+                // 本家: 自分と真下の両方に更新を通知する (真下のブロック越しに信号を伝えるため)。
                 level.updateNeighborsAt(pos, this);
                 level.updateNeighborsAt(pos.below(), this);
                 level.playSound(null, pos, net.minecraft.sounds.SoundEvents.LEVER_CLICK,
@@ -249,7 +238,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }
-        //本家 BlockTicketVendor.onBlockActivated: 素手で右クリック → 券売機 GUI (切符/回数券)。
+        // 本家 BlockTicketVendor.onBlockActivated: 素手で右クリック → 券売機 GUI (切符/回数券)。
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
             && be.getCategory() == InstalledObjectCategory.TICKET_VENDOR) {
             if (level.isClientSide) {
@@ -257,7 +246,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }
-        //本家 BlockRailroadSign.onBlockActivated: 素手で右クリック → 標識のテクスチャ選択。
+        // 本家 BlockRailroadSign.onBlockActivated: 素手で右クリック → 標識のテクスチャ選択。
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
             && be.getCategory() == InstalledObjectCategory.RAILROAD_SIGN) {
             if (level.isClientSide) {
@@ -276,9 +265,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         super.onPlace(state, level, pos, oldState, isMoving);
     }
 
-    /**
-     * 本家 electric: 出力コネクタは配線網の信号レベルをレッドストーン出力する
-     */
+    /** 本家 electric: 出力コネクタは配線網の信号レベルをレッドストーン出力する */
     @Override
     protected boolean isSignalSource(BlockState state) {
         return true;
@@ -291,8 +278,8 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             if (be.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
                 return net.minecraft.util.Mth.clamp(be.getElectricity(), 0, 15);
             }
-            //本家 BlockPoint.getWeakPower: 転轍機は切り替わっている間 15 を出す。
-            //これで分岐器 (レール) やレッドストーン回路を直接動かせる。
+            // 本家 BlockPoint.getWeakPower: 転轍機は切り替わっている間 15 を出す。
+            // これで分岐器 (レール) やレッドストーン回路を直接動かせる。
             if (be.getCategory() == InstalledObjectCategory.POINT) {
                 return be.isPointActivated() ? 15 : 0;
             }
@@ -418,9 +405,8 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             double cy = pos.getY() + 0.5D;
             double cz = pos.getZ() + 0.5D;
             if (nowPowered && !wasPowered) {
-                // 立ち上がり: 再生 (本家同様 RS 強度 = 音スロット。音はスピーカーごとの登録
-                // → 未登録はグローバル設定へフォールバック。音量は可聴範囲から算出し
-                // 距離減衰は MC LINEAR に任せる)
+                // 立ち上がり: 再生 (本家同様 RS 強度 = 音スロット。
+                // → 未登録はグローバル設定へフォールバック。
                 blockEntity.playSpeakerSound(signal);
             } else if (!nowPowered && wasPowered) {
                 // 立ち下がり(レバーOFF): 再生中の音を止める。範囲外プレイヤーにも送って取りこぼしを防ぐ。

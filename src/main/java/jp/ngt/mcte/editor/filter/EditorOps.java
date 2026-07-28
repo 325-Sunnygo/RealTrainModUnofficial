@@ -10,9 +10,7 @@ import java.util.function.BiPredicate;
 
 /**
  * フィルタから使う共通処理 (neo mcte)。
- *
- * <p>本家 {@code Editor.setBlock} / {@code record} 相当。
- * <b>Undo 用の記録はここで一括して行う</b>ので、各フィルタは記録を意識しなくてよい。
+ * 本家 Editor.setBlock / record 相当。
  */
 public final class EditorOps {
 
@@ -44,7 +42,6 @@ public final class EditorOps {
 
     /**
      * 置き換え。Undo 記録込み。
-     *
      * @param filter 置き換えてよいか (現在の状態を見て判定)。null なら常に置き換える
      * @return 実際に変えた数
      */

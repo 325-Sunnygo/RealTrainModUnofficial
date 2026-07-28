@@ -22,16 +22,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 編集フィルタ一式 (neo mcte)。本家 MCTE {@code editor/filter} の移植。
- *
- * <p>本家は 1 フィルタ 1 ファイルだったが、どれも数十行なのでここにまとめてある。
- * 足すときは {@link #REGISTRY} に 1 行足すだけでよく、UI は
- * {@link EditFilter#config()} の宣言から自動で組まれる。
- *
- * <h2>本家との違い</h2>
- * <p>本家は「エディタが持つインベントリのスロット」から埋めるブロックを取っていたが
- * ({@code Editor.getFillItem})、neo mcte はエディタにインベントリを持たせていないので
- * <b>プレイヤーのオフハンドのブロック</b>を使う。持ち替えるだけで対象が変わるので手数が減る。
+ * 編集フィルタ一式 (neo mcte)。本家 MCTE editor/filter の移植。
+ * 本家は 1 フィルタ 1 ファイルだったが、どれも数十行なのでここにまとめてある。
  */
 public final class Filters {
 
@@ -69,8 +61,8 @@ public final class Filters {
     );
 
     /**
-     * 一覧に出る順。組み込み + {@code mcte/filter/*.js} の独自フィルタ。
-     * <p>スクリプトは 1 回だけ読む。追加したら再起動 (本家も同じ)。
+     * 一覧に出る順。組み込み + mcte/filter/*.js の独自フィルタ。
+     * スクリプトは 1 回だけ読む。追加したら再起動 (本家も同じ)。
      */
     public static final List<EditFilter> REGISTRY = build();
 
@@ -79,7 +71,7 @@ public final class Filters {
         try {
             all.addAll(CustomFilter.loadAll());
         } catch (Throwable t) {
-            //スクリプトが壊れていても組み込みは使えるようにする
+            // スクリプトが壊れていても組み込みは使えるようにする
             jp.ngt.ngtlib.io.NGTLog.debug("[Filters] 独自フィルタの読み込みに失敗: " + t);
         }
         return java.util.List.copyOf(all);
@@ -105,9 +97,7 @@ public final class Filters {
 
     /**
      * エディタのスロット → オフハンド、の順で引く。
-     * <p>本家はエディタのスロット (ContainerEditor の 72,152 / 72,172) だけを見る。
-     * neo mcte はスロットが空のときにオフハンドへ落とすので、
-     * 画面を開かずに手持ちで塗るという使い方もできる。
+     * 本家はエディタのスロット (ContainerEditor の 72,152 / 72,172) だけを見る。
      */
     private static BlockState slotOrOffhand(EditorSelection editor, Player player, int slot) {
         if (editor != null) {
@@ -128,7 +118,7 @@ public final class Filters {
         return null;
     }
 
-    /** 文字列 (例 {@code minecraft:stone}) からブロック。空/不正なら null。 */
+    /** 文字列 (例 minecraft:stone) からブロック。空/不正なら null。 */
     private static Block blockByName(String id) {
         if (id == null || id.isBlank()) {
             return null;
@@ -136,7 +126,7 @@ public final class Filters {
         try {
             ResourceLocation loc = ResourceLocation.parse(id.trim());
             Block b = BuiltInRegistries.BLOCK.get(loc);
-            //未登録は AIR が返るので、明示的に air を指定した場合以外は null 扱い
+            // 未登録は AIR が返るので、明示的に air を指定した場合以外は null 扱い
             return b == Blocks.AIR && !loc.getPath().equals("air") ? null : b;
         } catch (Exception e) {
             return null;
@@ -149,7 +139,7 @@ public final class Filters {
 
     // ---- 各フィルタ ----
 
-    /** 範囲を消す。本家 {@code EditFilterDelete}。 */
+    /** 範囲を消す。本家 EditFilterDelete。 */
     public static final class Delete extends EditFilter {
         @Override
         public String name() {
@@ -169,7 +159,7 @@ public final class Filters {
         }
     }
 
-    /** 範囲を埋める。本家 {@code EditFilterFill}。 */
+    /** 範囲を埋める。本家 EditFilterFill。 */
     public static final class Fill extends EditFilter {
         @Override
         public String name() {
@@ -202,7 +192,7 @@ public final class Filters {
         }
     }
 
-    /** A を B に置き換える。本家 {@code EditFilterReplace} 相当。 */
+    /** A を B に置き換える。本家 EditFilterReplace 相当。 */
     public static final class Replace extends EditFilter {
         @Override
         public String name() {
@@ -231,7 +221,7 @@ public final class Filters {
         }
     }
 
-    /** 範囲の外殻だけ埋める。本家 {@code EditFilterFillSurface}。 */
+    /** 範囲の外殻だけ埋める。本家 EditFilterFillSurface。 */
     public static final class FillSurface extends EditFilter {
         @Override
         public String name() {
@@ -263,7 +253,7 @@ public final class Filters {
         }
     }
 
-    /** 確率で埋める。本家 {@code EditFilterRandom}。 */
+    /** 確率で埋める。本家 EditFilterRandom。 */
     public static final class Random extends EditFilter {
         @Override
         public String name() {
@@ -286,14 +276,14 @@ public final class Filters {
             }
             float p = config().getFloat("Probability");
             boolean onlyAir = config().getBoolean("OnlyAir");
-            //ワールドの乱数を使う (シード依存にしない。毎回違ってよい処理のため)
+            // ワールドの乱数を使う (シード依存にしない。毎回違ってよい処理のため)
             var rng = level.getRandom();
             return EditorOps.replace(level, editor, to,
                 (pos, cur) -> (!onlyAir || cur.isAir()) && rng.nextFloat() < p);
         }
     }
 
-    /** 範囲を控える。本家 {@code EditFilterCopy}。 */
+    /** 範囲を控える。本家 EditFilterCopy。 */
     public static final class Copy extends EditFilter {
         @Override
         public String name() {
@@ -318,14 +308,14 @@ public final class Filters {
             if (blocks.isEmpty()) {
                 return 0;
             }
-            //★原点を記録する。貼り付け時に「元はどこにあったか」が分からないと
-            //RTMU レールの絶対座標を補正できない。
+            // ★原点を記録する。貼り付け時に「元はどこにあったか」が分からないと
+            // RTMU レールの絶対座標を補正できない。
             CLIPBOARD.put(editor.getUUID(), NGTObject.createNGTO(blocks, w, h, d, x0, y0, z0));
             return blocks.size();
         }
     }
 
-    /** 控えた内容を選択範囲の最小角へ貼る。本家 {@code EditFilterPaste}。 */
+    /** 控えた内容を選択範囲の最小角へ貼る。本家 EditFilterPaste。 */
     public static final class Paste extends EditFilter {
         @Override
         public String name() {
@@ -363,7 +353,7 @@ public final class Filters {
                 level.setBlock(p, set.state, 3);
                 if (set.nbt != null && level.getBlockEntity(p) != null) {
                     try {
-                        //RTMU のレールは絶対座標を持つのでずらした量ぶん補正する
+                        // RTMU のレールは絶対座標を持つのでずらした量ぶん補正する
                         net.minecraft.nbt.CompoundTag t = set.nbt.copy();
                         RailPaste.shift(t, origin.getX() - obj.origX,
                             origin.getY() - obj.origY, origin.getZ() - obj.origZ);
@@ -371,7 +361,7 @@ public final class Filters {
                         level.getBlockEntity(p).setChanged();
                         RailPaste.finish(level, p);
                     } catch (Exception ignored) {
-                        //読めない BE は飛ばす。ブロック自体は置けている
+                        // 読めない BE は飛ばす。ブロック自体は置けている
                     }
                 }
                 count++;
@@ -383,7 +373,7 @@ public final class Filters {
         }
     }
 
-    /** 控えてから消す。本家 {@code EditFilterCut}。 */
+    /** 控えてから消す。本家 EditFilterCut。 */
     public static final class Cut extends EditFilter {
         private final Copy copy = new Copy();
 
@@ -403,7 +393,7 @@ public final class Filters {
         }
     }
 
-    /** 範囲内のエンティティを消す。本家 {@code EditFilterDeleteEntity}。 */
+    /** 範囲内のエンティティを消す。本家 EditFilterDeleteEntity。 */
     public static final class DeleteEntity extends EditFilter {
         @Override
         public String name() {
@@ -438,7 +428,7 @@ public final class Filters {
 
     /**
      * 中を空洞にする (neo mcte 追加)。外殻だけ残す。
-     * <p>本家には無い。建物の内側を一発で抜きたい場面が多いので足した。
+     * 本家には無い。建物の内側を一発で抜きたい場面が多いので足した。
      */
     public static final class Hollow extends EditFilter {
         @Override
@@ -462,7 +452,7 @@ public final class Filters {
                 if (cur.isAir()) {
                     return false;
                 }
-                //外殻 t 枚は残す
+                // 外殻 t 枚は残す
                 return pos.getX() >= x0 + t && pos.getX() <= x1 - t
                     && pos.getY() >= y0 + t && pos.getY() <= y1 - t
                     && pos.getZ() >= z0 + t && pos.getZ() <= z1 - t;
@@ -472,8 +462,7 @@ public final class Filters {
 
     /**
      * 範囲ごと動かす (neo mcte 追加)。
-     * <p>本家は Copy → 範囲を選び直して Paste → 元を Delete という手順が必要だった。
-     * 「1 ブロックずらす」だけで 3 手かかるのは手数が多いので 1 本にまとめた。
+     * 本家は Copy → 範囲を選び直して Paste → 元を Delete という手順が必要だった。
      */
     public static final class Move extends EditFilter {
         @Override
@@ -496,7 +485,7 @@ public final class Filters {
             if (dx == 0 && dy == 0 && dz == 0) {
                 return 0;
             }
-            //まず全部読む (書きながら読むと、ずらし方向によって自分を上書きしてしまう)
+            // まず全部読む (書きながら読むと、ずらし方向によって自分を上書きしてしまう)
             List<BlockPos> from = new ArrayList<>();
             List<BlockState> states = new ArrayList<>();
             List<net.minecraft.nbt.CompoundTag> tags = new ArrayList<>();
@@ -515,12 +504,12 @@ public final class Filters {
             }
 
             UndoHistory.Snapshot snapshot = new UndoHistory.Snapshot();
-            //元を消す
+            // 元を消す
             for (BlockPos p : from) {
                 snapshot.record(level, p, level.getBlockState(p));
                 level.setBlock(p, Blocks.AIR.defaultBlockState(), 3);
             }
-            //移動先へ置く
+            // 移動先へ置く
             for (int i = 0; i < from.size(); i++) {
                 BlockPos p = from.get(i).offset(dx, dy, dz);
                 snapshot.record(level, p, level.getBlockState(p));
@@ -534,12 +523,12 @@ public final class Filters {
                         level.getBlockEntity(p).setChanged();
                         RailPaste.finish(level, p);
                     } catch (Exception ignored) {
-                        //読めない BE は飛ばす
+                        // 読めない BE は飛ばす
                     }
                 }
             }
             UndoHistory.push(editor, snapshot);
-            //選択範囲も一緒に動かす (動かした先をそのまま触れるように)
+            // 選択範囲も一緒に動かす (動かした先をそのまま触れるように)
             editor.setStart(editor.getStart().offset(dx, dy, dz));
             editor.setEnd(editor.getEnd().offset(dx, dy, dz));
             return from.size();
@@ -547,9 +536,8 @@ public final class Filters {
     }
 
     /**
-     * ノイズで埋める。本家 {@code EditFilterPerlinNoise}。
-     * <p>本家は {@code NGTLib} の {@code PerlinNoise} を使っていた。RTMU には無いので
-     * 同じ形 (オクターブ + 減衰 + 軸ごとのスケール) の値ノイズを自前で持つ。
+     * ノイズで埋める。本家 EditFilterPerlinNoise。
+     * 本家は NGTLib の PerlinNoise を使っていた。
      */
     public static final class PerlinNoise extends EditFilter {
         @Override
@@ -631,7 +619,7 @@ public final class Filters {
 
     /**
      * 選択範囲を指定量ずらして繰り返し複製する。本家 GuiEditor の Clone。
-     * <p>コピー → 移動先へ貼り付け、を Repeat 回。元は残す。
+     * コピー → 移動先へ貼り付け、を Repeat 回。元は残す。
      */
     public static final class Clone extends EditFilter {
         private final Copy copy = new Copy();
@@ -691,7 +679,7 @@ public final class Filters {
                             level.getBlockEntity(p).setChanged();
                             RailPaste.finish(level, p);
                         } catch (Exception ignored) {
-                            //読めない BE は飛ばす
+                            // 読めない BE は飛ばす
                         }
                     }
                     count++;
@@ -705,9 +693,8 @@ public final class Filters {
     }
 
     /**
-     * コピー内容を回した状態に差し替える (本家 {@code EditorTransform})。
-     * <p>回すのは<b>クリップボード</b>。貼り付けたときに回った形で出る。
-     * ワールドを直接回すと元の範囲との整合が取れないため。
+     * コピー内容を回した状態に差し替える (本家 EditorTransform)。
+     * 回すのはクリップボード。貼り付けたときに回った形で出る。
      */
     public static final class Rotate extends EditFilter {
         @Override
@@ -746,15 +733,14 @@ public final class Filters {
                         nw = h; nh = w;
                     }
                     default -> {
-                        //Y 軸 90 度: (x,z) -> (d-1-z, x)
+                        // Y 軸 90 度: (x,z) -> (d-1-z, x)
                         rx = d - 1 - z; ry = y; rz = x;
                         nw = d; nd = w;
                     }
                 }
-                //★形だけでなくブロックの向きも回す。
-                //  これが無いと階段・ハーフ・レール・看板が回す前の向きのまま残り、
-                //  回した建物がその場で作り直しになっていた (本家 MCTE も形だけ)。
-                //  X/Z 軸回転はバニラに対応する Rotation が無いので状態はそのまま。
+                // ★形だけでなくブロックの向きも回す。
+                // これが無いと階段・ハーフ・レール・看板が回す前の向きのまま残り、
+                // 回した建物がその場で作り直しになっていた (本家 MCTE も形だけ)。
                 BlockState st = "Y".equals(axis) || axis == null || axis.isEmpty()
                     ? s.state.rotate(net.minecraft.world.level.block.Rotation.CLOCKWISE_90)
                     : s.state;
@@ -765,7 +751,7 @@ public final class Filters {
         }
     }
 
-    /** コピー内容を反転する (本家 {@code EditorTransform})。 */
+    /** コピー内容を反転する (本家 EditorTransform)。 */
     public static final class Mirror extends EditFilter {
         @Override
         public String name() {
@@ -795,7 +781,7 @@ public final class Filters {
                     case "Z" -> z = obj.zSize - 1 - z;
                     default -> x = obj.xSize - 1 - x;
                 }
-                //★向きも反転する (Rotate と同じ理由)。Y は上下反転なので状態は触らない。
+                // ★向きも反転する (Rotate と同じ理由)。Y は上下反転なので状態は触らない。
                 BlockState st = switch (axis) {
                     case "Z" -> s.state.mirror(net.minecraft.world.level.block.Mirror.FRONT_BACK);
                     case "Y" -> s.state;
@@ -838,7 +824,7 @@ public final class Filters {
             jp.ngt.mcte.item.ItemMiniature.setNGTObject(obj, tag);
             float scale = config().getFloat("Scale");
             if (scale <= 0.0F) {
-                //0 なら 1 ブロックに収まる縮尺を自動で入れる
+                // 0 なら 1 ブロックに収まる縮尺を自動で入れる
                 scale = 1.0F / Math.max(1, Math.max(obj.xSize, Math.max(obj.ySize, obj.zSize)));
             }
             jp.ngt.mcte.item.ItemMiniature.setScale(scale, tag);
@@ -943,9 +929,7 @@ public final class Filters {
 
     /**
      * 選択範囲に何が何個あるかを数える (neo mcte 追加)。
-     *
-     * <p>置換する前に「何を置き換えるのか」を知りたい場面が多い。
-     * 本家には無いが、これが無いと目視で数えることになる。
+     * 置換する前に「何を置き換えるのか」を知りたい場面が多い。
      */
     public static final class Analyze extends EditFilter {
         @Override
@@ -992,19 +976,15 @@ public final class Filters {
                         BuiltInRegistries.BLOCK.getKey(e.getKey()), e.getValue(), pct))
                     .withStyle(net.minecraft.ChatFormatting.GRAY), false);
             }
-            //ワールドは変えないが「0 件」扱いにすると失敗に見えるので総数を返す
+            // ワールドは変えないが「0 件」扱いにすると失敗に見えるので総数を返す
             return total[0];
         }
     }
 
     /**
      * 配列複製 (neo mcte 追加)。
-     *
-     * <p>{@link Clone} は同じ向きのまま並べるだけなので、螺旋階段・曲線に沿った柱・
+     * Clone は同じ向きのまま並べるだけなので、螺旋階段・曲線に沿った柱・
      * 円形の建物のように「1 個ずつ回しながら並べる」ものが作れなかった。
-     * ここでは 1 個進むごとに Y 軸まわりに {@code RotateStep} × 90 度回す。
-     *
-     * <p>回転はブロックの向きにも効く ({@link Rotate} と同じ)。
      */
     public static final class Array extends EditFilter {
         private final Copy copy = new Copy();
@@ -1020,9 +1000,9 @@ public final class Filters {
             cfg.addInt("Y", 0, -256, 256);
             cfg.addInt("Z", 0, -256, 256);
             cfg.addInt("Repeat", 4, 1, 64);
-            //1 個進むごとの回転量 (×90 度)。1 なら 4 個で 1 周する
+            // 1 個進むごとの回転量 (×90 度)。1 なら 4 個で 1 周する
             cfg.addInt("RotateStep", 1, 0, 3);
-            //回した分だけ進む向きも回すか。螺旋階段は true、柱を回すだけなら false
+            // 回した分だけ進む向きも回すか。螺旋階段は true、柱を回すだけなら false
             cfg.addBoolean("RotateOffset", true);
         }
 
@@ -1049,7 +1029,7 @@ public final class Filters {
 
             UndoHistory.Snapshot snapshot = new UndoHistory.Snapshot();
             int count = 0;
-            //進む向き。RotateOffset なら 1 個ごとに一緒に回す
+            // 進む向き。RotateOffset なら 1 個ごとに一緒に回す
             int ox = 0, oy = 0, oz = 0;
             int stepX = dx, stepZ = dz;
             for (int r = 1; r <= repeat && count < EditorOps.MAX_BLOCKS; r++) {
@@ -1097,7 +1077,7 @@ public final class Filters {
                             level.getBlockEntity(p).setChanged();
                             RailPaste.finish(level, p);
                         } catch (Exception ignored) {
-                            //読めない BE は飛ばす
+                            // 読めない BE は飛ばす
                         }
                     }
                     count++;
@@ -1112,9 +1092,7 @@ public final class Filters {
 
     /**
      * 選択範囲に内接する楕円体で埋める (neo mcte 追加)。
-     *
-     * <p>ドームや丸屋根を手で積むと必ず歪む。範囲を取って実行するだけで正確な形が出る。
-     * {@code Hollow} を入れると殻だけになり、内側は触らない。
+     * ドームや丸屋根を手で積むと必ず歪む。範囲を取って実行するだけで正確な形が出る。
      */
     public static final class Ellipsoid extends EditFilter {
         @Override
@@ -1126,7 +1104,7 @@ public final class Filters {
         protected void initConfig(FilterConfig cfg) {
             cfg.addString("Block", "");
             cfg.addBoolean("Hollow", false);
-            //上半分だけ (ドーム)
+            // 上半分だけ (ドーム)
             cfg.addBoolean("TopHalf", false);
         }
 
@@ -1158,7 +1136,7 @@ public final class Filters {
                 if (!hollow) {
                     return true;
                 }
-                //1 ブロック内側が外に出るなら殻
+                // 1 ブロック内側が外に出るなら殻
                 double di = norm(px - cx, rx - 1.0D) + norm(py - cy, ry - 1.0D) + norm(pz - cz, rz - 1.0D);
                 return di > 1.0D;
             });
@@ -1171,7 +1149,7 @@ public final class Filters {
 
     /**
      * 選択範囲に内接する円柱で埋める (neo mcte 追加)。
-     * <p>塔・煙突・トンネルの断面。軸は縦だけでなく横にも取れる。
+     * 塔・煙突・トンネルの断面。軸は縦だけでなく横にも取れる。
      */
     public static final class Cylinder extends EditFilter {
         @Override
@@ -1222,7 +1200,7 @@ public final class Filters {
         }
     }
 
-    /** 選択範囲の<b>辺</b>だけを埋める (neo mcte 追加)。範囲の当たりを付けるのに使う。 */
+    /** 選択範囲の辺だけを埋める (neo mcte 追加)。範囲の当たりを付けるのに使う。 */
     public static final class Outline extends EditFilter {
         @Override
         public String name() {
@@ -1247,7 +1225,7 @@ public final class Filters {
         }
     }
 
-    /** 選択範囲の<b>側面 4 枚</b>だけを埋める (neo mcte 追加)。壁を一気に立てる。 */
+    /** 選択範囲の側面 4 枚だけを埋める (neo mcte 追加)。壁を一気に立てる。 */
     public static final class Walls extends EditFilter {
         @Override
         public String name() {
@@ -1257,7 +1235,7 @@ public final class Filters {
         @Override
         protected void initConfig(FilterConfig cfg) {
             cfg.addString("Block", "");
-            //上下の面も張ると箱になる
+            // 上下の面も張ると箱になる
             cfg.addBoolean("WithFloorCeil", false);
         }
 
@@ -1281,8 +1259,8 @@ public final class Filters {
     }
 
     /**
-     * 地面の<b>上に一層</b>敷く (neo mcte 追加)。
-     * <p>草地に道を敷く、屋根の上に雪を載せる、といった作業が 1 回で済む。
+     * 地面の上に一層敷く (neo mcte 追加)。
+     * 草地に道を敷く、屋根の上に雪を載せる、といった作業が 1 回で済む。
      */
     public static final class Overlay extends EditFilter {
         @Override
@@ -1293,7 +1271,7 @@ public final class Filters {
         @Override
         protected void initConfig(FilterConfig cfg) {
             cfg.addString("Block", "");
-            //置き換える対象を「空気のみ」に絞るか。false なら草や雪の上にも重ねる
+            // 置き換える対象を「空気のみ」に絞るか。false なら草や雪の上にも重ねる
             cfg.addBoolean("AirOnly", true);
         }
 
@@ -1311,7 +1289,7 @@ public final class Filters {
                     return false;
                 }
                 BlockState below = level.getBlockState(pos.below());
-                //真下が中身の詰まったブロックのときだけ載せる
+                // 真下が中身の詰まったブロックのときだけ載せる
                 return !below.isAir() && !below.equals(to) && below.isSolidRender(level, pos.below());
             });
         }
@@ -1319,10 +1297,7 @@ public final class Filters {
 
     /**
      * でこぼこをならす (neo mcte 追加)。
-     *
-     * <p>周り 6 方向のうち何個が埋まっているかを見て、飛び出しは削り、へこみは埋める。
-     * 地形をいじった後の角ばりを取るのに使う。埋める材料は真下のブロックに合わせるので、
-     * 草地なら草、砂なら砂になる。
+     * 周り 6 方向のうち何個が埋まっているかを見て、飛び出しは削り、へこみは埋める。
      */
     public static final class Smooth extends EditFilter {
         @Override
@@ -1332,9 +1307,9 @@ public final class Filters {
 
         @Override
         protected void initConfig(FilterConfig cfg) {
-            //削る閾値: 周りがこれ以下なら消す
+            // 削る閾値: 周りがこれ以下なら消す
             cfg.addInt("EraseAt", 1, 0, 5);
-            //埋める閾値: 周りがこれ以上なら埋める
+            // 埋める閾値: 周りがこれ以上なら埋める
             cfg.addInt("FillAt", 5, 1, 6);
             cfg.addInt("Passes", 1, 1, 4);
         }
@@ -1347,7 +1322,7 @@ public final class Filters {
             UndoHistory.Snapshot snapshot = new UndoHistory.Snapshot();
             int[] count = {0};
             for (int pass = 0; pass < passes; pass++) {
-                //1 周ぶんの判定を先に集めてから流す。途中の結果が次の判定に混ざらないようにする
+                // 1 周ぶんの判定を先に集めてから流す。途中の結果が次の判定に混ざらないようにする
                 List<BlockPos> erase = new ArrayList<>();
                 List<BlockPos> fill = new ArrayList<>();
                 EditorOps.forEach(editor, pos -> {

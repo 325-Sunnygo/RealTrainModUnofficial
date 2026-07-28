@@ -3,9 +3,7 @@ package jp.ngt.mccompat.input;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
-/**
- * LWJGL2 org.lwjgl.input.Mouse のスクリプト互換 (GLFW ベース)。
- */
+/** LWJGL2 org.lwjgl.input.Mouse のスクリプト互換 (GLFW ベース)。 */
 public final class Mouse {
     private Mouse() {
     }

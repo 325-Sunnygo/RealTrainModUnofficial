@@ -2,9 +2,7 @@ package net.neoforged.neoforge.server;
 
 import net.minecraft.server.MinecraftServer;
 
-/**
- * シム: 現在のサーバー参照。エントリポイントが ServerLifecycleEvents で set/clear する。
- */
+/** シム: 現在のサーバー参照。エントリポイントが ServerLifecycleEvents で set/clear する。 */
 public final class ServerLifecycleHooks {
     private static volatile MinecraftServer currentServer;
 

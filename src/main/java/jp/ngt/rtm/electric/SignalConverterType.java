@@ -1,8 +1,6 @@
 package jp.ngt.rtm.electric;
 
-/**
- * 本家 jp.ngt.rtm.electric.SignalConverterType の忠実移植。
- */
+/** 本家 jp.ngt.rtm.electric.SignalConverterType の忠実移植。 */
 public enum SignalConverterType {
     RSIn(0),
     RSOut(1),

@@ -48,9 +48,7 @@ public class Vec3 {
         return dx * dx + dy * dy + dz * dz;
     }
 
-    /**
-     * @param par1 度
-     */
+    /** @param par1 度 */
     public Vec3 rotateAroundX(float par1) {
         float rad = NGTMath.toRadians(par1);
         float f1 = Mth.cos(rad);
@@ -61,9 +59,7 @@ public class Vec3 {
         return new Vec3(d0, d1, d2);
     }
 
-    /**
-     * @param par1 度
-     */
+    /** @param par1 度 */
     public Vec3 rotateAroundY(float par1) {
         float rad = NGTMath.toRadians(par1);
         float f1 = Mth.cos(rad);
@@ -74,9 +70,7 @@ public class Vec3 {
         return new Vec3(d0, d1, d2);
     }
 
-    /**
-     * @param par1 度
-     */
+    /** @param par1 度 */
     public Vec3 rotateAroundZ(float par1) {
         float rad = NGTMath.toRadians(par1);
         float f1 = Mth.cos(rad);
@@ -103,9 +97,7 @@ public class Vec3 {
         return new Vec3(this.getX() * num, this.getY() * num, this.getZ() * num);
     }
 
-    /**
-     * 外積
-     */
+    /** 外積 */
     public Vec3 crossProduct(Vec3 par1) {
         return new Vec3(
                 this.y * par1.z - this.z * par1.y,
@@ -114,9 +106,7 @@ public class Vec3 {
         );
     }
 
-    /**
-     * 内積
-     */
+    /** 内積 */
     public double dotProduct(Vec3 vec) {
         return this.x * vec.x + this.y * vec.y + this.z * vec.z;
     }
@@ -153,12 +143,12 @@ public class Vec3 {
         return Math.min(d0, 1.0D);
     }
 
-    // NOTE: 本家には toNGTVec() があるが、NGTVec (MC Vec3 依存) は必要になった時点で移植する
+    // NOTE: 本家には toNGTVec があるが、NGTVec (MC Vec3 依存) は必要になった時点で移植する
 
-    //以下は本家に無い別名。旧 RTMU の JS スタブが提供していた名前で、
-    //それ向けに書かれたスクリプトが落ちないよう実クラス側にも用意する。
+    // 以下は本家に無い別名。旧 RTMU の JS スタブが提供していた名前で、
+    // それ向けに書かれたスクリプトが落ちないよう実クラス側にも用意する。
 
-    /** {@link #multi(double)} の別名。 */
+    /** #multi(double) の別名。 */
     public Vec3 scale(double s) {
         return this.multi(s);
     }
@@ -167,12 +157,12 @@ public class Vec3 {
         return this.multi(s);
     }
 
-    /** {@link #sub(Vec3)} の別名。 */
+    /** #sub(Vec3) の別名。 */
     public Vec3 subtract(Vec3 other) {
         return this.sub(other);
     }
 
-    /** {@link #dotProduct(Vec3)} の別名。 */
+    /** #dotProduct(Vec3) の別名。 */
     public double dot(Vec3 other) {
         return this.dotProduct(other);
     }

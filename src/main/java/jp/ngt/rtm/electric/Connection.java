@@ -2,12 +2,7 @@ package jp.ngt.rtm.electric;
 
 /**
  * 本家 jp.ngt.rtm.electric.Connection の移植。
- *
- * <p>電線 1 本の「接続先」を表す。NGTO Builder の Wire ツールが
- * {@code tileEntity.setConnectionTo(x, y, z, Connection.ConnectionType.WIRE, resourceState)} と
- * 種別を渡す。ConnectionType の顔ぶれと id は本家に合わせてある
- * (以前は RTMU 独自の WIRE2/RELAY/DUMMY だったため、本家スクリプトが参照する
- * DIRECT / TO_ENTITY / TO_PLAYER が解決できなかった)。
+ * 電線 1 本の「接続先」を表す。
  */
 @SuppressWarnings("unused")
 public class Connection {
@@ -71,7 +66,7 @@ public class Connection {
         if (level == null) {
             return null;
         }
-        //TO_PLAYER は x にエンティティ ID を入れる (本家の {eID, -1, 0} 形式)
+        // TO_PLAYER は x にエンティティ ID を入れる (本家の {eID, -1, 0} 形式)
         net.minecraft.world.entity.Entity e = level.getEntity(this.x);
         return e instanceof net.minecraft.world.entity.player.Player p ? p : null;
     }
@@ -117,7 +112,7 @@ public class Connection {
     }
 
     public static Connection readFromNBT(net.minecraft.nbt.CompoundTag nbt) {
-        //IsRoot が無いのは v34 以前のデータ。当時は張った側しか保存しなかった
+        // IsRoot が無いのは v34 以前のデータ。当時は張った側しか保存しなかった
         boolean isRoot = !nbt.contains("IsRoot") || nbt.getBoolean("IsRoot");
         int type = nbt.getInt("type");
         String name = nbt.getString("ModelName");

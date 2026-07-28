@@ -50,7 +50,7 @@ public class PolygonModel {
         return out;
     }
 
-    /** 本家 getGroupObjects(): 全グループ。 */
+    /** 本家 getGroupObjects: 全グループ。 */
     public List<GroupObject> getGroupObjects() {
         return this.groupObjects;
     }
@@ -67,7 +67,7 @@ public class PolygonModel {
         return this.fileName;
     }
 
-    /** 本家 getSize(): 外接箱をそのまま返す。 */
+    /** 本家 getSize: 外接箱をそのまま返す。 */
     public float[] getSize() {
         return this.sizeBox;
     }
@@ -155,9 +155,7 @@ public class PolygonModel {
         return copy;
     }
 
-    /**
-     * 本家: renderPart(smoothing, objName) — 指定グループを即時描画。
-     */
+    /** 本家: renderPart(smoothing, objName) — 指定グループを即時描画。 */
     public void renderPart(boolean smoothing, String objName) {
         GLRecorder rec = GLRecorder.active();
         if (rec != null && objName != null) {
@@ -169,9 +167,7 @@ public class PolygonModel {
         this.renderPart(false, objName);
     }
 
-    /**
-     * 全グループ描画。
-     */
+    /** 全グループ描画。 */
     public void renderAll() {
         this.renderAll(false);
     }

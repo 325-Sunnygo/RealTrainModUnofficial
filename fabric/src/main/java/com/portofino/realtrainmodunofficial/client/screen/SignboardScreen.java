@@ -25,18 +25,11 @@ import java.util.List;
 
 /**
  * 本家 GuiSignboard の 1.21.1 移植。看板を素手で右クリックすると開く。
- * <p>
- * 左側が板のプレビュー (実際の見た目と同じ配置)、右側が編集パネル。プレビュー上の文字は
- * ドラッグで移動、四隅/辺をつかむとリサイズできる。
- * <p>
- * 本家は TileEntity の文字リストを直接いじっていて、キャンセルしてもクライアント側は
- * 変更されたままだった。こちらは編集用のコピーを持ち、「完了」でだけサーバへ送る。
+ * 左側が板のプレビュー (実際の見た目と同じ配置)、右側が編集パネル。
  */
 public class SignboardScreen extends Screen {
     private static final int PANEL_W = 130;
-    /**
-     * 掴み判定の太さ(px)。
-     */
+    /** 掴み判定の太さ(px)。 */
     private static final float GRAB = 3.0F;
     private static final int COLOR_ON = 0xFFFFFF;
     private static final int COLOR_OFF = 0xA0A0A0;
@@ -64,35 +57,29 @@ public class SignboardScreen extends Screen {
 
     /**
      * 編集中の文字のフォント名/スタイル。EditBox に出さないのでここで持つ。
-     * ({@code font} は {@link Screen} 側の描画用 Font なので名前を分ける)
+     * (font は Screen 側の描画用 Font なので名前を分ける)
      */
     private String fontName = "Meiryo UI";
     private int style;
     private SignboardAnimeType animeType = SignboardAnimeType.SWITCH;
 
-    /**
-     * プレビューの倍率 (px / ブロック)。
-     */
+    /** プレビューの倍率 (px / ブロック)。 */
     private float scale = 1.0F;
     private int previewW;
     private int previewH;
 
     private boolean dragging;
-    /**
-     * 掴んでいる辺のビット: 8=左, 4=右, 2=上, 1=下。0 なら移動。
-     */
+    /** 掴んでいる辺のビット: 8=左, 4=右, 2=上, 1=下。0 なら移動。 */
     private int dragState;
     private double prevDragX;
     private double prevDragY;
 
     /**
      * ウィジェットの作り直し要求。
-     * <p>
-     * ボタンの onPress の中で直接 rebuildWidgets() すると、呼び出し元の
+     * ボタンの onPress の中で直接 rebuildWidgets すると、呼び出し元の
      * ContainerEventHandler.mouseClicked が「押されたウィジェット」にフォーカスを
-     * セットするのが作り直しの<b>後</b>になるため、破棄済みのボタンがフォーカスを持ち、
+     * セットするのが作り直しの後になるため、破棄済みのボタンがフォーカスを持ち、
      * その後 Enter を押すと同じボタンがもう一度発火してしまう (Del で2件消える等)。
-     * そこで作り直しは次の描画まで遅らせる。
      */
     private boolean pendingRebuild;
 
@@ -118,7 +105,7 @@ public class SignboardScreen extends Screen {
         float cfgHeight = def == null ? 1.0F : def.getHeight();
         int backTexture = def == null ? 0 : def.getBackTexture();
 
-        //本家: backTexture==1 はテクスチャに表裏が並んでいるので、プレビューは倍幅になる。
+        // 本家: backTexture==1 はテクスチャに表裏が並んでいるので、プレビューは倍幅になる。
         float boardWidth = backTexture == 1 ? cfgWidth * 2.0F : cfgWidth;
         int areaW = this.width - PANEL_W;
         int areaH = this.height - 30;
@@ -224,9 +211,7 @@ public class SignboardScreen extends Screen {
 
     // ---- 編集操作 ----
 
-    /**
-     * 入力欄の内容を選択中の文字に反映する (本家 updateText)。
-     */
+    /** 入力欄の内容を選択中の文字に反映する (本家 updateText)。 */
     private void applyFields() {
         if (selected == null || fieldText == null) {
             return;
@@ -299,8 +284,8 @@ public class SignboardScreen extends Screen {
                 infos,
                 selection -> {
                     this.definitionId = selection.modelId();
-                    //ModelSelectScreen は選択直後に自分を閉じる (setScreen(null)) ので、
-                    //次のティックまで待ってから看板エディタへ戻す。
+                    // ModelSelectScreen は選択直後に自分を閉じる (setScreen(null)) ので、
+                    // 次のティックまで待ってから看板エディタへ戻す。
                     mc.tell(() -> mc.setScreen(this));
                 },
                 definitionId,
@@ -358,7 +343,7 @@ public class SignboardScreen extends Screen {
         }
         boolean wasSelected = selected == clicked;
         if (wasSelected) {
-            //本家: 選択済みの文字をもう一度掴むとドラッグ開始。
+            // 本家: 選択済みの文字をもう一度掴むとドラッグ開始。
             dragging = true;
             dragState = grabState(clicked, mouseX, mouseY);
             prevDragX = mouseX;
@@ -429,9 +414,7 @@ public class SignboardScreen extends Screen {
         return x >= minX - GRAB && x <= maxX + GRAB && y >= minY - GRAB && y <= maxY + GRAB;
     }
 
-    /**
-     * 本家 getClickState: 掴んだ辺 (8=左, 4=右, 2=上, 1=下)。
-     */
+    /** 本家 getClickState: 掴んだ辺 (8=左, 4=右, 2=上, 1=下)。 */
     private int grabState(SignboardText text, double x, double y) {
         float minX = text.posU * scale;
         float minY = text.posV * scale;
@@ -461,15 +444,15 @@ public class SignboardScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        //ウィジェットの作り直しはここで消化する (クリック処理の途中でやるとフォーカスが
-        //破棄済みボタンに残る)。rebuildWidgets() は clearFocus() も行う。
+        // ウィジェットの作り直しはここで消化する (クリック処理の途中でやるとフォーカスが
+        // 破棄済みボタンに残る)。rebuildWidgets は clearFocus も行う。
         if (pendingRebuild) {
             pendingRebuild = false;
             rebuildWidgets();
         }
         renderBackground(graphics, mouseX, mouseY, partialTick);
 
-        //板のテクスチャ (backTexture==1 なら表裏が並んで写る)
+        // 板のテクスチャ (backTexture==1 なら表裏が並んで写る)
         InstalledObjectDefinition def = definition();
         ResourceLocation texture = def == null || def.getSignTexture().isBlank()
                 ? null
@@ -520,9 +503,7 @@ public class SignboardScreen extends Screen {
                 imgW, imgH);
     }
 
-    /**
-     * 本家: 選択中の文字を赤枠 + 掴みハンドルで示す。
-     */
+    /** 本家: 選択中の文字を赤枠 + 掴みハンドルで示す。 */
     private void drawSelection(GuiGraphics graphics, SignboardText text, int mouseX, int mouseY) {
         int minX = (int) (text.posU * scale);
         int minY = (int) (text.posV * scale);
@@ -541,13 +522,13 @@ public class SignboardScreen extends Screen {
         boolean top = (state & 2) != 0;
         boolean bottom = (state & 1) != 0;
         if ((left || right) && (top || bottom)) {
-            //角: 4隅すべてにハンドルを出す
+            // 角: 4隅すべてにハンドルを出す
             handle(graphics, minX, minY, g, red);
             handle(graphics, maxX, minY, g, red);
             handle(graphics, minX, maxY, g, red);
             handle(graphics, maxX, maxY, g, red);
         } else if (left || right || top || bottom) {
-            //辺: 各辺の中点にハンドルを出す
+            // 辺: 各辺の中点にハンドルを出す
             int cx = (minX + maxX) / 2;
             int cy = (minY + maxY) / 2;
             handle(graphics, minX, cy, g, red);

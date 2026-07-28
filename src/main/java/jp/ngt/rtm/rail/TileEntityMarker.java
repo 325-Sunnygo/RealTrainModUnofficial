@@ -24,21 +24,17 @@ import java.util.List;
 /**
  * 本家 jp.ngt.rtm.rail.TileEntityMarker (KaizPatchX) の忠実移植。
  * NBT: RP / MarkerState (本家キーのまま)。
- * 1.21 適合: マーカー間の RailMap 同期 (本家 PacketMarker) はフル NBT 更新タグに
- * markerPosList を含めることで代替。MCTE GUI (InternalGUI) は未移植。
  */
 public class TileEntityMarker extends BlockEntity {
     private RailPosition rp;
 
     public boolean displayDistance = true;//同期必要なし
-    /**
-     * 0:なし, 1:グリッド, 2:ベジェ
-     */
+    /** 0:なし, 1:グリッド, 2:ベジェ */
     private byte displayMode;
     private TileEntityMarker coreMarker;
     public int editMode;
 
-    //本家: レンチのアンカー移動モード (レール形状編集、同期不要)
+    // 本家: レンチのアンカー移動モード (レール形状編集、同期不要)
     public boolean followMouseMoving;
     public net.minecraft.world.entity.player.Player followingPlayer;
 
@@ -48,9 +44,7 @@ public class TileEntityMarker extends BlockEntity {
 
     private RailMap[] railMaps;
 
-    /**
-     * {{x,y,z}}
-     */
+    /** {{x,y,z}} */
     private List<int[]> grid;
 
     public float startPlayerPitch;
@@ -89,14 +83,14 @@ public class TileEntityMarker extends BlockEntity {
             this.rp = RailPosition.readFromNBT(nbt.getCompound("RP"));
         }
         this.markerState = nbt.getInt("MarkerState");
-        //コアマーカー座標 (クライアントの getCoreMarker 解決に必須)
+        // コアマーカー座標 (クライアントの getCoreMarker 解決に必須)
         if (nbt.contains("StartY")) {
             this.startX = nbt.getInt("StartX");
             this.startY = nbt.getInt("StartY");
             this.startZ = nbt.getInt("StartZ");
         }
 
-        //1.21: PacketMarker 代替 (同期タグ経由の markerPosList)
+        // 1.21: PacketMarker 代替 (同期タグ経由の markerPosList)
         if (nbt.contains("MarkerPosList")) {
             ListTag list = nbt.getList("MarkerPosList", Tag.TAG_INT_ARRAY);
             List<int[]> posList = new ArrayList<>();
@@ -150,9 +144,7 @@ public class TileEntityMarker extends BlockEntity {
         super.setRemoved();
     }
 
-    /**
-     * 本家 updateEntity 相当 (rp の遅延生成)。BlockMarker の ticker から呼ばれる。
-     */
+    /** 本家 updateEntity 相当 (rp の遅延生成)。BlockMarker の ticker から呼ばれる。 */
     public void tick() {
         if (this.rp == null && this.level != null) {
             BlockState state = this.getBlockState();
@@ -225,7 +217,7 @@ public class TileEntityMarker extends BlockEntity {
 
     public List<int[]> getGrid() {
         if (this.grid == null && this.railMaps == null && !this.markerPosList.isEmpty() && this.level != null && this.level.isClientSide) {
-            //同期タグ受信後の遅延再構築
+            // 同期タグ受信後の遅延再構築
             this.rebuildRailMaps();
         }
         return this.grid;
@@ -270,22 +262,20 @@ public class TileEntityMarker extends BlockEntity {
         if (core != null) {
             core.updateRailMap();
         } else if (!this.markerPosList.isEmpty()) {
-            //クライアントで core 未解決でも自身が RailMap を持っていれば再構築できる
+            // クライアントで core 未解決でも自身が RailMap を持っていれば再構築できる
             this.updateRailMap();
         }
     }
 
     public void updateRailMap() {
-        //自身のリストを渡すとイテレート中の差し替えで CME になるため防御コピー
+        // 自身のリストを渡すとイテレート中の差し替えで CME になるため防御コピー
         this.setMarkersPos(new ArrayList<>(this.markerPosList));
     }
 
-    /**
-     * マーカーのグリッド表示用RailMap生成
-     */
+    /** マーカーのグリッド表示用RailMap生成 */
     public void setMarkersPos(List<int[]> list) {
-        //loadAdditional (同期パケット) が markerPosList を差し替えても
-        //イテレーションが壊れないよう防御コピーで処理する
+        // loadAdditional (同期パケット) が markerPosList を差し替えても
+        // イテレーションが壊れないよう防御コピーで処理する
         list = new ArrayList<>(list);
         if (list.size() == 2) {
             RailPosition rp0 = this.getMarkerRP(list.get(0));
@@ -326,7 +316,7 @@ public class TileEntityMarker extends BlockEntity {
         }
 
         if (!this.level.isClientSide) {
-            //本家 PacketMarker 代替: フル NBT 同期 (markerPosList 含む)
+            // 本家 PacketMarker 代替: フル NBT 同期 (markerPosList 含む)
             for (int[] pos : list) {
                 BlockPos bp = new BlockPos(pos[0], pos[1], pos[2]);
                 BlockState st = this.level.getBlockState(bp);
@@ -377,7 +367,7 @@ public class TileEntityMarker extends BlockEntity {
     }
 
     public RailPosition[] getAllRP() {
-        //GuiRailMarker用
+        // GuiRailMarker用
         if (this.markerPosList.isEmpty()) {
             return new RailPosition[]{this.getMarkerRP()};
         }

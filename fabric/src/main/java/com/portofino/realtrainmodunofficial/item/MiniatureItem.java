@@ -27,17 +27,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * ミニチュアアイテム (neo mcte)。本家 MCTE {@code ItemMiniature} 相当。
- *
- * <p>操作:
- * <ul>
- *   <li>中身が<b>無い</b>とき: ブロックを右クリックで範囲の始点 → もう一方の角で取り込み</li>
- *   <li>中身が<b>ある</b>とき: ブロックを右クリックで設置 ({@code Mode} に従う)</li>
- *   <li>スニーク右クリック: 中身をクリア</li>
- * </ul>
- *
- * <p>中身と設定は全て {@link ItemMiniature} 経由で<b>このスタックの NBT</b> に入る。
- * MCTEU のように ID で外部テーブルを引かないので、1 つ変更しても他のミニチュアに波及しない。
+ * ミニチュアアイテム (neo mcte)。本家 MCTE ItemMiniature 相当。
+ * 操作:
  */
 public class MiniatureItem extends Item {
 
@@ -50,10 +41,9 @@ public class MiniatureItem extends Item {
 
     /**
      * インベントリや手元で中身を描く (neo mcte)。
-     * <p>NeoForge 21.1 の作法。{@code initializeClient} はクライアントでしか呼ばれないので、
-     * ここから client 専用クラスへ触ってよい。
+     * NeoForge 21.1 の作法。
      */
-    //★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
+    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
         consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {
@@ -71,8 +61,7 @@ public class MiniatureItem extends Item {
 
     /**
      * 何もない所を右クリック: 設定画面を開く (本家 MCTE と同じ)。
-     * <p>Screen は client 専用なので必ず {@code ClientHooks} 経由。共通クラスから直接触ると
-     * 専用サーバが起動時に落ちる。
+     * Screen は client 専用なので必ず ClientHooks 経由。
      */
     @Override
     public net.minecraft.world.InteractionResultHolder<ItemStack> use(
@@ -137,7 +126,7 @@ public class MiniatureItem extends Item {
             level.setBlock(target, RealTrainModUnofficialBlocks.MINIATURE.get().defaultBlockState(), 3);
             if (level.getBlockEntity(target) instanceof MiniatureBlockEntity be) {
                 be.setMiniatureTag(tag);
-                //本家 TileEntityMiniature.setRotation 相当。プレイヤーの向きで正面を決める。
+                // 本家 TileEntityMiniature.setRotation 相当。プレイヤーの向きで正面を決める。
                 be.setPlacement(snapYaw(player.getYRot()), (byte) face.get3DDataValue());
             }
         }
@@ -149,8 +138,8 @@ public class MiniatureItem extends Item {
     }
 
     /**
-     * {@code Mode=ORIGINAL}: 中身を実ブロックとして原寸で展開する。
-     * <p>本家 {@code setOriginalBlocks} 相当。ブロックエンティティの NBT も復元する。
+     * Mode=ORIGINAL: 中身を実ブロックとして原寸で展開する。
+     * 本家 setOriginalBlocks 相当。ブロックエンティティの NBT も復元する。
      */
     private static int expandOriginal(Level level, BlockPos origin, NGTObject ngto) {
         int placed = 0;
@@ -165,7 +154,7 @@ public class MiniatureItem extends Item {
                     level.getBlockEntity(p).loadWithComponents(set.nbt, level.registryAccess());
                     level.getBlockEntity(p).setChanged();
                 } catch (Exception ignored) {
-                    //中身の BE が現行バージョンで読めなくても、ブロック自体は置けているので続ける
+                    // 中身の BE が現行バージョンで読めなくても、ブロック自体は置けているので続ける
                 }
             }
             placed++;
@@ -173,7 +162,7 @@ public class MiniatureItem extends Item {
         return placed;
     }
 
-    /** 15 度刻み。本家 {@code MCTE.rotationInterval} 相当の丸め。 */
+    /** 15 度刻み。本家 MCTE.rotationInterval 相当の丸め。 */
     private static float snapYaw(float yaw) {
         float f = yaw % 360.0F;
         if (f < 0.0F) {
@@ -233,9 +222,9 @@ public class MiniatureItem extends Item {
             }
         }
         NGTObject obj = NGTObject.createNGTO(blocks, w, h, d, 0, 0, 0);
-        //★BlocksData として入れる (本家の契約)。スタック単位で完結する。
+        // ★BlocksData として入れる (本家の契約)。スタック単位で完結する。
         ItemMiniature.setNGTObject(obj, tag);
-        //取り込んだ直後は 1 ブロックに収まる縮尺を既定にする
+        // 取り込んだ直後は 1 ブロックに収まる縮尺を既定にする
         ItemMiniature.setScale(1.0F / Math.max(1, Math.max(w, Math.max(h, d))), tag);
         ItemMiniature.setMode(tag, ItemMiniature.MiniatureMode.MINIATURE);
         tag.remove("SelStart");

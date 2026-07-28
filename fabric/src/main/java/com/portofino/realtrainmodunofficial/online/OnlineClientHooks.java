@@ -13,10 +13,7 @@ import net.neoforged.neoforge.client.event.ScreenEvent;
 
 /**
  * オンライン連携のクライアントフック。
- * <ul>
- *   <li>BAN されたユーザー: どの画面を開こうとしても {@link BannedScreen} に差し替え、先へ進めない。</li>
- *   <li>アップデート通知: タイトル画面の右上に「新しいバージョンがあります」を表示。</li>
- * </ul>
+ * BAN されたユーザー: どの画面を開こうとしても BannedScreen に差し替え、先へ進めない。
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class OnlineClientHooks {

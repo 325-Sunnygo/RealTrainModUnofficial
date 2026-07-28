@@ -21,14 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 本家 jp.ngt.rtm.block.tt.TimeTableManager の移植。
- * <p>
- * 看板の時刻表表示は描画時にしか使わないのでクライアント専用。tt_*.csv を
- * <ol>
- *   <li>リソース (mod jar / リソースパックの {@code assets/&lt;ns&gt;/timetable/})</li>
- *   <li>モデルパック zip ({@link jp.ngt.ngtlib.io.NGTFileLoader})</li>
- *   <li>{@code config/realtrainmodunofficial/timetable/} (ユーザー配置)</li>
- * </ol>
- * の順で探す。後から読んだものが優先 (ユーザーの config が最優先)。
+ * 看板の時刻表表示は描画時にしか使わないのでクライアント専用。
  */
 public final class TimeTableManager {
     public static final String SAMPLE = "tt_sample.csv";
@@ -40,9 +33,7 @@ public final class TimeTableManager {
     private TimeTableManager() {
     }
 
-    /**
-     * config/realtrainmodunofficial/timetable/ (ユーザーが tt_*.csv を置く場所)。
-     */
+    /** config/realtrainmodunofficial/timetable/ (ユーザーが tt_*.csv を置く場所)。 */
     public static Path userDir() {
         return FMLPaths.CONFIGDIR.get().resolve(RealTrainModUnofficial.MODID).resolve("timetable");
     }
@@ -69,9 +60,7 @@ public final class TimeTableManager {
         }
     }
 
-    /**
-     * mod jar / リソースパックの assets/&lt;ns&gt;/timetable/tt_*.csv。
-     */
+    /** mod jar / リソースパックの assets/<ns>/timetable/tt_*.csv。 */
     private void loadFromResources() {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.getResourceManager() == null) {
@@ -92,9 +81,7 @@ public final class TimeTableManager {
         }
     }
 
-    /**
-     * モデルパック zip の中の tt_*.csv。NGTFileLoader が全パックを索引済み。
-     */
+    /** モデルパック zip の中の tt_*.csv。NGTFileLoader が全パックを索引済み。 */
     private void loadFromPacks() {
         byte[] sample = jp.ngt.ngtlib.io.NGTFileLoader.findAsset("timetable/" + SAMPLE);
         if (sample != null && !entries.containsKey(SAMPLE)) {
@@ -102,9 +89,7 @@ public final class TimeTableManager {
         }
     }
 
-    /**
-     * config/realtrainmodunofficial/timetable/*.csv (ユーザー配置、最優先)。
-     */
+    /** config/realtrainmodunofficial/timetable/*.csv (ユーザー配置、最優先)。 */
     private void loadFromUserDir() {
         Path dir = userDir();
         if (!Files.isDirectory(dir)) {
@@ -140,8 +125,7 @@ public final class TimeTableManager {
 
     /**
      * 本家 NGTText.readCSV 相当。
-     * <p>
-     * 本家は {@code String.split(",")} をそのまま使っており、末尾の空フィールドが落ちる
+     * 本家は String.split(",") をそのまま使っており、末尾の空フィールドが落ちる
      * (= "," だけの行は長さ0の配列になり読み飛ばされる) 挙動に依存している。ここも同じにする。
      */
     private static List<String[]> readCsv(byte[] bytes) throws IOException {
@@ -152,7 +136,7 @@ public final class TimeTableManager {
             boolean first = true;
             while ((line = r.readLine()) != null) {
                 if (first) {
-                    //UTF-8 BOM
+                    // UTF-8 BOM
                     if (!line.isEmpty() && line.charAt(0) == '﻿') {
                         line = line.substring(1);
                     }
@@ -169,9 +153,7 @@ public final class TimeTableManager {
         return i < 0 ? path : path.substring(i + 1);
     }
 
-    /**
-     * 本家: 見つからなければ tt_sample.csv にフォールバックする。無ければ null。
-     */
+    /** 本家: 見つからなければ tt_sample.csv にフォールバックする。無ければ null。 */
     public TimeTable getTimeTable(String name) {
         load();
         TimeTable tt = name == null ? null : entries.get(name);

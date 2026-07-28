@@ -6,17 +6,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * サーバー側で「各プレイヤーが最後に選択した車両 ID」を覚える保険。
- *
- * <p><b>症状</b>: 専用サーバー (特に Youer/Mohist などの Bukkit 系ハイブリッド) では、
- * アイテムのカスタムデータコンポーネント ({@code SELECTED_MODEL_ID}) が Bukkit の
+ * 症状: 専用サーバー (特に Youer/Mohist などの Bukkit 系ハイブリッド) では、
+ * アイテムのカスタムデータコンポーネント (SELECTED_MODEL_ID) が Bukkit の
  * ItemStack 変換で失われたり、クリエイティブのスロット同期で上書きされたりして、
- * 設置時 ({@code TrainItem.useOn}) に {@code stack.get(SELECTED_MODEL_ID)} が null になり、
- * どの車両を選んでも {@link VehicleRegistry} の先頭車両 (223 系 5000 番台 Tc) に
+ * 設置時 (TrainItem.useOn) に stack.get(SELECTED_MODEL_ID) が null になり、
+ * どの車両を選んでも VehicleRegistry の先頭車両 5000 番台 Tc) に
  * フォールバックしていた。
- *
- * <p><b>対策</b>: 選択パケット ({@code SelectModelPayload}) を受けたときに、ここへ
- * プレイヤー UUID → 選択 ID を控える。設置側はコンポーネントが null のときここから拾う。
- * アイテム NBT/コンポーネントの同期・保持に依存しないので、Bukkit 系でも選択が効く。
  */
 public final class ServerVehicleSelection {
 

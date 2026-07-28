@@ -24,9 +24,7 @@ public final class NGTFileLoader {
     /** 本家 NO_ZIP: 「zip の中ではなく素のファイル」を表す ScanResult のキー。 */
     public static final String NO_ZIP = "no_zip";
 
-    /**
-     * 正規化パス (assets/minecraft/ 以降, 小文字) → コンテナ
-     */
+    /** 正規化パス (assets/minecraft/ 以降, 小文字) → コンテナ */
     private static Map<String, AssetRef> index;
     private static final Map<String, byte[]> CONTENT_CACHE = new ConcurrentHashMap<>();
     /** 索引に無いと確定したキー。全走査の再実行を防ぐ。 */
@@ -39,9 +37,7 @@ public final class NGTFileLoader {
     private NGTFileLoader() {
     }
 
-    /**
-     * スクリプト用: ResourceLocation (mccompat/実物) からパックアセットのストリームを開く。
-     */
+    /** スクリプト用: ResourceLocation (mccompat/実物) からパックアセットのストリームを開く。 */
     public static InputStream getInputStream(Object resource) {
         String path = pathOf(resource);
         if (path == null) {
@@ -66,12 +62,10 @@ public final class NGTFileLoader {
         Map<String, AssetRef> idx = getIndex();
         AssetRef ref = idx.get(key);
         if (ref == null) {
-            //サフィックス一致 (パス表記ゆれ対策)。索引全走査なので結果は必ずキャッシュする
-            //(見つからない要求を毎回走査すると、スクリプトが欠落アセットを繰り返し要求したとき
+            // サフィックス一致 (パス表記ゆれ対策)。
+            // (見つからない要求を毎回走査すると、スクリプトが欠落アセットを繰り返し要求したとき
             // 索引サイズ×要求回数の走査になり描画が止まる)。
-            //★ファイル名だけの一致は取らない (本家は完全パスでしか引かない)。同名ファイルを
-            //多数持つパックで別物を掴むため。サフィックス一致は assets/<domain>/ を基準にした
-            //完全パス解決なので残す。
+            // ★ファイル名だけの一致は取らない (本家は完全パスでしか引かない)。
             String suffix = "/" + key;
             for (Map.Entry<String, AssetRef> e : idx.entrySet()) {
                 if (e.getKey().endsWith(suffix)) {
@@ -81,10 +75,10 @@ public final class NGTFileLoader {
             }
         }
         if (ref == null) {
-            //mod 自身の同梱アセット (assets/minecraft/scripts/... 等)。
-            //索引はワールドの mods/ や config/ の<b>外部パックしか見ていない</b>ため、
-            //同梱のレール描画スクリプトなどはここまで来ないと見つからない
-            //(開発環境では jar が mods/ に無いので索引にすら載らない)。
+            // mod 自身の同梱アセット (assets/minecraft/scripts/... 等)。
+            // 索引はワールドの mods/ や config/ の外部パックしか見ていないため、
+            // 同梱のレール描画スクリプトなどはここまで来ないと見つからない
+            // (開発環境では jar が mods/ に無いので索引にすら載らない)。
             byte[] bundled = findBundledAsset(key);
             if (bundled != null) {
                 if (bundled.length < 4 * 1024 * 1024) {
@@ -92,8 +86,8 @@ public final class NGTFileLoader {
                 }
                 return bundled;
             }
-            //★TypeScript のパックへの配慮。定義 JSON が "scripts/Foo.js" のままでも、
-            //  同梱されているのが Foo.ts なら拾う。逆は起きない (.ts を書いた人は .ts を指す)。
+            // ★TypeScript のパックへの配慮。定義 JSON が "scripts/Foo.js" のままでも、
+            // 同梱されているのが Foo.ts なら拾う。逆は起きない (.ts を書いた人は .ts を指す)。
             String ts = com.portofino.realtrainmodunofficial.script.TypeScriptTranspiler
                 .toTypeScriptPath(key);
             if (ts != null) {
@@ -151,7 +145,6 @@ public final class NGTFileLoader {
      * パックアセットをテキスト行として読む安定 API (単一引数・オーバーロード無し)。
      * スクリプトの自前 include (eval(append(NGTText.readText(getResource(path)))) ) は
      * 最終的にここへ来る。見つからなければ空リスト。
-     * <p>Nashorn の Java オーバーロード解決が不安定なので、あえて 1 引数 String 固定。
      */
     public static List<String> readAssetLines(String path) {
         List<String> lines = new ArrayList<>();
@@ -166,9 +159,7 @@ public final class NGTFileLoader {
         return lines;
     }
 
-    /**
-     * パック内画像を動的テクスチャとして登録し RL を返す (NGTUtilClient.bindTexture 用)。
-     */
+    /** パック内画像を動的テクスチャとして登録し RL を返す (NGTUtilClient.bindTexture 用)。 */
     public static net.minecraft.resources.ResourceLocation resolvePackTexture(String path) {
         if (path == null) {
             return null;
@@ -187,7 +178,7 @@ public final class NGTFileLoader {
             var rl = net.minecraft.client.Minecraft.getInstance().getTextureManager()
                     .register("rtmu_pack_tex", new net.minecraft.client.renderer.texture.DynamicTexture(img));
             TEXTURE_CACHE.put(key, rl);
-            //発光テクスチャ (***_light*.png): 黒地=非発光として加算合成で描くための印
+            // 発光テクスチャ (***_light*.png): 黒地=非発光として加算合成で描くための印
             if (key.toLowerCase(java.util.Locale.ROOT).contains("_light")) {
                 LIGHT_OVERLAY_TEXTURES.add(rl);
             }
@@ -346,7 +337,7 @@ public final class NGTFileLoader {
             int slash = entryName.lastIndexOf('/');
             String base = slash < 0 ? entryName : entryName.substring(slash + 1);
             if (base.equals(file.getName())) {
-                //ZipFile は close するとストリームも閉じるので、内容を読み切って返す
+                // ZipFile は close するとストリームも閉じるので、内容を読み切って返す
                 byte[] bytes = zip.getInputStream(ze).readAllBytes();
                 zip.close();
                 return new ByteArrayInputStream(bytes);
@@ -372,7 +363,7 @@ public final class NGTFileLoader {
 
     /**
      * 本家 findFile: 探索ディレクトリ以下から条件に合うファイルを集める。
-     * matcher は {@code match(File)} を持つオブジェクト (スクリプトの関数でも可)。
+     * matcher は match(File) を持つオブジェクト (スクリプトの関数でも可)。
      */
     public static List<java.io.File> findFile(Object matcher) {
         List<java.io.File> out = new ArrayList<>();

@@ -12,15 +12,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * DataMap 同期の <b>client → server</b> 方向。
- *
- * <p>{@link DataMapSyncPayload} は server → client だけで、逆向きが無かった。
- * NGTO Builder のように<b>描画スクリプト (クライアント) が操作を受け取り、
- * サーバースクリプトが実処理をする</b>パックは、この向きが無いと何も起きない。
- * (Enter で {@code dataMap.setBoolean("isBuilding", true, 1)} を立てても、
- *  サーバー側の {@code getBoolean("isBuilding")} は永久に false のまま)
- *
- * <p>値の表記は server → client と同じ型プレフィクス付き文字列 ("I:5" / "B:true" 等)。
+ * DataMap 同期の client → server 方向。
+ * DataMapSyncPayload は server → client だけで、逆向きが無かった。
  */
 public record DataMapClientSyncPayload(int entityId, Map<String, String> data) implements CustomPacketPayload {
 
@@ -57,7 +50,7 @@ public record DataMapClientSyncPayload(int entityId, Map<String, String> data) i
         context.enqueueWork(() -> {
             if (context.player().level().getEntity(payload.entityId())
                     instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> vehicle) {
-                //操作できるのは乗っている本人だけ。他人の車両を書き換えられないようにする。
+                // 操作できるのは乗っている本人だけ。他人の車両を書き換えられないようにする。
                 if (!vehicle.hasPassenger(context.player())) {
                     return;
                 }

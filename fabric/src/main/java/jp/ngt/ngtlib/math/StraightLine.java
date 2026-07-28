@@ -1,8 +1,6 @@
 package jp.ngt.ngtlib.math;
 
-/**
- * Port of jp.legacy.legacylib.math.StraightLine (XZ plane: first coord = Z, second = X).
- */
+/** Port of jp.legacy.legacylib.math.StraightLine (XZ plane: first coord = Z, second = X). */
 public final class StraightLine implements ILine {
     public final double startX;
     public final double startY;

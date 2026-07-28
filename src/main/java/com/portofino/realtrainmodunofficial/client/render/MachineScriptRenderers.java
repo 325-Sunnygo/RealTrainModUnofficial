@@ -27,7 +27,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * 本家式の設置物 (踏切等) スクリプト描画。
  * ModelMachine_*.json の rendererPath (RenderCrossingGate01.js 等) を Nashorn で実行し、
  * renderClass (jp.ngt.rtm.render.MachinePartsRenderer) を毎フレーム記録→再生する。
- * pass 0 (通常) と pass 2 (発光: 警報灯) の 2 パスを本家どおり実行する。
  */
 public final class MachineScriptRenderers {
 
@@ -53,7 +52,7 @@ public final class MachineScriptRenderers {
                 RealTrainModUnofficial.LOGGER.warn("Machine script not found: {} ({})", def.getId(), def.getScriptPath());
                 return INVALID;
             }
-            //Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-8 だと構文ごと壊れる)
+            // Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-8 だと構文ごと壊れる)
             String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
 
             // 機械/信号スクリプトも列車と同じフル・プレリュード + 互換リマップを使う。
@@ -75,8 +74,8 @@ public final class MachineScriptRenderers {
             } catch (NoSuchMethodException e) {
                 instance = rc.getDeclaredConstructor().newInstance();
             }
-            //踏切/改札 (MachinePartsRenderer) に加え、信号 (SignalPartsRenderer) も
-            //共通基底 TileEntityPartsRenderer なので受け入れる。
+            // 踏切/改札 (MachinePartsRenderer) に加え、信号 (SignalPartsRenderer) も
+            // 共通基底 TileEntityPartsRenderer なので受け入れる。
             if (!(instance instanceof TileEntityPartsRenderer renderer)) {
                 RealTrainModUnofficial.LOGGER.warn("renderClass {} is not a TileEntityPartsRenderer ({})", rcName, def.getId());
                 return INVALID;
@@ -84,7 +83,7 @@ public final class MachineScriptRenderers {
             renderer.setScript(se);
             se.put("renderer", renderer);
 
-            //ModelObject: テクスチャ + モデルグラフ
+            // ModelObject: テクスチャ + モデルグラフ
             List<TextureSet> sets = new ArrayList<>();
             if (def.getTextureOverrides() != null) {
                 for (String path : def.getTextureOverrides().values()) {
@@ -103,13 +102,13 @@ public final class MachineScriptRenderers {
             }
             mo.model = modelBytes != null ? ModelLoader.parse(modelBytes, def.getModelFile()) : new PolygonModel();
 
-            //getModelName() は本家 config.getName() 相当、つまり <b>素のモデル名</b>
-            //("CrossingGate01R" / "Point01A") を返さなければならない。
-            //以前は def.getId() ("crossing:pack名:CrossingGate01R") を入れていたため、
-            //  RenderCrossingGate01.js : getModelName().equals("CrossingGate01R")
-            //  RenderPoint01.js        : getModelName().equals("Point01A")
-            //がどちらも常に false になり、右用の踏切が左用と同じ向きに描かれ、
-            //自動転轍機がモーターでなくレバーで描かれていた。
+            // getModelName は本家 config.getName 相当、つまり 素のモデル名
+            // ("CrossingGate01R" / "Point01A") を返さなければならない。
+            // 以前は def.getId ("crossing:pack名:CrossingGate01R") を入れていたため、
+            // RenderCrossingGate01.js : getModelName.equals("CrossingGate01R")
+            // RenderPoint01.js        : getModelName.equals("Point01A")
+            // がどちらも常に false になり、右用の踏切が左用と同じ向きに描かれ、
+            // 自動転轍機がモーターでなくレバーで描かれていた。
             jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = new jp.ngt.rtm.modelpack.cfg.TrainConfig();
             cfg.trainName = def.getDisplayName();
             cfg.init();
@@ -132,9 +131,9 @@ public final class MachineScriptRenderers {
         private static final ThreadLocal<GLRecorder> SCRATCH0 = ThreadLocal.withInitial(GLRecorder::new);
         private static final ThreadLocal<GLRecorder> SCRATCH2 = ThreadLocal.withInitial(GLRecorder::new);
 
-        //★焼き込みキャッシュは ObjectMeshCache が持つ (本家 te.glLists 相当)。
-        //以前ここに valid/sig/rec を持つ Cache があったが、判定側が消えていて<b>一度も
-        //読まれておらず</b>、毎フレーム「記録して即再生」する純オーバーヘッドになっていた。
+        // ★焼き込みキャッシュは ObjectMeshCache が持つ (本家 te.glLists 相当)。
+        // 以前ここに valid/sig/rec を持つ Cache があったが、判定側が消えていて一度も
+        // 読まれておらず、毎フレーム「記録して即再生」する純オーバーヘッドになっていた。
 
         Scripted(TileEntityPartsRenderer renderer, ModelObject modelObject, boolean blockDetection) {
             this.renderer = renderer;
@@ -147,14 +146,12 @@ public final class MachineScriptRenderers {
             return this.blockDetection;
         }
 
-        /**
-         * @return true = 描画を担当した
-         */
+        /** @return true = 描画を担当した */
         public boolean render(InstalledObjectBlockEntity be, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
-            //replay 経路では renderNamedGroups に entity が渡らないため、遅延判定用に記録する
-            //(色付きレンズ越しのレール/地形に色を乗せるにはガラスをレールの後に描く必要がある)。
+            // replay 経路では renderNamedGroups に entity が渡らないため、遅延判定用に記録する
+            // (色付きレンズ越しのレール/地形に色を乗せるにはガラスをレールの後に描く必要がある)。
             com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(be);
             try {
                 return renderInner(be, partialTick, poseStack, buffer, packedLight, packedOverlay, model);
@@ -168,22 +165,15 @@ public final class MachineScriptRenderers {
                               MqoModelLoader.MqoModel model) {
             PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
 
-            //★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
-            //信号の点滅・踏切の警報・改札の矢印はスクリプトが自前で進めるので、
-            //RTMU が知っている状態 (renderStateSignature) では動きを検出できない。
-            //間引くとアニメが止まるため、実行はそのまま。削るのは頂点提出のほう。
+            // ★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
+            // 信号の点滅・踏切の警報・改札の矢印はスクリプトが自前で進めるので、
+            // RTMU が知っている状態 (renderStateSignature) では動きを検出できない。
 
-            //本家 ModelObject.render の 2 段構成をそのまま再現する:
-            //  pass 0 = 通常テクスチャで本体
-            //  pass 2 = Light テクスチャ (***_light0.png) で発光部のみ・フルブライト
-            //
-            //★pass ごとに別レコーダーに録る。以前は 1 本のレコーダーに両パスを混ぜて
-            //legacyPass=0 (通常) で再生していたため、pass 2 のパーツが<b>素のテクスチャの
-            //まま全光量</b>で描かれていた。踏切は灯具の筐体・矢印板・警報器まで赤黒く光り、
-            //自動改札の通行可矢印は「素テクスチャでは透明な UV 領域」なので何も出なかった。
-            //legacyPass=2 で再生すれば replay が renderNamedGroupsEmissive へ回し、
-            //本家どおり「Light テクスチャを持つマテリアルの面だけ」を _light0 で描く。
-            //★毎フレーム new しない (設置物と同じ理由)。rec0/rec2 は同時に生きるので 2 本持つ。
+            // 本家 ModelObject.render の 2 段構成をそのまま再現する:
+            // pass 0 = 通常テクスチャで本体
+            // pass 2 = Light テクスチャ (***_light0.png) で発光部のみ・フルブライト
+            // ★pass ごとに別レコーダーに録る。
+            // ★毎フレーム new しない (設置物と同じ理由)。rec0/rec2 は同時に生きるので 2 本持つ。
             GLRecorder rec0 = SCRATCH0.get();
             rec0.clear();
             GLRecorder.activate(rec0);
@@ -197,40 +187,29 @@ public final class MachineScriptRenderers {
             rec2.clear();
             GLRecorder.activate(rec2);
             try {
-                //本家 GLHelper.setLightmapMaxBrightness 相当 (発光はフルブライト)
+                // 本家 GLHelper.setLightmapMaxBrightness 相当 (発光はフルブライト)
                 rec2.brightness(0xF000F0);
                 this.renderer.render(be, 2, partialTick);
             } finally {
                 GLRecorder.deactivate();
                 this.renderer.consumeScriptFailure();
             }
-            //★ isEmpty ではなく hasGeometry。スクリプトが何も描かずに落ちると行列操作だけが
-            //  残って isEmpty()==false になり、「描画済み」と誤判定して素のモデル描画が
-            //  スキップされ、設置物が透明になる。
+            // ★ isEmpty ではなく hasGeometry。スクリプトが何も描かずに落ちると行列操作だけが
+            // 残って isEmpty==false になり、「描画済み」と誤判定して素のモデル描画が
+            // スキップされ、設置物が透明になる。
             boolean drew = rec0.hasGeometry();
             if (!drew) {
                 return false;
             }
 
-            //★本家 RailPartsRenderer.renderRailStatic と同じ流れ:
-            //  内容キーが同じなら焼き直さず、GPU に置いた頂点をそのまま描く。
-            //  点滅すれば記録が変わる → キーが変わる → その場で焼き直すので止まらない。
-            //  明るさは頂点に焼き込まれるため、本家が createStaticRenderKey に brightness を
-            //  混ぜているのと同じく packedLight もキーに入れる。
-            //  pass0 と発光パス (pass2) は<b>同じ焼き込みに入れる</b>。片方だけ GPU 変換にすると
-            //  (A·B)·v と A·(B·v) が数 ULP ずれて同一面が z-fighting する。
-            //★2 つのパスのキーは<b>撹拌してから</b>混ぜること。
-            //  素直に 31*(31*rec0 + rec2) と足すと、スクリプトが同じ 2 部品を
-            //  通常パスと発光パスで<b>入れ替える</b>ときに差がちょうど打ち消し合い、
-            //  絵が変わっているのにキーが動かない。Masa 踏切パックの警報機がこれで、
-            //  light1/light2 を pass0 と pass2 で入れ替えるため両状態のキーが完全一致し、
-            //  焼き込みが更新されず<b>警報灯が点滅しなくなっていた</b> (音と遮断桿は動く)。
-            //  GLRecorder.mixKey 参照。
+            // ★本家 RailPartsRenderer.renderRailStatic と同じ流れ:
+            // 内容キーが同じなら焼き直さず、GPU に置いた頂点をそのまま描く。
+            // ★2 つのパスのキーは撹拌してから混ぜること。
             int key = 31 * (31 * jp.ngt.ngtlib.renderer.GLRecorder.mixKey(rec0.contentKey())
                     + jp.ngt.ngtlib.renderer.GLRecorder.mixKey(rec2.contentKey()))
                     + packedLight;
             boolean baked = ObjectMeshCache.draw(be, poseStack, key, buf -> {
-                //焼くときは単位行列で再生する (カメラ相対の pose で焼くと視点に付いてくる)。
+                // 焼くときは単位行列で再生する (カメラ相対の pose で焼くと視点に付いてくる)。
                 PoseStack local = new PoseStack();
                 VehicleScriptRenderers.replay(rec0, local, buf, packedLight, packedOverlay, model, graph);
                 if (rec2.hasGeometry()) {
@@ -239,7 +218,7 @@ public final class MachineScriptRenderers {
                 }
             });
             if (!baked) {
-                //シェーダーパック使用中など、焼き込みを使えないときは従来どおり CPU で提出
+                // シェーダーパック使用中など、焼き込みを使えないときは従来どおり CPU で提出
                 VehicleScriptRenderers.replay(rec0, poseStack, buffer, packedLight, packedOverlay, model, graph);
                 if (rec2.hasGeometry()) {
                     VehicleScriptRenderers.replay(rec2, poseStack, buffer, packedLight, packedOverlay, model,

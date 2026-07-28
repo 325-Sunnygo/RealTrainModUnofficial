@@ -9,15 +9,9 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
- * MQO (Metasequoia) テキストの<b>唯一の読み取り口</b>。
- * <p>
- * 以前は同じ書式を 2 箇所で別々に解析していた ({@link ModelLoader} のグラフ生成と、
- * 描画用バッチを組む {@code MqoModelLoader})。片方だけ直すと、スクリプトが見るモデルと
- * 実際に描かれるモデルが食い違う (グループ名・面数・マテリアル番号のずれ) ため、
- * 書式の解釈はここに一本化する。
- * <p>
- * ここは<b>解釈だけ</b>を行い、座標のスケールや面の頂点順序といった「使う側の都合」は
- * {@link Handler} の実装に委ねる。両者の既存の振る舞いを変えずに読み取りだけ共有するため。
+ * MQO (Metasequoia) テキストの唯一の読み取り口。
+ * 以前は同じ書式を 2 箇所で別々に解析していた (ModelLoader のグラフ生成と、
+ * 描画用バッチを組む MqoModelLoader)。
  */
 public final class MqoReader {
     private static final Pattern OBJECT_NAME = Pattern.compile("Object\\s+\"([^\"]*)\"");
@@ -32,7 +26,7 @@ public final class MqoReader {
 
     /** 読み取り結果の受け口。必要なものだけ実装すればよい。 */
     public interface Handler {
-        /** Material チャンクの 1 行。{@code index} は面の {@code M(n)} が指す番号。 */
+        /** Material チャンクの 1 行。index は面の M(n) が指す番号。 */
         default void material(int index, String name, String texPath, float r, float g, float b, float a) {
         }
 
@@ -40,11 +34,11 @@ public final class MqoReader {
         default void objectStart(String name) {
         }
 
-        /** スムージング角 (Object 内 {@code facet})。 */
+        /** スムージング角 (Object 内 facet)。 */
         default void facet(float angle) {
         }
 
-        /** ミラー軸 (Object 内 {@code mirror_axis})。1=X, 2=Y, 4=Z のビットマスク。 */
+        /** ミラー軸 (Object 内 mirror_axis)。1=X, 2=Y, 4=Z のビットマスク。 */
         default void mirrorAxis(int axis) {
         }
 
@@ -53,15 +47,15 @@ public final class MqoReader {
         }
 
         /**
-         * 頂点 1 個。<b>MQO の生の単位</b> (スケール前)。
-         * z を持たない 2 成分表記の場合 {@code z} は 0。
+         * 頂点 1 個。MQO の生の単位 (スケール前)。
+         * z を持たない 2 成分表記の場合 z は 0。
          */
         default void vertex(float x, float y, float z) {
         }
 
         /**
-         * 面 1 枚。{@code vertexIndices} は直前の {@code vertex} チャンク内の番号、
-         * 順序も MQO の記述どおり。{@code uvs} は {@code count * 2} 個、無ければ null。
+         * 面 1 枚。vertexIndices は直前の vertex チャンク内の番号、
+         * 順序も MQO の記述どおり。uvs は count * 2 個、無ければ null。
          */
         default void face(int count, int materialId, int[] vertexIndices, float[] uvs) {
         }
@@ -97,12 +91,12 @@ public final class MqoReader {
         }
     }
 
-    /** MQO テキストを 1 回走査して {@link Handler} へ流す。 */
+    /** MQO テキストを 1 回走査して Handler へ流す。 */
     public static void read(String text, Handler handler) {
         if (text == null || handler == null) {
             return;
         }
-        //0=外, 1=vertex, 2=face, 3=Material, 4=読み飛ばす (BVertex 等の未対応チャンク)
+        // 0=外, 1=vertex, 2=face, 3=Material, 4=読み飛ばす (BVertex 等の未対応チャンク)
         int chunk = 0;
         int materialIndex = 0;
         for (String raw : text.split("\\R")) {
@@ -137,7 +131,7 @@ public final class MqoReader {
                 continue;
             }
             if (line.startsWith("BVertex")) {
-                //バイナリ頂点は未対応。チャンクごと読み飛ばす (面は出ないので描画されない)
+                // バイナリ頂点は未対応。チャンクごと読み飛ばす (面は出ないので描画されない)
                 chunk = 4;
                 continue;
             }

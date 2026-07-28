@@ -15,19 +15,15 @@ import java.util.function.Consumer;
 
 /**
  * 看板の文字に使う OS フォントを選ぶ画面。
- * <p>
  * 本家 GuiSignboard は Swing の JFrame + JComboBox を出していたが、Minecraft は
- * {@code java.awt.headless=true} で起動されることがあり (特に macOS)、その状態では
- * ウィンドウを開けない。フォントの一覧取得自体は headless でもできるので、
- * ゲーム内のリストとして作り直してある。
+ * java.awt.headless=true で起動されることがあり (特に macOS)、その状態では
+ * ウィンドウを開けない。
  */
 public class FontSelectScreen extends Screen {
     private static final int ROW_H = 14;
     private static final int LIST_TOP = 50;
 
-    /**
-     * OS のフォント一覧は取得が重いので一度だけ読む。
-     */
+    /** OS のフォント一覧は取得が重いので一度だけ読む。 */
     private static List<String> allFonts;
 
     private final Screen parent;
@@ -49,7 +45,7 @@ public class FontSelectScreen extends Screen {
         if (allFonts == null) {
             List<String> names = new ArrayList<>();
             try {
-                //headless でも取得できる (ウィンドウを作らないため)
+                // headless でも取得できる (ウィンドウを作らないため)
                 java.util.Collections.addAll(names,
                         GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames());
             } catch (Throwable t) {
@@ -133,7 +129,7 @@ public class FontSelectScreen extends Screen {
             if (hovered) {
                 graphics.fill(left, y, right, y + ROW_H, 0x44FFFFFF);
             }
-            //選択中のフォントは強調する
+            // 選択中のフォントは強調する
             int color = name.equals(current) ? 0xFFFF55 : 0xFFFFFF;
             graphics.drawString(this.font, name, left + 4, y + 3, color, false);
         }

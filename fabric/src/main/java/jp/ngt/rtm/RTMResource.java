@@ -2,11 +2,9 @@ package jp.ngt.rtm;
 
 /**
  * 本家 jp.ngt.rtm.RTMResource のスクリプト互換 (リソース種別の static 定数)。
- *
- * <p>本家は {@code ResourceType<Config, ModelSet>} の static 群で、スクリプトは
- * {@code ModelPackManager.INSTANCE.getResourceSet(RTMResource.CONNECTOR_RELAY, name)} 等の
- * 種別引数に使う。RTMU では種別はマーカーで足りるため、型名文字列を入れておく
- * (ModelPackManager 側は名前で解決するので値自体は照合されない)。
+ * 本家は ResourceType<Config, ModelSet> の static 群で、スクリプトは
+ * ModelPackManager.INSTANCE.getResourceSet(RTMResource.CONNECTOR_RELAY, name) 等の
+ * 種別引数に使う。
  */
 @SuppressWarnings("unused")
 public final class RTMResource {

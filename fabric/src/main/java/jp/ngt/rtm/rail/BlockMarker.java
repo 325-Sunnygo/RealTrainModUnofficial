@@ -46,21 +46,16 @@ import java.util.stream.Collectors;
 /**
  * 本家 jp.ngt.rtm.rail.BlockMarker (KaizPatchX) の忠実移植。
  * metadata (0-7: 下位2bit=方角, bit2=斜め) は META ブロックステートで代替。
- * TODO(Phase 4): ItemRail (レール種選択) / GUI (GuiRailMarker) の接続。
  */
 public class BlockMarker extends BaseEntityBlock {
     public static final MapCodec<BlockMarker> CODEC = simpleCodec(props -> new BlockMarker(0, props));
 
-    /**
-     * 本家 metadata 相当 (0-7)。ID は既存アセット (blockstates) と互換の "facing"。
-     */
+    /** 本家 metadata 相当 (0-7)。ID は既存アセット (blockstates) と互換の "facing"。 */
     public static final IntegerProperty META = IntegerProperty.create("facing", 0, 7);
 
     private static final VoxelShape SHAPE = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 0.0625D, 1.0D);
 
-    /**
-     * 0:normal, 1:switch, 10:straight, 11: void
-     */
+    /** 0:normal, 1:switch, 10:straight, 11: void */
     public final int markerType;
 
     public BlockMarker(int type, Properties props) {
@@ -113,12 +108,12 @@ public class BlockMarker extends BaseEntityBlock {
     @Nullable
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        //本家 onBlockPlacedBy: プレイヤーの向きから 0-7 を算出
+        // 本家 onBlockPlacedBy: プレイヤーの向きから 0-7 を算出
         LivingEntity placer = context.getPlayer();
         float yaw = placer != null ? placer.getYRot() : 0.0F;
         int playerFacing = Mth.floor(NGTMath.normalizeAngle(yaw + 180.0D) / 45.0D + 0.5D) & 7;
         playerFacing = playerFacing / 2 + (playerFacing % 2 == 0 ? 0 : 4);
-        //Remaster 拡張: 斜め専用マーカーアイテムは斜め向きを強制
+        // Remaster 拡張: 斜め専用マーカーアイテムは斜め向きを強制
         if (context.getItemInHand().getItem() instanceof com.portofino.realtrainmodunofficial.item.MarkerItem mi
                 && mi.isDiagonal() && playerFacing < 4) {
             playerFacing += 4;
@@ -129,8 +124,8 @@ public class BlockMarker extends BaseEntityBlock {
     @Override
     public void setPlacedBy(Level world, BlockPos pos, BlockState state, LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(world, pos, state, placer, stack);
-        //設置直後に自動プレビュー (距離表示のため)。本家は右クリックで作るが、
-        //旧 Remaster 同様「2本目を置いた瞬間に距離が出る」体感に合わせる。
+        // 設置直後に自動プレビュー (距離表示のため)。本家は右クリックで作るが、
+        // 旧 Remaster 同様「2本目を置いた瞬間に距離が出る」体感に合わせる。
         if (!world.isClientSide && placer instanceof Player player && (this.markerType == 0 || this.markerType == 1)) {
             BlockEntity be = world.getBlockEntity(pos);
             if (be instanceof TileEntityMarker marker) {
@@ -140,9 +135,7 @@ public class BlockMarker extends BaseEntityBlock {
         }
     }
 
-    /**
-     * 本家 getMarkerDir(Block, meta) 相当。
-     */
+    /** 本家 getMarkerDir(Block, meta) 相当。 */
     public static byte getMarkerDir(BlockState state) {
         int meta = state.getValue(META);
         int i0 = meta & 3;
@@ -161,10 +154,10 @@ public class BlockMarker extends BaseEntityBlock {
         }
 
         if (!item.isEmpty()) {
-            //本家: レンチ = makeRailMap + ItemWrench.onRightClickMarker (C/S 両方)
+            // 本家: レンチ = makeRailMap + ItemWrench.onRightClickMarker (C/S 両方)
             if (item.getItem() instanceof com.portofino.realtrainmodunofficial.item.RtmWrenchItem wrench
                     && (this.markerType == 0 || this.markerType == 1)) {
-                //シフト右クリック = カント設定 GUI (数値入力)
+                // シフト右クリック = カント設定 GUI (数値入力)
                 if (player.isShiftKeyDown()) {
                     if (world.isClientSide) {
                         com.portofino.realtrainmodunofficial.ClientHooks.openMarkerCantScreen(marker);
@@ -180,7 +173,7 @@ public class BlockMarker extends BaseEntityBlock {
                 if (!world.isClientSide) {
                     this.makeRailMap(marker, pos.getX(), pos.getY(), pos.getZ(), player);
                 }
-                //TODO(Phase 4): GuiRailMarker を開く
+                // TODO(Phase 4): GuiRailMarker を開く
                 return ItemInteractionResult.SUCCESS;
             }
         }
@@ -216,15 +209,13 @@ public class BlockMarker extends BaseEntityBlock {
         RailProperty prop = this.hasRail(player, makeRail);
         if (prop != null) {
             int type = this.markerType;
-            //★敷設できる距離。本家は RTMConfig の固定値だが、RTMU は設定で変えられるようにする。
-            //  ここが `RTMConfig.railGeneratingDistance` (固定 64) のままだったため、
-            //  設定 railMarkerSearchRange をいくら伸ばしても敷設距離が変わらなかった。
-            //  マーカーブロックは com.portofino…MarkerBlock と jp.ngt.rtm.rail.BlockMarker の
-            //  2 つあり、実際に置かれるのは<b>こちら</b> (本家忠実移植・Phase 1) の方。
+            // ★敷設できる距離。本家は RTMConfig の固定値だが、RTMU は設定で変えられるようにする。
+            // ここが `RTMConfig.railGeneratingDistance` (固定 64) のままだったため、
+            // 設定 railMarkerSearchRange をいくら伸ばしても敷設距離が変わらなかった。
             int dis1 = com.portofino.realtrainmodunofficial.Config.railMarkerSearchRange();
             int dis3 = dis1 * dis1;
             int hei1 = com.portofino.realtrainmodunofficial.Config.railMarkerSearchHeight();
-            //本家互換フィールドも同じ値へ寄せる (スクリプトがリフレクションで読むため)。
+            // 本家互換フィールドも同じ値へ寄せる (スクリプトがリフレクションで読むため)。
             RTMConfig.railGeneratingDistance = (short) Math.min(Short.MAX_VALUE, dis1);
             RTMConfig.railGeneratingHeight = (short) Math.min(Short.MAX_VALUE, hei1);
             boolean isCreative = player == null || player.getAbilities().instabuild;
@@ -252,7 +243,7 @@ public class BlockMarker extends BaseEntityBlock {
                             rpE.anchorYaw = sE.getYaw();
                             rpE.anchorPitch = sE.getPitch();
                         }
-                        //RTMU: 敷設プレイヤーの設定で自動カント (カーブ) / 自動高さを適用
+                        // RTMU: 敷設プレイヤーの設定で自動カント (カーブ) / 自動高さを適用
                         com.portofino.realtrainmodunofficial.RtmuAutoRail.applyTwo(world, player, rpS, rpE);
                         return createRail0(world, rpS, rpE, prop, makeRail, isCreative);
                     }
@@ -275,7 +266,7 @@ public class BlockMarker extends BaseEntityBlock {
                     return createTurntable(world, list.get(0), list.get(1), prop, makeRail, isCreative);
                 }
                 if (list.size() >= 3) {
-                    //RTMU: 分岐レールへ自動高さを適用 (自動カントは 2 点レールのみ)
+                    // RTMU: 分岐レールへ自動高さを適用 (自動カントは 2 点レールのみ)
                     com.portofino.realtrainmodunofficial.RtmuAutoRail.applyList(player, list);
                     return createRail1(world, x, y, z, player, list, prop, makeRail, isCreative);
                 }
@@ -289,11 +280,10 @@ public class BlockMarker extends BaseEntityBlock {
     }
 
     /**
+     * 版 1 以上は「アンカーの向きが dir から導かれる値と違えば必ずベジェにする」という
+     * 条件が入る (fixRTM 由来)。
+     * 独自のアンカー規約を持ち、本来 版 0 で敷く (new RailMapBasic(start, end))。
      * @param railMapVersion レールマップの版。
-     *   <p>版 1 以上は「アンカーの向きが dir から導かれる値と違えば必ずベジェにする」という
-     *   条件が入る (fixRTM 由来)。マーカーで敷くときはこれでよいが、<b>SuperRailBuilder3 は
-     *   独自のアンカー規約を持ち、本来 版 0 で敷く</b> ({@code new RailMapBasic(start, end)})。
-     *   版を合わせないと直線区間までベジェで膨らみ、分岐のトング付近が潰れる。
      */
     public static boolean createRail(Level world, int x, int y, int z, List<RailPosition> rps, RailProperty prop,
                                      boolean makeRail, boolean isCreative, int railMapVersion) {
@@ -311,16 +301,13 @@ public class BlockMarker extends BaseEntityBlock {
     }
 
     /**
-     * 通常のレール<br>
+     * 通常のレール
      * y0 <= y1でなければならない
      */
     /**
-     * そのブロックに<b>別のレールのコア</b>が既に居るか。
-     * <p>
+     * そのブロックに別のレールのコアが既に居るか。
      * コアはレールの全情報 (RailPosition / RailProperty) を持っている唯一のブロックで、
-     * ここを {@code setBlock} で潰すと<b>そのレールが丸ごと消える</b>。通常マーカーは
-     * マーカーブロックの位置にコアを置くので衝突しないが、ペンマーカーは既存レールの端に
-     * 吸着できるため、吸着先がそのレールのコアだと踏み抜く。
+     * ここを setBlock で潰すとそのレールが丸ごと消える。
      */
     public static boolean hasRailCore(Level world, int x, int y, int z) {
         return world.getBlockEntity(new BlockPos(x, y, z)) instanceof TileEntityLargeRailCore;
@@ -328,10 +315,8 @@ public class BlockMarker extends BaseEntityBlock {
 
     /**
      * ソートせずに 2 点でレールを敷く (ペンマーカー用)。
-     * <p>
-     * {@link #createRail} は blockY で並べ替えるため「どちらの点がコアになるか」を呼び出し側で
+     * #createRail は blockY で並べ替えるため「どちらの点がコアになるか」を呼び出し側で
      * 決められない。ペンは既存レールのコアを踏まない点をコアにしたいので、順序を保つ入口を出す。
-     * 曲線は両端の anchorYaw から作られ、どちらを始点にしても同じ形になる。
      */
     public static boolean createRailKeepOrder(Level world, RailPosition start, RailPosition end,
                                               RailProperty prop, boolean makeRail, boolean isCreative) {
@@ -352,7 +337,7 @@ public class BlockMarker extends BaseEntityBlock {
                                        boolean makeRail, boolean isCreative, int railMapVersion) {
         RailMapBasic railMap = new RailMapBasic(start, end, railMapVersion);
 
-        //コアの位置に別レールのコアが居るなら、置いた瞬間にそのレールが消える。敷設を中止する。
+        // コアの位置に別レールのコアが居るなら、置いた瞬間にそのレールが消える。敷設を中止する。
         if (hasRailCore(world, start.blockX, start.blockY, start.blockZ)) {
             return false;
         }
@@ -391,16 +376,14 @@ public class BlockMarker extends BaseEntityBlock {
         }
     }
 
-    /**
-     * 分岐レール
-     */
+    /** 分岐レール */
     private static boolean createRail1(Level world, int x, int y, int z, Player player, List<RailPosition> list, RailProperty prop, boolean makeRail, boolean isCreative) {
         return createRail1(world, x, y, z, player, list, prop, makeRail, isCreative, RailMapBasic.fixRTMRailMapVersionCurrent);
     }
 
     private static boolean createRail1(Level world, int x, int y, int z, Player player, List<RailPosition> list,
                                        RailProperty prop, boolean makeRail, boolean isCreative, int railMapVersion) {
-        //コアの位置に別レールのコアが居るなら、置いた瞬間にそのレールが消える。敷設を中止する。
+        // コアの位置に別レールのコアが居るなら、置いた瞬間にそのレールが消える。敷設を中止する。
         if (hasRailCore(world, x, y, z)) {
             return false;
         }
@@ -435,7 +418,7 @@ public class BlockMarker extends BaseEntityBlock {
             railMapSwitch.setRail(world, RTMRailBlocks.LARGE_RAIL_BASE.get(), x, y, z, prop);
         }
         for (RailPosition rp : list) {
-            //既存レールのコアの上に分岐ベースを置くと、そのレールが消える。触らない。
+            // 既存レールのコアの上に分岐ベースを置くと、そのレールが消える。触らない。
             if (hasRailCore(world, rp.blockX, rp.blockY, rp.blockZ)) {
                 continue;
             }
@@ -537,7 +520,7 @@ public class BlockMarker extends BaseEntityBlock {
         }
 
         ItemStack item = player.getInventory().getSelected();
-        //本家 ItemRail (Property NBT 保持)
+        // 本家 ItemRail (Property NBT 保持)
         if (!item.isEmpty() && item.getItem() instanceof jp.ngt.rtm.item.ItemRail) {
             RailProperty prop = jp.ngt.rtm.item.ItemRail.getProperty(item);
             if (prop != null) {
@@ -546,7 +529,7 @@ public class BlockMarker extends BaseEntityBlock {
             }
             return RailProperty.getDefaultProperty();
         }
-        //Remaster RailItem: アイテム自身の選択モデル ID を最優先 (本家 ItemRail.getProperty(item) 相当)
+        // Remaster RailItem: アイテム自身の選択モデル ID を最優先 (本家 ItemRail.getProperty(item) 相当)
         if (!item.isEmpty() && item.getItem() instanceof com.portofino.realtrainmodunofficial.item.RailItem) {
             String model = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(item);
             if (model == null || model.isEmpty()) {
@@ -561,8 +544,8 @@ public class BlockMarker extends BaseEntityBlock {
         }
 
         if (player.getAbilities().instabuild || !par2) {
-            //空手: 最後に使ったレールを最優先 (ユーザー要望)、
-            //無ければ 選択中 or 先頭のレール定義 (railModel="" だと描画もスクリプトも無い)
+            // 空手: 最後に使ったレールを最優先 (ユーザー要望)、
+            // 無ければ 選択中 or 先頭のレール定義 (railModel="" だと描画もスクリプトも無い)
             if (lastUsedProperty != null) {
                 return lastUsedProperty;
             }

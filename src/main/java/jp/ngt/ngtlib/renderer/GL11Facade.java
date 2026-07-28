@@ -4,12 +4,10 @@ package jp.ngt.ngtlib.renderer;
  * パックスクリプト向け GL11 互換ファサード。
  * ScriptUtil のプリリュードで `var GL11 = Java.type("jp.ngt.ngtlib.renderer.GL11Facade")`
  * とバインドされ、mozilla_compat の importPackage(org.lwjgl.opengl) より優先される。
- * 呼び出しは GLRecorder.active() に記録され、レンダラが PoseStack に再生する。
- * 未対応の関数は無視 (クラッシュさせない)。
  */
 @SuppressWarnings("unused")
 public final class GL11Facade {
-    //よく使われる定数 (値は本物の GL11 と同一)
+    // よく使われる定数 (値は本物の GL11 と同一)
     public static final int GL_LIGHTING = 0x0B50;
     public static final int GL_BLEND = 0x0BE2;
     public static final int GL_TEXTURE_2D = 0x0DE1;
@@ -30,8 +28,6 @@ public final class GL11Facade {
     /**
      * glPushAttrib / glPopAttrib は 1.21 に対応する状態スタックが無い。
      * 記録側 (GLRecorder) は行列とテクスチャ・色しか持たないので、受けるだけの空実装。
-     * <p>NGTO Builder 2 が {@code glPushAttrib(GL_ENABLE_BIT)} で囲む箇所があり、
-     * 未定義だとそこでスクリプトが止まる。
      */
     public static void glPushAttrib(int mask) {
     }
@@ -108,7 +104,7 @@ public final class GL11Facade {
         glColor4f(r0, g, b, 1.0D);
     }
 
-    //以下は記録不要 (1.21 のレンダーパイプラインが管理) — 無視
+    // 以下は記録不要 (1.21 のレンダーパイプラインが管理) — 無視
     public static void glEnable(int cap) {
     }
 
@@ -119,7 +115,7 @@ public final class GL11Facade {
     }
 
     public static void glBindTexture(int target, int tex) {
-        //mccompat.TextureUtil の疑似ハンドル → 動的テクスチャ RL に解決して記録
+        // mccompat.TextureUtil の疑似ハンドル → 動的テクスチャ RL に解決して記録
         GLRecorder r = rec();
         if (r != null) {
             r.bindTexture(jp.ngt.mccompat.TextureUtil.getTexture(tex));

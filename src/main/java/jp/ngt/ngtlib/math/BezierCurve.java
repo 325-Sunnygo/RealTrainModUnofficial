@@ -2,12 +2,10 @@ package jp.ngt.ngtlib.math;
 
 import net.minecraft.util.Mth;
 
-/**
- * Port of jp.legacy.legacylib.math.BezierCurve (cubic Bezier on Z/X plane).
- */
+/** Port of jp.legacy.legacylib.math.BezierCurve (cubic Bezier on Z/X plane). */
 public final class BezierCurve implements ILine {
     public static final int QUANTIZE = 32;
-    /** レンダラの {@code max} と同一にし、{@code max > split} による重複サンプル（スパイク）を防ぐ。 */
+    /** レンダラの max と同一にし、max > split による重複サンプル（スパイク）を防ぐ。 */
     public static final int MAX_CURVE_RENDER_SPLIT = 384;
 
     public final double[] sp;
@@ -19,24 +17,10 @@ public final class BezierCurve implements ILine {
     private final int split;
 
     /**
-     * 等間隔化テーブルの分割数。<b>描画用の上限を掛けてはいけない。</b>
-     *
-     * <p>台車はレール上の位置を「レール長 × 360」の解像度で数えるが、実際に座標へ直すのは
-     * このテーブル ({@code normalizedParameters}) で、<b>テーブルの粗さがそのまま
-     * 台車が止まれる位置の粗さになる</b>。
-     *
-     * <p>ここに描画用の上限 (384) を掛けていたため、長いカーブほど点が粗くなっていた:
-     * <pre>
-     *   30 m のカーブ  → 384 点 =  7.8 cm 刻み
-     *   100 m のカーブ → 384 点 = 26   cm 刻み
-     * </pre>
-     * 1 tick の進みがこの刻みより小さいと<b>次の点に届かず位置が更新されない</b>。
-     * 1〜6 km/h は 1 tick あたり 1.4〜8.3 cm なので、ちょうどこの帯で動かなくなる。
-     * 走行中も刻み単位で飛ぶため、カーブでガタガタ揺れ、台車 2 つから姿勢を決めている
-     * 車体と視点も一緒に揺れる。<b>報告された 2 つの症状は同じここから出ている。</b>
-     *
-     * <p>本家は {@code 長さ × 32} で上限なし。こちらは 1 tick の最小移動 (1 km/h ≒ 1.4 cm) を
-     * 下回るよう<b>1 m あたり 128 点</b>取る。100 m のレールでも float 12800 個 (51 KB) で収まる。
+     * 等間隔化テーブルの分割数。描画用の上限を掛けてはいけない。
+     * 台車はレール上の位置を「レール長 × 360」の解像度で数えるが、実際に座標へ直すのは
+     * このテーブル (normalizedParameters) で、テーブルの粗さがそのまま
+     * 台車が止まれる位置の粗さになる。
      */
     public static int tableSplitForLength(double arcLength) {
         if (arcLength < 1.0e-4) {
@@ -46,8 +30,8 @@ public final class BezierCurve implements ILine {
     }
 
     /**
-     * <b>描画用</b>の分割数。レンダラの {@code max} と揃えて重複サンプルを防ぐ。
-     * <p>位置計算には使わないこと ({@link #tableSplitForLength} 参照)。
+     * 描画用の分割数。レンダラの max と揃えて重複サンプルを防ぐ。
+     * 位置計算には使わないこと (#tableSplitForLength 参照)。
      */
     public static int splitForLength(double arcLength) {
         if (arcLength < 1.0e-4) {

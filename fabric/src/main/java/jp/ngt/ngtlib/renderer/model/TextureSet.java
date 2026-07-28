@@ -1,8 +1,6 @@
 package jp.ngt.ngtlib.renderer.model;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.model.TextureSet の移植 (スクリプト可視フィールド)。
- */
+/** 本家 jp.ngt.ngtlib.renderer.model.TextureSet の移植 (スクリプト可視フィールド)。 */
 public class TextureSet {
     public Material material;
     /** 発光テクスチャ (***_light0/1/2.png)。無ければ null。 */

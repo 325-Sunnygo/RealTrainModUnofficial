@@ -168,7 +168,7 @@ public final class TrainBogieEntity extends Entity {
         Vec3 target = train.getBogieEntityWorldPosition(getBogieIndex());
         if (level().isClientSide()) {
             // クライアント側: xo を train.xo/yRotO ベースで明示設定して
-            // train body の lerp(pt, train.xo, train.getX()) と同期させる。
+            // train body の lerp(pt, train.xo, train.getX) と同期させる。
             // tick順序の不定性により baseTick が設定する xo がずれると高速時に
             // 台車が前後にずれて見えるため、毎tick明示的に揃える。
             Vec3 prevTarget = train.getBogieEntityWorldPositionPrev(getBogieIndex());
@@ -189,8 +189,8 @@ public final class TrainBogieEntity extends Entity {
             this.setYHeadRot(targetYaw);
             this.setYBodyRot(targetYaw);
         }
-        // クライアント側では rotation はサーバーからの lerpTo() で setYRot/setXRot され、
-        // yRotO/xRotO は lerpTo() 内で前tick値として保持される。ここでは触らない。
+        // クライアント側では rotation はサーバーからの lerpTo で setYRot/setXRot され、
+        // yRotO/xRotO は lerpTo 内で前tick値として保持される。ここでは触らない。
     }
 
     public TrainEntity getTrain() {
@@ -211,9 +211,8 @@ public final class TrainBogieEntity extends Entity {
 
     @Override
     public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps) {
-        // 位置は refreshFromTrain() が毎tick設定するため server lerp パケットの位置は無視。
+        // 位置は refreshFromTrain が毎tick設定するため server lerp パケットの位置は無視。
         // 回転はサーバーが railアンカーから計算した値を反映する。
-        // yRotO/xRotO は現時点の回転値を退避して描画補間で使う (= 前tickのrotation)。
         this.yRotO = this.getYRot();
         this.xRotO = this.getXRot();
         this.setYRot(yRot);

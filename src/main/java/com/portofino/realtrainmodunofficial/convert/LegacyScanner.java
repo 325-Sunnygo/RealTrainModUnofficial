@@ -18,17 +18,7 @@ import java.util.stream.Stream;
 
 /**
  * 旧ワールド (1.7.10 / 1.12.2) のチャンクから RTM のオブジェクトを抜き出す。
- *
- * <p>抜き出すのは <b>タイルエンティティとエンティティの生 NBT</b> だけ。変換 (名前→定義の解決など) は
- * ゲーム内の復元時に行う。理由は 2 つ:
- * <ul>
- *   <li>モデルパックのレジストリはゲームが起動していないと引けない</li>
- *   <li>変換ロジックを後から直しても、ワールドを再変換しなくてよい</li>
- * </ul>
- *
- * <p>ブロック ID は数値でしか保存されておらず、その対応表 (FML レジストリ) は level.dat にある。
- * ただし RTM の設置物・レールは<b>すべてタイルエンティティを持つ</b>ので、ID 表が無くても
- * 位置と中身は取り出せる。ブロックのメタデータ (取付面) だけはチャンクのセクションから読む。
+ * 抜き出すのは タイルエンティティとエンティティの生 NBT だけ。
  */
 public final class LegacyScanner {
 
@@ -54,7 +44,6 @@ public final class LegacyScanner {
 
     /**
      * ワールドの 1 ディメンションぶん (region/*.mca) を走査する。
-     *
      * @param dimension 復元先のディメンション ID ("minecraft:overworld" 等)
      */
     public static void scanDimension(Path regionDir, String dimension, Result result) {
@@ -75,9 +64,7 @@ public final class LegacyScanner {
 
     /**
      * チャンクの中から、バニラに読み替えられる MOD ブロックを拾う。
-     *
-     * <p>1.7.10 / 1.12.2 のチャンクはブロックを数値 ID で持つ:
-     * {@code Sections[].Blocks} (下位 8bit) + {@code Add} (上位 4bit) + {@code Data} (メタ)。
+     * 1.7.10 / 1.12.2 のチャンクはブロックを数値 ID で持つ:
      */
     private static void scanModBlocks(CompoundTag level, String dimension, Result result) {
         if (result.blockIds.isEmpty()) {
@@ -133,10 +120,10 @@ public final class LegacyScanner {
     }
 
     private static void scanChunk(CompoundTag chunk, String dimension, Result result) {
-        //1.7.10 / 1.12.2 は Level 直下。念のため Level が無い場合はルートを見る。
+        // 1.7.10 / 1.12.2 は Level 直下。念のため Level が無い場合はルートを見る。
         CompoundTag level = chunk.contains("Level") ? chunk.getCompound("Level") : chunk;
 
-        //旧 MOD のブロックをバニラに読み替えるため位置を控える
+        // 旧 MOD のブロックをバニラに読み替えるため位置を控える
         scanModBlocks(level, dimension, result);
 
         Sections sections = Sections.of(level);
@@ -191,9 +178,7 @@ public final class LegacyScanner {
         }
     }
 
-    /**
-     * チャンクのセクション (数値ブロック ID + メタデータ)。取付面の復元にメタデータが要る。
-     */
+    /** チャンクのセクション (数値ブロック ID + メタデータ)。取付面の復元にメタデータが要る。 */
     private static final class Sections {
         private final Map<Integer, byte[]> data = new HashMap<>();
 

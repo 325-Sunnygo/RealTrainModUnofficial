@@ -19,26 +19,19 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class LegacyScriptSoundManager {
-    //本家 SoundUpdaterVehicle.playingSounds の移植:
-    //  (列車UUID|サウンドID) → 追跡中サウンド。playSound は「リストに居れば音量/ピッチ更新のみ、
-    //  居なければ新規再生して登録」。一発音 (repeat=false) は鳴り終わっても登録が残り続け、
-    //  stopSound されるまで再発火しない (= 本家のラッチ)。ループも一発音も同じ 1 本の仕組み。
-    //  毎 tick playSound し続ける MugenLib 等のコンプレッサ音が 1 回で済み、
-    //  OpenAL ソースも (列車×サウンド名) につき最大 1 個しか使わない。
+    // 本家 SoundUpdaterVehicle.playingSounds の移植:
+    // (列車UUID|サウンドID) → 追跡中サウンド。
     private static final Map<String, TrainScriptSound> ACTIVE = new ConcurrentHashMap<>();
     private static final Map<UUID, AutoRunningSoundState> AUTO_RUNNING = new ConcurrentHashMap<>();
     // スピーカー等 playAt の在世界音を位置キーで保持(ブロック破壊時に stopAt で停止するため)。
     private static final Map<String, SimpleSoundInstance> SPEAKER_SOUNDS = new ConcurrentHashMap<>();
-    //消えた列車の登録を掃除する頻度 (play 呼び出し回数)
+    // 消えた列車の登録を掃除する頻度 (play 呼び出し回数)
     private static int pruneCounter;
 
     /**
-     * 音量を安全化。<b>NaN → 0 (無音)</b>。
-     * <p>パックの音スクリプトの音量補間 (fadeCon 等) がゼロ除算で NaN / ±Infinity を返すことがあり、
-     * {@link Mth#clamp} は NaN をそのまま素通しする ({@code Math.max(NaN,0)==NaN})。NaN 音量は
-     * OpenAL の減衰距離 {@code max(vol,1)×16} も NaN にして<b>減衰そのものを無効化</b>し、
-     * 「どんなに離れても最大音量で聞こえる」不具合を起こす。ここで確実に潰す。
-     * ±Infinity は {@code Mth.clamp} が正しく端に丸めるので NaN だけ特別扱いすれば足りる。
+     * 音量を安全化。NaN → 0 (無音)。
+     * パックの音スクリプトの音量補間 (fadeCon 等) がゼロ除算で NaN / ±Infinity を返すことがあり、
+     * Mth#clamp は NaN をそのまま素通しする (Math.max(NaN,0)==NaN)。
      */
     static float safeVolume(float v, float max) {
         if (Float.isNaN(v)) {
@@ -59,12 +52,7 @@ public final class LegacyScriptSoundManager {
     }
 
     // ---- 列車エンティティの両対応 ----
-    //
     // RTMU には列車エンティティが 2 系統ある:
-    //   ・com.portofino...entity.TrainEntity          (旧, レガシー)
-    //   ・jp.ngt.rtm.entity.train.EntityTrainBase     (本家忠実移植。列車アイテムが出すのはこちら)
-    // サウンド一式は旧 TrainEntity 決め打ちで書かれていたため、実際に出る本家側の列車では
-    // <b>音が一切鳴らなかった</b>。どちらでも鳴るように、必要な値だけを型に依存せず取り出す。
 
     /** その Entity が列車か。 */
     public static boolean isTrain(Entity e) {
@@ -72,11 +60,8 @@ public final class LegacyScriptSoundManager {
     }
 
     /**
-     * クライアントのカメラ (プレイヤー視点) から {@code distance} ブロックより遠いか。
+     * クライアントのカメラ (プレイヤー視点) から distance ブロックより遠いか。
      * 可聴距離外の列車のサウンド処理 (毎tick Nashorn) をスキップする軽量化判定用。
-     * プレイヤー/カメラ不明時は false (= 従来どおり処理する。安全側)。
-     * <p>
-     * 近く (しきい値以内) の列車は一切触らないので、聞こえる音のバグは起きない。
      */
     public static boolean beyondCameraRange(Entity entity, double distance) {
         Minecraft mc = Minecraft.getInstance();
@@ -93,7 +78,7 @@ public final class LegacyScriptSoundManager {
             return t.getVehicleId();
         }
         if (e instanceof jp.ngt.rtm.entity.train.EntityTrainBase t) {
-            //本家側は getModelName() が定義 ID にあたる
+            // 本家側は getModelName が定義 ID にあたる
             return t.getModelName();
         }
         return "";
@@ -158,10 +143,10 @@ public final class LegacyScriptSoundManager {
     }
 
     /**
+     * サーバー発の離散イベント音 (マスコンのレバー音・警笛など) 用。スクリプトが毎tick要求する
+     * 一発音 (コンプレッサ等) と違い、送られてきた回数だけ鳴ってよい
+     * (連続ノッチ操作でレバー音がガタガタ鳴るのが正: 本家挙動)。
      * @param bypassOneShotSuppression true = 一発音の「再生中は鳴らし直さない」抑制とデバウンスを無視する。
-     *        サーバー発の離散イベント音 (マスコンのレバー音・警笛など) 用。スクリプトが毎tick要求する
-     *        一発音 (コンプレッサ等) と違い、送られてきた回数だけ鳴ってよい
-     *        (連続ノッチ操作でレバー音がガタガタ鳴るのが正: 本家挙動)。
      */
     public static void play(Entity train, String namespace, String soundName, float volume, float pitch,
                             boolean looping, boolean bypassOneShotSuppression) {
@@ -176,12 +161,11 @@ public final class LegacyScriptSoundManager {
         if (minecraft.getSoundManager() == null) {
             return;
         }
-        //ノッチ (マスコン/ブレーキハンドル) のレバー音はラッチ対象外:
-        //連続ノッチ操作で操作した回数だけガタガタ鳴るのが正 (本家挙動)。
-        //スクリプト経由 (bypass なし) で鳴らすパックでも欠落しないよう名前で許可する。
+        // ノッチ (マスコン/ブレーキハンドル) のレバー音はラッチ対象外:
+        // 連続ノッチ操作で操作した回数だけガタガタ鳴るのが正 (本家挙動)。
         boolean notchSound = !looping && isNotchSound(soundId);
-        //サーバー発の離散イベント音 (レバー音・警笛など) は追跡せず毎回そのまま鳴らす
-        //(本家もこれらは SoundUpdater ではなく都度 playSound)。
+        // サーバー発の離散イベント音 (レバー音・警笛など) は追跡せず毎回そのまま鳴らす
+        // (本家もこれらは SoundUpdater ではなく都度 playSound)。
         if (!looping && (bypassOneShotSuppression || notchSound)) {
             minecraft.getSoundManager().play(new SimpleSoundInstance(
                 soundId,
@@ -199,10 +183,9 @@ public final class LegacyScriptSoundManager {
             ));
             return;
         }
-        //---- 本家 SoundUpdaterVehicle.playSound の忠実移植 ----
-        //既に登録済み (playingSounds 相当) なら、ループ/一発音を問わず音量・ピッチ更新のみ。
-        //一発音は鳴り終わっても登録が残るので、毎 tick 呼ばれても再発火しない (= 本家のラッチ)。
-        //stopSound で登録が外れると、次の playSound でまた 1 回鳴る。
+        // ---- 本家 SoundUpdaterVehicle.playSound の忠実移植 ----
+        // 既に登録済み (playingSounds 相当) なら、ループ/一発音を問わず音量・ピッチ更新のみ。
+        // 一発音は鳴り終わっても登録が残るので、毎 tick 呼ばれても再発火しない (= 本家のラッチ)。
         String key = key(train.getUUID(), soundId);
         TrainScriptSound sound = ACTIVE.get(key);
         if (sound != null && !sound.isStopped()) {
@@ -210,13 +193,12 @@ public final class LegacyScriptSoundManager {
             return;
         }
         if (sound != null) {
-            //明示 stop 済み / 列車消滅で止まった残骸 → 作り直す
+            // 明示 stop 済み / 列車消滅で止まった残骸 → 作り直す
             ACTIVE.remove(key, sound);
         }
-        //新規作成: サニタイズ後の音量が 0 以下なら登録も再生もしない。
-        //  NaN/±Infinity や fadeIn 開始点の 0 で「音量0のまま SoundEngine にスキップされ、
-        //  チャンネルが無いのに ACTIVE に居座って二度と復活しない」のを防ぐ。次フレームで
-        //  音量が正になれば新規に作り直して鳴る。
+        // 新規作成: サニタイズ後の音量が 0 以下なら登録も再生もしない。
+        // NaN/±Infinity や fadeIn 開始点の 0 で「音量0のまま SoundEngine にスキップされ、
+        // チャンネルが無いのに ACTIVE に居座って二度と復活しない」のを防ぐ。
         float sanVol = safeVolume(volume, 1.0F);
         if (sanVol <= 0.0F) {
             return;
@@ -225,7 +207,7 @@ public final class LegacyScriptSoundManager {
         sound.update(volume, pitch);
         ACTIVE.put(key, sound);
         minecraft.getSoundManager().play(sound);
-        //消えた列車の登録をたまに掃除 (ラッチは isStopped=false なので消えない)
+        // 消えた列車の登録をたまに掃除 (ラッチは isStopped=false なので消えない)
         if (++pruneCounter >= 256) {
             pruneCounter = 0;
             ACTIVE.entrySet().removeIf(entry -> !entry.getValue().train.isAlive());
@@ -235,7 +217,6 @@ public final class LegacyScriptSoundManager {
     /**
      * 任意のワールド座標で 1 回サウンドを鳴らす（スピーカー用）。
      * soundIdStr は "namespace:path" 形式のサウンドイベントID。
-     * volume を上げると可聴範囲が広がる（MC の LINEAR 減衰は概ね volume×16 ブロック）。
      */
     public static void playAt(double x, double y, double z, String soundIdStr, float volume, float pitch) {
         if (soundIdStr == null || soundIdStr.isBlank()) {
@@ -263,7 +244,7 @@ public final class LegacyScriptSoundManager {
             z,
             false
         );
-        // 位置キーで保持し、ブロック破壊時に stopAt() で止められるようにする
+        // 位置キーで保持し、ブロック破壊時に stopAt で止められるようにする
         // (スピーカーの長い音がブロックを壊しても鳴り続ける問題の対策)。
         String key = posKey(x, y, z);
         SimpleSoundInstance prev = SPEAKER_SOUNDS.put(key, instance);
@@ -321,22 +302,18 @@ public final class LegacyScriptSoundManager {
         }
         state.currentSoundId = soundId;
 
-        //本家 MovingSoundEntity は音量を速度で変えない (作成時の値のまま)。
+        // 本家 MovingSoundEntity は音量を速度で変えない (作成時の値のまま)。
         float volume = 1.0F;
         float pitch = runningSoundPitch(definition, speed);
         play(train, soundId.getNamespace(), soundId.getPath(), volume, pitch, true);
     }
 
     /**
-     * 本家 {@code SoundUpdaterTrain.getSound} の移植。
-     * <pre>
-     * speed &gt; 0 なら acceleration = EnumNotch.getAcceleration(notch, speed)
-     *   speed &lt; maxSpeed[0] : acceleration &gt; 0 ? sound_S_A : sound_D_S
-     *   それ以外            : acceleration &gt; 0 ? sound_Acceleration : sound_Deceleration
+     * 本家 SoundUpdaterTrain.getSound の移植。
+     * speed > 0 なら acceleration = EnumNotch.getAcceleration(notch, speed)
+     * speed < maxSpeed[0] : acceleration > 0 ? sound_S_A : sound_D_S
+     * それ以外            : acceleration > 0 ? sound_Acceleration : sound_Deceleration
      * speed == 0 なら sound_Stop
-     * </pre>
-     * <p>加速判定は<b>ノッチと速度から決まる加速度</b>で、速度の増減を見る推測ではない。
-     * 音が無い項目は空のまま (本家は代替を探さない)。
      */
     private static String selectJsonRunningSound(VehicleDefinition definition, Entity train,
                                                  float speed, boolean moving, boolean ignoredAccelerating) {
@@ -351,9 +328,8 @@ public final class LegacyScriptSoundManager {
     }
 
     /**
-     * 本家 {@code MovingSoundTrain.func_73660_a} のピッチ。
-     * {@code (speed - maxSpeed[0]) / (maxSpeed[4] - maxSpeed[0]) + 1.0}。
-     * 低速域 ({@code changePitch == false}) は 1.0 のまま。
+     * 本家 MovingSoundTrain.func_73660_a のピッチ。
+     * (speed - maxSpeed[0]) / (maxSpeed[4] - maxSpeed[0]) + 1.0。
      */
     private static float runningSoundPitch(VehicleDefinition definition, float speed) {
         float low = maxSpeedAt(definition, 0);
@@ -465,15 +441,14 @@ public final class LegacyScriptSoundManager {
         if (soundName == null || soundName.isBlank()) {
             return null;
         }
-        //生成側 (ExternalSoundPackBridge) と同じ規則で空白・大文字を安全化してから ResourceLocation 化する。
+        // 生成側 (ExternalSoundPackBridge) と同じ規則で空白・大文字を安全化してから ResourceLocation 化する。
         String resolvedNamespace = namespace == null || namespace.isBlank() ? "minecraft" : ExternalSoundPackBridge.sanitizeSoundPath(namespace);
         String resolvedPath = ExternalSoundPackBridge.sanitizeSoundPath(soundName.trim().replace('\\', '/'));
         if (resolvedPath.startsWith("sounds/")) {
             resolvedPath = resolvedPath.substring("sounds/".length());
         } else if (resolvedPath.startsWith("sound/")) {
-            //1.7.10 のアセットは sounds/ ではなく sound/ 配下。パックの指定
-            //("sound/train/DoorOpn" 等) はこの綴りで来るので同じように剥がす。
-            //剥がさないと rtm:sound.train.dooropn という存在しないイベントを引く。
+            // 1.7.10 のアセットは sounds/ ではなく sound/ 配下。
+            // ("sound/train/DoorOpn" 等) はこの綴りで来るので同じように剥がす。
             resolvedPath = resolvedPath.substring("sound/".length());
         }
         if (resolvedPath.endsWith(".ogg")) {
@@ -520,9 +495,9 @@ public final class LegacyScriptSoundManager {
         /** 最後にスクリプトから再生要求された時刻 (ms)。ループ音の鳴りっぱなし対策に使う。 */
         private volatile long lastRequestMs;
 
-        //列車の車体音の可聴距離。実際の減衰は sounds.json の attenuation_distance=45
-        //(ExternalSoundPackBridge が生成時に付与) × max(音量,1) で決まり、45 ブロックかけて
-        //線形にゼロへ落ちる。SoundEvent の range は減衰計算に使われないが、値は合わせておく。
+        // 列車の車体音の可聴距離。実際の減衰は sounds.json の attenuation_distance=45
+        // (ExternalSoundPackBridge が生成時に付与) × max(音量,1) で決まり、45 ブロックかけて
+        // 線形にゼロへ落ちる。SoundEvent の range は減衰計算に使われないが、値は合わせておく。
         private static final float TRAIN_SOUND_RANGE = 45.0F;
 
         private TrainScriptSound(Entity train, ResourceLocation soundId, boolean repeat) {
@@ -542,9 +517,9 @@ public final class LegacyScriptSoundManager {
         }
 
         private void update(float volume, float pitch) {
-            //実減衰距離は max(音量,1.0) × attenuation_distance(45)。音量を 1.0 に制限すると
-            //きっかり 45 ブロックで線形にゼロへ落ちる (音量>1 は近くの大きさを変えず範囲だけ
-            //伸ばすため、制限しても近距離の聞こえ方は変わらない)。ループ・一発音とも。
+            // 実減衰距離は max(音量,1.0) × attenuation_distance(45)。音量を 1.0 に制限すると
+            // きっかり 45 ブロックで線形にゼロへ落ちる (音量>1 は近くの大きさを変えず範囲だけ
+            // 伸ばすため、制限しても近距離の聞こえ方は変わらない)。ループ・一発音とも。
             float maxVol = 1.0F;
             this.volume = safeVolume(volume, maxVol);
             this.pitch = safePitch(pitch);
@@ -560,16 +535,16 @@ public final class LegacyScriptSoundManager {
 
         @Override
         public void tick() {
-            //本家 MovingSoundEntity.update: 列車が消えたら停止、生きていれば追従
+            // 本家 MovingSoundEntity.update: 列車が消えたら停止、生きていれば追従
             if (!train.isAlive()) {
                 ACTIVE.remove(key(train.getUUID(), this.getLocation()), this);
                 AUTO_RUNNING.remove(train.getUUID());
                 stop();
                 return;
             }
-            //ループ音がスクリプトから要求されなくなったら (チャンク遠方・非描画で走行スクリプトが
-            //回らなくなった等) 止める。本家 SoundUpdaterVehicle は「今 update で要求されない音は止める」
-            //方式。要求が途絶えて 400ms 経ったら停止 (鳴りっぱなしの走行音を消す)。
+            // ループ音がスクリプトから要求されなくなったら (チャンク遠方・非描画で走行スクリプトが
+            // 回らなくなった等) 止める。本家 SoundUpdaterVehicle は「今 update で要求されない音は止める」
+            // 方式。要求が途絶えて 400ms 経ったら停止 (鳴りっぱなしの走行音を消す)。
             if (this.repeat && System.currentTimeMillis() - this.lastRequestMs > 400L) {
                 ACTIVE.remove(key(train.getUUID(), this.getLocation()), this);
                 stop();

@@ -5,10 +5,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 
 /**
- * 編集フィルタ (neo mcte)。本家 MCTE {@code EditFilterBase} の移植。
- *
- * <p>フィルタは「選択範囲に対して何かをする」処理の単位。
- * パラメータは {@link #initConfig} で宣言するだけでよく、入力 UI は自動で組まれる。
+ * 編集フィルタ (neo mcte)。本家 MCTE EditFilterBase の移植。
+ * フィルタは「選択範囲に対して何かをする」処理の単位。
  */
 public abstract class EditFilter {
 
@@ -32,7 +30,6 @@ public abstract class EditFilter {
 
     /**
      * 実行。
-     *
      * @return 変更したブロック数。0 なら「何も起きなかった」として扱う
      */
     public abstract int apply(ServerLevel level, Player player, EditorSelection editor);

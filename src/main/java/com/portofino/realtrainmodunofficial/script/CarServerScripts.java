@@ -13,8 +13,6 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * 車両 (ModelVehicle) の serverScriptPath を本家と同じ Nashorn で実行する。
  * SRB3 / NGTO Builder のサーバースクリプト (onUpdate(entity, executer)) 用。
- * エンジンは定義ごとに 1 つ (本家 ScriptExecuter と同じ形; スクリプト側は
- * WeakHashMap 等でエンティティごとの状態を持つ)。
  */
 public final class CarServerScripts {
 
@@ -44,7 +42,7 @@ public final class CarServerScripts {
             String path = def.getServerScriptPath();
             byte[] bytes = NGTFileLoader.findAsset(path);
             if (bytes == null) {
-                //"scripts/..." 前置の揺れを吸収
+                // "scripts/..." 前置の揺れを吸収
                 bytes = NGTFileLoader.findAsset("scripts/" + path);
             }
             if (bytes == null) {
@@ -53,13 +51,13 @@ public final class CarServerScripts {
             }
             String source = PackScriptSource.decode(bytes);
             source = PackScriptSource.prepare(source, path);
-            //★SuperRailBuilder3 のビルダーは車として登録されているので、その敷設処理は
-            //この経路で読まれる。ここに差し込まないとブリッジが一切効かず、SRB 本来の
-            //1.12.2 向けコードがそのまま走って分岐敷設で失敗する。
+            // ★SuperRailBuilder3 のビルダーは車として登録されているので、その敷設処理は
+            // この経路で読まれる。ここに差し込まないとブリッジが一切効かず、SRB 本来の
+            // 1.12.2 向けコードがそのまま走って分岐敷設で失敗する。
             source = TrainScriptSystem.appendSuperRailBuilderOverrides(source);
             ScriptEngine engine = ScriptUtil.doScript(PackScriptSource.PRELUDE + source);
-            //差し込んだ差し替えが呼ぶブリッジ。この経路では束縛されていなかったため、
-            //差し替えても __SRB__ が未定義で必ず失敗していた。
+            // 差し込んだ差し替えが呼ぶブリッジ。この経路では束縛されていなかったため、
+            // 差し替えても __SRB__ が未定義で必ず失敗していた。
             engine.put("__SRB__", new SrbRailBridge());
             return new Entry(engine);
         } catch (Throwable t) {
@@ -72,8 +70,8 @@ public final class CarServerScripts {
         private final ScriptEngine engine;
         private boolean broken;
         private boolean warned;
-        //エンティティごとの ScriptExecuter (NGTO Builder の Measure が executer.count % 20 を使う。
-        //null を渡すと毎 tick TypeError で onUpdate が中断していた)。
+        // エンティティごとの ScriptExecuter (NGTO Builder の Measure が executer.count % 20 を使う。
+        // null を渡すと毎 tick TypeError で onUpdate が中断していた)。
         private final java.util.Map<Object, jp.ngt.rtm.modelpack.ScriptExecuter> executers =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
@@ -83,20 +81,15 @@ public final class CarServerScripts {
             this.engine = engine;
         }
 
-        /**
-         * onUpdate(entity, executer) を 1tick 分実行。
-         */
+        /** onUpdate(entity, executer) を 1tick 分実行。 */
         public void onUpdate(Object entity) {
             if (engine == null || broken) {
                 return;
             }
-            //★サーバースクリプトはサーバーでしか実行してはならない。
-            //クライアントで走ると、SRB の buildNormalRail がクライアントのワールドへ
-            //ブロックを置いてしまい (サーバーには存在しないので即消える)、
-            //「敷設したのに何も残らない」状態になる。実測でこの経路が確認されたため、
-            //入口でも塞ぐ (呼び出し側の tick ガードだけに頼らない)。
-            //サイドの判定は<b>スレッド</b>で行う。entity.level().isClientSide() は
-            //実測で当てにならなかった (ClientLevel.tickEntities から呼ばれているのに false を返す)。
+            // ★サーバースクリプトはサーバーでしか実行してはならない。
+            // クライアントで走ると、SRB の buildNormalRail がクライアントのワールドへ
+            // ブロックを置いてしまい (サーバーには存在しないので即消える)、
+            // 「敷設したのに何も残らない」状態になる。
             net.minecraft.server.MinecraftServer srv =
                 net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
             boolean onServerThread = srv != null && srv.isSameThread();

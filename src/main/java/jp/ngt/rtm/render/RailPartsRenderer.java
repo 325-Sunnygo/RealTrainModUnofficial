@@ -7,12 +7,9 @@ import jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore;
 /**
  * 本家 jp.ngt.rtm.render.RailPartsRenderer の移植。
  * レールスクリプトの renderRailStatic/renderRailDynamic/shouldRenderObject を仲介する。
- * currentRailIndex はスクリプトがリフレクションで読むため、このクラスに直接宣言する (本家準拠)。
  */
 public class RailPartsRenderer extends PartsRenderer {
-    /**
-     * 現在描画中のレール index (0=メイン, 1..=subRails)。スクリプトがリフレクション参照。
-     */
+    /** 現在描画中のレール index (0=メイン, 1..=subRails)。スクリプトがリフレクション参照。 */
     public int currentRailIndex;
 
     /**
@@ -38,9 +35,7 @@ public class RailPartsRenderer extends PartsRenderer {
         }
     }
 
-    /**
-     * 通常パイプラインの各オブジェクトを描画するかどうか (端のトリミング等)。
-     */
+    /** 通常パイプラインの各オブジェクトを描画するかどうか (端のトリミング等)。 */
     public boolean shouldRenderObject(TileEntityLargeRailCore tile, String objName, double len, double pos) {
         if (this.script == null) {
             return true;
@@ -59,15 +54,12 @@ public class RailPartsRenderer extends PartsRenderer {
     public java.util.Set<String> modelGroupNames = java.util.Set.of();
 
     /**
-     * 本家のデフォルトレール描画。スクリプトの renderRailStatic から
+     * 本家のデフォルトレール描画。
      * renderer.renderStaticParts(tileEntity, x, y, z) として呼ばれる。
-     * split = length*2 (0.5m 毎)、各点でモデルを yaw/-pitch/roll 回転して設置し、
-     * 各オブジェクトは shouldRenderObject(tile, objName, max, i) を通す (位置依存可)。
      */
     /**
      * 本家 renderRailMapStatic の忠実移植 (GLRecorder 記録)。
      * BRE 系スクリプトが分岐の非可動側レールを描くのに使う:
-     *   renderer.renderRailMapStatic(tile, rm, max, start, end, leftParts, rightParts, ...)
      */
     public void renderRailMapStatic(Object tileObj, Object railMapObj, int max, int startIndex, int endIndex, Parts... pArray) {
         if (!(tileObj instanceof jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore tileEntity)
@@ -82,7 +74,7 @@ public class RailPartsRenderer extends PartsRenderer {
         double origHeight = rm.getRailHeight(max, 0);
         int[] startPos = tileEntity.getStartPoint();
         float[] revXZ = jp.ngt.rtm.rail.util.RailPosition.REVISION[tileEntity.getRailPositions()[0].direction];
-        //レール全体の始点からの移動差分 (本家式)
+        // レール全体の始点からの移動差分 (本家式)
         float moveX = (float) (origPos[1] - ((double) startPos[0] + 0.5D + (double) revXZ[0]));
         float moveZ = (float) (origPos[0] - ((double) startPos[2] + 0.5D + (double) revXZ[1]));
 
@@ -109,9 +101,8 @@ public class RailPartsRenderer extends PartsRenderer {
 
     /**
      * レール 1 区間の明るさ。レール面のすぐ上で拾う。
-     * <p>そこが完全に真っ暗 (= ブロックの中でサンプリングしてしまった) の時だけ 1〜2 段上へ
-     * 逃がす。空の明るさで塗りつぶすような救済はしない — 本家に無いうえ、日陰やトンネルでも
-     * レールだけ明るく浮く。
+     * そこが完全に真っ暗 (= ブロックの中でサンプリングしてしまった) の時だけ 1〜2 段上へ
+     * 逃がす。
      */
     private static int sampleBrightness(TileEntityLargeRailCore tile, double wx, double wy, double wz) {
         net.minecraft.world.level.Level level = tile.getLevel();
@@ -130,9 +121,8 @@ public class RailPartsRenderer extends PartsRenderer {
     }
 
     /**
-     * 本家 {@code RailPartsRendererBase.createRailPos} の忠実移植。
-     * <p>全 RailMap の 0.5m 刻み各点を {@code {x, y, z, yaw, -pitch, cant}} で返す。
-     * 焼き込みキャッシュの無効化キーはこの配列から作る (形が変われば必ず値が変わる)。
+     * 本家 RailPartsRendererBase.createRailPos の忠実移植。
+     * 全 RailMap の 0.5m 刻み各点を {x, y, z, yaw, -pitch, cant} で返す。
      */
     public static float[][] createRailPos(TileEntityLargeRailCore tile) {
         jp.ngt.rtm.rail.util.RailMap[] rms = tile.getAllRailMaps();
@@ -169,9 +159,8 @@ public class RailPartsRenderer extends PartsRenderer {
     }
 
     /**
-     * 本家 {@code getRailBrightness} の忠実移植。各点の位置で明るさを拾う。
-     * <p>★コアブロック 1 点で代表させてはいけない。コアはバラストに埋まっていて 0 を
-     * 返すことが多く、その 0 が焼き込まれると「レールが真っ黒のまま戻らない」になる。
+     * 本家 getRailBrightness の忠実移植。各点の位置で明るさを拾う。
+     * ★コアブロック 1 点で代表させてはいけない。
      */
     public static int[] getRailBrightness(net.minecraft.world.level.Level level,
                                           net.minecraft.core.BlockPos origin, float[][] rp) {
@@ -188,7 +177,7 @@ public class RailPartsRenderer extends PartsRenderer {
         return out;
     }
 
-    /** 本家 {@code getBrightness}: 0 なら 1 段上へ逃がす。 */
+    /** 本家 getBrightness: 0 なら 1 段上へ逃がす。 */
     private static int brightnessAt(net.minecraft.world.level.Level level, int x, int y, int z) {
         net.minecraft.core.BlockPos p = new net.minecraft.core.BlockPos(x, y, z);
         int b = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, p);
@@ -199,10 +188,8 @@ public class RailPartsRenderer extends PartsRenderer {
     }
 
     /**
-     * 本家 KaizPatchX {@code createStaticRenderKey} の忠実移植。
-     * <p>レール形状・各点の明るさ・モデル (オブジェクト名/テクスチャ) をまとめた 1 個の int。
-     * {@code shouldRerenderRail} が立っていても<b>キーが同じなら焼き直さない</b>のが要点で、
-     * これが本家のレール軽量化の本体。
+     * 本家 KaizPatchX createStaticRenderKey の忠実移植。
+     * レール形状・各点の明るさ・モデル (オブジェクト名/テクスチャ) をまとめた 1 個の int。
      */
     public static int createStaticRenderKey(float[][] fa, int[] brightness, int modelKey) {
         int key = 31 * java.util.Arrays.deepHashCode(fa) + java.util.Arrays.hashCode(brightness);
@@ -217,11 +204,9 @@ public class RailPartsRenderer extends PartsRenderer {
         if (rec == null) {
             return;
         }
-        //★本家 createRailPos と同じく<b>全 RailMap を 1 回の呼び出しで回す</b>。
-        //分岐は RailMap を複数持つので、1 本しか見ないと分岐側のルートに土台 (道床/枕木) が
-        //付かない。逆に呼び出し側でマップごとに renderStaticParts を呼ぶと、スクリプトの
-        //描画全体がマップの本数ぶん重なり、マップが収束する分岐の端で潰れて見える。
-        //回すのはここ (本家と同じ場所) が正しい。
+        // ★本家 createRailPos と同じく全 RailMap を 1 回の呼び出しで回す。
+        // 分岐は RailMap を複数持つので、1 本しか見ないと分岐側のルートに土台 (道床/枕木) が
+        // 付かない。
         jp.ngt.rtm.rail.util.RailMap[] maps;
         if (this.renderMapOverride != null) {
             maps = new jp.ngt.rtm.rail.util.RailMap[]{this.renderMapOverride};
@@ -265,12 +250,8 @@ public class RailPartsRenderer extends PartsRenderer {
             float relY = (float) (y + h - origin.getY() - 0.0625D);
             float relZ = (float) (z + p1[0] - origin.getZ());
 
-            //本家 renderRailMapStatic と同じく、明るさは<b>区間ごと</b>にサンプリングする。
-            //
-            //★コアブロック 1 点で全長を代表させてはいけない。コアはバラストや地面に
-            //埋まっていて getLightColor が 0 を返すことが多く、その 0 が統合メッシュへ
-            //焼き込まれると「直線レールが真っ黒のまま、リログするまで戻らない」状態になる
-            //(焼き直しの判定もそのコア 1 点しか見ていないため、永久に更新されない)。
+            // 本家 renderRailMapStatic と同じく、明るさは区間ごとにサンプリングする。
+            // ★コアブロック 1 点で全長を代表させてはいけない。
             rec.brightness(sampleBrightness(tile, origin.getX() + relX, origin.getY() + relY, origin.getZ() + relZ));
             rec.push();
             rec.translate(relX, relY, relZ);

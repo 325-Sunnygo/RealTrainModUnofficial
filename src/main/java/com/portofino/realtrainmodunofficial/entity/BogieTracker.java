@@ -8,14 +8,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 
 /**
- * 1台車のレール追従状態。分割数は整数だが位置インデックスは小数で保持し、
+ * 1台車のレール追従状態。
  * 補間によってなめらかな座標・角度を計算する。
- *
- * <p>RTM yaw 規約: {@code getRailYaw()} は RTM 角度（東=+90°）を返す。
- * Minecraft yaw（東=-90°）に変換するには符号を反転すること。
- *
- * <p>{@code direction} は {@code index} の増加方向が列車前進方向かを示す。
- * +1 = index 増加が前進、-1 = index 減少が前進。
  */
 public final class BogieTracker {
 
@@ -45,7 +39,7 @@ public final class BogieTracker {
     }
 
     /**
-     * 前台車を {@code meters} メートル前進させる。
+     * 前台車を meters メートル前進させる。
      * レール区間の端に達したら隣接区間へ乗り換える。
      */
     public void advance(double meters, Level level) {
@@ -55,7 +49,7 @@ public final class BogieTracker {
     }
 
     /**
-     * {@code source} 台車の位置から {@code offset} メートルだけレールを遡って自身を配置する。
+     * source 台車の位置から offset メートルだけレールを遡って自身を配置する。
      * 後台車の配置に使用（offset は負値）。
      */
     public void walkFrom(BogieTracker source, double offset, Level level) {
@@ -72,7 +66,6 @@ public final class BogieTracker {
 
     /**
      * 指定ワールド座標の近傍レールを探して位置を初期化する。
-     *
      * @return スナップに成功すれば true
      */
     public boolean initAt(double x, double y, double z, float initYaw, Level level) {
@@ -114,7 +107,7 @@ public final class BogieTracker {
     // -------------------------------------------------------------------------
 
     /**
-     * {@code meters} メートル分だけ現在の map/index を前進させる。
+     * meters メートル分だけ現在の map/index を前進させる。
      * meters > 0 で前進（direction 方向）、< 0 で後退。
      */
     private void walkInPlace(double meters, Level level) {
@@ -270,9 +263,7 @@ public final class BogieTracker {
         return Math.max(2, (int) (map.getHorizontalPathLength() * SPLIT_PER_METER));
     }
 
-    /**
-     * ブロック位置の BE を直接取得する（RailCollision 経由含む）。
-     */
+    /** ブロック位置の BE を直接取得する（RailCollision 経由含む）。 */
     public static LargeRailCoreBlockEntity findCoreDirect(Level level, BlockPos pos) {
         if (level.getBlockEntity(pos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
             return core;
@@ -334,9 +325,7 @@ public final class BogieTracker {
         return best;
     }
 
-    /**
-     * 移動方向 {@code forwardYaw} に近い方向の {@code railYaw}（またはその逆）を返す。
-     */
+    /** 移動方向 forwardYaw に近い方向の railYaw（またはその逆）を返す。 */
     public static float snapYaw(float forwardYaw, float railYaw) {
         float diff = Mth.wrapDegrees(forwardYaw - railYaw);
         if (diff > 90.0F) return Mth.wrapDegrees(railYaw + 180.0F);

@@ -143,8 +143,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         this.lastSignalStrength = tag.contains("LastSignalStrength") ? tag.getInt("LastSignalStrength") : -1;
         // ロード時は switchType を再構築する(loadAdditwith で null 化)が、再構築直後は既定(直進)状態。
         // 保存時の switchStateDirty=false をそのまま使うと再評価されず、レッドストーンブロックが
-        // 隣接していても直進へ「リセット」されてしまう。ロード時は必ず再評価して周囲の信号から
-        // 分岐状態を復元する(信号が無ければ自然に直進へ戻る)。
+        // 隣接していても直進へ「リセット」されてしまう。
         this.switchStateDirty = true;
         clampActiveSegment();
     }
@@ -240,23 +239,14 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return getRailMap();
     }
 
-    /** SRB3 互換(tile.getRailCore())。RTMU ではコア自身が tile。 */
+    /** SRB3 互換(tile.getRailCore)。RTMU ではコア自身が tile。 */
     public LargeRailCoreBlockEntity getRailCore() {
         return this;
     }
 
     /**
      * 本家 TileEntityLargeRailBase.getRailFromCoordinates (KaizPatchX の 4 引数版) の移植。
-     *
-     * <p>指定座標から<b>真下へ降りながらレールを探し</b>、見つかったレールのコアを返す。
-     *
-     * <p>架線柱のスクリプトはこれで足元の線路を掴み、
-     * {@code railMap.getRailRotation(...)} でレールの向きを取って<b>自分の向き (yaw) を線路に合わせる</b>。
-     * 無いと yaw が決まらないままスクリプトが TypeError で死に、柱が線路と無関係な向き・
-     * フォールバック描画になっていた。
-     *
-     * <p>スクリプトからは {@code tileEntity.func_145831_w()} の戻り値 (WorldCompat) が渡るので
-     * Object で受けて実 Level を取り出す。
+     * 指定座標から真下へ降りながらレールを探し、見つかったレールのコアを返す。
      */
     public static LargeRailCoreBlockEntity getRailFromCoordinates(Object world, double px, double py, double pz) {
         return getRailFromCoordinates(world, px, py, pz, Integer.MIN_VALUE);
@@ -305,9 +295,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return cachedAllRailMaps.clone();
     }
 
-    /**
-     * Returns the rail maps that should be used by moving trains.
-     */
+    /** Returns the rail maps that should be used by moving trains. */
     public RailMap[] getActiveRailMaps() {
         RailMap[] maps = getAllRailMaps();
         if (maps.length <= 1) {
@@ -358,9 +346,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return false;
     }
 
-    /**
-     * Adds one branch segment to this core.
-     */
+    /** Adds one branch segment to this core. */
     public void appendRailSegment(RailPosition start, RailPosition end) {
         if (start == null || end == null) {
             return;
@@ -381,9 +367,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         this.switchStateDirty = true;
     }
 
-    /**
-     * Returns the first point stored in this core.
-     */
+    /** Returns the first point stored in this core. */
     public RailPosition getFirstRailPosition() {
         if (railPositions != null) {
             for (RailPosition railPosition : railPositions) {
@@ -395,9 +379,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return null;
     }
 
-    /**
-     * Updates the active branch from redstone strength.
-     */
+    /** Updates the active branch from redstone strength. */
     public void updateSignalStrength(int signalStrength) {
         if (switchType != null) {
             lastSignalStrength = signalStrength;
@@ -490,23 +472,17 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         }
     }
 
-    /**
-     * Returns the currently selected branch index.
-     */
+    /** Returns the currently selected branch index. */
     public int getActiveSegmentIndex() {
         return activeSegmentIndex;
     }
 
-    /**
-     * Returns the previous branch index used during client-side animation.
-     */
+    /** Returns the previous branch index used during client-side animation. */
     public int getPreviousSegmentIndex() {
         return previousSegmentIndex;
     }
 
-    /**
-     * Returns branch animation progress.
-     */
+    /** Returns branch animation progress. */
     public float getSwitchProgress(float partialTick) {
         return Mth.clamp(switchProgress + partialTick * 0.04F, 0.0F, 1.0F);
     }
@@ -529,9 +505,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return true;
     }
 
-    /**
-     * Ticks redstone state and branch animation.
-     */
+    /** Ticks redstone state and branch animation. */
     public static void tick(Level level, BlockPos pos, BlockState state, LargeRailCoreBlockEntity be) {
         if (be.switchType != null) {
             be.switchType.onUpdate(level);
@@ -542,8 +516,8 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         if (be.switchProgress < 1.0F) {
             be.switchProgress = Math.min(1.0F, be.switchProgress + 0.04F);
             if (level.isClientSide()) {
-                //NeoForge の requestModelDataUpdate 相当。Fabric にモデルデータの
-                //仕組みは無いので、ブロック更新を投げて再描画させる。
+                // NeoForge の requestModelDataUpdate 相当。Fabric にモデルデータの
+                // 仕組みは無いので、ブロック更新を投げて再描画させる。
                 if (be.getLevel() != null) {
                     net.minecraft.world.level.block.state.BlockState st = be.getBlockState();
                     be.getLevel().sendBlockUpdated(be.getBlockPos(), st, st, 3);

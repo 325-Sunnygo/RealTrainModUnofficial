@@ -31,18 +31,11 @@ public final class ClientItemHelper {
     private ClientItemHelper() {}
 
     /**
-     * 選択を <b>サーバーへペイロード送信するだけ</b>。クライアント側の手持ちスタックには書かない。
-     * <p>
-     * <b>重要 (回帰対策):</b> 以前はここでクライアント側スタックにも
-     * {@link LegacyItemStackBridge#setSelectedModelData} で書き込んでいたが、これが
-     * <b>Bukkit系ハイブリッド専用サーバー (Youer/Mohist 等) のクリエイティブで全列車が
-     * 223系5000番台Tc になる回帰</b>を起こした (1.0.8 で混入)。クライアント手持ちを書き換えると
-     * クリエイティブのスロット同期 (SetCreativeModeSlot) が走り、その版が Bukkit の ItemStack 変換で
-     * カスタムコンポーネントを剥がされたままサーバー側スタックを上書きし、選択が消えて既定
-     * (先頭の ELECTRIC 車両 = 223系5000番台Tc) にフォールバックする。クライアントを書かなければ
-     * この同期が誘発されず、ペイロードで確定したサーバー側の選択 (ServerVehicleSelection および
-     * サーバースタックの custom_data) が生き残る。自動車 (payload のみ) が正常なのと同じ経路。
-     * 1.0.7 の挙動に戻す。
+     * 選択を サーバーへペイロード送信するだけ。クライアント側の手持ちスタックには書かない。
+     * 重要 (回帰対策): 以前はここでクライアント側スタックにも
+     * LegacyItemStackBridge#setSelectedModelData で書き込んでいたが、これが
+     * Bukkit系ハイブリッド専用サーバー (Youer/Mohist 等) のクリエイティブで全列車が
+     * 5000番台Tc になる回帰を起こした (1.0.8 で混入)。
      */
     private static void commitSelection(ItemStack stack, ModelSelectScreen.SelectionResult selection) {
         PacketDistributor.sendToServer(new SelectModelPayload(
@@ -91,10 +84,9 @@ public final class ClientItemHelper {
 
     /**
      * 本家 guiIdSelectEntityModel: 設置済み車両をシフト右クリックしたときのモデル選択画面。
-     * <p>
-     * アイテム用の {@link #openTrainSelectScreen} と違い、決定したら
-     * {@link com.portofino.realtrainmodunofficial.network.ChangeEntityModelPayload} を送って
-     * <b>ワールドに居るその車両</b>のモデルを差し替える。初期選択には現在のモデルを入れる。
+     * アイテム用の #openTrainSelectScreen と違い、決定したら
+     * com.portofino.realtrainmodunofficial.network.ChangeEntityModelPayload を送って
+     * ワールドに居るその車両のモデルを差し替える。初期選択には現在のモデルを入れる。
      */
     public static void openEntityModelSelectScreen(Object vehicleObj) {
         if (!(vehicleObj instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> vehicle)) {
@@ -104,7 +96,7 @@ public final class ClientItemHelper {
         jp.ngt.rtm.modelpack.state.ResourceState state = vehicle.getResourceState();
         String currentArg = state != null ? state.getArg() : "";
         int currentColor = state != null ? state.color : 0xFFFFFF;
-        //カスタム名が未設定のときは名前欄を空にする (getName はモデル名を返すため)
+        // カスタム名が未設定のときは名前欄を空にする (getName はモデル名を返すため)
         String currentName = "";
 
         List<ModelSelectScreen.ModelInfo> infos = getVisibleTrainModels();
@@ -202,7 +194,7 @@ public final class ClientItemHelper {
         String displayName = definition.getDisplayName() == null ? "" : definition.getDisplayName();
         String displayNameLower = displayName.toLowerCase(Locale.ROOT);
         String buttonTexture = definition.getButtonTexture() == null ? "" : definition.getButtonTexture().toLowerCase(Locale.ROOT);
-        // [RTM]SL_D51_v1.2 contains stale DD51-498 entries whose button textures are not bundled.
+        // 一部のパックはボタン画像を同梱しない古い定義を残している。
         // The pack author confirmed they are not intended selectable vehicles.
         if ((id.startsWith("dd51-498") || displayNameLower.startsWith("dd51-498"))
                 && buttonTexture.contains("button_dd51-498")) {
@@ -263,7 +255,6 @@ public final class ClientItemHelper {
 
     /**
      * 本家 guiIdSelectTileEntityTexture: 設置済みの標識を素手で右クリックしてテクスチャを変える。
-     * <p>
      * 標識は 1 テクスチャ = 1 定義なので、モデル選択画面をそのまま使える
      * (ボタン画像に標識のテクスチャ自体が入っている)。
      */

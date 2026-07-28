@@ -26,15 +26,12 @@ import java.util.Arrays;
 /**
  * 本家 jp.ngt.rtm.rail.BlockLargeRailBase (KaizPatchX) の忠実移植。
  * 道床(レールベース)ブロック。描画はコア BE のレンダラが行うため INVISIBLE。
- * 当たり判定は BE の getBlockHeights (4隅カント) の平均高さによる動的 VoxelShape (本家準拠)。
  */
 public class BlockLargeRailBase extends BaseEntityBlock {
     public static final MapCodec<BlockLargeRailBase> CODEC = simpleCodec(props -> new BlockLargeRailBase(2, props));
 
     public static final float THICKNESS = 0.0625F;
-    /**
-     * 2:Gravel, 3:Stone, 4:Snow, 5:Asphalt
-     */
+    /** 2:Gravel, 3:Stone, 4:Snow, 5:Asphalt */
     public final int railTextureType;
 
     public BlockLargeRailBase(int par1, Properties props) {
@@ -55,8 +52,8 @@ public class BlockLargeRailBase extends BaseEntityBlock {
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
-        //道床の見た目はレールモデル (MQO の base/ballast/sleeper グループ) が描画する。
-        //ブロック自体は当たり判定/構造用 (静的スラブ描画は浮き・二重描画になるため廃止)。
+        // 道床の見た目はレールモデル (MQO の base/ballast/sleeper グループ) が描画する。
+        // ブロック自体は当たり判定/構造用 (静的スラブ描画は浮き・二重描画になるため廃止)。
         return RenderShape.INVISIBLE;
     }
 
@@ -90,7 +87,7 @@ public class BlockLargeRailBase extends BaseEntityBlock {
             return Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, THICKNESS, 1.0D);
         }
         if (preventMob) {
-            //Mob の通せんぼ用の壁。歩き心地は関係ないので本家どおり平均高さ + 256 の1枚箱。
+            // Mob の通せんぼ用の壁。歩き心地は関係ないので本家どおり平均高さ + 256 の1枚箱。
             float[] fa = rail.getBlockHeights(pos.getX(), pos.getY(), pos.getZ(), THICKNESS, true);
             float height2 = (fa[0] + fa[1] + fa[2] + fa[3]) * 0.25F;
             if (height2 < THICKNESS) {
@@ -98,13 +95,13 @@ public class BlockLargeRailBase extends BaseEntityBlock {
             }
             return Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, height2 + 256.0D, 1.0D);
         }
-        //坂は「1ブロック=平らな箱1つ」だと段差になるので、ブロック内を細かく割って
-        //レール面に沿わせる (TileEntityLargeRailBase.getRailCollisionShape)。
+        // 坂は「1ブロック=平らな箱1つ」だと段差になるので、ブロック内を細かく割って
+        // レール面に沿わせる (TileEntityLargeRailBase.getRailCollisionShape)。
         return rail.getRailCollisionShape(pos.getX(), pos.getY(), pos.getZ(), THICKNESS);
     }
 
     /**
-     * 本家: ModelSetRail.getConfig().allowCrossing が false なら Mob 通行禁止。
+     * 本家: ModelSetRail.getConfig.allowCrossing が false なら Mob 通行禁止。
      * TODO(Phase 4): ModelSetRail 移植後に allowCrossing を参照。それまでは通行許可。
      */
     public boolean preventMobMovement(BlockGetter level, BlockPos pos) {
@@ -141,7 +138,7 @@ public class BlockLargeRailBase extends BaseEntityBlock {
                             Arrays.stream(maps).filter(java.util.Objects::nonNull)
                                     .forEach(rm -> rm.breakRail(world, core.getProperty(), core));
                         } else {
-                            //RailMap 不明でもコアは撤去する
+                            // RailMap 不明でもコアは撤去する
                             world.removeBlock(core.getBlockPos(), false);
                         }
                     } else if (core == null) {
@@ -159,8 +156,8 @@ public class BlockLargeRailBase extends BaseEntityBlock {
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        //クライアントでも tick する: 分岐の Point.moveCount (転てつアニメーション) は
-        //クライアント側 SwitchType.onUpdate で進む (本家 updateEntity は両側で動く)。
+        // クライアントでも tick する: 分岐の Point.moveCount (転てつアニメーション) は
+        // クライアント側 SwitchType.onUpdate で進む (本家 updateEntity は両側で動く)。
         if (this.isCore()) {
             return (lvl, pos, st, be) -> {
                 if (be instanceof TileEntityLargeRailCore core) {
@@ -174,7 +171,7 @@ public class BlockLargeRailBase extends BaseEntityBlock {
     @Override
     protected void neighborChanged(BlockState state, Level world, BlockPos pos, net.minecraft.world.level.block.Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
         super.neighborChanged(state, world, pos, neighborBlock, neighborPos, movedByPiston);
-        //RS 変化で分岐の開通状態 (isOpen/activeRails) を更新
+        // RS 変化で分岐の開通状態 (isOpen/activeRails) を更新
         if (!world.isClientSide) {
             BlockEntity be = world.getBlockEntity(pos);
             if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore switchCore) {

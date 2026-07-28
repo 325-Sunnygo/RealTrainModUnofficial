@@ -39,7 +39,7 @@ public record MotormanMacroPayload(int entityId, String macro) implements Custom
             if (!(player.level().getEntity(payload.entityId()) instanceof EntityMotorman motorman)) {
                 return;
             }
-            //遠隔操作防止: 近くの運転士のみ
+            // 遠隔操作防止: 近くの運転士のみ
             if (motorman.distanceToSqr(player) > 64.0D * 64.0D) {
                 return;
             }

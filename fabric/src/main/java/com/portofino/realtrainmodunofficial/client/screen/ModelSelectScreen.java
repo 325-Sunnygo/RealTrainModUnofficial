@@ -36,15 +36,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * 本家 RTM (KaizPatchX {@code GuiSelectModel}) と同じ挙動のモデル選択画面。
- * <ul>
- *   <li>左に<b>中央寄せスクロール</b>の一覧 (選択中が縦中央)。各項目 160×32 にモデルのボタン画像。</li>
- *   <li><b>スクロールバーは画面右端</b>。ホイール/上下キー/Home/End/PgUp/PgDn でも移動。</li>
- *   <li>右上に<b>コンパクトな2列の入力群</b> (本家配置): Custom Name / Search / DataMap / Color。</li>
- *   <li>決定時に modelId と併せて dataMap/name/color を {@link SelectionResult} に載せる。</li>
- * </ul>
- * 本家の argField と DataMap は本家では別物だが、RTMU でスクリプトに渡るパラメータは
- * DataMap 一本なので「引数 = DataMap」に統合している。
+ * 本家 RTM (KaizPatchX GuiSelectModel) と同じ挙動のモデル選択画面。
+ * 左に中央寄せスクロールの一覧 (選択中が縦中央)。各項目 160×32 にモデルのボタン画像。
  */
 @OnlyIn(Dist.CLIENT)
 public class ModelSelectScreen extends Screen {
@@ -212,16 +205,15 @@ public class ModelSelectScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float pt) {
-        // ここには黒を描かない。super.render() (= Screen.render) がこの renderBackground を
+        // ここには黒を描かない。
         // もう一度呼ぶため、ここに黒を置くと「ボタンを描いた後」にもう一枚黒が重なり、
         // ボタンだけ暗くなる (field は後描画なので明るいまま、という不具合)。
-        // 全画面の黒は render() の先頭で 1 回だけ敷く。
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
-        // 全画面「半透明の黒」を一番下に<b>一度だけ</b>敷く (world はうっすら透ける)。
-        // renderBackground には置かない — super.render() がそれを再度呼び、ボタンの上に黒が重なって
+        // 全画面「半透明の黒」を一番下に一度だけ敷く (world はうっすら透ける)。
+        // renderBackground には置かない — super.render がそれを再度呼び、ボタンの上に黒が重なって
         // ボタンだけ暗くなるため。ここで先に敷けば、この後に描くボタン/フィールドは黒に載る=暗くならない。
         g.fill(0, 0, width, height, 0xB0000000);
 
@@ -249,7 +241,7 @@ public class ModelSelectScreen extends Screen {
             g.renderOutline(cx, cyy, FIELD_H, FIELD_H, 0xFFFFFFFF);
         }
 
-        //一覧のボタンをクリックして選んだモデルを右手に浮かべる
+        // 一覧のボタンをクリックして選んだモデルを右手に浮かべる
         renderSelectedPreview(g);
 
         super.render(g, mouseX, mouseY, pt);
@@ -263,11 +255,7 @@ public class ModelSelectScreen extends Screen {
 
     // ============================================================ モデルプレビュー
     // 本家 GuiSelectModel.renderModel + ModelSet*Client.renderModelInGui の移植。
-    //
     // 本家は「一覧のボタンにマウスを乗せている間だけ」画面右手にモデルを浮かべる。
-    // GUI の平行投影ではなく<b>透視投影を張り直して</b>描くのが特徴で、そのため
-    // 拡大縮小や回転の操作は無く、機種ごとに決め打ちの 3/4 視点になる。
-    // 1.21 には固定機能パイプラインが無いので、投影行列の差し替えで同じことをする。
 
     /** 本家 gluPerspective(80, 1.0, 5, 1000)。アスペクトを 1.0 にするのも本家どおり。 */
     private static final float PREVIEW_FOV_DEG = 80.0F;
@@ -291,7 +279,7 @@ public class ModelSelectScreen extends Screen {
         }
         VehicleDefinition vehicleDef = VehicleRegistry.getById(info.id());
 
-        //ここまでに積んだ GUI の頂点を吐き出してから投影を差し替える
+        // ここまでに積んだ GUI の頂点を吐き出してから投影を差し替える
         g.flush();
 
         RenderSystem.backupProjectionMatrix();
@@ -303,19 +291,19 @@ public class ModelSelectScreen extends Screen {
                     (float) Math.toRadians(PREVIEW_FOV_DEG), 1.0F, PREVIEW_NEAR, PREVIEW_FAR),
                 com.mojang.blaze3d.vertex.VertexSorting.DISTANCE_TO_ORIGIN);
 
-            //★本家 glLoadIdentity 相当。これが要る。
-            //1.21 の GUI は modelview に translate(0,0,-11000) が入っており、そこへ
-            //near=5 / far=1000 の透視投影を張ると<b>全部が遠クリップされて何も出ない</b>。
+            // ★本家 glLoadIdentity 相当。これが要る。
+            // 1.21 の GUI は modelview に translate(0,0,-11000) が入っており、そこへ
+            // near=5 / far=1000 の透視投影を張ると全部が遠クリップされて何も出ない。
             modelView.identity();
             RenderSystem.applyModelViewMatrix();
 
-            //機種ごとの配置は PoseStack 側に積む (頂点は CPU で変換される)
+            // 機種ごとの配置は PoseStack 側に積む (頂点は CPU で変換される)
             PoseStack ps = new PoseStack();
             applyGuiPlacement(ps, info.id(), vehicleDef);
 
-            //本家 RenderHelper.enableStandardItemLighting + GL_DEPTH_TEST
+            // 本家 RenderHelper.enableStandardItemLighting + GL_DEPTH_TEST
             Lighting.setupFor3DItems();
-            //平行投影で描いた GUI の深度値とは尺度が違うので、いったん深度を流す
+            // 平行投影で描いた GUI の深度値とは尺度が違うので、いったん深度を流す
             RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
             RenderSystem.enableDepthTest();
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
@@ -327,11 +315,11 @@ public class ModelSelectScreen extends Screen {
             buf.endBatch();
 
             RenderSystem.disableDepthTest();
-            //以降の GUI (ボタン/文字) が透視投影の深度に負けないよう戻しておく
+            // 以降の GUI (ボタン/文字) が透視投影の深度に負けないよう戻しておく
             RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
             Lighting.setupFor3DItems();
         } catch (Throwable t) {
-            //プレビューが失敗しても選択画面自体は使えるようにする
+            // プレビューが失敗しても選択画面自体は使えるようにする
         } finally {
             modelView.popMatrix();
             RenderSystem.applyModelViewMatrix();
@@ -340,32 +328,30 @@ public class ModelSelectScreen extends Screen {
         }
     }
 
-    /**
-     * 本家 {@code renderModelInGui} の機種別配置。X:右が+, Z:手前が+ (本家のコメントどおり)。
-     */
+    /** 本家 renderModelInGui の機種別配置。X:右が+, Z:手前が+ (本家のコメントどおり)。 */
     private static void applyGuiPlacement(PoseStack ps, String id, VehicleDefinition vehicleDef) {
         if (vehicleDef != null) {
-            //ModelSetVehicleBaseClient
+            // ModelSetVehicleBaseClient
             ps.translate(11.0F, -1.0F, -12.0F);
             ps.mulPose(Axis.YP.rotationDegrees(-65.0F));
             ps.scale(1.2F, 1.2F, 1.2F);
             return;
         }
         if (RailRegistry.getById(id) != null) {
-            //ModelSetRailClient
+            // ModelSetRailClient
             ps.translate(3.0F, -2.0F, -6.0F);
             ps.mulPose(Axis.ZP.rotationDegrees(10.0F));
             ps.mulPose(Axis.YP.rotationDegrees(-50.0F));
             ps.scale(1.5F, 1.5F, 1.5F);
             return;
         }
-        //ModelSetMachineClient / ModelSetOrnamentClient (設置物はこちら)
+        // ModelSetMachineClient / ModelSetOrnamentClient (設置物はこちら)
         ps.translate(3.0F, -1.0F, -10.0F);
         ps.mulPose(Axis.YP.rotationDegrees(-60.0F));
     }
 
     /**
-     * 本家は {@code model.render(null, cfg, 0/1, 0)} で pass0/pass1 を描く。
+     * 本家は model.render(null, cfg, 0/1, 0) で pass0/pass1 を描く。
      * RTMU はスクリプト車両の描画経路が別なので、そちらを優先し、無ければベイク経路で 2 パス描く。
      */
     private static void renderPreviewModel(MqoModelLoader.MqoModel model, VehicleDefinition vehicleDef,
@@ -376,7 +362,7 @@ public class ModelSelectScreen extends Screen {
             if (vehicleDef != null) {
                 Vec3 offset = vehicleDef.getModelOffset();
                 poseStack.translate(offset.x, offset.y, offset.z);
-                //ボクセルモデルは形状に scale が焼き込んであるので掛けない (在ワールドと同じ)。
+                // ボクセルモデルは形状に scale が焼き込んであるので掛けない (在ワールドと同じ)。
                 if (model == null || !model.isVoxelModel()) {
                     float modelScale = vehicleDef.getModelScale();
                     poseStack.scale(modelScale, modelScale, modelScale);
@@ -395,17 +381,17 @@ public class ModelSelectScreen extends Screen {
                 }
             }
             if (!rendered) {
-                //本家 pass0 → pass1 の順。entity を渡さないと doCulling も発光判定も引けない。
+                // 本家 pass0 → pass1 の順。entity を渡さないと doCulling も発光判定も引けない。
                 MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer,
                     LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, false, null, null, previewEnt);
                 MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer,
                     LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, true, null, null, previewEnt);
             }
 
-            //本家 renderPartsInGui 相当: 台車も一緒に出す
+            // 本家 renderPartsInGui 相当: 台車も一緒に出す
             if (vehicleDef != null) {
-                //在ワールド (RtmBogieRenderer) と同じ判定にする: スクリプトで走り装置を
-                //動かす車両だけ、車体側に一本化する。
+                // 在ワールド (RtmBogieRenderer) と同じ判定にする: スクリプトで走り装置を
+                // 動かす車両だけ、車体側に一本化する。
                 boolean selfDrawsRunningGear = model.hasOwnWheelGroups()
                     && vehicleDef != null && vehicleDef.hasScript();
                 List<VehicleDefinition.BogieDefinition> bogies = vehicleDef.getBogies();
@@ -418,7 +404,7 @@ public class ModelSelectScreen extends Screen {
                         BogieRenderer.renderBogie(poseStack, i, bogieDef, vehicleDef,
                             null, buffer, LightTexture.FULL_BRIGHT, 0.0F, 1.0F);
                     } catch (Throwable ignored) {
-                        //台車 1 つの失敗で車体プレビューまで消さない
+                        // 台車 1 つの失敗で車体プレビューまで消さない
                     }
                 }
             }
@@ -434,7 +420,7 @@ public class ModelSelectScreen extends Screen {
         if (BogieRenderer.isDummyBogieModel(bogieDef.modelFile())) {
             return true;
         }
-        //本家 RenderBogie と同じ: ダミー指定以外は必ず描く。
+        // 本家 RenderBogie と同じ: ダミー指定以外は必ず描く。
         return false;
     }
 

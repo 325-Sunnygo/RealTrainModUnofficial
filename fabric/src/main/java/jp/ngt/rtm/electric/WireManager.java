@@ -30,9 +30,7 @@ public final class WireManager {
     }
 
     // ---- 架線ジオメトリ (本家 WireManager 相当) ----
-    //
-    // 信号伝播 (上の static 群) とは別物。こちらは「その座標の真上に架線があるか、
-    // あるなら何 Y か」を答える。パンタグラフの上昇停止位置に使う。
+    // 信号伝播 (上の static 群) とは別物。
 
     /** 直線の分割数 (本家 SPLIT)。 */
     private static final int SPLIT = 512;
@@ -112,7 +110,7 @@ public final class WireManager {
         double x2 = end.getX() + 0.5D;
         double y2 = end.getY() + 0.5D;
         double z2 = end.getZ() + 0.5D;
-        //線は「低い方が始点」。getWireY が始点→終点の割合で高さを補間するため
+        // 線は「低い方が始点」。getWireY が始点→終点の割合で高さを補間するため
         boolean startIsLower = y1 <= y2;
         double sx = startIsLower ? x1 : x2;
         double sz = startIsLower ? z1 : z2;
@@ -247,9 +245,7 @@ public final class WireManager {
         }
     }
 
-    /**
-     * ノードへ信号を適用し、通過後のレベルを返す (変換器のみ変換)。
-     */
+    /** ノードへ信号を適用し、通過後のレベルを返す (変換器のみ変換)。 */
     private static int applyAndTransform(Level level, BlockPos pos, int lvl, boolean isOrigin) {
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof TileEntitySignalConverter converter) {

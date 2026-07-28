@@ -11,7 +11,6 @@ import net.minecraft.world.level.block.state.BlockState;
  * 本家 jp.ngt.rtm.electric.TileEntitySignalConverter の移植 (簡略版)。
  * RSIn: レッドストーン入力→配線網 / RSOut: 配線網→レッドストーン出力 /
  * Increment・Decrement: 通過する信号レベルを ±1。
- * TODO: Wireless (無線) は未対応。
  */
 public class TileEntitySignalConverter extends BlockEntity implements IProvideElectricity {
     private int electricity;
@@ -37,16 +36,14 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
             this.setChanged();
             if (this.level != null && !this.level.isClientSide) {
                 if (this.getConverterType() == SignalConverterType.RSOut) {
-                    //レッドストーン出力の更新
+                    // レッドストーン出力の更新
                     this.level.updateNeighborsAt(this.worldPosition, this.getBlockState().getBlock());
                 }
             }
         }
     }
 
-    /**
-     * RSIn: レッドストーン入力を監視して配線網へ伝播
-     */
+    /** RSIn: レッドストーン入力を監視して配線網へ伝播 */
     public static void tick(Level level, BlockPos pos, BlockState state, TileEntitySignalConverter be) {
         if (level.isClientSide) {
             return;

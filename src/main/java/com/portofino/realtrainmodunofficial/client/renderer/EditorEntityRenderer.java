@@ -11,16 +11,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.AABB;
 
 /**
- * エディタの選択範囲の描画 (neo mcte)。本家 MCTE {@code RenderEditor} 相当。
- *
- * <p>本家は選択範囲を枠 + 半透明の面で描く。ここも同じにしてある。
- * 枠だけだと大きな範囲でどこを囲っているのか分からず、面だけだと中が見えないため。
+ * エディタの選択範囲の描画 (neo mcte)。本家 MCTE RenderEditor 相当。
+ * 本家は選択範囲を枠 + 半透明の面で描く。ここも同じにしてある。
  */
 public class EditorEntityRenderer extends EntityRenderer<EditorEntity> {
 
     /**
-     * 選択範囲の面。MCTEU {@code mcte_selection_faces} 相当。
-     * <p>POSITION_COLOR / QUADS / 加算合成 / 両面 / 深度書き込みあり。
+     * 選択範囲の面。MCTEU mcte_selection_faces 相当。
+     * POSITION_COLOR / QUADS / 加算合成 / 両面 / 深度書き込みあり。
      */
     private static final RenderType SELECTION_FACES = RenderType.create(
         "rtmu_selection_faces",
@@ -51,32 +49,32 @@ public class EditorEntityRenderer extends EntityRenderer<EditorEntity> {
     @Override
     public boolean shouldRender(EditorEntity entity, net.minecraft.client.renderer.culling.Frustum frustum,
                                 double camX, double camY, double camZ) {
-        //範囲が広いとエンティティ本体は視界外でも枠は見えるべきなので、常に描く判定にする
+        // 範囲が広いとエンティティ本体は視界外でも枠は見えるべきなので、常に描く判定にする
         return true;
     }
 
     @Override
     public void render(EditorEntity entity, float yaw, float partialTick, PoseStack poseStack,
                        MultiBufferSource buffer, int packedLight) {
-        //★描画は SelectionRenderer (レベル描画) が行う。
-        //エンティティ経路だと視界外セクションのとき枠ごと消えるため
-        //(「前を向くと選択が見えない」)。ここでは何もしない。
+        // ★描画は SelectionRenderer (レベル描画) が行う。
+        // エンティティ経路だと視界外セクションのとき枠ごと消えるため
+        // (「前を向くと選択が見えない」)。ここでは何もしない。
     }
 
-    /** {@code LevelRenderer.renderLineBox} に面版が無いので自前で 6 面張る。 */
+    /** LevelRenderer.renderLineBox に面版が無いので自前で 6 面張る。 */
     private static void renderFilled(PoseStack poseStack, VertexConsumer vc, AABB b,
                                      float r, float g, float bl, float a) {
         var m = poseStack.last().pose();
         float x0 = (float) b.minX, y0 = (float) b.minY, z0 = (float) b.minZ;
         float x1 = (float) b.maxX, y1 = (float) b.maxY, z1 = (float) b.maxZ;
 
-        //下面 / 上面
+        // 下面 / 上面
         quad(vc, m, x0, y0, z0, x1, y0, z0, x1, y0, z1, x0, y0, z1, r, g, bl, a);
         quad(vc, m, x0, y1, z0, x0, y1, z1, x1, y1, z1, x1, y1, z0, r, g, bl, a);
-        //北 / 南
+        // 北 / 南
         quad(vc, m, x0, y0, z0, x0, y1, z0, x1, y1, z0, x1, y0, z0, r, g, bl, a);
         quad(vc, m, x0, y0, z1, x1, y0, z1, x1, y1, z1, x0, y1, z1, r, g, bl, a);
-        //西 / 東
+        // 西 / 東
         quad(vc, m, x0, y0, z0, x0, y0, z1, x0, y1, z1, x0, y1, z0, r, g, bl, a);
         quad(vc, m, x1, y0, z0, x1, y1, z0, x1, y1, z1, x1, y0, z1, r, g, bl, a);
     }

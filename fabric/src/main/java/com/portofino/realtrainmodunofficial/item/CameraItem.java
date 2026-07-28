@@ -10,11 +10,7 @@ import net.minecraft.world.level.Level;
 
 /**
  * 本家 jp.ngt.rtm.item.ItemCamera の移植 + 撮り鉄向けの作り直し。
- *
- * <p>本家は右クリックで GuiCamera を開き、そこからファインダーモードに入る作りだった。
- * RTMU では GUI を挟まず、右クリックでそのままファインダーに入る (すぐ構えられるように)。
- *
- * <p>中身はすべてクライアント側 ({@code client.camera} パッケージ)。サーバーは何も知らない。
+ * 本家は右クリックで GuiCamera を開き、そこからファインダーモードに入る作りだった。
  */
 public class CameraItem extends Item {
 

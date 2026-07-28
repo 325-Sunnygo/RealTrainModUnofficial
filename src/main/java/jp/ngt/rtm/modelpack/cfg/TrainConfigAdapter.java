@@ -38,7 +38,7 @@ public final class TrainConfigAdapter {
             }
 
             if (def.getTrainDistance() > 0.0F) {
-                //VehicleDefinition の trainDistance は 1 両分 (本家と同義)
+                // VehicleDefinition の trainDistance は 1 両分 (本家と同義)
                 cfg.trainDistance = def.getTrainDistance();
             }
 
@@ -65,7 +65,7 @@ public final class TrainConfigAdapter {
                 cfg.setSlotPos(slots.toArray(new float[0][]));
             }
 
-            //運転席位置: JSON playerPos をそのまま使用 (本家と同義)
+            // 運転席位置: JSON playerPos をそのまま使用 (本家と同義)
             List<net.minecraft.world.phys.Vec3> players = def.getPlayerPositions();
             if (players != null && !players.isEmpty()) {
                 net.minecraft.world.phys.Vec3 p0 = players.get(0);

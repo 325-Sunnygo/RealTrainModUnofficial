@@ -14,12 +14,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
 /**
- * 設置済みミニチュア (neo mcte)。本家 MCTE {@code TileEntityMiniature} 相当。
- *
- * <p><b>中身はこのブロックエンティティが丸ごと持つ。</b>外部テーブルに ID で預けない。
- * アイテム側と同じ {@link ItemMiniature} の NBT 契約をそのまま保持するので、
- * 壊して拾ったときに設定 (縮尺/オフセット/モード/明るさ) が完全に往復する。
- * MCTEU の「ID を共有していると 1 つ変更すると全部変わる」問題はこの持ち方では起きない。
+ * 設置済みミニチュア (neo mcte)。本家 MCTE TileEntityMiniature 相当。
+ * 中身はこのブロックエンティティが丸ごと持つ。外部テーブルに ID で預けない。
  */
 public class MiniatureBlockEntity extends BlockEntity {
 
@@ -111,7 +107,7 @@ public class MiniatureBlockEntity extends BlockEntity {
         cachedObject = null;
     }
 
-    //---- クライアントへの同期 (中身が無いと描けないので初期同期に載せる) ----
+    // ---- クライアントへの同期 (中身が無いと描けないので初期同期に載せる) ----
 
     @Override
     public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
@@ -125,7 +121,7 @@ public class MiniatureBlockEntity extends BlockEntity {
 
     /**
      * 縮尺次第で 1 ブロックからはみ出すので、描画範囲を中身の大きさから決める。
-     * <p>これが無いと大きなミニチュアがブロック境界で切れる。
+     * これが無いと大きなミニチュアがブロック境界で切れる。
      */
     public AABB getRenderBoundingBox() {
         NGTObject obj = getNGTObject();

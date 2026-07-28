@@ -37,7 +37,7 @@ public record RtmuSettingsPayload(boolean autoCant, int autoHeightLevel, int max
             if (player != null) {
                 RtmuSettings.setServerValues(player.getUUID(), payload.autoCant(), payload.autoHeightLevel());
             }
-            //乗客上限はワールド全体で 1 値 (プレイヤー別ではない)。最後に送られた値を採用。
+            // 乗客上限はワールド全体で 1 値 (プレイヤー別ではない)。最後に送られた値を採用。
             RtmuSettings.setServerMaxPassengers(payload.maxPassengers());
         });
     }

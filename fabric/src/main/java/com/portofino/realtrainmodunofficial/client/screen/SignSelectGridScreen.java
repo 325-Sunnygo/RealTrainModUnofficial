@@ -17,13 +17,8 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * 本家 RTM (KaizPatchX {@code GuiSelectTexture}) 式の、標識/看板などの選択画面。
- * <ul>
- *   <li>テクスチャ(ボタン画像)を<b>グリッドに敷き詰めて</b>並べる。</li>
- *   <li>ホイール/スクロールバーで行スクロール。</li>
- *   <li><b>タイルをクリックすると即選択して閉じる</b> (本家どおり)。スクロールでは選択しない。</li>
- * </ul>
- * サムネイルは {@link PackButtonTextureCache#getCrisp} で表示解像度へ焼き直し 1:1 描画 = 鮮明。
+ * 本家 RTM (KaizPatchX GuiSelectTexture) 式の、標識/看板などの選択画面。
+ * テクスチャ(ボタン画像)をグリッドに敷き詰めて並べる。
  */
 @OnlyIn(Dist.CLIENT)
 public class SignSelectGridScreen extends Screen {
@@ -111,7 +106,7 @@ public class SignSelectGridScreen extends Screen {
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
         // モデル選択画面と同じく、全画面「半透明の黒」を先頭で 1 回だけ敷く。
-        // renderBackground に置くと super.render() の再呼び出しでタイルの上にも重なって暗くなるため。
+        // renderBackground に置くと super.render の再呼び出しでタイルの上にも重なって暗くなるため。
         g.fill(0, 0, width, height, 0xB0000000);
         g.drawString(font, getTitle(), 12, 8, 0xFFFFFF, true);
 

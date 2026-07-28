@@ -40,7 +40,7 @@ public record BuyTicketPayload(BlockPos pos, boolean book) implements CustomPack
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            //券売機の前にいることを確かめる (GUI を開かずにパケットだけ送られるのを防ぐ)。
+            // 券売機の前にいることを確かめる (GUI を開かずにパケットだけ送られるのを防ぐ)。
             if (!player.level().isLoaded(payload.pos())
                     || player.distanceToSqr(payload.pos().getCenter()) > 64.0D) {
                 return;

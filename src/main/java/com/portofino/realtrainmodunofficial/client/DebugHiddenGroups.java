@@ -5,16 +5,9 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * <b>モデルのグループを名前で一時的に隠す</b> (調査用)。
- *
- * <p>「変な板が出ている」「この部品だけ描かれない」といった報告は、
- * <b>どの部品なのかを先に確定させないと直しようがない</b>。当てずっぽうで
- * 描画経路を変えても当たらず、ユーザーに何度も確認させることになる。
- *
- * <p>{@code /rtm hidegroup <名前>} で切り替える。隠れれば犯人が確定する。
- * 原因が分かるまでの回避策としても使える。
- *
- * <p>クライアント側だけの一時設定で、保存しない (ワールドを出ると戻る)。
+ * モデルのグループを名前で一時的に隠す (調査用)。
+ * 「変な板が出ている」「この部品だけ描かれない」といった報告は、
+ * どの部品なのかを先に確定させないと直しようがない。
  */
 public final class DebugHiddenGroups {
 
@@ -44,7 +37,7 @@ public final class DebugHiddenGroups {
         return Set.copyOf(HIDDEN);
     }
 
-    /** 隠す指定があるか。<b>1 つも指定が無ければ即 false</b> (通常時の負荷をゼロにする)。 */
+    /** 隠す指定があるか。1 つも指定が無ければ即 false (通常時の負荷をゼロにする)。 */
     public static boolean isHidden(String groupName) {
         if (HIDDEN.isEmpty() || groupName == null) {
             return false;

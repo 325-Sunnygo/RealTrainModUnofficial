@@ -12,19 +12,8 @@ import net.minecraft.world.item.component.CustomData;
 import java.util.List;
 
 /**
- * 本家 jp.ngt.rtm.item.ItemTicket の移植。券売機 (TICKET_VENDOR) が発券し、
+ * 本家 jp.ngt.rtm.item.ItemTicket の移植。
  * 改札 (TICKET_GATE) が消費する。
- *
- * <p>本家は残り回数をメタデータ (damage) に、入場済みフラグを NBT "Entered" に持っていた。
- * 1.21 にメタデータは無いので、どちらも CUSTOM_DATA の中に入れる。
- *
- * <p>本家 ItemTicket.consumeTicket の挙動:
- * <ul>
- *   <li>未入場で残り &gt; 0 → 残りを 1 減らして「入場済み」印を付ける (入場)</li>
- *   <li>入場済みで残り &gt; 0 → 「入場済み」印を外して返す (出場。次also使える)</li>
- *   <li>入場済みで残り 0    → 券は回収される (出場して使い切り)</li>
- * </ul>
- * つまり切符 (残り 1) は片道1往復で無くなり、回数券 (残り 11) は 11 往復できる。
  */
 public class TicketItem extends Item {
 
@@ -48,8 +37,7 @@ public class TicketItem extends Item {
 
     /**
      * 改札を通ったときの処理。
-     *
-     * @return 手に残るスタック (使い切ったら {@link ItemStack#EMPTY})
+     * @return 手に残るスタック (使い切ったら ItemStack#EMPTY)
      */
     public ItemStack consume(ItemStack stack) {
         CompoundTag tag = read(stack);
@@ -57,7 +45,7 @@ public class TicketItem extends Item {
         boolean entered = tag.getBoolean(KEY_ENTERED);
 
         if (entered) {
-            //出場。残っていれば入場済み印を外して返す。使い切っていたら回収。
+            // 出場。残っていれば入場済み印を外して返す。使い切っていたら回収。
             if (rides <= 0) {
                 return ItemStack.EMPTY;
             }
@@ -65,7 +53,7 @@ public class TicketItem extends Item {
             write(out, rides, false);
             return out;
         }
-        //入場。残り 0 の券では入れない (通常は起こらない)。
+        // 入場。残り 0 の券では入れない (通常は起こらない)。
         if (rides <= 0) {
             return ItemStack.EMPTY;
         }
@@ -85,7 +73,7 @@ public class TicketItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        //本家: 回数券だけ残り回数を出す。
+        // 本家: 回数券だけ残り回数を出す。
         if (defaultRides > 1) {
             tooltip.add(Component.translatable("tooltip.realtrainmodunofficial.ticket.remaining", getRides(stack))
                 .withStyle(ChatFormatting.GRAY));

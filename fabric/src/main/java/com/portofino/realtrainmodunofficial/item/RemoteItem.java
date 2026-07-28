@@ -20,11 +20,8 @@ import java.util.List;
 
 /**
  * リモコン: 2 つのブロックを無線レッドストーンで結ぶ。
- *
- * <p>持って<b>シフト+右クリック</b>で 1 つ目を選ぶと「ペアリング1」、もう 1 つを選ぶと
- * 「ペアリング2 → 完了」。以降、片方がレッドストーンを受ける/出す (レバー ON・転轍機の切替など) と、
- * ペアのもう片方が無線給電されて動く (スピーカーが鳴る・踏切が鳴動する・券売機が開く 等)。
- * どちらかのブロックを壊すとペアは自動で解除され「ペアリングが解除されました」と表示される。
+ * 持ってシフト+右クリックで 1 つ目を選ぶと「ペアリング1」、もう 1 つを選ぶと
+ * 「ペアリング2 → 完了」。
  */
 public class RemoteItem extends Item {
 
@@ -38,7 +35,7 @@ public class RemoteItem extends Item {
     public InteractionResult useOn(UseOnContext ctx) {
         Player player = ctx.getPlayer();
         Level level = ctx.getLevel();
-        //シフト+右クリックのみペアリング操作 (通常の右クリックは何もしない)。
+        // シフト+右クリックのみペアリング操作 (通常の右クリックは何もしない)。
         if (player == null || !player.isShiftKeyDown()) {
             return InteractionResult.PASS;
         }

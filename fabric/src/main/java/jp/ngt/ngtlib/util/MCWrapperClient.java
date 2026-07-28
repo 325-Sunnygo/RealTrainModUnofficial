@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 
 /**
  * 本家 jp.ngt.ngtlib.util.MCWrapperClient のスクリプト互換。
- * getPlayer() は PlayerCompat ラッパーを返す (SRB3 等が SRG フィールドを直接読むため)。
+ * getPlayer は PlayerCompat ラッパーを返す (SRB3 等が SRG フィールドを直接読むため)。
  */
 @SuppressWarnings("unused")
 public final class MCWrapperClient {

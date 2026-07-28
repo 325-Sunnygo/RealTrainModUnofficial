@@ -16,16 +16,8 @@ import net.minecraft.world.phys.AABB;
 import java.util.List;
 
 /**
- * エディタ (neo mcte)。本家 MCTE {@code ItemEditor} の移植。
- *
- * <p>操作:
- * <ul>
- *   <li>ブロックを右クリック: 1 点目 → もう一度で 2 点目 (範囲確定)</li>
- *   <li>スニーク + 右クリック: 選択を解除</li>
- * </ul>
- *
- * <p>選択範囲は {@link EditorEntity} が持つ。プレイヤー 1 人につき 1 個で、
- * 既にあれば使い回す (本家 {@code EditorManager} 相当)。
+ * エディタ (neo mcte)。本家 MCTE ItemEditor の移植。
+ * 操作:
  */
 public class EditorItem extends Item {
 
@@ -48,9 +40,7 @@ public class EditorItem extends Item {
 
     /**
      * ブロックを右クリックで 1 点目 → 2 点目。スニークで解除。
-     *
-     * <p>★選択は<b>クライアントとサーバの両方</b>で同じように更新する (MCTEU と同じ)。
-     * ワールドにエンティティを置かないので、離れても消えない。
+     * ★選択はクライアントとサーバの両方で同じように更新する (MCTEU と同じ)。
      */
     @Override
     public InteractionResult useOn(UseOnContext context) {
@@ -82,7 +72,7 @@ public class EditorItem extends Item {
             return InteractionResult.SUCCESS;
         }
         if (!sel.hasEnd() && !sel.getStart().equals(BlockPos.ZERO) || sel.hasEnd()) {
-            //2 点目 (すでに確定済みなら 1 点目から取り直し)
+            // 2 点目 (すでに確定済みなら 1 点目から取り直し)
             if (sel.hasEnd()) {
                 sel.setStart(pos);
                 player.displayClientMessage(Component.literal("Pos1: " + pos.toShortString()), true);

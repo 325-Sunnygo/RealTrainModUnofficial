@@ -17,24 +17,20 @@ import org.lwjgl.glfw.GLFW;
  * 列車の運転席・客席に座っている状態でフリーカメラキー (既定 V、MC のコントロール設定で変更可)
  * を押すと「幽体離脱」してカメラがその場から切り離され、クリエイティブ飛行と同じ操作で
  * 自由に飛べる (WASD=水平移動 / スペース=上昇 / スニーク=下降 / ダッシュキー=高速)。
- * マウスで視点を回す。もう一度キーを押すと運転席視点へ戻る。
- * プレイヤー本体は座席に残り、列車は同じ速度で走り続ける (完全クライアント側 —
- * サーバーへは何も送らない)。フリーカメラ中は誤操作防止のためマスコン/ドア等の
- * 運転キーを無効化する ({@link TrainControlKeyHandler} 側で {@link #isActive()} を見る)。
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class FreeCameraController {
 
     private static final float BASE_SPEED = 0.7F;
     private static final float SPRINT_MULT = 3.0F;
-    /** マウス視点の速さ。バニラ ({@code Entity.turn}) は 0.15。フリーカメラは少し速め。 */
+    /** マウス視点の速さ。バニラ (Entity.turn) は 0.15。フリーカメラは少し速め。 */
     private static final double LOOK_SPEED = 0.22D;
 
     private static boolean active;
     private static Vec3 pos = Vec3.ZERO;
     private static Vec3 prevPos = Vec3.ZERO;
     private static CameraType savedCameraType;
-    //カメラ独自の向き (体は回さず、マウスはここへ振り向ける = 視点追従オフ)
+    // カメラ独自の向き (体は回さず、マウスはここへ振り向ける = 視点追従オフ)
     private static float camYaw;
     private static float camPitch;
 
@@ -54,8 +50,8 @@ public final class FreeCameraController {
     }
 
     /**
-     * {@code MouseHandlerMixin} から: マウスの視点デルタをカメラの向きへ加える
-     * (体は回さない)。係数 0.15 は {@code Entity.turn} と同じ。
+     * MouseHandlerMixin から: マウスの視点デルタをカメラの向きへ加える
+     * (体は回さない)。係数 0.15 は Entity.turn と同じ。
      */
     public static void addLook(double dyaw, double dpitch) {
         camYaw += (float) (dyaw * LOOK_SPEED);
@@ -79,7 +75,7 @@ public final class FreeCameraController {
         if (mc.player == null || mc.screen != null) {
             return;
         }
-        //起動は運転席・客席に座っている時のみ。解除はフリーカメラ中ならいつでも。
+        // 起動は運転席・客席に座っている時のみ。解除はフリーカメラ中ならいつでも。
         if (!active && !isRidingTrain(mc)) {
             return;
         }
@@ -103,7 +99,7 @@ public final class FreeCameraController {
             camYaw = mc.player.getYRot();
             camPitch = mc.player.getXRot();
             savedCameraType = mc.options.getCameraType();
-            //三人称扱いにして自分 (と列車) が描画されるようにする。位置と向きは毎フレーム上書きする。
+            // 三人称扱いにして自分 (と列車) が描画されるようにする。位置と向きは毎フレーム上書きする。
             mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
         } else {
             active = false;
@@ -121,7 +117,7 @@ public final class FreeCameraController {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
-        //降車・ログアウトしたら自動解除
+        // 降車・ログアウトしたら自動解除
         if (mc.player == null || mc.player.getVehicle() == null) {
             if (mc.player != null) {
                 toggle(mc);
@@ -136,7 +132,7 @@ public final class FreeCameraController {
         if (mc.screen != null) {
             return;
         }
-        //WASD + スペース/スニークで移動 (カメラ自身の向き基準)
+        // WASD + スペース/スニークで移動 (カメラ自身の向き基準)
         float yawRad = (float) Math.toRadians(camYaw);
         double fx = -Math.sin(yawRad);
         double fz = Math.cos(yawRad);
@@ -190,7 +186,7 @@ public final class FreeCameraController {
     }
 
     /**
-     * フリーカメラ中は E キー等でインベントリを<b>開かせない</b> (ユーザー報告: フリーカメラなのに
+     * フリーカメラ中は E キー等でインベントリを開かせない (ユーザー報告: フリーカメラなのに
      * E でインベントリが開いてしまう)。飛び回っている最中に画面が開くと操作が奪われ没入も切れるため。
      * ポーズメニュー (Esc) は脱出用に通す。
      */
@@ -207,9 +203,9 @@ public final class FreeCameraController {
     }
 
     /**
-     * {@code Camera.setup()} 末尾で {@code CameraMixin} が呼ぶ、補間済みカメラ位置。
-     * {@code ComputeCameraAngles} イベントは position 確定より前に発火し上書きされてしまうため、
-     * 位置の上書きは setup() の TAIL (mixin) で行う。null ならフリーカメラ非アクティブ。
+     * Camera.setup 末尾で CameraMixin が呼ぶ、補間済みカメラ位置。
+     * ComputeCameraAngles イベントは position 確定より前に発火し上書きされてしまうため、
+     * 位置の上書きは setup の TAIL (mixin) で行う。null ならフリーカメラ非アクティブ。
      */
     public static Vec3 getInterpolatedPosition(float partialTick) {
         if (!active) {

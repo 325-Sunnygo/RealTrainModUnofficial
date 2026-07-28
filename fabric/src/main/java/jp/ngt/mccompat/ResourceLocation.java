@@ -4,7 +4,6 @@ package jp.ngt.mccompat;
  * パックスクリプト互換: 1.7.10 の net.minecraft.util.ResourceLocation。
  * スクリプトの `new Packages.net.minecraft.util.ResourceLocation(...)` は
  * ローダの FQN リマップでこのクラスに差し替えられる。
- * SRG 名 (func_110624_b/func_110623_a) もスクリプトから直接呼ばれる。
  */
 public class ResourceLocation {
     private final String domain;
@@ -26,16 +25,12 @@ public class ResourceLocation {
         }
     }
 
-    /**
-     * 1.7.10 SRG: getResourceDomain
-     */
+    /** 1.7.10 SRG: getResourceDomain */
     public String func_110624_b() {
         return this.domain;
     }
 
-    /**
-     * 1.7.10 SRG: getResourcePath
-     */
+    /** 1.7.10 SRG: getResourcePath */
     public String func_110623_a() {
         return this.path;
     }
@@ -48,9 +43,7 @@ public class ResourceLocation {
         return this.path;
     }
 
-    /**
-     * 実 ResourceLocation へ (バニラ形式に正規化できない文字はサニタイズ)。
-     */
+    /** 実 ResourceLocation へ (バニラ形式に正規化できない文字はサニタイズ)。 */
     public net.minecraft.resources.ResourceLocation toReal() {
         String d = this.domain.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_.\\-]", "_");
         String p = this.path.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_.\\-/]", "_");

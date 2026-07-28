@@ -23,8 +23,7 @@ import org.joml.Quaternionf;
 /**
  * 本家 RenderMarkerBlock(Base) の忠実移植 (1.21 BER 版)。
  * - renderDistanceMark: マーカー単体で向き方向に 10m 毎の目盛り (直進+左右45°の3方向、
- *   色付き四角 + "10m".."100m" テキスト)。設置した瞬間に表示される。
- * - renderLine: プレビュー確立後、各 RailMap に沿ったライン + 中央に総延長表示。
+ * 色付き四角 + "10m".."100m" テキスト)。設置した瞬間に表示される。
  */
 public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntityMarker> {
     private final Font font;
@@ -41,15 +40,15 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             return;
         }
 
-        //レンチの「アンカー移動」モード中のみアンカー線を表示し、線を右クリックで掴んで編集
-        //(coreMarker はクライアントで null のことがあるため RailMaps の有無で判定)
+        // レンチの「アンカー移動」モード中のみアンカー線を表示し、線を右クリックで掴んで編集
+        // (coreMarker はクライアントで null のことがあるため RailMaps の有無で判定)
         if (marker.getRailMaps() != null && marker.getRailMaps().length > 0 && marker.getMarkerRP() != null) {
             if (isAnchorWrenchHeld()) {
                 this.changeAnchor(marker);
                 this.updateHover(marker);
                 this.renderAnchor(marker, poseStack, buffer);
             } else if (editingMarker == marker) {
-                //モードを離れたら編集中断
+                // モードを離れたら編集中断
                 marker.editMode = 0;
                 editingMarker = null;
                 TileEntityMarker.clientEditingMarker = null;
@@ -68,11 +67,9 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         }
     }
 
-    //---- 本家 RenderMarkerBlock1122: アンカー編集 (線を右クリックで掴んで動かす) ----
+    // ---- 本家 RenderMarkerBlock1122: アンカー編集 (線を右クリックで掴んで動かす) ----
 
-    /**
-     * 編集対象の要素 (ordinal = marker.editMode)。本家 1122 と同順。
-     */
+    /** 編集対象の要素 (ordinal = marker.editMode)。本家 1122 と同順。 */
     public enum MarkerElement {
         NONE(0x000000),
         HORIZONTIAL(0x00FF20),
@@ -88,30 +85,21 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         }
     }
 
-    /**
-     * 現在編集中のマーカー (クライアント)
-     */
+    /** 現在編集中のマーカー (クライアント) */
     public static TileEntityMarker editingMarker;
-    /**
-     * 直近フレームでカーソルが乗っている線
-     */
+    /** 直近フレームでカーソルが乗っている線 */
     public static TileEntityMarker hoveredMarker;
     public static MarkerElement hoveredElement = MarkerElement.NONE;
     private static long hoveredNanos;
-    /**
-     * ホバー中の線上最近点までの視点距離 (ブロック優先判定用)
-     */
+    /** ホバー中の線上最近点までの視点距離 (ブロック優先判定用) */
     private static double hoveredEyeDist = Double.MAX_VALUE;
 
     /**
      * 右クリック時に TrainControlKeyHandler から呼ばれる。
      * 本家 1122: 編集中なら確定 (サーバー送信)、線にカーソルが乗っていれば掴む。
-     *
      * @return true = クリックを消費した
      */
-    /**
-     * レンチの「アンカー移動」モードを持っているか
-     */
+    /** レンチの「アンカー移動」モードを持っているか */
     public static boolean isAnchorWrenchHeld() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
@@ -132,7 +120,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             return false;
         }
         if (editingMarker != null) {
-            //確定 → RailPosition をサーバーへ (本家 PacketMarkerRPClient)
+            // 確定 → RailPosition をサーバーへ (本家 PacketMarkerRPClient)
             TileEntityMarker marker = editingMarker;
             marker.editMode = 0;
             editingMarker = null;
@@ -146,8 +134,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             }
             return true;
         }
-        //マーカーブロック自体を狙っている場合はブロック操作 (レンチのマーカー操作等) を優先。
-        //その他のブロックは「線より手前」にある場合のみ優先 (背景の地面越しには掴める)。
+        // マーカーブロック自体を狙っている場合はブロック操作 (レンチのマーカー操作等) を優先。
+        // その他のブロックは「線より手前」にある場合のみ優先 (背景の地面越しには掴める)。
         if (mc.hitResult instanceof net.minecraft.world.phys.BlockHitResult bhr
                 && mc.hitResult.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK
                 && mc.level != null) {
@@ -161,7 +149,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         }
         if (hoveredMarker != null && hoveredElement != MarkerElement.NONE
                 && System.nanoTime() - hoveredNanos < 200_000_000L && !hoveredMarker.isRemoved()) {
-            //掴む
+            // 掴む
             TileEntityMarker marker = hoveredMarker;
             marker.editMode = hoveredElement.ordinal();
             marker.startPlayerPitch = mc.player.getXRot();
@@ -179,9 +167,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 new com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload(pos, rp.writeToNBT()));
     }
 
-    /**
-     * 本家 renderAnchorLine (isPickMode): カーソルが乗っている線をレイ-線分距離で判定
-     */
+    /** 本家 renderAnchorLine (isPickMode): カーソルが乗っている線をレイ-線分距離で判定 */
     private void updateHover(TileEntityMarker marker) {
         if (editingMarker != null) {
             return;
@@ -194,7 +180,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         net.minecraft.world.phys.Vec3 eye = mc.player.getEyePosition();
         net.minecraft.world.phys.Vec3 look = mc.player.getViewVector(1.0F);
 
-        //ユーザー要望: 掴めるのは緑 (水平) の線のみ
+        // ユーザー要望: 掴めるのは緑 (水平) の線のみ
         MarkerElement best = MarkerElement.NONE;
         double bestDist = Double.MAX_VALUE;
         double bestEyeDist = Double.MAX_VALUE;
@@ -219,9 +205,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         }
     }
 
-    /**
-     * 各アンカー線のワールド座標線分 (本家 renderAnchorLine の変換と一致させる)
-     */
+    /** 各アンカー線のワールド座標線分 (本家 renderAnchorLine の変換と一致させる) */
     private java.util.List<net.minecraft.world.phys.Vec3[]> anchorSegments(TileEntityMarker marker, RailPosition rp, MarkerElement elm) {
         java.util.List<net.minecraft.world.phys.Vec3[]> out = new java.util.ArrayList<>(2);
         net.minecraft.world.phys.Vec3 base = new net.minecraft.world.phys.Vec3(rp.posX, rp.posY, rp.posZ);
@@ -242,7 +226,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             }
             case CANT_EDGE -> {
                 float cantRad = rp.cantEdge * Mth.DEG_TO_RAD;
-                //R_Y(yaw) * R_Z(cant) * (±1,0,0)
+                // R_Y(yaw) * R_Z(cant) * (±1,0,0)
                 double lx = Mth.cos(cantRad);
                 double ly = Mth.sin(cantRad);
                 net.minecraft.world.phys.Vec3 v = new net.minecraft.world.phys.Vec3(
@@ -263,9 +247,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         return out;
     }
 
-    /**
-     * カント(中央) 線: レール中央位置 {位置, ±方向ベクトル} (コアマーカー + 単一 RailMap のみ)
-     */
+    /** カント(中央) 線: レール中央位置 {位置, ±方向ベクトル} (コアマーカー + 単一 RailMap のみ) */
     private net.minecraft.world.phys.Vec3[] cantCenterSegmentBase(TileEntityMarker marker, RailPosition rp) {
         if (marker.getRailMaps() == null || marker.getRailMaps().length != 1) {
             return null;
@@ -287,9 +269,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 new net.minecraft.world.phys.Vec3(lx * Mth.cos(yawMid), ly, -lx * Mth.sin(yawMid))};
     }
 
-    /**
-     * レイと線分の最短距離 {距離, 線分側最近点までの視点距離}
-     */
+    /** レイと線分の最短距離 {距離, 線分側最近点までの視点距離} */
     private static double[] raySegmentDistance(net.minecraft.world.phys.Vec3 origin, net.minecraft.world.phys.Vec3 dir,
                                                net.minecraft.world.phys.Vec3 a, net.minecraft.world.phys.Vec3 b) {
         net.minecraft.world.phys.Vec3 u = dir.normalize();
@@ -326,9 +306,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         return origin.add(u.scale(t)).distanceTo(p);
     }
 
-    /**
-     * 本家 1122 changeAnchor: 掴んでいる線を毎フレーム視線に追従させる
-     */
+    /** 本家 1122 changeAnchor: 掴んでいる線を毎フレーム視線に追従させる */
     private void changeAnchor(TileEntityMarker marker) {
         if (editingMarker != marker || marker.editMode == 0) {
             return;
@@ -385,7 +363,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             return;
         }
 
-        //水平/勾配: 視線先のブロックへ (本家: MOP 128m)
+        // 水平/勾配: 視線先のブロックへ (本家: MOP 128m)
         net.minecraft.world.phys.HitResult target = mc.player.pick(128.0D, 0.0F, true);
         if (!(target instanceof net.minecraft.world.phys.BlockHitResult)) {
             return;
@@ -401,7 +379,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 fitOpposite = true;
             }
         }
-        //ANCHOR21: 制御長を 2/3 に
+        // ANCHOR21: 制御長を 2/3 に
         if (marker.getState(MarkerState.ANCHOR21)) {
             double d0 = 2.0D / 3.0D;
             targetVec = new net.minecraft.world.phys.Vec3(
@@ -438,9 +416,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         }
     }
 
-    /**
-     * 本家 getOppositeRail: プレビューの反対側マーカーの RP
-     */
+    /** 本家 getOppositeRail: プレビューの反対側マーカーの RP */
     private static RailPosition getOppositeRailStatic(TileEntityMarker marker) {
         if (marker.getRailMaps() == null) {
             return null;
@@ -456,9 +432,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         return null;
     }
 
-    /**
-     * 本家 getNeighborRail: マーカー隣接位置の既設レールの最寄り RP (接続スナップ用)
-     */
+    /** 本家 getNeighborRail: マーカー隣接位置の既設レールの最寄り RP (接続スナップ用) */
     private RailPosition getNeighborRail(TileEntityMarker marker) {
         RailPosition markerRP = marker.getMarkerRP();
         if (markerRP == null || marker.getLevel() == null) {
@@ -506,9 +480,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         return rp.anchorLengthHorizontal < 0.0F ? -5.0F : 5.0F;
     }
 
-    /**
-     * 太いライン描画用 RenderType (バニラ lines() の線幅 5px 版)
-     */
+    /** 太いライン描画用 RenderType (バニラ lines の線幅 5px 版) */
     private static final class AnchorRenderTypes extends RenderType {
         private AnchorRenderTypes(String name, com.mojang.blaze3d.vertex.VertexFormat format,
                                   com.mojang.blaze3d.vertex.VertexFormat.Mode mode, int bufferSize,
@@ -549,7 +521,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         double oy = rp.posY - marker.getBlockPos().getY();
         double oz = rp.posZ - marker.getBlockPos().getZ();
 
-        //掴んでいる間は制御長そのまま (視線先まで伸びる)、通常は displayLen (未編集=5固定/編集済み=実長)
+        // 掴んでいる間は制御長そのまま (視線先まで伸びる)、通常は displayLen (未編集=5固定/編集済み=実長)
         float len = editing ? rp.anchorLengthHorizontal : displayLen(rp);
 
         poseStack.pushPose();
@@ -562,7 +534,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
 
     private static int colorOf(MarkerElement elm, MarkerElement active) {
         if (elm == active) {
-            //本家: ColorUtil.multiplicating — 減光でハイライト
+            // 本家: ColorUtil.multiplicating — 減光でハイライト
             int r = (int) (((elm.color >> 16) & 0xFF) * 0.75F);
             int g = (int) (((elm.color >> 8) & 0xFF) * 0.75F);
             int b = (int) ((elm.color & 0xFF) * 0.75F);
@@ -588,7 +560,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         dx /= len;
         dy /= len;
         dz /= len;
-        //LINES (POSITION_COLOR_NORMAL): 法線 = 線の方向 (lines シェーダが太さ展開に使用)
+        // LINES (POSITION_COLOR_NORMAL): 法線 = 線の方向 (lines シェーダが太さ展開に使用)
         lines.addVertex(m, x0, y0, z0).setColor(r, g, b, 1.0F).setNormal(pose, dx, dy, dz);
         lines.addVertex(m, x1, y1, z1).setColor(r, g, b, 1.0F).setNormal(pose, dx, dy, dz);
     }
@@ -603,7 +575,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         poseStack.translate(0.5D, 0.0625D, 0.5D);
         poseStack.mulPose(new Quaternionf().rotationY(dir * Mth.DEG_TO_RAD));
 
-        //目盛り四角 (本家: GL_QUADS サイズ0.4)。debugQuads (position_color)
+        // 目盛り四角 (本家: GL_QUADS サイズ0.4)。debugQuads (position_color)
         VertexConsumer quads = buffer.getBuffer(RenderType.debugQuads());
         Matrix4f m = poseStack.last().pose();
         float r = ((color >> 16) & 0xFF) / 255.0F;
@@ -621,7 +593,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             }
         }
 
-        //距離テキスト "10m".."100m"
+        // 距離テキスト "10m".."100m"
         Quaternionf cameraRot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
         for (int j = 0; j < count; j++) {
             float moveZ = (j + 1) * 10.0F;
@@ -630,7 +602,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 float moveX = moveZ * k;
                 poseStack.pushPose();
                 poseStack.translate(moveX, 2.5F, moveZ);
-                //親の向き回転を打ち消してからカメラビルボード (バニラのネームタグ方式)
+                // 親の向き回転を打ち消してからカメラビルボード (バニラのネームタグ方式)
                 poseStack.mulPose(new Quaternionf().rotationY(-dir * Mth.DEG_TO_RAD));
                 poseStack.mulPose(cameraRot);
                 poseStack.scale(0.25F, -0.25F, 0.25F);
@@ -644,9 +616,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         poseStack.popPose();
     }
 
-    /**
-     * 本家 renderLine: RailMap に沿ったライン + 中央に総延長 (m)。
-     */
+    /** 本家 renderLine: RailMap に沿ったライン + 中央に総延長 (m)。 */
     private void renderLine(TileEntityMarker marker, RailMap[] maps, PoseStack poseStack, MultiBufferSource buffer) {
         RailPosition rp = marker.getMarkerRP();
         if (rp == null) {
@@ -656,8 +626,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         float baseY = (float) (rp.posY - marker.getBlockPos().getY());
         float baseZ = (float) (rp.posZ - marker.getBlockPos().getZ());
 
-        //緑のプレビュー曲線はユーザー要望で非表示 (マーカー設置直後から出て邪魔なため)。
-        //アンカー編集モード中のみ描画してカーブ形状の確認に使う。
+        // 緑のプレビュー曲線はユーザー要望で非表示 (マーカー設置直後から出て邪魔なため)。
+        // アンカー編集モード中のみ描画してカーブ形状の確認に使う。
         if (isAnchorWrenchHeld()) {
             VertexConsumer lines = buffer.getBuffer(RenderType.debugLineStrip(2.0D));
             for (RailMap rm : maps) {
@@ -682,7 +652,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             }
         }
 
-        //総延長テキスト (本家: 中央、緑 0x00EE00)
+        // 総延長テキスト (本家: 中央、緑 0x00EE00)
         Quaternionf cameraRot = Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
         for (RailMap rm : maps) {
             if (rm == null) continue;
@@ -696,7 +666,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             float z0 = (float) (pos[0] - rp.posZ);
             poseStack.translate(x0, y0 + 3.0F, z0);
             poseStack.mulPose(cameraRot);
-            //本家は 0.05 だが視認性向上のため少し大きめ + "m" 付き (バニラのネームタグ方式)
+            // 本家は 0.05 だが視認性向上のため少し大きめ + "m" 付き (バニラのネームタグ方式)
             poseStack.scale(0.1F, -0.1F, 0.1F);
             Matrix4f tm = poseStack.last().pose();
             String s = String.format("%.2fm", rm.getLength());

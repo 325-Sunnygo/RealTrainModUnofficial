@@ -7,17 +7,9 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * 本家 jp.ngt.rtm.block.BlockLinePole の <b>スクリプト互換ファサード</b>。
- *
- * <p>本家では架線柱は専用ブロックだったが、RTMU では他の設置物と同じ
- * {@code InstalledObjectBlock} (カテゴリ OVERHEAD_LINE_POLE) に載っている。
- * ただし架線柱のレンダースクリプト RenderConnectablePole.js が
- * <pre>
- *   importPackage(Packages.jp.ngt.rtm.block);
- *   var conXP = BlockLinePole.isConnected(world, x + 1, y, z, 0);
- * </pre>
- * とこのクラスを名前で直接呼ぶので、同じパッケージ・同じシグネチャで用意しておく。
- * これが無いと隣の柱とつながる腕 (partXP/partXN/partZP/partZN) が出ず、柱が単体で立つだけになる。
+ * 本家 jp.ngt.rtm.block.BlockLinePole の スクリプト互換ファサード。
+ * 本家では架線柱は専用ブロックだったが、RTMU では他の設置物と同じ
+ * InstalledObjectBlock (カテゴリ OVERHEAD_LINE_POLE) に載っている。
  */
 public final class BlockLinePole {
 
@@ -26,7 +18,6 @@ public final class BlockLinePole {
 
     /**
      * 本家 BlockLinePole.isConnected。指定座標が「柱として繋がる相手」かを返す。
-     *
      * @param type 0=柱(架線柱/信号柱)のみ / 1=柱または不透過ブロック / 2=空気と液体以外 / それ以外=常に true
      */
     public static boolean isConnected(Object world, int x, int y, int z, int type) {
@@ -38,8 +29,8 @@ public final class BlockLinePole {
         }
         BlockPos pos = new BlockPos(x, y, z);
         BlockState state = level.getBlockState(pos);
-        //本家: linePole / framework / signal が「柱」。RTMU ではどれも InstalledObjectBlock なので
-        //ブロックの種類ではなくブロックエンティティのカテゴリで見る。
+        // 本家: linePole / framework / signal が「柱」。RTMU ではどれも InstalledObjectBlock なので
+        // ブロックの種類ではなくブロックエンティティのカテゴリで見る。
         boolean isPole = false;
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
             InstalledObjectCategory category = be.getCategory();

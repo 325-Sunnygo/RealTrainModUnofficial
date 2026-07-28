@@ -17,14 +17,10 @@ import java.util.List;
 
 /**
  * SignalControllerMod (作者: masa300, https://github.com/masa300/SignalControllerMod)
- * の GUISignalController 1.21.1 移植。ボタン配置は 1.7.10 原作と同じ:
- *   SignalType [切替ボタン]
- *   Option     [x]last [ ]repeat [ ]Reduced Speed
- *   ("above" は未使用かつ画面からはみ出すため非表示。値は保持したまま送り返す)
- *                x      y      z
- *   nextSignal0 [___] [___] [___] [+]
- *   displayPos0 [___] [___] [___] [+]
- * 座標は直接編集可能、[+] で行を追加。閉じた時にサーバーへ反映。
+ * の GUISignalController 1.21.1 移植。
+ * SignalType [切替ボタン]
+ * Option     [x]last [ ]repeat [ ]Reduced Speed
+ * ("above" は未使用かつ画面からはみ出すため非表示。
  */
 public class SignalControllerScreen extends Screen {
     private final TileEntitySignalController controller;
@@ -69,14 +65,14 @@ public class SignalControllerScreen extends Screen {
         int cx = this.width / 2;
         int cy = this.height / 2;
 
-        //SignalType 切替 (原作: 中央の大ボタン)
+        // SignalType 切替 (原作: 中央の大ボタン)
         addRenderableWidget(Button.builder(typeLabel(), b -> {
             SignalType[] values = SignalType.values();
             this.signalType = values[(this.signalType.ordinal() + 1) % values.length];
             b.setMessage(typeLabel());
         }).bounds(cx - 40, cy - 82, 150, 20).build());
 
-        //Option チェックボックス (原作: last / repeat / Reduced Speed 並び)
+        // Option チェックボックス (原作: last / repeat / Reduced Speed 並び)
         this.lastBox = addRenderableWidget(Checkbox.builder(Component.literal("last"), this.font)
                 .pos(cx - 40, cy - 55).selected(this.last)
                 .onValueChange((box, value) -> this.last = value).build());
@@ -86,10 +82,10 @@ public class SignalControllerScreen extends Screen {
         this.reducedBox = addRenderableWidget(Checkbox.builder(Component.literal("Reduced Speed"), this.font)
                 .pos(cx + 85, cy - 55).selected(this.reducedSpeed)
                 .onValueChange((box, value) -> this.reducedSpeed = value).build());
-        //"above" は使われていないうえ、画面外にはみ出して見切れていたので出さない。
-        //値そのものは読み込んだままサーバーへ送り返すので、既存の設定は壊れない。
+        // "above" は使われていないうえ、画面外にはみ出して見切れていたので出さない。
+        // 値そのものは読み込んだままサーバーへ送り返すので、既存の設定は壊れない。
 
-        //座標行 (x/y/z の EditBox ×3 + 最終行の "+" 追加ボタン)
+        // 座標行 (x/y/z の EditBox ×3 + 最終行の "+" 追加ボタン)
         this.nextBoxes.clear();
         this.displayBoxes.clear();
         int y = cy - 5;
@@ -136,9 +132,7 @@ public class SignalControllerScreen extends Screen {
         return Component.translatable("SignalControllerMod.gui.signalType." + this.signalType.toString());
     }
 
-    /**
-     * EditBox の現在値を rows に反映
-     */
+    /** EditBox の現在値を rows に反映 */
     private void applyEdits() {
         readBoxes(this.nextBoxes, this.nextRows);
         readBoxes(this.displayBoxes, this.displayRows);
@@ -156,9 +150,7 @@ public class SignalControllerScreen extends Screen {
         }
     }
 
-    /**
-     * 閉じる時にサーバーへ一括反映 (原作もパケットで反映)
-     */
+    /** 閉じる時にサーバーへ一括反映 (原作もパケットで反映) */
     @Override
     public void onClose() {
         applyEdits();
@@ -184,7 +176,7 @@ public class SignalControllerScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
         int cx = this.width / 2;
         int cy = this.height / 2;
-        //原作の文字配置
+        // 原作の文字配置
         graphics.drawString(this.font, "SignalController", 20, 20, 0xFFFFFF);
         graphics.drawString(this.font, "SignalType", cx - 120, cy - 76, 0xFFFFFF);
         graphics.drawString(this.font, "Option", cx - 120, cy - 50, 0xFFFFFF);

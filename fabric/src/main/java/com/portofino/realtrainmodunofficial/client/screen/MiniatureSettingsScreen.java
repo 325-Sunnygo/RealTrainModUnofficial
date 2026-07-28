@@ -16,23 +16,8 @@ import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * ミニチュアの設定画面 (neo mcte)。本家 MCTE {@code GuiItemMiniature} の移植。
- *
- * <p>本家と同じ「左に操作ボタン・右に数値入力」の配置にしてある。
- * 本家はスライダーではなく<b>テキスト入力</b>で、任意の値を直接打てる。
- * <pre>
- *   [選択]      縮尺     [____]
- *   [書き出し]  オフセットX [____]
- *   [モード]    オフセットY [____]
- *               オフセットZ [____]
- *   [名前_____] 明るさ    [____]
- *
- *          [決定]        [やめる]
- * </pre>
- *
- * <p>変更対象は<b>いま手に持っているスタックだけ</b>。開いたときの手を覚えておき、
- * 適用時もその手のスタックへ送る。MCTEU のように ID 経由で外部テーブルを触らないので、
- * インベントリ内の他のミニチュアには影響しない。
+ * ミニチュアの設定画面 (neo mcte)。本家 MCTE GuiItemMiniature の移植。
+ * 本家と同じ「左に操作ボタン・右に数値入力」の配置にしてある。
  */
 public class MiniatureSettingsScreen extends Screen {
 
@@ -69,7 +54,7 @@ public class MiniatureSettingsScreen extends Screen {
 
         int hw = this.width / 2;
         int h = 40;
-        //本家: 左列 hw-120 (幅80)、右列 hw+40 (幅80)
+        // 本家: 左列 hw-120 (幅80)、右列 hw+40 (幅80)
         int leftX = hw - 120;
         int rightX = hw + 40;
 
@@ -95,7 +80,7 @@ public class MiniatureSettingsScreen extends Screen {
             apply();
             onClose();
         }).bounds(hw - 155, this.height - 28, 150, 20).build());
-        //本家: 中身が無いミニチュアは決定できない
+        // 本家: 中身が無いミニチュアは決定できない
         buttonDone.active = ngto != null;
 
         addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> onClose())
@@ -155,14 +140,14 @@ public class MiniatureSettingsScreen extends Screen {
         int h = 40;
         g.drawCenteredString(this.font, this.title, hw, 16, 0xFFFFFF);
 
-        //右列の入力に対する見出し (本家と同じく左側へ小さく出す)
+        // 右列の入力に対する見出し (本家と同じく左側へ小さく出す)
         drawLabel(g, hw - 30, h, "gui.realtrainmodunofficial.miniature.scale");
         drawLabel(g, hw - 30, h + 20, "gui.realtrainmodunofficial.miniature.offset_x");
         drawLabel(g, hw - 30, h + 40, "gui.realtrainmodunofficial.miniature.offset_y");
         drawLabel(g, hw - 30, h + 60, "gui.realtrainmodunofficial.miniature.offset_z");
         drawLabel(g, hw - 30, h + 80, "gui.realtrainmodunofficial.miniature.light");
 
-        //中身の情報 (本家は NGTObject.addInformation をここに出す)
+        // 中身の情報 (本家は NGTObject.addInformation をここに出す)
         if (ngto != null) {
             g.drawString(this.font, Component.literal(
                     String.format("%d x %d x %d  (%d)", ngto.xSize, ngto.ySize, ngto.zSize, ngto.blockList.size())),

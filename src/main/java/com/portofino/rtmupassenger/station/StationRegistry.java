@@ -17,15 +17,14 @@ import java.util.Map;
 
 /**
  * ワールドに置かれた駅ブロックの一覧 (位置 → タグビット) の SavedData。
- * 行き先抽選は時刻とタグの到着需要 ({@link StationTag#destWeight}) の重み付きで行う
+ * 行き先抽選は時刻とタグの到着需要 (StationTag#destWeight) の重み付きで行う
  * (朝はオフィス街行きが多い、夕方は住宅街行きが多い、など)。
- * チャンクのロード状態に関係なく参照できる。
  */
 public final class StationRegistry extends SavedData {
 
     private static final String NAME = "rtmupassenger_stations";
 
-    /** 駅位置 → タグビット ({@code 1 << StationTag.ordinal()} の OR)。 */
+    /** 駅位置 → タグビット (1 << StationTag.ordinal の OR)。 */
     private final Map<BlockPos, Integer> stations = new HashMap<>();
 
     public static StationRegistry get(ServerLevel level) {
@@ -45,7 +44,7 @@ public final class StationRegistry extends SavedData {
                 reg.stations.put(BlockPos.of(c.getLong("Pos")), c.getInt("Tags"));
             }
         } else {
-            //旧形式 (タグ無しの位置配列) からの引き継ぎ
+            // 旧形式 (タグ無しの位置配列) からの引き継ぎ
             for (long l : tag.getLongArray("Stations")) {
                 reg.stations.put(BlockPos.of(l), 0);
             }

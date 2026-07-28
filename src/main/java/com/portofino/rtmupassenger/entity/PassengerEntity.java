@@ -24,17 +24,8 @@ import javax.annotation.Nullable;
 
 /**
  * 乗客 NPC。停車中でドアの開いた列車にドア前から直接着席し、目的の駅で降りる。
- *
- * <p>状態遷移: WAITING(停止位置目標で待つ) → BOARDING(ドアまで歩く→着席) →
+ * 状態遷移: WAITING(停止位置目標で待つ) → BOARDING(ドアまで歩く→着席) →
  * RIDING(乗車) → LEAVING(降車後、駅へ立ち去り) → discard。
- *
- * <p><b>降車判定は乗客自身が乗車中に行う</b> (駅ブロックの tick に頼らない)。
- * 駅ブロックのチャンクがアンロードされていても、列車 (と一緒にロードされている乗客) が
- * 目的駅の座標に近づき停車してドアが開けば、扉が開いてから 1 秒後に降りる。
- * これが「駅のチャンクがロードされていないと降りない」問題の根治。
- *
- * <p><b>列車が壊されたら乗客も消える</b>。湧かせる上限は
- * 「プレイヤーの視界内にいる乗客の数」で判定する (StationBlockEntity)。
  */
 public class PassengerEntity extends PathfinderMob {
 
@@ -77,7 +68,7 @@ public class PassengerEntity extends PathfinderMob {
     /** 目指す/着席中の座席オフセット (車体ローカル)。 */
     @Nullable
     private float[] ridingSeat;
-    /** 乗車で使う<b>実際のドア</b>の車体ローカル位置 (モデルのドアグループ重心)。null なら停止位置目標基準。 */
+    /** 乗車で使う実際のドアの車体ローカル位置 (モデルのドアグループ重心)。null なら停止位置目標基準。 */
     @Nullable
     private float[] boardDoorLocal;
     /** 降車で使う実際のドアの車体ローカル位置。null なら停止位置目標基準。 */
@@ -98,7 +89,7 @@ public class PassengerEntity extends PathfinderMob {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0D)
                 .add(Attributes.MOVEMENT_SPEED, 0.28D)
-                //殴られても弾き飛ばされない (整列を崩さない)。押されたぶんは tickWaiting が整列位置へ戻す。
+                // 殴られても弾き飛ばされない (整列を崩さない)。押されたぶんは tickWaiting が整列位置へ戻す。
                 .add(Attributes.KNOCKBACK_RESISTANCE, 1.0D)
                 .add(Attributes.FOLLOW_RANGE, 48.0D);
     }
@@ -106,11 +97,11 @@ public class PassengerEntity extends PathfinderMob {
     @Override
     protected void registerGoals() {
         this.goalSelector.addGoal(0, new FloatGoal(this));
-        //移動は tick で navigation を直接制御する。ここは待機中の仕草だけ。
+        // 移動は tick で navigation を直接制御する。ここは待機中の仕草だけ。
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
 
-    //---- 駅 BE から呼ばれる操作 ----
+    // ---- 駅 BE から呼ばれる操作 ----
 
     /** スポーン時の初期化 (所属駅・目的駅・待機ドア)。 */
     public void initPassenger(BlockPos home, @Nullable BlockPos dest, @Nullable BlockPos waitSpot) {
@@ -143,8 +134,8 @@ public class PassengerEntity extends PathfinderMob {
         this.state = State.BOARDING;
         this.targetTrain = train;
         this.boardDeadline = this.tickCount + 20 * 15;
-        //★停止位置目標に最も近い<b>実際のドア</b>へ吸い付く。特急などドア配置が違っても、
-        //  停止位置目標がドアと合っていなくても、本物のドアから乗る。ドアが無い車種は null。
+        // ★停止位置目標に最も近い実際のドアへ吸い付く。特急などドア配置が違っても、
+        // 停止位置目標がドアと合っていなくても、本物のドアから乗る。ドアが無い車種は null。
         this.boardDoorLocal = this.waitSpot == null ? null
                 : TrainDoorLocator.nearestDoorLocal(train,
                         this.waitSpot.getX() + 0.5D, this.waitSpot.getZ() + 0.5D);
@@ -152,9 +143,8 @@ public class PassengerEntity extends PathfinderMob {
 
     /**
      * 乗降のドア形状を車体の実位置から求める。
-     * {@code local} (ドアの車体ローカル位置) があればそれを、無ければ停止位置目標 {@code spot} を
-     * ドア位置とする。返り値 {doorX, doorZ, inX, inZ, inLen}: ドアのワールド XZ と、そこから車内へ
-     * 向かう単位ベクトル (車体軸への垂線) と軸までの距離。
+     * local (ドアの車体ローカル位置) があればそれを、無ければ停止位置目標 spot を
+     * ドア位置とする。
      */
     private double[] doorGeom(EntityTrainBase train, @Nullable float[] local, @Nullable BlockPos spot) {
         double doorX;
@@ -227,7 +217,7 @@ public class PassengerEntity extends PathfinderMob {
         return dx * dx + dz * dz;
     }
 
-    //---- tick ----
+    // ---- tick ----
 
     @Override
     public void tick() {
@@ -235,7 +225,7 @@ public class PassengerEntity extends PathfinderMob {
         if (this.level().isClientSide) {
             return;
         }
-        //乗車中: 列車を追跡し、降車判定は自分で行う (駅ブロックの tick に頼らない)。
+        // 乗車中: 列車を追跡し、降車判定は自分で行う (駅ブロックの tick に頼らない)。
         if (this.getVehicle() instanceof EntityTrainBase train) {
             this.lastRiddenTrain = train;
             this.state = State.RIDING;
@@ -244,13 +234,13 @@ public class PassengerEntity extends PathfinderMob {
         }
         if (this.lastRiddenTrain != null) {
             if (this.lastRiddenTrain.isRemoved() && this.state == State.RIDING) {
-                //降車を経ずに列車が消えた = 破壊。乗客も消滅 (要件)。
+                // 降車を経ずに列車が消えた = 破壊。乗客も消滅 (要件)。
                 this.discard();
                 return;
             }
             this.lastRiddenTrain = null;
         }
-        //車内歩行中に列車が壊れたら: ENTERING(車内)=消滅、ALIGHTING(出口付近)=立ち去りへ。
+        // 車内歩行中に列車が壊れたら: ENTERING(車内)=消滅、ALIGHTING(出口付近)=立ち去りへ。
         if ((this.state == State.ENTERING || this.state == State.ALIGHTING)
                 && (this.targetTrain == null || this.targetTrain.isRemoved())) {
             this.setInteriorMode(false);
@@ -272,7 +262,7 @@ public class PassengerEntity extends PathfinderMob {
     }
 
     /**
-     * 乗車中の降車判定: 目的駅の近くで停車しドアが開いたら、<b>扉が開いてから 1 秒待って</b>降りる。
+     * 乗車中の降車判定: 目的駅の近くで停車しドアが開いたら、扉が開いてから 1 秒待って降りる。
      * 駅ブロックのチャンク状態に依存しないので、チャンク外の駅でも確実に降りられる。
      */
     private void tickRiding(EntityTrainBase train) {
@@ -290,7 +280,7 @@ public class PassengerEntity extends PathfinderMob {
         } else if (!stopped || !doorOpen) {
             this.alightAtTick = 0; //発車/ドア閉で降りそこねた → 次に停車したら再判定
         } else if (this.tickCount >= this.alightAtTick) {
-            //1 秒経過 → 席から立って車内を歩いて降りる (ワープしない)。
+            // 1 秒経過 → 席から立って車内を歩いて降りる (ワープしない)。
             this.beginAlightingWalk(train);
         }
     }
@@ -302,12 +292,12 @@ public class PassengerEntity extends PathfinderMob {
             this.ridingSeat = train.getSeatOffset(this); //リロードで消えていても復元
         }
         this.exitDoor = this.findExitDoor(train);
-        //降り口の停止位置目標に最も近い<b>実際のドア</b>へ吸い付いて出る。無ければ停止位置目標基準。
+        // 降り口の停止位置目標に最も近い実際のドアへ吸い付いて出る。無ければ停止位置目標基準。
         this.alightDoorLocal = this.exitDoor == null ? null
                 : TrainDoorLocator.nearestDoorLocal(train,
                         this.exitDoor.getX() + 0.5D, this.exitDoor.getZ() + 0.5D);
         this.stopRiding();
-        //席のワールド位置へ置く (今そこに座っているので見た目の飛びは無い)。
+        // 席のワールド位置へ置く (今そこに座っているので見た目の飛びは無い)。
         if (this.ridingSeat != null) {
             Vec3 sw = train.getSeatWorldPos(this.ridingSeat);
             this.setPos(sw.x, (train.getInteriorFloorY() - NPC_FLOOR_LOWER), sw.z);
@@ -356,18 +346,17 @@ public class PassengerEntity extends PathfinderMob {
         }
         int qi = this.queueIndex();
         double[] dir = this.queueDir();
-        //qi+1: 先頭も停止位置目標の 1 ブロック後ろに立たせ、目標の真上に溜まって重ならないようにする
-        //(乗車時は tickBoarding が目標=ドアまで歩く)。以降 1 ブロックずつ後ろへ伸ばす。
+        // qi+1: 先頭も停止位置目標の 1 ブロック後ろに立たせ、目標の真上に溜まって重ならないようにする
+        // (乗車時は tickBoarding が目標=ドアまで歩く)。以降 1 ブロックずつ後ろへ伸ばす。
         double slotX = this.waitSpot.getX() + 0.5D + dir[0] * (qi + 1);
         double slotZ = this.waitSpot.getZ() + 0.5D + dir[1] * (qi + 1);
         double dx = slotX - this.getX();
         double dz = slotZ - this.getZ();
         double distSq = dx * dx + dz * dz;
-        //整列位置から外れている (殴られた・押された・湧いた直後) → 歩いて戻る。
-        //★必ず<b>ナビゲーション (経路探索)</b> で戻す。setPos で直接動かすと当たり判定を無視して
-        //  壁の中へ押し込み、そこから出られず「壁抜け・ドアに行けない・乗れない」の原因になる。
+        // 整列位置から外れている (殴られた・押された・湧いた直後) → 歩いて戻る。
+        // ★必ずナビゲーション (経路探索) で戻す。
         if (distSq > 0.8D) {
-            //残った横方向の勢い (ノックバック等) を止めてから経路を出す。
+            // 残った横方向の勢い (ノックバック等) を止めてから経路を出す。
             Vec3 v = this.getDeltaMovement();
             this.setDeltaMovement(v.x * 0.5D, v.y, v.z * 0.5D);
             if (this.tickCount >= this.nextRepath || this.getNavigation().isDone()) {
@@ -376,7 +365,7 @@ public class PassengerEntity extends PathfinderMob {
             }
             return;
         }
-        //整列位置に到着 → その場で止まり、停止位置目標 (ドア) を向く。
+        // 整列位置に到着 → その場で止まり、停止位置目標 (ドア) を向く。
         this.getNavigation().stop();
         Vec3 v = this.getDeltaMovement();
         this.setDeltaMovement(0.0D, v.y, 0.0D);
@@ -390,17 +379,17 @@ public class PassengerEntity extends PathfinderMob {
                 || Math.abs(train.getSpeed()) > 0.05F
                 || train.getTrainStateData(4) == 0
                 || this.tickCount > this.boardDeadline) {
-            //乗り損ね/ドアが閉まった: 待機に戻る
+            // 乗り損ね/ドアが閉まった: 待機に戻る
             this.targetTrain = null;
             this.state = State.WAITING;
             return;
         }
-        //実際のドア (吸着先) の位置とホーム側への向きを車体の実位置から出す。
+        // 実際のドア (吸着先) の位置とホーム側への向きを車体の実位置から出す。
         double[] g = this.doorGeom(train, this.boardDoorLocal, this.waitSpot);
         double doorX = g[0];
         double doorZ = g[1];
-        //ホーム側 (車内の逆) へ 1.6 ブロック出た「ドア前のホーム上」を目標に歩く。端ぎりぎりでなく
-        //ホーム側なので経路探索が届きやすい。
+        // ホーム側 (車内の逆) へ 1.6 ブロック出た「ドア前のホーム上」を目標に歩く。端ぎりぎりでなく
+        // ホーム側なので経路探索が届きやすい。
         double approachX = doorX - g[2] * 1.6D;
         double approachZ = doorZ - g[3] * 1.6D;
         double doorY = this.waitSpot != null ? this.waitSpot.getY() : this.getY();
@@ -408,13 +397,13 @@ public class PassengerEntity extends PathfinderMob {
         double dz = approachZ - this.getZ();
         double dsq = dx * dx + dz * dz;
         boolean reached = dsq <= 1.6D;
-        //★ドア前はプラットフォーム端に近く、地上の経路探索が寄り切れず手前で止まりがち
-        //  (moveTo が経路を返さない=isDone)。行き詰まって、かつドア前がそこそこ近ければ、そこから
-        //  先は ENTERING の noPhysics 歩行で確実に寄せる。これで「ドアまで行かない・乗らない」を防ぐ。
+        // ★ドア前はプラットフォーム端に近く、地上の経路探索が寄り切れず手前で止まりがち
+        // (moveTo が経路を返さない=isDone)。行き詰まって、かつドア前がそこそこ近ければ、そこから
+        // 先は ENTERING の noPhysics 歩行で確実に寄せる。これで「ドアまで行かない・乗らない」を防ぐ。
         long elapsed = this.tickCount - (this.boardDeadline - 20 * 15);
         boolean navStuckNearDoor = this.getNavigation().isDone() && elapsed > 12 && dsq <= 49.0D;
         if (!reached && !navStuckNearDoor) {
-            //まだ経路で寄れる余地がある → ドア前まで歩く (一定間隔で必ず再探索)。
+            // まだ経路で寄れる余地がある → ドア前まで歩く (一定間隔で必ず再探索)。
             if (this.tickCount >= this.nextRepath || this.getNavigation().isDone()) {
                 this.getNavigation().moveTo(approachX, doorY, approachZ, 1.0D);
                 this.nextRepath = this.tickCount + 8;
@@ -422,7 +411,7 @@ public class PassengerEntity extends PathfinderMob {
             this.getLookControl().setLookAt(doorX, this.getEyeY(), doorZ);
             return;
         }
-        //ドア前に到着 (または経路が端で行き詰まった) → 空席を確保して ENTERING で確実に扉から入る。
+        // ドア前に到着 (または経路が端で行き詰まった) → 空席を確保して ENTERING で確実に扉から入る。
         this.getNavigation().stop();
         float[] seat = findFreeSeat(train);
         if (seat != null) {
@@ -433,7 +422,7 @@ public class PassengerEntity extends PathfinderMob {
             this.state = State.ENTERING;
             return;
         }
-        //満席: 待機に戻す
+        // 満席: 待機に戻す
         this.targetTrain = null;
         this.state = State.WAITING;
     }
@@ -441,11 +430,8 @@ public class PassengerEntity extends PathfinderMob {
     /**
      * 乗車の車内歩行: ① 停止位置目標 (=ドア) の真上へ整列 → ② そこから線路側へ真っ直ぐ車内へ →
      * ③ 席へ、と自分の足で歩き、席の 1 ブロック以内で着席する。
-     *
-     * <p><b>侵入の基準は「停止位置目標の実座標」</b>にする (以前は車体からの相対位置で算出していたため、
-     * 列車が 1 ブロックほどずれて停まると扉の脇=壁を抜けて入ってしまっていた)。停止位置目標は
-     * ユーザーが扉の位置に合わせて置くマーカーなので、そこを基準に<b>ホームと垂直に真っ直ぐ</b>
-     * 入れば、多少停止位置がずれても常に扉から入る。中に入ってからは席まで歩く (車内は従来どおり)。
+     * 侵入の基準は「停止位置目標の実座標」にする (以前は車体からの相対位置で算出していたため、
+     * 列車が 1 ブロックほどずれて停まると扉の脇=壁を抜けて入ってしまっていた)。
      */
     private void tickEntering() {
         EntityTrainBase train = this.targetTrain;
@@ -458,8 +444,8 @@ public class PassengerEntity extends PathfinderMob {
         boolean departed = Math.abs(train.getSpeed()) > 0.05F || train.getTrainStateData(4) == 0;
         boolean timeout = this.tickCount - this.interiorStart > 20 * 14;
         double floorY = (train.getInteriorFloorY() - NPC_FLOOR_LOWER);
-        //★実際のドア (吸着先) の位置と、そこから車内へ向かう垂線を車体の実位置から出す。
-        //  boardDoorLocal があればモデルの本物のドア、無ければ停止位置目標を基準にする。
+        // ★実際のドア (吸着先) の位置と、そこから車内へ向かう垂線を車体の実位置から出す。
+        // boardDoorLocal があればモデルの本物のドア、無ければ停止位置目標を基準にする。
         double[] g = this.doorGeom(train, this.boardDoorLocal, this.waitSpot);
         double doorX = g[0];
         double doorZ = g[1];
@@ -468,7 +454,7 @@ public class PassengerEntity extends PathfinderMob {
         double inLen = g[4];
 
         if (this.walkStage == 0) {
-            //① 実際のドアの真正面 (ホーム側すぐ) へ整列してから入る。
+            // ① 実際のドアの真正面 (ホーム側すぐ) へ整列してから入る。
             double frontX = doorX - inX * 0.6D;
             double frontZ = doorZ - inZ * 0.6D;
             if (this.walkToward(frontX, this.getY(), frontZ, false, 0.3D) || departed || timeout) {
@@ -477,7 +463,7 @@ public class PassengerEntity extends PathfinderMob {
             return;
         }
         if (this.walkStage == 1) {
-            //② ドアから車内へ、軸を少し越える所まで真っ直ぐ入る (必ず扉を通り、壁を斜めに抜けない)。
+            // ② ドアから車内へ、軸を少し越える所まで真っ直ぐ入る (必ず扉を通り、壁を斜めに抜けない)。
             double into = inLen + 0.4D;
             double tx = doorX + inX * into;
             double tz = doorZ + inZ * into;
@@ -486,7 +472,7 @@ public class PassengerEntity extends PathfinderMob {
             }
             return;
         }
-        //③ 席へ歩き、1 ブロック以内で着席。
+        // ③ 席へ歩き、1 ブロック以内で着席。
         Vec3 seatW = train.getSeatWorldPos(this.ridingSeat);
         if (this.walkToward(seatW.x, floorY, seatW.z, true, 1.0D) || departed || timeout) {
             float[] seat = this.ridingSeat;
@@ -520,7 +506,7 @@ public class PassengerEntity extends PathfinderMob {
         double floorY = (train.getInteriorFloorY() - NPC_FLOOR_LOWER);
 
         if (this.alightDoorLocal != null || this.exitDoor != null) {
-            //実際のドア (吸着先。無ければ降り口マーカー) を基準に、そこからホームへ真っ直ぐ出る。
+            // 実際のドア (吸着先。無ければ降り口マーカー) を基準に、そこからホームへ真っ直ぐ出る。
             double[] g = this.doorGeom(train, this.alightDoorLocal, this.exitDoor);
             double doorX = g[0];
             double doorZ = g[1];
@@ -528,13 +514,13 @@ public class PassengerEntity extends PathfinderMob {
             double outZ = -g[3];
             double outY = this.exitDoor != null ? this.exitDoor.getY() : floorY;
             if (this.walkStage == 0) {
-                //① 車内から実際のドアの真上まで歩く。
+                // ① 車内から実際のドアの真上まで歩く。
                 if (this.walkToward(doorX, floorY, doorZ, true, 0.32D) || timeout) {
                     this.walkStage = 1;
                 }
                 return;
             }
-            //② ドアからホームへ 1.6 ブロック出て、立ち去りへ。
+            // ② ドアからホームへ 1.6 ブロック出て、立ち去りへ。
             double tx = doorX + outX * 1.6D;
             double tz = doorZ + outZ * 1.6D;
             if (this.walkToward(tx, outY, tz, false, 0.4D) || timeout) {
@@ -548,7 +534,7 @@ public class PassengerEntity extends PathfinderMob {
             return;
         }
 
-        //降り口マーカーが無い (目的駅チャンク未ロード等): 車体から横へ出す従来のフォールバック。
+        // 降り口マーカーが無い (目的駅チャンク未ロード等): 車体から横へ出す従来のフォールバック。
         double halfWidth = EntityTrainBase.TRAIN_WIDTH / 2.0D;
         double[] door = this.doorLocal(train, null);
         double sign = door[0];
@@ -571,8 +557,8 @@ public class PassengerEntity extends PathfinderMob {
     }
 
     /**
-     * 車内歩行の 1 tick: (tx,ty,tz) へ WALK_STEP ずつ近づく。{@code insideCar} なら Y を床へスナップ、
-     * そうでなければ徐々に寄せる。進行方向へ体を向ける。水平距離が {@code reach} 以内で true。
+     * 車内歩行の 1 tick: (tx,ty,tz) へ WALK_STEP ずつ近づく。insideCar なら Y を床へスナップ、
+     * そうでなければ徐々に寄せる。進行方向へ体を向ける。水平距離が reach 以内で true。
      */
     private boolean walkToward(double tx, double ty, double tz, boolean insideCar, double reach) {
         double dx = tx - this.getX();
@@ -595,7 +581,7 @@ public class PassengerEntity extends PathfinderMob {
     }
 
     /**
-     * 扉の車体ローカル {widthSign(±1), length}。{@code ref} (停止位置目標) を車体ローカルへ射影して
+     * 扉の車体ローカル {widthSign(±1), length}。ref (停止位置目標) を車体ローカルへ射影して
      * 長さと左右どちら側かを取る。列車の実位置・向きから算出するので停止位置が多少ずれても追従する。
      */
     private double[] doorLocal(EntityTrainBase train, @Nullable BlockPos ref) {
@@ -661,10 +647,8 @@ public class PassengerEntity extends PathfinderMob {
     }
 
     /**
-     * 並ぶ方向: 停止位置目標から見て<b>駅ブロック側 (ホーム奥)</b>へ一直線。駅ブロックはホーム上
+     * 並ぶ方向: 停止位置目標から見て駅ブロック側 (ホーム奥)へ一直線。
      * (線路と反対側) に置かれるので、この向き＝線路から離れる向き＝ドアの後ろへ縦並び、になる。
-     * <p><b>列車の位置ではなく駅ブロックで向きを決める</b>のが要点。列車が通過するたびに向きが
-     * 反転して列が乱れるのを防ぎ、常に同じ向きへ綺麗に整列する。1 つの最寄り軸へ量子化する。
      */
     private double[] queueDir() {
         if (this.waitSpot == null || this.homeStation == null) {
@@ -711,7 +695,7 @@ public class PassengerEntity extends PathfinderMob {
         return fallback;
     }
 
-    //---- 永続化 / 総数管理 ----
+    // ---- 永続化 / 総数管理 ----
 
     @Override
     public void addAdditionalSaveData(CompoundTag tag) {
@@ -736,7 +720,7 @@ public class PassengerEntity extends PathfinderMob {
         } catch (IllegalArgumentException e) {
             this.state = State.WAITING;
         }
-        //ターゲット列車を保存しない遷移状態は安全側へ戻す。物理も確実に復元。
+        // ターゲット列車を保存しない遷移状態は安全側へ戻す。物理も確実に復元。
         if (this.state == State.BOARDING || this.state == State.ENTERING) {
             this.state = State.WAITING;
         } else if (this.state == State.ALIGHTING) {
@@ -752,7 +736,7 @@ public class PassengerEntity extends PathfinderMob {
         NbtUtils.readBlockPos(tag, "PsgWait").ifPresent(pos -> this.waitSpot = pos);
     }
 
-    //---- 振る舞いの細部 ----
+    // ---- 振る舞いの細部 ----
 
     /** 自然デスポーンしない (駅で待ち続ける)。 */
     @Override

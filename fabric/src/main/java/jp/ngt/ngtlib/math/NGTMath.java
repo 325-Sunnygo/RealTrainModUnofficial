@@ -10,10 +10,6 @@ import java.util.stream.IntStream;
  * 本家 NGTLib (jp.ngt.ngtlib.math.NGTMath) の忠実移植。
  * KaizPatchX (1.7.10) 版をベースに、1.12.2 版で追加されたメソッド
  * (floor, getSinD/getCosD, getAtan2/getAtan2D, getAngleD) を統合。
- *
- * 重要: sin/cos は「度」入力、getSin/getCos は「ラジアン」入力
- * (getSin/getCos は JS からの利用向け — Java8 Nashorn では "sin" が使えなかった対策、本家コメントのまま)。
- * MathHelper → Mth (同じ 65536 エントリのルックアップテーブル実装)。
  */
 public final class NGTMath {
     public static final Random RANDOM = new Random();
@@ -35,16 +31,12 @@ public final class NGTMath {
     private NGTMath() {
     }
 
-    /**
-     * ラジアンから度
-     */
+    /** ラジアンから度 */
     public static float toDegrees(float par1) {
         return par1 * (float) TO_DEG;
     }
 
-    /**
-     * 度からラジアン
-     */
+    /** 度からラジアン */
     public static float toRadians(float par1) {
         return par1 * (float) TO_RAD;
     }
@@ -57,9 +49,7 @@ public final class NGTMath {
         return par1 * TO_RAD;
     }
 
-    /**
-     * 0 ~ 360
-     */
+    /** 0 ~ 360 */
     public static double normalizeAngle(double par1) {
         double d0 = par1;
 
@@ -73,9 +63,7 @@ public final class NGTMath {
         return d0;
     }
 
-    /**
-     * @param sd : 分散
-     */
+    /** @param sd : 分散 */
     public static double getGaussian(Random random, double sd) {
         double z = Math.sqrt(-2.0D * StrictMath.log(random.nextDouble())) * Math.sin(2.0D * Math.PI * random.nextDouble());
         return sd * z;
@@ -145,9 +133,7 @@ public final class NGTMath {
         return v1.getX() == v2.getX() && v1.getY() == v2.getY() && v1.getZ() == v2.getZ();
     }
 
-    /**
-     * @return radian
-     */
+    /** @return radian */
     public static double getAngle(Vec3 v1, Vec3 v2) {
         double d0 = (v1.getX() * v2.getX() + v1.getY() * v2.getY() + v1.getZ() * v2.getZ()) / (v1.length() * v2.length());
         return Math.acos(d0);
@@ -165,7 +151,6 @@ public final class NGTMath {
 
     /**
      * 小数をある程度の精度で誤差を無視して比較
-     *
      * @param p3 小数点以下の桁数
      */
     public static boolean compare(double p1, double p2, int p3) {
@@ -184,9 +169,7 @@ public final class NGTMath {
         return Mth.sin(par1);
     }
 
-    /**
-     * 単位:度
-     */
+    /** 単位:度 */
     public static float getSinD(float par1) {
         return Mth.sin(toRadians(par1));
     }
@@ -199,9 +182,7 @@ public final class NGTMath {
         return Mth.cos(par1);
     }
 
-    /**
-     * 単位:度
-     */
+    /** 単位:度 */
     public static float getCosD(float par1) {
         return Mth.cos(toRadians(par1));
     }
@@ -214,16 +195,12 @@ public final class NGTMath {
         return toDegrees(getAtan2(y, x));
     }
 
-    /**
-     * 単位:度
-     */
+    /** 単位:度 */
     public static float sin(float par1) {
         return Mth.sin(toRadians(par1));
     }
 
-    /**
-     * 単位:度
-     */
+    /** 単位:度 */
     public static float cos(float par1) {
         return Mth.cos(toRadians(par1));
     }

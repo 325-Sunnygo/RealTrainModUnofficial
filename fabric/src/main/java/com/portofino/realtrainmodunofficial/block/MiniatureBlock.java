@@ -24,14 +24,9 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
 /**
- * 設置済みミニチュア (neo mcte)。本家 MCTE {@code BlockMiniature} 相当。
- *
- * <p>見た目は全て {@link com.portofino.realtrainmodunofficial.blockentity.MiniatureBlockEntity}
- * が持つ中身を描く。ブロック自体は<b>描かない</b> ({@link RenderShape#INVISIBLE})。
- *
- * <p>明るさは中身の設定 ({@code MBState.LightValue}) をそのまま出す。本家は
- * 中身のブロックの最大光源値を拾っていたが、それだと設置後に変えられないので
- * neo mcte では設定値を正とする (未設定なら中身から推定)。
+ * 設置済みミニチュア (neo mcte)。本家 MCTE BlockMiniature 相当。
+ * 見た目は全て com.portofino.realtrainmodunofficial.blockentity.MiniatureBlockEntity
+ * が持つ中身を描く。ブロック自体は描かない (RenderShape#INVISIBLE)。
  */
 public class MiniatureBlock extends BaseEntityBlock {
 
@@ -62,7 +57,7 @@ public class MiniatureBlock extends BaseEntityBlock {
 
     @Override
     protected RenderShape getRenderShape(BlockState state) {
-        //中身はブロックエンティティレンダラが描く。ブロック本体は描かない。
+        // 中身はブロックエンティティレンダラが描く。ブロック本体は描かない。
         return RenderShape.INVISIBLE;
     }
 
@@ -76,7 +71,7 @@ public class MiniatureBlock extends BaseEntityBlock {
         return true;
     }
 
-    //★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
+    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public int getLightEmission(BlockState state, BlockGetter level, BlockPos pos) {
         if (level.getBlockEntity(pos) instanceof MiniatureBlockEntity be) {
             return Math.max(0, Math.min(15, be.getLightValue()));
@@ -85,8 +80,8 @@ public class MiniatureBlock extends BaseEntityBlock {
     }
 
     /**
-     * 壊したら<b>中身ごと</b>アイテムに戻す。
-     * <p>これが無いと設置した瞬間に中身が失われる。設定 (縮尺/オフセット/モード) も往復させる。
+     * 壊したら中身ごとアイテムに戻す。
+     * これが無いと設置した瞬間に中身が失われる。設定 (縮尺/オフセット/モード) も往復させる。
      */
     @Override
     public ItemStack getCloneItemStack(net.minecraft.world.level.LevelReader level, BlockPos pos, BlockState state) {

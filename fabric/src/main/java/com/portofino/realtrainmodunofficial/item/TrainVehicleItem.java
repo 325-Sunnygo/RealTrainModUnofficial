@@ -34,11 +34,11 @@ import java.util.Locale;
 
 public class TrainVehicleItem extends Item {
     /**
-     * 本家 KaizPatchX の {@code customIconTexture} 用の描画器。
-     * <p>実際に使われるのは、選択中のモデルが {@code customIconTexture} を持つときだけ
-     * ({@link com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel} が判定する)。
+     * 本家 KaizPatchX の customIconTexture 用の描画器。
+     * 実際に使われるのは、選択中のモデルが customIconTexture を持つときだけ
+     * (com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel が判定する)。
      */
-    //★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
+    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
         consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {

@@ -26,18 +26,7 @@ import net.minecraft.world.level.Level;
 
 /**
  * 本家 jp.ngt.rtm.entity.npc.EntityMotorman の移植 (運転士)。
- *
- * <p>運転士アイテムで列車を右クリックすると運転台に乗り、自動運転する:
- * <ul>
- *   <li><b>信号運転:</b> 通過した信号の現示に応じた速度まで加減速 (本家 EntityAIDrivingWithSignal)</li>
- *   <li><b>ダイヤ運転:</b> 「本と羽根ペン」を持たせると、書かれたダイヤ
- *       ({@code 時刻 コマンド x y z} 形式) に従って発車/通過/停車 (本家 EntityAIDrivingWithDiagram)</li>
- *   <li><b>マクロ運転:</b> 素手で右クリック → config/realtrainmodunofficial/macro/ の
- *       マクロ (.txt) を選択して実行 (本家 EntityAIDriveWithMacro)</li>
- * </ul>
- *
- * <p>軽量化: AI は数 tick おきに判断する (ノッチ操作に 20Hz は不要)。描画はバニラの
- * プレイヤーモデル + 同梱スキンで、スクリプト実行は一切無い。
+ * 運転士アイテムで列車を右クリックすると運転台に乗り、自動運転する:
  */
 public class EntityMotorman extends PathfinderMob {
 
@@ -47,8 +36,8 @@ public class EntityMotorman extends PathfinderMob {
     private static final EntityDataAccessor<String> SKIN =
             SynchedEntityData.defineId(EntityMotorman.class, EntityDataSerializers.STRING);
 
-    //★registerGoals() はスーパーコンストラクタから呼ばれるため、ここで生成する
-    //  (コンストラクタのフィールド初期化より前。final にして ctor で入れると null で登録され NPE)。
+    // ★registerGoals はスーパーコンストラクタから呼ばれるため、ここで生成する
+    // (コンストラクタのフィールド初期化より前。final にして ctor で入れると null で登録され NPE)。
     private DriveWithMacroGoal macroGoal;
 
     public EntityMotorman(EntityType<? extends EntityMotorman> type, Level level) {
@@ -67,8 +56,8 @@ public class EntityMotorman extends PathfinderMob {
 
     @Override
     protected void registerGoals() {
-        //本家の task 順: 泳ぐ > マクロ > ダイヤ > 信号 > うろつき > プレイヤー注視 > 見回し
-        //(このメソッドはスーパーコンストラクタから呼ばれるので macroGoal はここで生成する)
+        // 本家の task 順: 泳ぐ > マクロ > ダイヤ > 信号 > うろつき > プレイヤー注視 > 見回し
+        // (このメソッドはスーパーコンストラクタから呼ばれるので macroGoal はここで生成する)
         this.macroGoal = new DriveWithMacroGoal(this);
         this.goalSelector.addGoal(1, new FloatGoal(this));
         this.goalSelector.addGoal(2, this.macroGoal);
@@ -86,7 +75,7 @@ public class EntityMotorman extends PathfinderMob {
         builder.define(SKIN, "");
     }
 
-    //------------------------------------------------------------ スキン
+    // ------------------------------------------------------------ スキン
 
     /** スキン名 ("" = 既定/季節)。レンダラが参照する。 */
     public String getSkin() {
@@ -97,7 +86,7 @@ public class EntityMotorman extends PathfinderMob {
         this.entityData.set(SKIN, skin == null ? "" : skin);
     }
 
-    //------------------------------------------------------------ ダイヤ (本と羽根ペン)
+    // ------------------------------------------------------------ ダイヤ (本と羽根ペン)
 
     public boolean hasDiagram() {
         ItemStack stack = this.getDiagram();
@@ -119,7 +108,7 @@ public class EntityMotorman extends PathfinderMob {
         }
     }
 
-    //------------------------------------------------------------ NBT
+    // ------------------------------------------------------------ NBT
 
     @Override
     public void addAdditionalSaveData(CompoundTag nbt) {
@@ -143,12 +132,12 @@ public class EntityMotorman extends PathfinderMob {
         }
     }
 
-    //------------------------------------------------------------ インタラクト
+    // ------------------------------------------------------------ インタラクト
 
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
         ItemStack held = player.getItemInHand(hand);
-        //本家: 「本と羽根ペン」を渡すとダイヤとしてセット
+        // 本家: 「本と羽根ペン」を渡すとダイヤとしてセット
         if (held.is(Items.WRITABLE_BOOK) && held.has(DataComponents.WRITABLE_BOOK_CONTENT)) {
             if (!this.level().isClientSide) {
                 this.setDiagram(held.copyWithCount(1));
@@ -156,7 +145,7 @@ public class EntityMotorman extends PathfinderMob {
             held.shrink(1);
             return InteractionResult.sidedSuccess(this.level().isClientSide);
         }
-        //本家: 素手で右クリック → マクロ選択 GUI (クライアント)
+        // 本家: 素手で右クリック → マクロ選択 GUI (クライアント)
         if (hand == InteractionHand.MAIN_HAND && held.isEmpty()) {
             if (this.level().isClientSide) {
                 com.portofino.realtrainmodunofficial.client.MotormanClientHelper.openMacroScreen(this.getId());
@@ -166,11 +155,11 @@ public class EntityMotorman extends PathfinderMob {
         return super.mobInteract(player, hand);
     }
 
-    //------------------------------------------------------------ ダメージ/ドロップ
+    // ------------------------------------------------------------ ダメージ/ドロップ
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
-        //本家: プレイヤーの攻撃は一撃 (回収しやすく)。
+        // 本家: プレイヤーの攻撃は一撃 (回収しやすく)。
         if (source.getEntity() instanceof Player) {
             amount = 10000.0F;
         }
@@ -181,11 +170,11 @@ public class EntityMotorman extends PathfinderMob {
     public void die(DamageSource source) {
         super.die(source);
         if (!this.level().isClientSide) {
-            //ダイヤの本は必ず返す
+            // ダイヤの本は必ず返す
             if (this.hasDiagram()) {
                 this.spawnAtLocation(this.getDiagram(), 1.0F);
             }
-            //サバイバルのプレイヤーに倒されたらアイテムとして返す (本家 dropEntity)
+            // サバイバルのプレイヤーに倒されたらアイテムとして返す (本家 dropEntity)
             if (source.getEntity() instanceof Player player && !player.getAbilities().instabuild) {
                 this.spawnAtLocation(new ItemStack(
                         com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.MOTORMAN_ITEM.get()), 0.5F);
@@ -198,7 +187,7 @@ public class EntityMotorman extends PathfinderMob {
         return new ItemStack(com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.MOTORMAN_ITEM.get());
     }
 
-    //------------------------------------------------------------ その他
+    // ------------------------------------------------------------ その他
 
     @Override
     public boolean removeWhenFarAway(double distance) {
@@ -210,7 +199,7 @@ public class EntityMotorman extends PathfinderMob {
         return false;
     }
 
-    //経験値は落とさない (本家 getExperiencePoints=0。Mob の既定 xpReward も 0)
+    // 経験値は落とさない (本家 getExperiencePoints=0。Mob の既定 xpReward も 0)
 
     /** 本家 isMotorman: 運転士 NPC か。 */
     public boolean isMotorman() {

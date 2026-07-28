@@ -14,7 +14,7 @@ public final class MCTE {
     public static final String MODID = "MCTE";
     public static final String VERSION = "1.7.10.16 KaizPatchX/remaster-1.21.1";
 
-    //エディタ GUI の ID (本家の固定値)
+    // エディタ GUI の ID (本家の固定値)
     public static short guiIdEditor = 1700;
     public static short guiIdGenerator = 1701;
     public static short guiIdPainter = 1702;

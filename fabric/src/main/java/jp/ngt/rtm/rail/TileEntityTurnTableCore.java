@@ -11,8 +11,6 @@ import net.minecraft.world.phys.AABB;
 /**
  * 本家 jp.ngt.rtm.rail.TileEntityTurnTableCore (KaizPatchX) の忠実移植。
  * TODO(Phase 2): updateTrainYaw (回転中の列車追従) は EntityTrainBase/BogieController 移植後に接続。
- * TODO(Phase 1 flip): 回転値のクライアント通知 (本家 PacketNotice "TT:") は markBlockForUpdate の
- * フル NBT 同期で代替中。
  */
 public class TileEntityTurnTableCore extends TileEntityLargeRailCore {
     public static final float ROTATION_INC = 0.5F;
@@ -64,7 +62,7 @@ public class TileEntityTurnTableCore extends TileEntityLargeRailCore {
                 if (rm instanceof RailMapTurntable) {
                     ((RailMapTurntable) rm).setRotation(this.rotation);
                 }
-                //TODO(Phase 2): updateTrainYaw()
+                // TODO(Phase 2): updateTrainYaw
             }
         } else {
             float f0 = this.rotation % ROTATION_STEP;

@@ -5,8 +5,7 @@ import java.util.List;
 
 /**
  * 本家 jp.ngt.ngtlib.renderer.NGTTessellator (Tessellator ラッパ) のスクリプト互換。
- * 頂点列を蓄積し、draw() で GLRecorder に DRAW_TESS として記録する。
- * 再生側が現在のテクスチャ差し替え/輝度で頂点を emit する。
+ * 頂点列を蓄積し、draw で GLRecorder に DRAW_TESS として記録する。
  */
 @SuppressWarnings("unused")
 public final class NGTTessellator {
@@ -66,12 +65,7 @@ public final class NGTTessellator {
 
     /**
      * 本家 Tessellator.setColorOpaque_I: パック済み RGB を不透明色として設定する。
-     *
-     * <p><b>これが未実装だったため、本家の電線スクリプトが動いていなかった。</b>
-     * RenderBasicWire.js は {@code tessellator.setColorOpaque_I(renderer.getColor(tileEntity))} を
-     * 呼ぶので、TypeError でスクリプトごと落ち、呼び出し側が「何も描かなかった」と判断して
-     * RTMU 独自のハードコード色 (ほぼ黒) のフォールバック描画に切り替わっていた。
-     * 結果、既定のワイヤー (BasicWireBlack / シンプルカテナリー) が真っ黒な電線に見えていた。
+     * これが未実装だったため、本家の電線スクリプトが動いていなかった。
      */
     public void setColorOpaque_I(int color) {
         this.setColorRGBA((color >>> 16) & 0xFF, (color >>> 8) & 0xFF, color & 0xFF, 255);
@@ -181,7 +175,7 @@ public final class NGTTessellator {
         this.mode = s.mode;
     }
 
-    /** 本家 draw() は積んだバイト数を返す。値を見るスクリプトがあるので合わせる。 */
+    /** 本家 draw は積んだバイト数を返す。値を見るスクリプトがあるので合わせる。 */
     public int draw() {
         int count = this.verts.size();
         GLRecorder rec = GLRecorder.active();

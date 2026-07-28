@@ -2,13 +2,7 @@ package jp.ngt.mccompat.tileentity;
 
 /**
  * 1.7.10 net.minecraft.tileentity.CommandBlockLogic のスクリプト互換。
- *
- * <p>スクリプトはコマンド文字列を<b>リフレクションで</b>抜く:
- * <pre>
- *   NGTUtil.getField(CommandBlockLogic.class, logic, ["Command", "field_145763_e"])
- * </pre>
- * MOD 越しに private フィールドを読む前提の書き方なので、こちらも
- * <b>両方の名前のフィールド</b>を実際に持たせて成立させる。
+ * スクリプトはコマンド文字列をリフレクションで抜く:
  */
 @SuppressWarnings("unused")
 public final class CommandBlockLogic {

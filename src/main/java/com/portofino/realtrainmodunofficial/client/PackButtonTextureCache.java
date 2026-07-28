@@ -22,9 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/**
- * RTM pack の buttonTexture を選択画面で再利用するための小さいキャッシュ。
- */
+/** RTM pack の buttonTexture を選択画面で再利用するための小さいキャッシュ。 */
 public final class PackButtonTextureCache {
     public record ButtonTextureInfo(ResourceLocation location, int width, int height,
                                     int sourceX, int sourceY, int sourceWidth, int sourceHeight) {}
@@ -38,10 +36,8 @@ public final class PackButtonTextureCache {
 
     /**
      * 「このパスにボタンテクスチャは無い」ことを表す番兵。
-     * <p>
-     * null を返すと {@link Map#computeIfAbsent} がキャッシュに乗せないため、欠落テクスチャを
-     * 参照するたびに全パック走査が走って FPS が激減する。<b>欠落という結果自体をキャッシュ</b>
-     * するためにこれを入れ、外に出すときだけ null へ戻す。
+     * null を返すと Map#computeIfAbsent がキャッシュに乗せないため、欠落テクスチャを
+     * 参照するたびに全パック走査が走って FPS が激減する。
      */
     private static final ButtonTextureInfo MISSING =
         new ButtonTextureInfo(null, 0, 0, 0, 0, 0, 0);
@@ -52,7 +48,7 @@ public final class PackButtonTextureCache {
         }
         String key = packName + "|" + texturePath;
         ButtonTextureInfo info = CACHE.computeIfAbsent(key, ignored -> load(packName, texturePath));
-        //呼び出し側には「無い = null」で見せる (描画側は車両名の文字にフォールバックする)
+        // 呼び出し側には「無い = null」で見せる (描画側は車両名の文字にフォールバックする)
         return info == MISSING ? null : info;
     }
 
@@ -87,17 +83,16 @@ public final class PackButtonTextureCache {
 
     /**
      * テクスチャ欠落。紫黒チェッカーは描かず、欠落であることだけをキャッシュに残す。
-     * 呼び出し側 (ModelSelectScreen) は null を受けて<b>車両名の文字</b>を描く。
+     * 呼び出し側 (ModelSelectScreen) は null を受けて車両名の文字を描く。
      */
     private static ButtonTextureInfo missingButtonInfo() {
         return MISSING;
     }
 
     /**
-     * buttonTexture のソース矩形を<b>ニアレストで target サイズへ焼き直した</b>テクスチャの location。
+     * buttonTexture のソース矩形をニアレストで target サイズへ焼き直したテクスチャの location。
      * これを 1:1 (target と同じ UV サイズ) で blit すれば、GUI の描画経路が線形補間を強制していても
-     * スケーリングが起きない (テクセル=ピクセル) ので<b>必ず鮮明</b>になる。にじみ対策の本命。
-     * target は「ボタンの GUI サイズ × guiScale」を渡すこと (画面ピクセルと 1:1 になる)。失敗時は素の location。
+     * スケーリングが起きない (テクセル=ピクセル) ので必ず鮮明になる。にじみ対策の本命。
      */
     public static ResourceLocation getCrisp(String packName, String texturePath, int targetW, int targetH) {
         ButtonTextureInfo base = get(packName, texturePath);
@@ -135,10 +130,8 @@ public final class PackButtonTextureCache {
     }
 
     /**
-     * {@link #getCrisp} の<b>全画像</b>版。ボタン矩形(左上62.5%×12.5%)ではなく画像全体を
-     * ニアレストで target へ焼き直す。標識/看板のように buttonTexture が 160×32 ボタン形式でなく
-     * <b>実寸のフル画像</b>のものはこちらを使う (region 切り出しだと絵が見切れる)。
-     * 呼び出し側で元画像のアスペクト比に合わせた target を渡すこと (歪み防止)。
+     * #getCrisp の全画像版。
+     * ニアレストで target へ焼き直す。
      */
     public static ResourceLocation getCrispFull(String packName, String texturePath, int targetW, int targetH) {
         ButtonTextureInfo base = get(packName, texturePath);
@@ -221,11 +214,8 @@ public final class PackButtonTextureCache {
         );
         int width = image.getWidth();
         int height = image.getHeight();
-        // RTM 本家のボタン UV は 256px 空間で (0,0)-(160,32) を <b>固定倍率 f=1/256</b> で描く。
-        // = テクスチャ左上の <b>62.5% × 12.5%</b> をサンプルする (解像度に依らずこの割合)。
-        // 実際のボタン画像は正方キャンバス (256/512/652…) の左上にこの比率で描かれているので、
-        // ソース矩形も解像度に比例させないと、512/652px 等で左上のごく一部だけ拾って
-        // 2〜4倍に拡大 = 文字化け/巨大化する (旧 min(w,160)/min(h,32) の不具合)。
+        // RTM 本家のボタン UV は 256px 空間で (0,0)-(160,32) を 固定倍率 f=1/256 で描く。
+        // = テクスチャ左上の 62.5% × 12.5% をサンプルする (解像度に依らずこの割合)。
         int srcW;
         int srcH;
         if (width >= 160 && height >= 128) {
@@ -238,12 +228,8 @@ public final class PackButtonTextureCache {
             srcH = Math.min(height, 32);
         }
         DynamicTexture dynamicTexture = new DynamicTexture(image);
-        // GUI ボタンはピクセル等倍で鮮明に見せたい。DynamicTexture は既定で線形補間が効いて
+        // GUI ボタンはピクセル等倍で鮮明に見せたい。
         // 拡大縮小時ににじむ (ユーザー報告「ボタンがぼやける」)。最近傍・ミップマップ無しに固定する。
-        // setFilter だけだと 1.21.1 では bind されず効かない場合があるので、テクスチャを明示バインドして
-        // 低レベル (glTexParameter) でも GL_NEAREST を強制する。RTM 本家 (1.7.10) も GUI は最近傍。
-        // 登録 (= GPU アップロード) してから最近傍を設定する。アップロード前に setFilter しても
-        // 上書きされる実装があるため、順序が重要。
         Minecraft.getInstance().getTextureManager().register(location, dynamicTexture);
         dynamicTexture.setFilter(false, false);
         forceNearestFilter(dynamicTexture);
@@ -325,9 +311,9 @@ public final class PackButtonTextureCache {
     private static ZipEntry findEntry(ZipFile zipFile, String texturePath) {
         String normalized = normalize(texturePath).toLowerCase(Locale.ROOT);
         String leaf = normalized.substring(normalized.lastIndexOf('/') + 1);
-        //1) フルパス一致を最優先。button_*.png が normal/ と new/ のように<b>別フォルダに同名で</b>
-        //   同居していると、リーフ名一致だけでは zip 内の先着を拾って取り違える (E259 と E259N で
-        //   同じボタンが出る不具合)。まず要求パスそのものに一致するエントリを探す。
+        // 1) フルパス一致を最優先。button_*.png が normal/ と new/ のように別フォルダに同名で
+        // 同居していると、リーフ名一致だけでは zip 内の先着を拾って取り違える とN で
+        // 同じボタンが出る不具合)。まず要求パスそのものに一致するエントリを探す。
         ZipEntry byFullPath = zipFile.stream()
             .filter(entry -> !entry.isDirectory())
             .filter(entry -> {
@@ -341,7 +327,7 @@ public final class PackButtonTextureCache {
         if (byFullPath != null) {
             return byFullPath;
         }
-        //2) フルパスで見つからないときだけ、最後の手段としてリーフ名一致にフォールバック。
+        // 2) フルパスで見つからないときだけ、最後の手段としてリーフ名一致にフォールバック。
         return zipFile.stream()
             .filter(entry -> !entry.isDirectory())
             .filter(entry -> {

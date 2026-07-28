@@ -21,44 +21,24 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * レールの統合メッシュ (VBO) を <b>RenderType ごとにまとめて</b> 描く。
- *
- * <p>統合メッシュ化 ({@link RailMeshCache}) 自体は効いていて、レール 1 本は数回の VBO 描画で
- * 済むようになっていた。それでも重かったのは、その数回のたびに
- * <pre>
- *   renderType.setupRenderState();   // テクスチャ bind / ブレンド / シェーダ / 深度 …
- *   vbo.bind(); vbo.drawWithShader(...); VertexBuffer.unbind();
- *   renderType.clearRenderState();   // 後始末
- * </pre>
- * を丸ごと 1 セット走らせていたため。GL のステート変更は 1 回が重く、描画呼び出しの回数より
- * <b>ステートを切り替えた回数</b>が効く。視界に 24 本 × セクション数ぶん繰り返せば、それだけで
- * フレーム時間の半分が消える (実測 0.21ms/本 → 24 本で 5ms/frame)。
- *
- * <p>そこで描画をその場では行わず、ここに積む。ブロックエンティティの描画が終わった時点で
- * RenderType ごとに束ね、<b>ステート設定は種類ごとに 1 回だけ</b>にして VBO を連続で描く。
- * 頂点も行列も既存コードが作ったものをそのまま使うので、見た目は変わらない。
+ * レールの統合メッシュ (VBO) を RenderType ごとにまとめて 描く。
+ * 統合メッシュ化 (RailMeshCache) 自体は効いていて、レール 1 本は数回の VBO 描画で
+ * 済むようになっていた。
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class RailDrawQueue {
 
     /**
      * 1 本ぶんの描画予約。
-     *
+     * 使い回されるので参照を持つとフレーム内で書き換わる)
      * @param modelView カメラ行列 × レールの pose (積んだ時点で確定させる。PoseStack は
-     *                  使い回されるので参照を持つとフレーム内で書き換わる)
      * @param normal    法線行列。null = 単位行列 (光源方向の補正が不要)
      */
     private record Draw(VertexBuffer vbo, Matrix4f modelView, Matrix4f pose, Matrix3f normal) {
     }
 
-    //★焼き込みは影 mod の有無に関係なく常に使う。
-    //
-    //以前はシェーダー使用中だけ焼き込みを止めていた。「ガラスが空へ飛ぶ」のを避けるためだが、
-    //真因は車両の半透明を後回しにするキューの方で、この経路とは無関係だった
-    //(止めても飛び続けた)。行列は flush() でグローバルの ModelView へ積んでから描くので、
-    //Iris が自前の行列を読んでもこちらの pose が入っている。
-    //止めたままだと影 mod を入れた瞬間に焼き込みが全部無効になり、レールも設置物も車両も
-    //毎フレーム CPU で頂点を流す状態に戻ってしまう。
+    // ★焼き込みは影 mod の有無に関係なく常に使う。
+    // 以前はシェーダー使用中だけ焼き込みを止めていた。
 
     private static final Map<RenderType, List<Draw>> QUEUE = new LinkedHashMap<>();
 
@@ -67,7 +47,6 @@ public final class RailDrawQueue {
 
     /**
      * レール 1 セクションの描画を予約する。
-     *
      * @return true = 予約した (呼び出し元は即時描画しない)
      */
     public static boolean enqueue(VertexBuffer vbo, RenderType renderType, PoseStack poseStack) {
@@ -76,10 +55,10 @@ public final class RailDrawQueue {
         }
         PoseStack.Pose pose = poseStack.last();
         Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix()).mul(pose.pose());
-        //Iris 経路では「グローバルの ModelView に積む」ため、pose 単体も持っておく。
+        // Iris 経路では「グローバルの ModelView に積む」ため、pose 単体も持っておく。
         Matrix4f localPose = new Matrix4f(pose.pose());
-        //レールの pose は「カメラ相対の平行移動」だけで回転が無いことがほとんど。
-        //その場合は光源方向の補正が要らないので、行列も uniform 転送も丸ごと省く。
+        // レールの pose は「カメラ相対の平行移動」だけで回転が無いことがほとんど。
+        // その場合は光源方向の補正が要らないので、行列も uniform 転送も丸ごと省く。
         Matrix3f normalMatrix = pose.normal();
         Matrix3f normal = isIdentity(normalMatrix) ? null : new Matrix3f(normalMatrix);
         QUEUE.computeIfAbsent(renderType, t -> new ArrayList<>()).add(
@@ -96,17 +75,15 @@ public final class RailDrawQueue {
 
     /**
      * ブロックエンティティの描画が終わった直後に、溜めたレールをまとめて描く。
-     * <p>
-     * 元はブロックエンティティの描画中に即時描画していた。この段階は不透明ブロックと
-     * エンティティの後・半透明ブロックの前なので、描画順は実質変わらない。
+     * 元はブロックエンティティの描画中に即時描画していた。
      */
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
-        //エンティティ描画より前の段階で「いまワールドを描いている」印を付ける。
-        //モデル選択画面のプレビューはこの外で描かれるので、そちらは遅延させない。
+        // エンティティ描画より前の段階で「いまワールドを描いている」印を付ける。
+        // モデル選択画面のプレビューはこの外で描かれるので、そちらは遅延させない。
         if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_SOLID_BLOCKS) {
-            //シェーダーパックの ON/OFF を 1 フレームに 1 回だけ引き直す (判定はリフレクション)。
-            //切り替わると頂点フォーマットが変わりうるので、焼いてあるものは全部捨てて焼き直す。
+            // シェーダーパックの ON/OFF を 1 フレームに 1 回だけ引き直す (判定はリフレクション)。
+            // 切り替わると頂点フォーマットが変わりうるので、焼いてあるものは全部捨てて焼き直す。
             int prevEpoch = com.portofino.realtrainmodunofficial.client.ShaderCompat.epoch();
             com.portofino.realtrainmodunofficial.client.ShaderCompat.refresh();
             if (com.portofino.realtrainmodunofficial.client.ShaderCompat.epoch() != prevEpoch) {
@@ -120,19 +97,17 @@ public final class RailDrawQueue {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_BLOCK_ENTITIES) {
             return;
         }
-        //レール焼き込みの「1フレーム上限」枠を毎フレームここでリセットする
-        //(この段階はブロックエンティティ描画=drawBaked 呼び出しの直後・毎フレーム1回)。
+        // レール焼き込みの「1フレーム上限」枠を毎フレームここでリセットする
+        // (この段階はブロックエンティティ描画=drawBaked 呼び出しの直後・毎フレーム1回)。
         RailMeshCache.beginFrame();
-        //設置物の焼き込みも同じ枠でスパイクを散らす (ObjectMeshCache)
+        // 設置物の焼き込みも同じ枠でスパイクを散らす (ObjectMeshCache)
         ObjectMeshCache.beginFrame();
         VehicleMeshCache.beginFrame();
         RailScriptRenderers.beginFrame();
         flush();
-        //★レールを描き終えた「あと」に車両の半透明を描く。
-        //本家は Forge 描画パス 1 (地形半透明・パス0の TileEntity のあと) で
-        //renderBodyTransparent を呼ぶので、レールはガラスより先に描き終わっている。
-        //RTMU は 1 パスで描くため、ここで前後関係を本家に合わせないと
-        //深度を書いたガラスに遮られてレールだけが消える。
+        // ★レールを描き終えた「あと」に車両の半透明を描く。
+        // 本家は Forge 描画パス 1 (地形半透明・パス0の TileEntity のあと) で
+        // renderBodyTransparent を呼ぶので、レールはガラスより先に描き終わっている。
         VehicleScriptRenderers.flushDeferredTranslucent();
     }
 
@@ -143,9 +118,9 @@ public final class RailDrawQueue {
         Matrix4f projection = RenderSystem.getProjectionMatrix();
         boolean shaderPack = com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
         Vector3f[] savedLights = null;
-        //焼き込み VBO は drawWithShader で直接描く。この段階 (AFTER_BLOCK_ENTITIES) では
-        //ライトマップ層 (Sampler2) が OFF のことがあり、頂点に焼いたライト座標が効かず
-        //レールがフルブライト (夜でも明るい) になる。明示的に ON にしてから描く。
+        // 焼き込み VBO は drawWithShader で直接描く。この段階 (AFTER_BLOCK_ENTITIES) では
+        // ライトマップ層 (Sampler2) が OFF のことがあり、頂点に焼いたライト座標が効かず
+        // レールがフルブライト (夜でも明るい) になる。明示的に ON にしてから描く。
         net.minecraft.client.renderer.LightTexture lightTex =
             net.minecraft.client.Minecraft.getInstance().gameRenderer.lightTexture();
         lightTex.turnOnLightLayer();
@@ -156,7 +131,7 @@ public final class RailDrawQueue {
                 if (draws.isEmpty()) {
                     continue;
                 }
-                //★ ここが要点: ステート設定は RenderType ごとに 1 回だけ
+                // ★ ここが要点: ステート設定は RenderType ごとに 1 回だけ
                 renderType.setupRenderState();
                 ClientRenderProfiler.countRailStateSetup();
                 try {
@@ -174,22 +149,16 @@ public final class RailDrawQueue {
                             }
                             applyRotatedLights(savedLights, draw.normal());
                         } else if (savedLights != null) {
-                            //直前のレールで光源を回していたら戻す
+                            // 直前のレールで光源を回していたら戻す
                             RenderSystem.setShaderLights(savedLights[0], savedLights[1]);
                             savedLights = null;
                         }
                         draw.vbo().bind();
                         if (shaderPack) {
-                            //★Iris 経路。
-                            //
-                            //drawWithShader(modelView, ...) は shader.MODEL_VIEW_MATRIX に値を入れて
-                            //apply() するが、Iris の ExtendedShader は apply() で<b>自前が捕まえた
-                            //グローバルの行列</b>を上書きしてしまう。結果、こちらが渡したレール 1 本ぶんの
-                            //平行移動が捨てられ、カメラ行列だけで描かれる = 視点に貼り付いてついてくる。
-                            //
-                            //ならば<b>グローバルの ModelView 自体に積んでから描く</b>。Iris が何を
-                            //読みに行っても、そこには既にこのレールの pose が入っている。
-                            //バニラ経路と数学的には同じ積 (ModelView × pose)。
+                            // ★Iris 経路。
+                            // drawWithShader(modelView, ...) は shader.MODEL_VIEW_MATRIX に値を入れて
+                            // apply するが、Iris の ExtendedShader は apply で自前が捕まえた
+                            // グローバルの行列を上書きしてしまう。
                             org.joml.Matrix4fStack mvStack = RenderSystem.getModelViewStack();
                             mvStack.pushMatrix();
                             mvStack.mul(draw.pose());

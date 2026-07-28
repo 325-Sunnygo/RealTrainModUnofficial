@@ -2,19 +2,7 @@ package com.portofino.realtrainmodunofficial.perf;
 
 /**
  * 軽量化作業用の計測カウンタ。
- *
- * <p>「どの最適化が実際に効いたか」を体感でなく数値で確かめるために置く。推測で直しては
- * 外すのを避けるための土台なので、<b>最適化を入れる前に基準値を取ること</b>。
- *
- * <p><b>クライアント専用クラスを一切参照しないこと。</b>計測点の一つである
- * {@link jp.ngt.ngtlib.io.ScriptUtil} は共通コードで専用サーバーからもロードされる。
- * ここで Minecraft のクライアントクラスに触れると RuntimeDistCleaner に弾かれて
- * 専用サーバーが起動時クラッシュする (過去に同じ事故あり)。表示は client 側の
- * 別クラスが担当する。
- *
- * <p>計測自体のコストは 1 呼び出しあたり {@code System.nanoTime()} 2 回 (数十 ns)。
- * 毎フレーム数十回の呼び出しに対して誤差の範囲だが、{@link #enabled} が false の間は
- * 計測しないので通常プレイには影響しない。
+ * 「どの最適化が実際に効いたか」を体感でなく数値で確かめるために置く。
  */
 public final class RtmuProfiler {
 
@@ -51,7 +39,7 @@ public final class RtmuProfiler {
 
     /**
      * スクリプト関数呼び出し 1 回ぶんを記録する。
-     * {@link jp.ngt.ngtlib.io.ScriptUtil#doScriptFunction} から呼ばれる
+     * jp.ngt.ngtlib.io.ScriptUtil#doScriptFunction から呼ばれる
      * (描画用 render も含め全てのスクリプト呼び出しがここを通る)。
      */
     public static void addScriptCall(long nanos) {
@@ -185,7 +173,7 @@ public final class RtmuProfiler {
         return (double) sum / windowFilled;
     }
 
-    /** 移動平均のスクリプト実行時間 (ms/フレーム)。<b>これが軽量化の主指標</b>。 */
+    /** 移動平均のスクリプト実行時間 (ms/フレーム)。これが軽量化の主指標。 */
     public static double avgScriptMillis() {
         if (windowFilled == 0) {
             return 0.0D;

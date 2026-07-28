@@ -46,9 +46,9 @@ public class TrainScriptSystem {
     private static final String SCRIPT_CORE_VERSION = jp.ngt.rtm.RTMCore.VERSION;
     private static final Set<String> REPORTED_SCRIPT_ERRORS = ConcurrentHashMap.newKeySet();
 
-    //★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
+    // ★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
 
-    //★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
+    // ★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
 
     private TrainScriptSystem() {
     }
@@ -128,10 +128,9 @@ public class TrainScriptSystem {
     }
 
     /**
-     * スクリプトエンジンは本家 {@link jp.ngt.ngtlib.io.ScriptUtil} の 1 本だけを使う。
+     * スクリプトエンジンは本家 jp.ngt.ngtlib.io.ScriptUtil の 1 本だけを使う。
      * 本家 (KaizPatchX 1.7.10 ScriptUtil:36-54) は NashornScriptEngineFactory を直接叩き
-     * {@code -doe} / {@code --language=es6} を渡して毎回新規エンジンを作る。
-     * RTMU で以前ここに別実装 (createNashornEngine) があったが、同一処理の二重定義だったため撤去した。
+     * -doe / --language=es6 を渡して毎回新規エンジンを作る。
      */
     private static ScriptEngine createScriptEngine() {
         return jp.ngt.ngtlib.io.ScriptUtil.createEngine();
@@ -150,21 +149,19 @@ public class TrainScriptSystem {
         }
         try {
             ScriptModelRenderer renderer = new ScriptModelRenderer(null, modelName);
-            //★本家の契約と同じく束縛は renderer だけ (KaizPatchX ScriptUtil:36-54)。
-            //以前はここで injectScriptCompatibility が 330 行の JS 再実装を eval しており、
-            //NGTUtil / NGTLog / ScriptUtil / ModelPackManager 等が実クラスではなく
-            //ダミー JS へ束縛されていた (NGTUtil.isClient() が常に true 等)。
-            //実シムは PRELUDE の bindOpt が束縛するので、そちらへ一本化する。
+            // ★本家の契約と同じく束縛は renderer だけ (KaizPatchX ScriptUtil:36-54)。
+            // 以前はここで injectScriptCompatibility が 330 行の JS 再実装を eval しており、
+            // NGTUtil / NGTLog / ScriptUtil / ModelPackManager 等が実クラスではなく
+            // ダミー JS へ束縛されていた (NGTUtil.isClient が常に true 等)。
             scriptEngine.put("renderer", renderer);
             scriptEngine.put("model", renderer.getModel());
-            //SRB3 のネイティブ敷設ブリッジは JS 再実装ではなく実 Java なので残す。
+            // SRB3 のネイティブ敷設ブリッジは JS 再実装ではなく実 Java なので残す。
             scriptEngine.put("__SRB__", new SrbRailBridge());
             scriptEngine.put(SCRIPT_PATH_KEY, scriptPath == null ? "" : scriptPath);
             scriptEngine.put(SCRIPT_MODEL_KEY, modelName == null ? "" : modelName);
-            //サーバー/サウンドスクリプトは描画しない (GL を触らない) ので、車両描画側と
-            //同じ PackScriptSource の前処理・束縛に一本化する。
-            //
-            //SRB3 のネイティブ敷設ブリッジだけはこの経路固有なので個別に付ける。
+            // サーバー/サウンドスクリプトは描画しない (GL を触らない) ので、車両描画側と
+            // 同じ PackScriptSource の前処理・束縛に一本化する。
+            // SRB3 のネイティブ敷設ブリッジだけはこの経路固有なので個別に付ける。
             script = PackScriptSource.PRELUDE
                     + appendSuperRailBuilderOverrides(PackScriptSource.prepare(script, scriptPath));
             scriptEngine.eval(script);
@@ -184,41 +181,21 @@ public class TrainScriptSystem {
 
     /**
      * OpList 経路の描画スクリプトだけに要る機能的な回避策。
-     * <p>クラス名の置換 (旧方言) ではなく、1.21 で挙動が変わる 2 点への対処:
-     * <ul>
-     *   <li>{@code Java.from} は配列変換で例外を投げる型があるので、安全版へ回す</li>
-     *   <li>テクスチャ読み込みが null を返すとスクリプトが早期 return して以降を描かなくなるので、
-     *       ダミーのテクスチャデータを返して描画を続行させる</li>
-     * </ul>
+     * クラス名の置換 (旧方言) ではなく、1.21 で挙動が変わる 2 点への対処:
      */
 
 
     /**
      * SRB3 のスクリプトにネイティブ敷設ブリッジの上書き定義を追加する。
-     * <p>SRB のビルダーは<b>車 (ModelVehicle)</b> なので、そのサーバースクリプトは
-     * {@code CarServerScripts} が読む。読み込み経路が複数あるので、どの経路からでも
-     * 同じ差し込みができるよう公開してある。
+     * SRB のビルダーは車 (ModelVehicle) なので、そのサーバースクリプトは
+     * CarServerScripts が読む。
      */
     /**
      * かつてここに SuperRailBuilder3 専用の関数差し替えがあった (約 60 行)。
-     *
-     * <p>{@code getSelectedSlotItem} を常に null にし、{@code getPlayerRail} /
-     * {@code buildNormalRail} / {@code buildBranchRail} / {@code createRailPosition} /
-     * {@code getTileEntity} / {@code deleteRail} を RTMU のブリッジ ({@code __SRB__}) へ
-     * 差し替えるものだったが、これは<b>パック名で分岐する特別処理</b>であり本家に無い。
-     *
-     * <p>差し替えが必要だった理由 (1.21 に該当 API が無い) は全て解消済み:
-     * <ul>
-     *   <li>{@code player.field_71071_by} → {@link jp.ngt.mccompat.PlayerCompat.InventoryCompat}
-     *       (実配列 {@code field_70462_a} を持つ)</li>
-     *   <li>{@code net.minecraft.util.math.BlockPos} → FQN remap 済み</li>
-     *   <li>{@code railMap.canPlaceRail/setRail}・{@code Point.getActiveRailMap} →
-     *       {@code Object} を受けて {@code BlockUtil.toLevel} で解く形に統一</li>
-     *   <li>{@code tile.sendPacket} / TileEntity の座標 SRG フィールド → 追加済み</li>
-     *   <li>手持ちレール判定 → {@link jp.ngt.mccompat.ItemStackCompat#func_77973_b} で
-     *       2 種あるレールアイテムを本家の 1 種へ正規化</li>
-     * </ul>
-     * よってスクリプトは本家の実装のまま動くはずである。
+     * getSelectedSlotItem を常に null にし、getPlayerRail /
+     * buildNormalRail / buildBranchRail / createRailPosition /
+     * getTileEntity / deleteRail を RTMU のブリッジ (__SRB__) へ
+     * 差し替えるものだったが、これはパック名で分岐する特別処理であり本家に無い。
      */
     public static String appendSuperRailBuilderOverrides(String script) {
         return script;
@@ -370,7 +347,7 @@ public class TrainScriptSystem {
 
     private static void invokeScriptInit(ScriptEngine scriptEngine, ScriptModelRenderer renderer) {
         Object initModel = renderer.getModel();
-        //無音終了 (ネイティブ/メモリ由来) の切り分け用。モデル1つにつき1回だけ出る。
+        // 無音終了 (ネイティブ/メモリ由来) の切り分け用。モデル1つにつき1回だけ出る。
         RealTrainModUnofficial.LOGGER.info("[RTMU] model script init: {}", renderer.getModelName());
         if (scriptEngine instanceof Invocable invocable) {
             try {
@@ -408,14 +385,8 @@ public class TrainScriptSystem {
 
 
     /**
-     * 本家 {@link jp.ngt.ngtlib.io.ScriptUtil#doScriptIgnoreError} と同じ意味。
-     * <b>エラーが出てもスクリプトは止めない</b>。本家は printStackTrace して次の tick もそのまま呼ぶ。
-     *
-     * <p>以前 RTMU はここで engine を DISABLED_SCRIPT_ENGINES に入れ、以後セッション中ずっと
-     * 実行しないようにしていた。1 tick の一時的な失敗で、その車両のドア・パンタ・方向幕・音が
-     * まとめて永久停止するため本家と挙動が全く違っていた。
-     *
-     * <p>ログだけは engine+phase ごとに 1 回に絞る (本家の printStackTrace は毎 tick 出て実用にならないため)。
+     * 本家 jp.ngt.ngtlib.io.ScriptUtil#doScriptIgnoreError と同じ意味。
+     * エラーが出てもスクリプトは止めない。本家は printStackTrace して次の tick もそのまま呼ぶ。
      */
     private static void reportScriptFailure(ScriptEngine scriptEngine, String phase, Throwable error) {
         if (scriptEngine == null) {
@@ -433,25 +404,8 @@ public class TrainScriptSystem {
     // ------------------------------------------------------------------
 
     /**
-     * <b>失敗し続けるスクリプトは呼ぶのをやめる。</b>
-     *
-     * <p>以前は失敗しても<b>ログを 1 回出すだけで毎 tick 呼び続けて</b>いた。
-     * 例外を投げるだけならまだしも、{@code StackOverflowError} は深く積んだスタックを
-     * 巻き戻すので<b>1 回が桁違いに高い</b>。毎 tick 出ると fps が 1 まで落ちる
-     * (あるパックで実際に発生。前提の音ライブラリが入っておらず、パック側の
-     * {@code onUpdate → sound_includeSoundLib → onUpdate} が無限再帰していた)。
-     *
-     * <p><b>パックの作りが悪くてもゲームは遊べないといけない。</b>
-     *
-     * <h2>止め方</h2>
-     * <ul>
-     *   <li>{@code StackOverflowError} / {@code OutOfMemoryError} … <b>即座に</b>止める。
-     *       一時的な失敗ではありえないし、投げ続けるコストが一番大きい</li>
-     *   <li>それ以外 … 連続 {@value #SCRIPT_FAILURE_LIMIT} 回で止める。
-     *       読み込み途中で 1〜2 回失敗するだけの物を殺さないため</li>
-     * </ul>
-     *
-     * <p>成功したら数え直すので、直った物はそのまま動き続ける。
+     * 失敗し続けるスクリプトは呼ぶのをやめる。
+     * 以前は失敗してもログを 1 回出すだけで毎 tick 呼び続けていた。
      */
     private static final int SCRIPT_FAILURE_LIMIT = 5;
 
@@ -525,12 +479,8 @@ public class TrainScriptSystem {
     /** サーバスクリプトを毎tick実行する。onUpdate(entity, executer)形式。 */
     /**
      * 本家 ScriptExecuter.execScript (KaizPatchX jp/ngt/rtm/modelpack/ScriptExecuter.java:32-36) の移植。
-     * <pre>
      * this.callMethod(selector, "onUpdate", selector, this);  // onUpdate(entity, executer)
      * ++this.count;
-     * </pre>
-     * executer は<b>エンティティごとに永続</b>で、スクリプトは {@code count} を経過 tick として読む。
-     * 以前 RTMU はここへ null を渡していたため、scriptExecuter を使うパックが全て動かなかった。
      */
     public static void invokeServerScriptOnUpdate(ScriptEngine scriptEngine, Object entity,
                                                   jp.ngt.rtm.modelpack.ScriptExecuter executer) {
@@ -545,9 +495,9 @@ public class TrainScriptSystem {
         } catch (Throwable ignored) {
         }
         Invocable invocable = (Invocable) scriptEngine;
-        //★止めてあるものは呼ばない (noteScriptFailure の説明を参照)。
-        //  サーバースクリプトは編成の全車ぶん毎 tick 走るので、
-        //  失敗し続けると tick 時間がそのまま溶ける。
+        // ★止めてあるものは呼ばない (noteScriptFailure の説明を参照)。
+        // サーバースクリプトは編成の全車ぶん毎 tick 走るので、
+        // 失敗し続けると tick 時間がそのまま溶ける。
         if (isScriptDisabled(scriptEngine, "onUpdate(entity, executer) [server]")
                 || isScriptDisabled(scriptEngine, "onUpdate(entity, executer) [server-runtime]")) {
             return;
@@ -685,19 +635,19 @@ public class TrainScriptSystem {
         try {
             scriptEngine.put("executer", su);
             scriptEngine.put("executor", su);
-            //本家では su がグローバルにも見える。onUpdate() を引数なしで定義したり、
-            //ヘルパー関数が引数で受けずグローバル su を参照するスクリプト
-            //(ReferenceError: "su" is not defined) のために必ず束縛する。
+            // 本家では su がグローバルにも見える。onUpdate を引数なしで定義したり、
+            // ヘルパー関数が引数で受けずグローバル su を参照するスクリプト
+            // (ReferenceError: "su" is not defined) のために必ず束縛する。
             scriptEngine.put("su", su);
         } catch (Throwable ignored) {
         }
         if (!(scriptEngine instanceof Invocable invocable)) {
             return;
         }
-        //本家 SoundUpdaterVehicle.update():45 は 1 本だけ:
-        //  ScriptUtil.doScriptIgnoreError(modelset.se, "onUpdate", this);
-        //update(su,1.0F) / tick(su) というフックは本家に存在しないため持たない。
-        //★止めてあるものは呼ばない。壊れたスクリプトを毎 tick 呼ぶと fps が落ちる
+        // 本家 SoundUpdaterVehicle.update:45 は 1 本だけ:
+        // ScriptUtil.doScriptIgnoreError(modelset.se, "onUpdate", this);
+        // update(su,1.0F) / tick(su) というフックは本家に存在しないため持たない。
+        // ★止めてあるものは呼ばない。
         if (isScriptDisabled(scriptEngine, "onUpdate(su) [sound]")) {
             return;
         }
@@ -705,7 +655,7 @@ public class TrainScriptSystem {
             invocable.invokeFunction("onUpdate", su);
             noteScriptSuccess(scriptEngine, "onUpdate(su) [sound]");
         } catch (NoSuchMethodException ignored) {
-            //onUpdate を持たないサウンドスクリプト = 本家では何も鳴らない
+            // onUpdate を持たないサウンドスクリプト = 本家では何も鳴らない
         } catch (Throwable e) {
             reportScriptFailure(scriptEngine, "onUpdate(su) [sound]", e);
         }
@@ -773,13 +723,9 @@ public class TrainScriptSystem {
         public final double zCoord;
         // Wheel rotation in degrees (accessed as entity.wheelRotationR in scripts)
         public final float wheelRotationR;
-        // RTM 1.7.10 obfuscated world field (entity.field_70170_p)。lib_FormationFix 等が
+        // RTM 1.7.10 obfuscated world field (entity.field_70170_p)。
         // entity.field_70170_p.field_72995_K(world.isRemote) を参照するため公開する。
-        //★本物のシム (jp.ngt.mccompat.WorldCompat) を渡す。
-        //以前は TrainEntity の内部クラス WorldCompat を渡していたが、こちらは
-        //isClientSide / field_72995_K / field_72996_f しか持たない別物で、
-        //スクリプトが world.func_73045_a(id) 等を呼んだ瞬間に
-        //「is not a function」でそのスクリプトが丸ごと落ちていた (MFCP のトレーラ等)。
+        // ★本物のシム (jp.ngt.mccompat.WorldCompat) を渡す。
         public final jp.ngt.mccompat.WorldCompat field_70170_p;
 
         public LegacyScriptExecutor(TrainEntity train) {
@@ -1177,7 +1123,7 @@ public class TrainScriptSystem {
         public double getZ() { return train == null ? 0 : train.getZ(); }
         public float getYaw() { return train == null ? 0 : train.getYRot(); }
         public float getPitch() { return train == null ? 0 : train.getXRot(); }
-        // 旧 RTM Render スクリプトは entity.getRotation() で yaw を取得する。
+        // 旧 RTM Render スクリプトは entity.getRotation で yaw を取得する。
         public float getRotation() { return getYaw(); }
 
         // ---- Speed (km/h, RTM compat alias) ----
@@ -1235,13 +1181,13 @@ public class TrainScriptSystem {
         public long getTick() { return count; }
         public long getTime() { return count; }
 
-        // ---- Resource state (RTM 1.12.2 entity.getResourceState().getDataMap()) ----
+        // ---- Resource state (RTM 1.12.2 entity.getResourceState.getDataMap) ----
 
         public com.portofino.realtrainmodunofficial.entity.TrainEntity.ResourceStateCompat getResourceState() {
             return train == null ? null : train.getResourceState();
         }
 
-        // ---- Formation / coupler (RTM 1.12.2 entity.getTrainDirection() etc.) ----
+        // ---- Formation / coupler (RTM 1.12.2 entity.getTrainDirection etc.) ----
 
         public float getTrainDirection() {
             return train == null ? 0.0F : train.getTrainDirection();
@@ -1288,47 +1234,47 @@ public class TrainScriptSystem {
         // ---- 1.7.10 / 1.12.2 obfuscated Minecraft entity method stubs ----
         // These are called from RTM render/tick scripts that were written against old MC versions.
 
-        // func_70089_S() = isEntityAlive (1.7.10/1.12.2)
+        // func_70089_S = isEntityAlive (1.7.10/1.12.2)
         public boolean func_70089_S() {
             return train != null && !train.isRemoved();
         }
 
-        // func_70027_ad() = isDead / isRemoved (1.7.10/1.12.2)
+        // func_70027_ad = isDead / isRemoved (1.7.10/1.12.2)
         public boolean func_70027_ad() {
             return train == null || train.isRemoved();
         }
 
-        // func_70075_an() = isInWater (1.7.10)
+        // func_70075_an = isInWater (1.7.10)
         public boolean func_70075_an() {
             return train != null && train.isInWater();
         }
 
-        // func_70093_af() = isSneaking (1.7.10/1.12.2)
+        // func_70093_af = isSneaking (1.7.10/1.12.2)
         public boolean func_70093_af() {
             return false;
         }
 
-        // func_70661_as() = isSprinting (1.7.10/1.12.2)
+        // func_70661_as = isSprinting (1.7.10/1.12.2)
         public boolean func_70661_as() {
             return false;
         }
 
-        // func_70617_f_() = isInWater (1.12.2 variant)
+        // func_70617_f_ = isInWater (1.12.2 variant)
         public boolean func_70617_f_() {
             return func_70075_an();
         }
 
-        // func_70086_ai() = isWet (1.7.10)
+        // func_70086_ai = isWet (1.7.10)
         public boolean func_70086_ai() {
             return train != null && train.isInWaterOrRain();
         }
 
-        // func_70023_ah() = isBurning (1.7.10)
+        // func_70023_ah = isBurning (1.7.10)
         public boolean func_70023_ah() {
             return train != null && train.isOnFire();
         }
 
-        // func_70040_Z() = isSneaking variant (1.7.10)
+        // func_70040_Z = isSneaking variant (1.7.10)
         public boolean func_70040_Z() {
             return false;
         }
@@ -1338,7 +1284,7 @@ public class TrainScriptSystem {
             return false;
         }
 
-        // func_110140_aT() = getAttributeMap (1.12.2) — return stub
+        // func_110140_aT = getAttributeMap (1.12.2) — return stub
         public Object func_110140_aT() {
             return null;
         }
@@ -1353,10 +1299,10 @@ public class TrainScriptSystem {
             // no-op in render context
         }
 
-        // func_70030_z() = preparePlayerToSpawn / onUpdate stub (1.7.10)
+        // func_70030_z = preparePlayerToSpawn / onUpdate stub (1.7.10)
         public void func_70030_z() {}
 
-        // func_70021_al() = getPassengerList (1.7.10) — returns empty
+        // func_70021_al = getPassengerList (1.7.10) — returns empty
         public Object[] func_70021_al() {
             return new Object[0];
         }
@@ -1366,17 +1312,17 @@ public class TrainScriptSystem {
             return 1.5F;
         }
 
-        // func_70047_e() = getEyeHeight (1.7.10/1.12.2)
+        // func_70047_e = getEyeHeight (1.7.10/1.12.2)
         public float func_70047_e() {
             return 1.5F;
         }
 
-        // func_70057_ab() = getAir (1.7.10 variant)
+        // func_70057_ab = getAir (1.7.10 variant)
         public int func_70057_ab() {
             return 300;
         }
 
-        // func_70020_e() = setAir (1.7.10)
+        // func_70020_e = setAir (1.7.10)
         public void func_70020_e(int air) {}
 
         // Field equivalents often read as properties in JS
@@ -1390,7 +1336,7 @@ public class TrainScriptSystem {
         // field_70178_ae = motionZ (1.7.10)
         public double field_70178_ae() { return train == null ? 0 : train.getDeltaMovement().z; }
 
-        // func_145782_y() is already implemented (getId / entityId)
+        // func_145782_y is already implemented (getId / entityId)
 
         // ---- Weapon entity stubs (RenderTank, RenderPhalanx, etc.) ----
 
@@ -1441,7 +1387,7 @@ public class TrainScriptSystem {
         private final Set<String> scriptedEmissiveGroups = new LinkedHashSet<>();
         // translucentを最初に描画したパスだけに限定するための記録(-1=未描画)
         private int firstTranslucentPass = -1;
-        // Groups registered via registerParts() during init() — script "owns" these, baked render skips them
+        // Groups registered via registerParts during init — script "owns" these, baked render skips them
         private final Set<String> scriptRegisteredGroups = new LinkedHashSet<>();
         private final Map<Long, Object> scriptData = new HashMap<>();
         private TrainEntity cachedExecutorTrain;
@@ -1736,12 +1682,11 @@ public class TrainScriptSystem {
             bindScriptTexture(parts[0], parts[1], frameIndex);
         }
 
-        // renderParts()入力→解析結果のキャッシュ。同一String前提でヒット率ほぼ100%
+        // renderParts入力→解析結果のキャッシュ。同一String前提でヒット率ほぼ100%
         private final Map<String, ParsedGroupSet> renderPartsParseCache = new HashMap<>();
 
         // emissive pass で、lightMode ごとの presentGroupNames をキャッシュ。
         // pass 2 の renderParts ごとに 3 コレクション確保していたのを排除する。
-        // キー: ParsedGroupSet インスタンスの identity × lightMode int → Set<String>
 
         // isEmissiveGroup のコンパイル済み regex (毎回コンパイルするコストを排除)
         private static final java.util.regex.Pattern DEST_N_PATTERN = java.util.regex.Pattern.compile("dest\\d+");
@@ -1780,11 +1725,9 @@ public class TrainScriptSystem {
             this.defaultModelName = defaultModelName == null ? "" : defaultModelName;
         }
 
-        //---- 実 PartsRenderer と同じ API (経路によって欠けないようにする) ----
-        //
+        // ---- 実 PartsRenderer と同じ API (経路によって欠けないようにする) ----
         // 車両描画は VehicleScriptRenderers (実 jp.ngt.rtm.render.PartsRenderer) を通るが、
-        // モデル添付スクリプトはこちらを通る。同じスクリプトが経路で TypeError になるのを防ぐため、
-        // 実 PartsRenderer 側にしか無かったものをここにも生やす。
+        // モデル添付スクリプトはこちらを通る。
 
         /** 本家 preRender: 既定は何もしない。 */
         public void preRender(Object t, boolean smoothing, boolean culling, float partialTick) {
@@ -1838,16 +1781,12 @@ public class TrainScriptSystem {
             return model;
         }
 
-        /**
-         * Returns the model object expected by legacy render scripts.
-         */
+        /** Returns the model object expected by legacy render scripts. */
         public Object getModelObject() {
             return getModel();
         }
 
-        /**
-         * Returns the model object as a legacy model-set placeholder.
-         */
+        /** Returns the model object as a legacy model-set placeholder. */
         public Object getModelSet() {
             return getModel();
         }
@@ -1872,7 +1811,7 @@ public class TrainScriptSystem {
             return new ScriptParts(this, usable);
         }
 
-        /** スクリプトが {@code bogieF.render(renderer)} を呼ぶと現在の poseStack で描画する。 */
+        /** スクリプトが bogieF.render(renderer) を呼ぶと現在の poseStack で描画する。 */
         public static final class ScriptParts {
             private final ScriptModelRenderer renderer;
             private final List<String> groupNames;
@@ -1996,7 +1935,7 @@ public class TrainScriptSystem {
         }
 
         // 角度サフィックスのしきい値。これ以上の「-数字」は連結曲げ用の角度バリアント(度数)、
-        // これ未満 (1〜9) は車体のセクション分割 (D51 の body-1/2/3 等) とみなす。
+        // これ未満 (1〜9) は車体のセクション分割 ( の body-1/2/3 等) とみなす。
         private static final int ANGLE_SUFFIX_THRESHOLD = 10;
 
         /** 連結曲げ用の角度/ミラー変種を除外する。角度数字付きだけを落とし、(mx)鏡像とセクションは残す。 */
@@ -2165,7 +2104,7 @@ public class TrainScriptSystem {
             if (entity instanceof TrainEntity train) {
                 // Legacy scripts read many values as plain fields (count, doorMoveL,
                 // field_70173_aa, seatRotation, etc.). A cached wrapper freezes those
-                // fields and stops tick-driven displays like E259 rollsign/LCD.
+                // fields and stops tick-driven displays likerollsign/LCD.
                 cachedExecutorTrain = train;
                 cachedExecutor = new LegacyScriptExecutor(train);
                 return cachedExecutor;
@@ -2528,8 +2467,8 @@ public class TrainScriptSystem {
                 }
                 for (int c = 0; c < 4; c++) {
                     TessVertex vtx = tessellatorVertices.get(i + c);
-                    //addVertex(Matrix4f,..) はバニラ実装が頂点ごとに new Vector3f() を確保するため、
-                    //同じ変換を確保なしで行う (見た目は不変)。
+                    // addVertex(Matrix4f,..) はバニラ実装が頂点ごとに new Vector3f を確保するため、
+                    // 同じ変換を確保なしで行う (見た目は不変)。
                     com.portofino.realtrainmodunofficial.client.render.VertexWriter.addVertex(vc, mat,
                             vtx.x + nx * overlayBias,
                             vtx.y + ny * overlayBias,
@@ -2808,25 +2747,19 @@ public class TrainScriptSystem {
             return null;
         }
 
-        /**
-         * Disables lighting for old model scripts.
-         */
+        /** Disables lighting for old model scripts. */
         public void disableLighting() {
             // Modern rendering keeps lighting in the packed light value.
         }
 
-        /**
-         * Enables lighting for old model scripts.
-         */
+        /** Enables lighting for old model scripts. */
         public void enableLighting() {
             this.packedLight = basePackedLight;
             this.lightmapMaxForced = false;
             recordOp(OP_ENABLE_LIGHTING, 0, 0, 0, 0, 0, null, ' ');
         }
 
-        /**
-         * Applies a packed light value requested by old model scripts.
-         */
+        /** Applies a packed light value requested by old model scripts. */
         public void setBrightness(Object value) {
             if (value instanceof Number number) {
                 this.packedLight = number.intValue();
@@ -2839,9 +2772,7 @@ public class TrainScriptSystem {
             }
         }
 
-        /**
-         * Forces full brightness for emissive script parts.
-         */
+        /** Forces full brightness for emissive script parts. */
         public void setLightmapMaxBrightness() {
             this.packedLight = 0x00F000F0;
             this.lightmapMaxForced = true;
@@ -3022,9 +2953,8 @@ public class TrainScriptSystem {
             if (!(currentEntity instanceof TrainEntity train)) {
                 return packedLight;
             }
-            //pass 3/4 = 前照灯/尾灯の発光パス。ここに来るグループは
-            //filterLegacyScriptEmissiveGroups でランプ系だけに絞られている。
-            //ランプは自己発光なので環境光ではなくフルブライトで描く (夜でも光る)。
+            // pass 3/4 = 前照灯/尾灯の発光パス。
+            // filterLegacyScriptEmissiveGroups でランプ系だけに絞られている。
             if (currentPass >= 3) {
                 return 0xF000F0;
             }
@@ -3225,11 +3155,11 @@ public class TrainScriptSystem {
             }
             String lower = groupName.toLowerCase(Locale.ROOT);
             if (train != null) {
-                //発光パスはマテリアルのLightフラグだけで絞る(グループ名では絞らない)
+                // 発光パスはマテリアルのLightフラグだけで絞る(グループ名では絞らない)
                 if (currentPass >= 3) {
                     return true;
                 }
-                //pass 2 = 室内灯。車体を明るくしないよう内装グループだけ。
+                // pass 2 = 室内灯。車体を明るくしないよう内装グループだけ。
                 return interiorOn && isInteriorEmissionGroup(lower);
             }
             if (isLegacyDisplayGroup(lower)) {
@@ -3238,7 +3168,7 @@ public class TrainScriptSystem {
             if (isInteriorEmissionGroup(lower)) {
                 return interiorOn;
             }
-            //自動改札の通行可/不可の表示 (sign_F / sign_B)。本家は pass 2 で描く。
+            // 自動改札の通行可/不可の表示 (sign_F / sign_B)。本家は pass 2 で描く。
             if (lower.startsWith("sign_") || lower.equals("sign")) {
                 return true;
             }
@@ -3248,10 +3178,10 @@ public class TrainScriptSystem {
             if (lower.contains("doorlamp")) {
                 return false;
             }
-            //★名前で絞るのは本家に無い仕組みだが、RTMU はグループ単位で描くため必要。
-            //本家はマテリアル単位で「Light テクスチャを持つものだけ」を発光パスに出すので、
-            //スクリプトが同じ Parts にまとめた非発光パーツ (踏切の dirL/dirR = 矢印の板) は
-            //光らない。ここを撤廃すると板まで赤く光る (ユーザー報告)。
+            // ★名前で絞るのは本家に無い仕組みだが、RTMU はグループ単位で描くため必要。
+            // 本家はマテリアル単位で「Light テクスチャを持つものだけ」を発光パスに出すので、
+            // スクリプトが同じ Parts にまとめた非発光パーツ (踏切の dirL/dirR = 矢印の板) は
+            // 光らない。ここを撤廃すると板まで赤く光る (ユーザー報告)。
             if (lower.contains("light") || lower.contains("lamp") || lower.contains("marker")) {
                 return shouldRenderLightGroup(train, lower) && !isLightOffGroup(lower);
             }
@@ -3314,7 +3244,7 @@ public class TrainScriptSystem {
         }
 
         public boolean hasScriptRenderedGroups() {
-            // RTM scripts own every group registered via registerParts().
+            // RTM scripts own every group registered via registerParts.
             // Even when a script intentionally skips a registered group this frame,
             // baked rendering must not draw it back in (MSE hood/end parts, car-type variants).
             return !scriptRegisteredGroups.isEmpty()
@@ -3349,7 +3279,7 @@ public class TrainScriptSystem {
                 return !scriptedOpaqueGroups.contains(normalized)
                     && !scriptedTranslucentGroups.contains(normalized);
             }
-            // Groups registered by the script in init() are fully managed by it —
+            // Groups registered by the script in init are fully managed by it —
             // skip them in baked render even if they weren't rendered this frame
             // (e.g. body02 when CarType="01": script skips it, baked must too).
             if (scriptRegisteredGroups.contains(normalized)) {
@@ -3506,16 +3436,12 @@ public class TrainScriptSystem {
             return System.currentTimeMillis() / 1000L;
         }
 
-        /**
-         * Returns legacy renderer scratch data addressed by an integer key.
-         */
+        /** Returns legacy renderer scratch data addressed by an integer key. */
         public Object getData(long key) {
             return scriptData.getOrDefault(key, 0);
         }
 
-        /**
-         * Stores legacy renderer scratch data addressed by an integer key.
-         */
+        /** Stores legacy renderer scratch data addressed by an integer key. */
         public void setData(long key, Object value) {
             scriptData.put(key, value == null ? 0 : value);
         }
@@ -3533,9 +3459,7 @@ public class TrainScriptSystem {
             return (time / 1000 + 6) % 24;
         }
 
-        /**
-         * Returns the current world hour for old scripts that omit the entity argument.
-         */
+        /** Returns the current world hour for old scripts that omit the entity argument. */
         public int getMCHour() {
             return getMCHour(currentEntity);
         }
@@ -3545,9 +3469,7 @@ public class TrainScriptSystem {
             return (int) ((time % 1000) * 0.06F);
         }
 
-        /**
-         * Returns the current world minute for old scripts that omit the entity argument.
-         */
+        /** Returns the current world minute for old scripts that omit the entity argument. */
         public int getMCMinute() {
             return getMCMinute(currentEntity);
         }
@@ -3833,8 +3755,8 @@ public class TrainScriptSystem {
             try {
                 Class<?> type = groups.getClass();
                 // First: try to read groupsStr from a Parts JS object.
-                // Parts() stores a pre-joined comma string as this.groupsStr so Java can read it
-                // reliably via getMember() even when the object is opaque to normal reflection.
+                // Parts stores a pre-joined comma string as this.groupsStr so Java can read it
+                // reliably via getMember even when the object is opaque to normal reflection.
                 try {
                     java.lang.reflect.Method hasMember = type.getMethod("hasMember", String.class);
                     java.lang.reflect.Method getMember = type.getMethod("getMember", String.class);
@@ -4167,20 +4089,20 @@ public class TrainScriptSystem {
     }
 
     /** GL11即時モード関数の最小シム。poseStack操作へブリッジする。 */
-    //★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
+    // ★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
 
     /** new Parts(...)用ビルダー。registerParts時にグループ名を抽出する。 */
-    //★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
+    // ★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
 
     /** NGTTextスタブ。各メソッドを1個の定義に統一する。 */
-    //★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
+    // ★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
 
     /** RTM 原作の jp.ngt.ngtlib.io.NGTLog スタブ。debug/info/warn/error を Java の logger に橋渡し。 */
-    //★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
+    // ★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
 
     /** RTM 原作の jp.ngt.ngtlib.util.NGTUtil スタブ。 */
-    //★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
+    // ★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
 
     /** RTM 原作の jp.ngt.ngtlib.math.NGTMath スタブ。 */
-    //★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
+    // ★JS 再実装の受け皿だった互換クラス群は撤去 (実シム + PRELUDE へ一本化)。
 }

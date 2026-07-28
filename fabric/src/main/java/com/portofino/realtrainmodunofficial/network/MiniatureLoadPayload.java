@@ -19,12 +19,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 保存済み NGTO をミニチュアへ読み込む (neo mcte)。
- *
- * <p>ファイル名だけを送り、実体は<b>サーバ側のゲームフォルダから読む</b>。
- * NGTO は数 MB になり得るのでパケットに乗せない。シングルプレイなら同じフォルダ、
- * マルチならサーバに置いたものが正になる (本家 MCTE の構造物ファイルと同じ考え方)。
- *
- * <p>書き込み先は<b>手に持っているスタックの NBT</b> だけ。他のミニチュアには触らない。
+ * ファイル名だけを送り、実体はサーバ側のゲームフォルダから読む。
  */
 public record MiniatureLoadPayload(boolean offHand, String fileName) implements CustomPacketPayload {
 
@@ -55,7 +50,7 @@ public record MiniatureLoadPayload(boolean offHand, String fileName) implements 
             if (stack.isEmpty() || !(stack.getItem() instanceof MiniatureItem)) {
                 return;
             }
-            //★ファイル名にパス区切りを許さない (任意のファイルを読ませない)
+            // ★ファイル名にパス区切りを許さない (任意のファイルを読ませない)
             String name = payload.fileName();
             if (name == null || name.isBlank() || name.contains("/") || name.contains("\\") || name.contains("..")) {
                 return;

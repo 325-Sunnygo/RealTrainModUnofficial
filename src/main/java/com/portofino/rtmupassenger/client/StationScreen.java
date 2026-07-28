@@ -10,14 +10,13 @@ import net.minecraft.client.gui.screens.Screen;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * 駅ブロックの設定画面。<b>右クリックで開く</b> (旧: Shift+右クリックでの 1 個ずつ切替を置き換え)。
- * 住宅街/オフィス街/工業地帯/… の各タグを ON/OFF でき、複数付けられる。タグは時間帯ごとの
- * 乗客の湧き方 (需要) を決める。閉じるときに選択をサーバーへ送って保存する。
+ * 駅ブロックの設定画面。右クリックで開く (旧: Shift+右クリックでの 1 個ずつ切替を置き換え)。
+ * 住宅街/オフィス街/工業地帯/… の各タグを ON/OFF でき、複数付けられる。
  */
 public class StationScreen extends Screen {
 
     private final BlockPos pos;
-    /** 編集中のタグビット (1 << StationTag.ordinal() の OR)。 */
+    /** 編集中のタグビット (1 << StationTag.ordinal の OR)。 */
     private int bits;
 
     public StationScreen(BlockPos pos, int bits) {
@@ -62,7 +61,7 @@ public class StationScreen extends Screen {
 
     @Override
     public void onClose() {
-        //選択したタグをサーバーへ送って保存 (駅の登録も兼ねる)。
+        // 選択したタグをサーバーへ送って保存 (駅の登録も兼ねる)。
         if (this.minecraft != null && this.minecraft.getConnection() != null) {
             PacketDistributor.sendToServer(new SetStationTagsPayload(this.pos, this.bits));
         }

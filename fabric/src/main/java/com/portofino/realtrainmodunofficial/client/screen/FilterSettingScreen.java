@@ -17,11 +17,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * フィルタの設定画面 (neo mcte)。本家 MCTE {@code GuiFilterSetting} 相当。
- *
- * <p><b>入力欄はフィルタの宣言から自動で組まれる。</b>
- * フィルタを足すときに画面を書かなくてよいのが本家のこの設計の要点で、
- * neo mcte で機能を足すときにもそのまま効く。
+ * フィルタの設定画面 (neo mcte)。本家 MCTE GuiFilterSetting 相当。
+ * 入力欄はフィルタの宣言から自動で組まれる。
  */
 public class FilterSettingScreen extends Screen {
 
@@ -101,7 +98,7 @@ public class FilterSettingScreen extends Screen {
         int hw = this.width / 2;
         g.drawCenteredString(this.font, this.title, hw, 16, 0xFFFFFF);
 
-        //各入力欄の左に名前を出す
+        // 各入力欄の左に名前を出す
         int y = 44;
         for (FilterConfig.Parameter p : params) {
             Component label = Component.translatable("filter.param.realtrainmodunofficial." + p.name.toLowerCase(java.util.Locale.ROOT));

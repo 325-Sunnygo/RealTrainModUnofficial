@@ -13,7 +13,6 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * 列車検知器の設定 (出力先の座標 + 検知時に置くか消すか)。
- *
  * @param pos           検知器の位置
  * @param hasTarget     出力先を設定しているか (false なら出力しない)
  * @param target        出力先の座標

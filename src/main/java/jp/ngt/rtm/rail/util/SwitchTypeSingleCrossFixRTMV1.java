@@ -7,7 +7,6 @@ import java.util.List;
 /**
  * KaizPatchX (fixRTM) の jp.kaiz.kaizpatch.fixrtm.rtm.rail.util.SwitchTypeSingleCrossFixRTMV1 (Kotlin) の Java 移植。
  * fixRTMRailMapVersion >= 1 の N字分岐 (渡り線) 生成を改良したもの。
- * 幾何判定 (crossLineSegments) も本家 Geometrix.kt をそのまま移植 (dot 積判定も本家準拠)。
  */
 public final class SwitchTypeSingleCrossFixRTMV1 extends SwitchType.SwitchSingleCross {
 

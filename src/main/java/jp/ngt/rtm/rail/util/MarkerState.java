@@ -1,8 +1,6 @@
 package jp.ngt.rtm.rail.util;
 
-/**
- * 本家 jp.ngt.rtm.rail.util.MarkerState の忠実移植。
- */
+/** 本家 jp.ngt.rtm.rail.util.MarkerState の忠実移植。 */
 public enum MarkerState {
     FIT_NEIGHBOR, DISTANCE, GRID, LINE1, LINE2, ANCHOR21;
 

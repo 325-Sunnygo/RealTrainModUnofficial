@@ -32,8 +32,7 @@ import org.jetbrains.annotations.Nullable;
 public class RailCollisionBlock extends BaseEntityBlock {
     public static final MapCodec<RailCollisionBlock> CODEC = simpleCodec(RailCollisionBlock::new);
     // 本家RTM準拠: ブロック底からレール面の高さまでのスラブ box(0,0,0,16,railTop,16)。
-    // 平坦レールは surfaceY=0 → 1px の薄いスラブ(=カーペット)。坂はレール面まで床から詰めるので
-    // 「ブロック全体」にも「浮いた薄板」にもならず、レール形状に沿って当たる/狙える/壊せる。
+    // 平坦レールは surfaceY=0 → 1px の薄いスラブ(=カーペット)。
     private static VoxelShape railShape(BlockGetter level, BlockPos pos) {
         float s = 0.0f;
         if (level.getBlockEntity(pos) instanceof RailCollisionBlockEntity rbe) {

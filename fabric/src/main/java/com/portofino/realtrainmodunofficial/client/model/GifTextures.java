@@ -24,14 +24,10 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.w3c.dom.Node;
 
 /**
- * 方向幕 (rollsign) / 種別幕などのテクスチャに <b>アニメーション GIF</b> を直接使えるようにする。
- *
- * <p>Minecraft の {@link NativeImage#read} は PNG しか読めないので、GIF は ImageIO で
+ * 方向幕 (rollsign) / 種別幕などのテクスチャに アニメーション GIF を直接使えるようにする。
+ * Minecraft の NativeImage#read は PNG しか読めないので、GIF は ImageIO で
  * フレーム分解 (部分フレーム・透過・disposal を合成して各フレームをフル画像に coalesce) し、
- * {@link DynamicTexture} 1 枚に毎 tick 現在フレームを貼り替えて再生する。
- *
- * <p>{@link MqoModelLoader#resolvePackTexture} が拡張子 .gif を見てここへ委譲する。
- * フレーム送りは {@link #tick()} を毎クライアント tick で呼ぶ。
+ * DynamicTexture 1 枚に毎 tick 現在フレームを貼り替えて再生する。
  */
 public final class GifTextures {
 
@@ -118,7 +114,7 @@ public final class GifTextures {
             dst.copyFrom(e.frames[frame]);
             e.texture.upload();
         } catch (Throwable ignored) {
-            //貼り替え失敗で描画を巻き込まない
+            // 貼り替え失敗で描画を巻き込まない
         }
     }
 
@@ -155,7 +151,7 @@ public final class GifTextures {
                     g.dispose();
                     coalesced.add(deepCopy(canvas));
                     delaysMs.add(Math.max(20, fm.delayMs)); //0 は多くのビューアで最低速度に丸める
-                    //disposal: 2=背景で塗り潰す, 3=直前に戻す, それ以外=そのまま
+                    // disposal: 2=背景で塗り潰す, 3=直前に戻す, それ以外=そのまま
                     if (fm.disposal == 2) {
                         clearRegion(canvas, fm.x, fm.y, frame.getWidth(), frame.getHeight());
                     } else if (fm.disposal == 3 && before != null) {
@@ -208,7 +204,7 @@ public final class GifTextures {
             }
         } catch (Exception ignored) {
         }
-        //フォールバック: 全フレームの (x+幅, y+高さ) の最大
+        // フォールバック: 全フレームの (x+幅, y+高さ) の最大
         int w = 1;
         int h = 1;
         try {
@@ -314,7 +310,7 @@ public final class GifTextures {
                 int r = (argb >>> 16) & 0xFF;
                 int gg = (argb >>> 8) & 0xFF;
                 int b = argb & 0xFF;
-                //NativeImage の RGBA int は 0xAABBGGRR (little-endian の R,G,B,A)
+                // NativeImage の RGBA int は 0xAABBGGRR (little-endian の R,G,B,A)
                 int abgr = (a << 24) | (b << 16) | (gg << 8) | r;
                 out.setPixelRGBA(x, y, abgr);
             }
@@ -323,7 +319,7 @@ public final class GifTextures {
     }
 
     private static String safeKey(String cacheKey) {
-        //ResourceLocation のパスは [a-z0-9/._-] のみ。ハッシュにして安全化。
+        // ResourceLocation のパスは [a-z0-9/._-] のみ。ハッシュにして安全化。
         return Integer.toHexString(cacheKey.hashCode()) + "_" + (cacheKey.length() & 0xFFFF);
     }
 }

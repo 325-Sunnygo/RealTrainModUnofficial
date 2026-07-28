@@ -15,13 +15,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 元に戻す (neo mcte)。本家 MCTE {@code WorldSnapshot} + {@code Editor.history} の移植。
- *
- * <p>本家はエディタ 1 個につきスタックを持っていた。ここはエディタのエンティティが
- * 消えても履歴が残るよう<b>エディタの UUID をキー</b>にしてサーバ側で持つ。
- *
- * <p>フィルタが誤爆したときに戻せないと使い物にならないので、
- * 「まず記録、それから変更」を {@link EditorOps} 側で徹底している。
+ * 元に戻す (neo mcte)。本家 MCTE WorldSnapshot + Editor.history の移植。
+ * 本家はエディタ 1 個につきスタックを持っていた。
  */
 public final class UndoHistory {
 
@@ -63,7 +58,7 @@ public final class UndoHistory {
 
         /** 戻す。戻した数を返す。 */
         public int restore(ServerLevel level) {
-            //後ろから戻す (同じ位置を複数回触っていた場合に最初の状態へ帰る)
+            // 後ろから戻す (同じ位置を複数回触っていた場合に最初の状態へ帰る)
             for (int i = positions.size() - 1; i >= 0; i--) {
                 BlockPos p = positions.get(i);
                 level.setBlock(p, states.get(i), 3);
@@ -73,7 +68,7 @@ public final class UndoHistory {
                         level.getBlockEntity(p).loadWithComponents(tag, level.registryAccess());
                         level.getBlockEntity(p).setChanged();
                     } catch (Exception ignored) {
-                        //読めなくてもブロック自体は戻っているので続ける
+                        // 読めなくてもブロック自体は戻っているので続ける
                     }
                 }
             }
@@ -92,7 +87,7 @@ public final class UndoHistory {
         if (key == null || snapshot.size() == 0) {
             return;
         }
-        //新しい編集をしたら、やり直しの先は無くなる (一般的な編集履歴の作法)
+        // 新しい編集をしたら、やり直しの先は無くなる (一般的な編集履歴の作法)
         REDO.remove(key);
         Deque<Snapshot> stack = HISTORY.computeIfAbsent(key, k -> new ArrayDeque<>());
         stack.push(snapshot);
@@ -112,7 +107,7 @@ public final class UndoHistory {
             return 0;
         }
         Snapshot s = stack.pop();
-        //戻す前の姿を控えておけば、そのまま「やり直し」になる
+        // 戻す前の姿を控えておけば、そのまま「やり直し」になる
         Snapshot forRedo = s.captureCurrent(level);
         int n = s.restore(level);
         Deque<Snapshot> redo = REDO.computeIfAbsent(key, k -> new ArrayDeque<>());
@@ -134,7 +129,7 @@ public final class UndoHistory {
             return 0;
         }
         Snapshot s = stack.pop();
-        //やり直す前の姿を控えて、元に戻す側へ積み直す
+        // やり直す前の姿を控えて、元に戻す側へ積み直す
         Snapshot back = s.captureCurrent(level);
         int n = s.restore(level);
         Deque<Snapshot> undo = HISTORY.computeIfAbsent(key, k -> new ArrayDeque<>());

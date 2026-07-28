@@ -22,8 +22,7 @@ public final class EntityCompatUtil {
 
     /**
      * func_110124_au = Entity.getUniqueID。
-     * <p>レシーバがバニラの Entity でシムを挟めないため、スクリプト変換がここへ回す。
-     * NGTO Builder 2 がプレイヤーごとの編集状態のキーに使う。
+     * レシーバがバニラの Entity でシムを挟めないため、スクリプト変換がここへ回す。
      */
     public static java.util.UUID func_110124_au(Object entity) {
         return entity instanceof net.minecraft.world.entity.Entity e ? e.getUUID() : null;

@@ -27,28 +27,7 @@ import java.util.Map;
 
 /**
  * エディタの画面 (neo mcte)。
- *
- * <p><b>本家 / MCTEU の写しではなく作り直したもの。</b>あちらは 1.12 時代の名残で
- * 座標欄・操作ボタン・変形ボタンが画面の左右へ散らばっており、どれが何に効くのか
- * 分かりづらい。ここでは<b>「選ぶ → 設定する → 実行する」</b>の順に並べ替えた。
- *
- * <pre>
- *  ┌───────────────────────────────────────────────┐
- *  │ neo mcte                      42x8x30 = 10080 │ ← いまの選択範囲
- *  ├──────────────┬────────────────────────────────┤
- *  │ [検索_______]│  Fill                          │
- *  │ ▸ Fill       │  選択範囲をブロックで埋める      │
- *  │   Replace    │                                │
- *  │   Delete     │  Block   [__________]  ▣       │ ← 設定はその場で
- *  │   …          │  OnlyAir [ON]                  │
- *  │              │            [ 実行 ]            │
- *  ├──────────────┴────────────────────────────────┤
- *  │ 始点 1 2 3   終点 4 5 6        [元に戻す]      │
- *  └───────────────────────────────────────────────┘
- * </pre>
- *
- * <p>フィルタは<b>一覧から選び、その場で設定して実行</b>する。画面を渡り歩かない。
- * 検索できるので数が増えても探せる。
+ * 本家 / MCTEU の写しではなく作り直したもの。
  */
 public class EditorScreen extends Screen {
 
@@ -204,7 +183,7 @@ public class EditorScreen extends Screen {
             String v = w instanceof EditBox box ? box.getValue()
                 : String.valueOf("ON".equals(w.getMessage().getString()));
             sb.append(p.name).append('=').append(v).append('\n');
-            //次に同じフィルタを開いたときにそのまま出す
+            // 次に同じフィルタを開いたときにそのまま出す
             com.portofino.realtrainmodunofficial.client.EditorPrefs.put(f.name(), p.name, v);
         }
         com.portofino.realtrainmodunofficial.client.EditorPrefs.save();
@@ -273,7 +252,7 @@ public class EditorScreen extends Screen {
         return super.mouseScrolled(mx, my, dx, dy);
     }
 
-    //★ワールドを見ながら使うのでぼかしも暗転もしない
+    // ★ワールドを見ながら使うのでぼかしも暗転もしない
     @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
     }
@@ -300,7 +279,7 @@ public class EditorScreen extends Screen {
         g.drawString(this.font, Component.literal("neo mcte").withStyle(ChatFormatting.AQUA),
             left + 6, top + 5, 0xFFFFFF, false);
 
-        //いまの選択範囲を見出しに常時出す (別画面へ行かなくても分かるように)
+        // いまの選択範囲を見出しに常時出す (別画面へ行かなくても分かるように)
         var box = ClientSelection.box();
         String info;
         if (box == null) {
@@ -342,13 +321,13 @@ public class EditorScreen extends Screen {
 
         int y = top + 52;
         for (FilterConfig.Parameter p : f.config().parameters()) {
-            //★ラベル列に収まらない文字は省略する。以前は入力欄へ重なって読めなかった。
+            // ★ラベル列に収まらない文字は省略する。以前は入力欄へ重なって読めなかった。
             drawTruncated(g, Component.translatable("filter.param.realtrainmodunofficial."
                 + p.name.toLowerCase(Locale.ROOT)).getString(), x, y + 3, LABEL_W - 4, 0xC0C0C0);
             y += 18;
         }
 
-        //ブロック見本 (左クリックで手持ちを登録 / 右クリックで空に)
+        // ブロック見本 (左クリックで手持ちを登録 / 右クリックで空に)
         int sx = x + LABEL_W + 114;
         for (int i = 0; i < 2; i++) {
             int sy = top + 52 + i * 18;

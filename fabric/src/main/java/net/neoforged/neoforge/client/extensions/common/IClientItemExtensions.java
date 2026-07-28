@@ -4,10 +4,7 @@ import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 
 /**
  * シム: アイテムのクライアント側拡張。
- *
- * <p>RTMU が使うのは {@code getCustomRenderer()} (ミニチュアの独自アイテム描画) だけ。
- * Fabric では {@code BuiltinItemRendererRegistry} が対応物なので、
- * エントリポイント側でこの実装を拾って登録する。
+ * RTMU が使うのは getCustomRenderer (ミニチュアの独自アイテム描画) だけ。
  */
 public interface IClientItemExtensions {
 

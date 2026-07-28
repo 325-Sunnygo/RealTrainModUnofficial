@@ -4,10 +4,8 @@ import net.minecraft.util.Mth;
 
 /**
  * カメラの設定値。本家 jp.ngt.rtm.gui.camera.Camera を撮り鉄向けに作り直したもの。
- *
- * <p>本家は「ズーム倍率 1〜30」「感度 0〜1」「フォーカス 0〜1 (深度バッファの生値)」という
- * 内部単位をそのまま UI に出していた。ここでは実際のカメラと同じ<b>焦点距離(mm) / F値 /
- * シャッター速度 / ピント距離(m)</b> で持つ。撮り鉄が「300mm F2.8 で 1/500」と言えるようにするため。
+ * 本家は「ズーム倍率 1〜30」「感度 0〜1」「フォーカス 0〜1 (深度バッファの生値)」という
+ * 内部単位をそのまま UI に出していた。
  */
 public final class CameraState {
 
@@ -119,14 +117,12 @@ public final class CameraState {
 
     /**
      * ボケの強さ (0=パンフォーカス, 1=最大)。
-     * <p>
      * 実際の被写界深度は「焦点距離が長いほど / F値が小さいほど / 被写体が近いほど」浅くなる。
-     * 撮り鉄で望遠を出したときに背景が溶けてほしいので、焦点距離も効かせる。
      */
     public float getBokehStrength() {
-        //F値: f/1.4 で 1.0、f/22 で ほぼ 0
+        // F値: f/1.4 で 1.0、f/22 で ほぼ 0
         float aperture = Mth.clamp((22.0F - getFStop()) / (22.0F - 1.4F), 0.0F, 1.0F);
-        //焦点距離: 28mm で 0.35、300mm 以上で 1.0
+        // 焦点距離: 28mm で 0.35、300mm 以上で 1.0
         float focal = Mth.clamp((focalMm - 18.0F) / (300.0F - 18.0F), 0.0F, 1.0F);
         focal = 0.35F + 0.65F * focal;
         return aperture * aperture * focal;
@@ -144,14 +140,13 @@ public final class CameraState {
 
     /**
      * 前フレームを残す割合 (0=止まる, 0.9=激しく流れる)。
-     * 1/1000 秒なら残さない。遅いシャッターほど前フレームが濃く残り、
-     * 列車を追ってカメラを振ると背景だけが流れる = 流し撮りになる。
+     * 1/1000 秒なら残さない。
      */
     public float getMotionBlend() {
         if (shutterIndex <= 1) {
             return 0.0F;
         }
-        //1/250 → 0.25、1/4 → 0.88 くらい
+        // 1/250 → 0.25、1/4 → 0.88 くらい
         float t = (float) (shutterIndex - 1) / (float) (SHUTTER_DENOM.length - 1 - 1);
         return 0.25F + 0.63F * t;
     }

@@ -18,7 +18,6 @@ import java.util.stream.Stream;
 /**
  * 本家 jp.ngt.rtm.entity.train.util.Formation (KaizPatchX) の忠実移植。
  * 編成の管理, ServerOnly。
- * TODO: PacketFormation 相当のクライアント同期 (sendPacket は現状 no-op)。
  */
 public class Formation {
     public final long id;
@@ -81,9 +80,7 @@ public class Formation {
         }
     }
 
-    /**
-     * @return 両数
-     */
+    /** @return 両数 */
     public int size() {
         return this.entries.length;
     }
@@ -110,7 +107,6 @@ public class Formation {
 
     /**
      * 編成に車両を登録
-     *
      * @param par3 車両の位置
      * @param par5 向き
      */
@@ -129,9 +125,7 @@ public class Formation {
         }
     }
 
-    /**
-     * 車両番号再振り分け
-     */
+    /** 車両番号再振り分け */
     private void reallocation() {
         int i = 0;
         for (FormationEntry entry : this.entries) {
@@ -143,12 +137,10 @@ public class Formation {
         this.sendPacket();
     }
 
-    /**
-     * 編成を反転
-     */
+    /** 編成を反転 */
     private void reverse() {
         NGTUtil.reverse(this.entries);
-        //向きを反転
+        // 向きを反転
         this.getFormationEntryStream().forEach(entry -> entry.dir ^= 1);
     }
 
@@ -208,11 +200,11 @@ public class Formation {
     }
 
     /**
-     * 車両を編成から除去<br>
+     * 車両を編成から除去
      * ※Server Only
      */
     public void onRemovedTrain(EntityTrainBase par1) {
-        //1両編成の時
+        // 1両編成の時
         if (this.entries.length <= 1) {
             FormationManager.getInstance(this.isRemote).removeFormation(this.id);
             return;
@@ -240,9 +232,7 @@ public class Formation {
         this.reallocation();
     }
 
-    /**
-     * バール右クリックで連結解除時
-     */
+    /** バール右クリックで連結解除時 */
     public void onDisconnectedTrain(EntityTrainBase par1, int par2) {
         FormationEntry entry = this.getEntry(par1);
         if (entry == null) {
@@ -321,12 +311,9 @@ public class Formation {
         {
             int stateR = data & 1;
             int stateL = (data >> 1) & 1;
-            //data は「操作した車両 (par2) 自身の物理左右」で来る。編成内の物理向き
-            //(FormationEntry.dir) が par2 と違う車両だけ左右を反転させれば、編成全体で
-            //同じ物理側のドアが開く (本家は getTrainDirection を基準に同じ事をしている)。
-            //旧実装は dir==0 を基準にしていたため、逆向き車 (dir==1) に乗ると
-            //par2 自身の値まで反転されて保存され、次のトグルで別のビットが立って
-            //「閉めたのに反対側が開く (両開き)」になっていた。
+            // data は「操作した車両 (par2) 自身の物理左右」で来る。
+            // (FormationEntry.dir) が par2 と違う車両だけ左右を反転させれば、編成全体で
+            // 同じ物理側のドアが開く (本家は getTrainDirection を基準に同じ事をしている)。
             FormationEntry control = this.getEntry(par2);
             int refDir = (control == null) ? 0 : control.dir;
             for (FormationEntry e : this.entries) {
@@ -346,7 +333,7 @@ public class Formation {
     }
 
     public void sendPacket() {
-        //TODO PacketFormation 移植 (クライアントへの編成同期)
+        // TODO PacketFormation 移植 (クライアントへの編成同期)
     }
 
     public boolean isFrontCar(EntityTrainBase train) {

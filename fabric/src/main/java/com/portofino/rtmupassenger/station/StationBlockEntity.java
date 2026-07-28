@@ -16,13 +16,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 駅ブロックの BlockEntity。作り直し版はシンプルに次のことだけ行う:
- * <ul>
- *   <li>自分を {@link StationRegistry} に登録 (乗客の行き先候補)。</li>
- *   <li>範囲内の停止位置目標 ({@link StopTargetBlock}) を把握。</li>
- *   <li>定期的に、停止位置目標に待機乗客を湧かせる (行き先 = 他の駅)。</li>
- *   <li>停車しドアの開いた列車に、待機乗客を乗せ、目的地の乗客を降ろす。</li>
- * </ul>
+ * 駅ブロックの BlockEntity。
+ * 自分を StationRegistry に登録 (乗客の行き先候補)。
  */
 public class StationBlockEntity extends BlockEntity {
 
@@ -34,8 +29,7 @@ public class StationBlockEntity extends BlockEntity {
     private static final int SPAWN_INTERVAL = 120;
     /**
      * 「列車のドアがこの停止位置目標に付いている」とみなす距離の2乗 (車体軸からの水平距離)。
-     * 停止位置目標は車体側面 (軸から約2m) に置くので 4m もあれば十分。隣の駅に停車中の列車は
-     * 車体軸から十数 m 離れるため、この閾値では拾わない (=誤って乗降させない)。
+     * 停止位置目標は車体側面 (軸から約2m) に置くので 4m もあれば十分。
      */
     private static final double SERVE_DIST_SQ = 16.0D;
 
@@ -52,7 +46,7 @@ public class StationBlockEntity extends BlockEntity {
             return;
         }
         long time = level.getGameTime();
-        //駅を登録し続ける (初回ロード・保険)。
+        // 駅を登録し続ける (初回ロード・保険)。
         if (time % 200L == 0L) {
             StationRegistry.get(sl).add(pos);
         }
@@ -100,9 +94,8 @@ public class StationBlockEntity extends BlockEntity {
         for (EntityTrainBase train : trains) {
             boolean stopped = Math.abs(train.getSpeed()) < 0.05F;
             boolean doorOpen = train.getTrainStateData(4) != 0; //State_Door (0=閉)
-            //この駅の停止位置目標にドアが付いている列車だけを扱う。小さいループで
-            //隣の駅に停車中の列車を自分の駅と誤認して乗せないため。
-            //(降車は乗客自身が乗車中に判定する — 駅チャンクがアンロードでも降りられる)
+            // この駅の停止位置目標にドアが付いている列車だけを扱う。
+            // 隣の駅に停車中の列車を自分の駅と誤認して乗せないため。
             if (stopped && doorOpen && this.trainServesThisStation(train)) {
                 if (boardable == null) {
                     boardable = train;
@@ -112,8 +105,8 @@ public class StationBlockEntity extends BlockEntity {
         if (boardable == null) {
             return;
         }
-        //乗車は<b>停止位置目標ごとに 1 人ずつ</b>: 既に乗り込み中 (BOARDING) の人が居る
-        //停止位置目標は、その人が着席するまで次を出さない (ドアでの押し合いを防ぐ)。
+        // 乗車は停止位置目標ごとに 1 人ずつ: 既に乗り込み中 (BOARDING) の人が居る
+        // 停止位置目標は、その人が着席するまで次を出さない (ドアでの押し合いを防ぐ)。
         AABB scan = this.platformArea().inflate(6.0D, 3.0D, 6.0D);
         java.util.Set<BlockPos> boarding = new java.util.HashSet<>();
         for (PassengerEntity b : level.getEntitiesOfClass(PassengerEntity.class, scan,
@@ -121,7 +114,7 @@ public class StationBlockEntity extends BlockEntity {
                         || q.getState() == PassengerEntity.State.ENTERING) && q.getWaitSpot() != null)) {
             boarding.add(b.getWaitSpot());
         }
-        //各停止位置目標の待ち行列の先頭 (id 最小=先に湧いた)。
+        // 各停止位置目標の待ち行列の先頭 (id 最小=先に湧いた)。
         Map<BlockPos, PassengerEntity> fronts = new HashMap<>();
         for (PassengerEntity p : level.getEntitiesOfClass(PassengerEntity.class, scan,
                 q -> q.getState() == PassengerEntity.State.WAITING && q.getWaitSpot() != null)) {
@@ -149,24 +142,23 @@ public class StationBlockEntity extends BlockEntity {
     }
 
     /**
-     * 需要 (タグ × 時刻) に応じて待機乗客を湧かせる。住宅街は朝・オフィス街は夕方に多い等、
+     * 需要 (タグ × 時刻) に応じて待機乗客を湧かせる。
      * タグの出発需要が高い時間帯ほど湧きやすい (= NPC の人数が時間帯で変わる)。
-     * ワールド全体で {@link #MAX_GLOBAL} 体まで (チャンク外の乗客も数える)。
      */
     private void trySpawn(ServerLevel level) {
         if (this.stopTargets.isEmpty()) {
             return; //停止位置目標が無ければ湧かせない
         }
-        //出発需要による抽選 (SPAWN_INTERVAL ごと)。ラッシュ時はほぼ毎回、閑散時はまれ。
+        // 出発需要による抽選 (SPAWN_INTERVAL ごと)。ラッシュ時はほぼ毎回、閑散時はまれ。
         float hour = StationTag.hourOf(level.getDayTime());
         int bits = StationRegistry.get(level).tagBits(this.worldPosition);
         float chance = Math.min(0.9F, 0.30F * StationTag.originWeight(bits, hour));
         if (level.random.nextFloat() >= chance) {
             return;
         }
-        //上限は「プレイヤーから見える乗客の数」で判定する (RTMU 設定「乗客の最大数」)。
-        //ワールド全体の総数で見ると、遠くの駅に湧いた乗客のせいで目の前の駅が
-        //いつまでも無人になる。見えている範囲で数えれば、どこにいても同じ密度になる。
+        // 上限は「プレイヤーから見える乗客の数」で判定する (RTMU 設定「乗客の最大数」)。
+        // ワールド全体の総数で見ると、遠くの駅に湧いた乗客のせいで目の前の駅が
+        // いつまでも無人になる。見えている範囲で数えれば、どこにいても同じ密度になる。
         if (this.visiblePassengerCount(level)
                 >= com.portofino.realtrainmodunofficial.RtmuSettings.serverMaxPassengers()) {
             return;
@@ -178,7 +170,7 @@ public class StationBlockEntity extends BlockEntity {
         if (waitingCount >= MAX_WAITING) {
             return;
         }
-        //行き先は到着需要の重み付き抽選 (朝はオフィス街行き、夕方は住宅街行きが多い)。
+        // 行き先は到着需要の重み付き抽選 (朝はオフィス街行き、夕方は住宅街行きが多い)。
         BlockPos dest = StationRegistry.get(level).pickDestination(this.worldPosition, hour, level.random);
         if (dest == null) {
             return; //行き先 (他の駅) が無ければ湧かせない
@@ -189,9 +181,8 @@ public class StationBlockEntity extends BlockEntity {
         if (p == null) {
             return;
         }
-        //★停止位置目標 (ホームの開けた足場) の真上に出す。以前は駅ブロック側へ 2 ブロック
-        //  寄せて出していたが、駅ブロックが壁の裏だと乗客が壁の中に湧いて動けなくなっていた。
-        //  目標の真上は必ず歩ける場所なので安全。整列は待機処理 (tickWaiting) がナビで行う。
+        // ★停止位置目標 (ホームの開けた足場) の真上に出す。
+        // 寄せて出していたが、駅ブロックが壁の裏だと乗客が壁の中に湧いて動けなくなっていた。
         p.moveTo(waitSpot.getX() + 0.5D, waitSpot.getY(), waitSpot.getZ() + 0.5D,
                 level.random.nextFloat() * 360.0F, 0.0F);
         p.initPassenger(this.worldPosition, dest, waitSpot);
@@ -201,8 +192,7 @@ public class StationBlockEntity extends BlockEntity {
 
     /**
      * この駅を見ているプレイヤーの視界内にいる乗客の数 (見ている人の中での最大値)。
-     * <p>
-     * 誰も見ていない駅では {@link Integer#MAX_VALUE} を返して湧かせない
+     * 誰も見ていない駅では Integer#MAX_VALUE を返して湧かせない
      * (チャンクローダーで回り続けている駅に、誰も見ないまま乗客が溜まるのを防ぐ)。
      */
     private int visiblePassengerCount(ServerLevel level) {
@@ -211,7 +201,7 @@ public class StationBlockEntity extends BlockEntity {
         int max = 0;
         boolean anyViewer = false;
         for (net.minecraft.server.level.ServerPlayer player : level.players()) {
-            //この駅がそのプレイヤーの視界外なら、その人にとっては関係ない
+            // この駅がそのプレイヤーの視界外なら、その人にとっては関係ない
             if (player.distanceToSqr(this.worldPosition.getX() + 0.5D,
                     this.worldPosition.getY() + 0.5D,
                     this.worldPosition.getZ() + 0.5D) > rSq) {

@@ -13,11 +13,7 @@ import java.util.List;
 
 /**
  * 変換したワールドに置く復元データ (rtmu_restore.dat)。
- *
- * <p>旧ワールドから抜いた RTM オブジェクトの<b>生 NBT</b> をそのまま持つ。
- * 実際の変換 (モデル名 → RTMU の定義、レールの敷設) は、ワールドを最初に開いたときに
- * ゲーム内で行う ({@link LegacyRestorer})。モデルパックのレジストリはゲームが動いていないと
- * 引けないため。
+ * 旧ワールドから抜いた RTM オブジェクトの生 NBT をそのまま持つ。
  */
 public final class RestoreData {
 
@@ -30,7 +26,7 @@ public final class RestoreData {
     public final List<ObjectRecord> objects = new ArrayList<>();
     public final List<EntityRecord> entities = new ArrayList<>();
     /**
-     * 旧 MOD のブロックを<b>バニラブロックに読み替えて置き直す</b>ためのリスト。
+     * 旧 MOD のブロックをバニラブロックに読み替えて置き直すためのリスト。
      * Minecraft の変換 (DataFixer) は MOD のブロックを空気にしてしまうので、
      * 位置と種類をここに退避しておき、ワールドを開いたときに置く。
      */
@@ -100,8 +96,8 @@ public final class RestoreData {
         }
         root.put("Entities", entityList);
 
-        //ブロックは数が多い (数十万になりうる) のでコンパクトに:
-        //  名前のパレット + [x, y, z, パレット番号, メタ] の int 配列
+        // ブロックは数が多い (数十万になりうる) のでコンパクトに:
+        // 名前のパレット + [x, y, z, パレット番号, メタ] の int 配列
         if (!blocks.isEmpty()) {
             List<String> palette = new ArrayList<>();
             java.util.Map<String, Integer> index = new java.util.HashMap<>();

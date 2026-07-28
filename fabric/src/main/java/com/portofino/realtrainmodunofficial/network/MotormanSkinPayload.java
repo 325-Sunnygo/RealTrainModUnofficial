@@ -10,9 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 運転士のスキン変更 (GUI で選択 → サーバーで entityData に設定 → 全クライアントへ同期)。
- */
+/** 運転士のスキン変更 (GUI で選択 → サーバーで entityData に設定 → 全クライアントへ同期)。 */
 public record MotormanSkinPayload(int entityId, String skin) implements CustomPacketPayload {
 
     public static final Type<MotormanSkinPayload> TYPE = new Type<>(
@@ -41,7 +39,7 @@ public record MotormanSkinPayload(int entityId, String skin) implements CustomPa
             if (motorman.distanceToSqr(player) > 64.0D * 64.0D) {
                 return;
             }
-            //ファイル名として安全な文字だけ許可 (パス区切りを含む値は拒否)
+            // ファイル名として安全な文字だけ許可 (パス区切りを含む値は拒否)
             String skin = payload.skin();
             if (skin.contains("/") || skin.contains("\\") || skin.contains("..")) {
                 return;

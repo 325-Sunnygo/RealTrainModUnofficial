@@ -37,7 +37,7 @@ public class PassengerRenderer extends HumanoidMobRenderer<PassengerEntity, Play
     public void render(PassengerEntity entity, float entityYaw, float partialTick,
                        com.mojang.blaze3d.vertex.PoseStack poseStack,
                        net.minecraft.client.renderer.MultiBufferSource buffer, int packedLight) {
-        //列車に乗っている間は座り姿勢 (HumanoidModel.riding=脚を曲げて着席)。
+        // 列車に乗っている間は座り姿勢 (HumanoidModel.riding=脚を曲げて着席)。
         this.getModel().riding = entity.isPassenger();
         this.getModel().young = false;
         super.render(entity, entityYaw, partialTick, poseStack, buffer, packedLight);

@@ -15,23 +15,14 @@ import java.util.Map;
 
 /**
  * 既存の描画コードが「実際に吐いた頂点」をそのまま捕まえて、1 つのメッシュ (VBO) に統合する。
- *
  * 本家 RTM 1.7.10 はレール 1 本をディスプレイリストに 1 回焼いて GPU に置きっぱなしにしていた。
- * 1.21 移植ではそれが「毎フレーム、0.5m 刻みの位置ごとにモデルを描画呼び出し」になっており、
- * 50m のレール 1 本で 900 回以上の draw call (setupRenderState + ユニフォーム転送 + bind/draw)
- * を毎フレーム発行していた (実測 2.83ms/本)。ここで 1 本 = 1〜2 draw call に統合する。
- *
- * 重要: 頂点の中身 (座標・法線・UV・色・ライト・RenderType の選択) は既存の描画コードに
- * そのまま生成させ、ここでは受け取るだけ。判断ロジックを複製しないので見た目は変わらない。
  */
 public final class MeshCapture {
 
     private MeshCapture() {
     }
 
-    /**
-     * 捕まえた頂点を RenderType ごとに貯める MultiBufferSource。
-     */
+    /** 捕まえた頂点を RenderType ごとに貯める MultiBufferSource。 */
     public static final class Source implements MultiBufferSource {
         private final Map<RenderType, Sink> sinks = new LinkedHashMap<>();
 
@@ -48,9 +39,7 @@ public final class MeshCapture {
             return total;
         }
 
-        /**
-         * 貯めた頂点を RenderType ごとに VBO へアップロードする (描画スレッドで呼ぶこと)。
-         */
+        /** 貯めた頂点を RenderType ごとに VBO へアップロードする (描画スレッドで呼ぶこと)。 */
         public List<Section> upload() {
             List<Section> sections = new ArrayList<>();
             for (Map.Entry<RenderType, Sink> entry : sinks.entrySet()) {
@@ -59,9 +48,9 @@ public final class MeshCapture {
                 if (sink.count <= 0) {
                     continue;
                 }
-                //RenderType 自身の format/mode で BufferBuilder を作る。
-                //シェーダー MOD (Iris) は RenderType の頂点フォーマットを拡張し、
-                //BufferBuilder 経由で接線などを補完するため、この経路なら追従できる。
+                // RenderType 自身の format/mode で BufferBuilder を作る。
+                // シェーダー MOD (Iris) は RenderType の頂点フォーマットを拡張し、
+                // BufferBuilder 経由で接線などを補完するため、この経路なら追従できる。
                 BufferBuilder builder = Tesselator.getInstance().begin(type.mode(), type.format());
                 for (int i = 0; i < sink.count; i++) {
                     int f = i * 8;
@@ -90,9 +79,7 @@ public final class MeshCapture {
         }
     }
 
-    /**
-     * 1 つの RenderType 分の統合済みメッシュ。
-     */
+    /** 1 つの RenderType 分の統合済みメッシュ。 */
     public record Section(RenderType renderType, VertexBuffer vbo, int vertexCount) {
         public void close() {
             if (vbo != null && !vbo.isInvalid()) {
@@ -107,9 +94,9 @@ public final class MeshCapture {
      * の順で使う (バニラの標準的な並び)。setOverlay/setLight は既定実装で setUv1/setUv2 に落ちる。
      */
     private static final class Sink implements VertexConsumer {
-        //x,y,z,u,v,nx,ny,nz
+        // x,y,z,u,v,nx,ny,nz
         private float[] data = new float[8 * 4096];
-        //color(ARGB), light, overlay
+        // color(ARGB), light, overlay
         private int[] meta = new int[3 * 4096];
         private int count;
         private int cur = -1;
@@ -133,7 +120,7 @@ public final class MeshCapture {
             data[f] = x;
             data[f + 1] = y;
             data[f + 2] = z;
-            //既定値 (呼ばれなかった場合の保険)
+            // 既定値 (呼ばれなかった場合の保険)
             int m = cur * 3;
             meta[m] = 0xFFFFFFFF;
             meta[m + 1] = 0;
@@ -160,7 +147,7 @@ public final class MeshCapture {
 
         @Override
         public VertexConsumer setUv1(int u, int v) {
-            //オーバーレイ (setOverlay の既定実装から来る)
+            // オーバーレイ (setOverlay の既定実装から来る)
             if (cur >= 0) {
                 meta[cur * 3 + 2] = (v << 16) | (u & 0xFFFF);
             }
@@ -169,7 +156,7 @@ public final class MeshCapture {
 
         @Override
         public VertexConsumer setUv2(int u, int v) {
-            //ライト (setLight の既定実装から来る)
+            // ライト (setLight の既定実装から来る)
             if (cur >= 0) {
                 meta[cur * 3 + 1] = (v << 16) | (u & 0xFFFF);
             }

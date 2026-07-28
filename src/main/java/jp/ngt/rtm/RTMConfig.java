@@ -6,7 +6,7 @@ package jp.ngt.rtm;
  */
 @SuppressWarnings("unused")
 public final class RTMConfig {
-    //設定カテゴリ名 (本家)
+    // 設定カテゴリ名 (本家)
     public static final String CATEGORY_SOUND = "Sound";
     public static final String CATEGORY_RAIL = "Rail";
     public static final String CATEGORY_ITEM = "Item";
@@ -17,24 +17,20 @@ public final class RTMConfig {
     public static final String CATEGORY_MARKER = "Marker";
     public static final String CATEGORY_LOAD = "Load";
 
-    /**
-     * レール生成距離 (default:64, max:256)
-     */
+    /** レール生成距離 (default:64, max:256) */
     public static short railGeneratingDistance = 64;
-    /**
-     * レール生成高さ (default:8, max:256)
-     */
+    /** レール生成高さ (default:8, max:256) */
     public static short railGeneratingHeight = 8;
 
     public static short markerDisplayDistance = 100;
 
-    //音量 (0.0〜1.0)。本家は 0〜100 の設定値を /100 する
+    // 音量 (0.0〜1.0)。本家は 0〜100 の設定値を /100 する
     public static float trainSoundVol = 1.0F;
     public static float gunSoundVol = 1.0F;
     public static byte crossingGateSoundType;
     public static boolean expandPlayableSoundCount = true;
 
-    //可聴距離 (ブロック)
+    // 可聴距離 (ブロック)
     public static float trainRunningSoundRange = 48.0F;
     public static float trainJointSoundRange = 48.0F;
     public static float trainBrakeReleaseSoundRange = 32.0F;

@@ -15,10 +15,8 @@ import java.util.Map;
 
 /**
  * サーバ→クライアントの CarEntity scriptData(DataMap) 同期。
- *
- * <p>SuperRailBuilder3 の render(クライアント)スクリプトは、サーバ onUpdate が設定した
- * {@code hostPlayerEntityId} 等を読んで GUI を起動する。これが同期されないとクライアントで
- * GUI が出ない。TrainScriptDataPayload の CarEntity 版。</p>
+ * SuperRailBuilder3 の render(クライアント)スクリプトは、サーバ onUpdate が設定した
+ * hostPlayerEntityId 等を読んで GUI を起動する。
  */
 public record CarScriptDataSyncPayload(int entityId, Map<String, String> data) implements CustomPacketPayload {
     public static final Type<CarScriptDataSyncPayload> TYPE = new Type<>(

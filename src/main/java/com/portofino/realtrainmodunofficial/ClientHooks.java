@@ -153,9 +153,9 @@ public final class ClientHooks {
         invokeClient("showScriptErrorMessage", new Class<?>[]{String.class}, message);
     }
 
-    //軽量化: 解決済み Class / Method をキャッシュする。踏切・スピーカー等の走行音つき設置物は
-    //tickCrossingGateSound を毎 client tick 通るため、その都度 Class.forName + getMethod (リフレクション
-    //走査) を回すのは無駄。このクラス内に「同名・別引数数」のメソッドは無いので name+引数数で一意にキー化できる。
+    // 軽量化: 解決済み Class / Method をキャッシュする。踏切・スピーカー等の走行音つき設置物は
+    // tickCrossingGateSound を毎 client tick 通るため、その都度 Class.forName + getMethod (リフレクション
+    // 走査) を回すのは無駄。このクラス内に「同名・別引数数」のメソッドは無いので name+引数数で一意にキー化できる。
     private static volatile Class<?> hooksClass;
     private static final java.util.Map<String, java.lang.reflect.Method> METHOD_CACHE =
         new java.util.concurrent.ConcurrentHashMap<>();

@@ -13,13 +13,13 @@ public final class MiniatureFiles {
     private MiniatureFiles() {
     }
 
-    /** {@code <ゲームフォルダ>/mcte/miniature}。無ければ作る。 */
+    /** <ゲームフォルダ>/mcte/miniature。無ければ作る。 */
     public static Path dir() {
         Path p = FMLPaths.GAMEDIR.get().resolve("mcte").resolve("miniature");
         try {
             Files.createDirectories(p);
         } catch (Exception ignored) {
-            //作れなくても読み書き時に失敗するだけなので、ここでは黙って進む
+            // 作れなくても読み書き時に失敗するだけなので、ここでは黙って進む
         }
         return p;
     }

@@ -5,13 +5,7 @@ import java.util.regex.Pattern;
 
 /**
  * 本家 jp.ngt.rtm.entity.npc.macro.TrainCommand の移植。
- * マクロの 1 行 = {@code 時刻 コマンド:引数} (# 以降はコメント)。
- * <pre>
- *   0 Notch:5        … 開始 0tick でノッチ+5
- *   200 Notch:-8     … 200tick で非常ブレーキ
- *   300 Door:Door_OpenLeft
- *   400 Horn:
- * </pre>
+ * マクロの 1 行 = 時刻 コマンド:引数 (# 以降はコメント)。
  */
 public class TrainCommand {
     public static final String SEPARATOR = "//";

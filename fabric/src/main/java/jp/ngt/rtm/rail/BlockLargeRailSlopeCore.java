@@ -8,9 +8,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
 
-/**
- * 勾配コアブロック (本家 BlockLargeRailSlopeCore 相当)。
- */
+/** 勾配コアブロック (本家 BlockLargeRailSlopeCore 相当)。 */
 public class BlockLargeRailSlopeCore extends BlockLargeRailSlopeBase {
     public static final MapCodec<BlockLargeRailSlopeCore> CODEC = simpleCodec(props -> new BlockLargeRailSlopeCore(2, props));
 

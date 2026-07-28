@@ -12,7 +12,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** ペインターの設定画面 (neo mcte)。本家 MCTE {@code GuiPainter} 相当。 */
+/** ペインターの設定画面 (neo mcte)。本家 MCTE GuiPainter 相当。 */
 public class PainterSettingsScreen extends Screen {
 
     private final InteractionHand hand;

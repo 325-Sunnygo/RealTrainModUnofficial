@@ -9,41 +9,21 @@ import java.util.regex.Pattern;
 
 /**
  * 本家 jp.ngt.rtm.block.tt.TimeTable の移植 (tt_*.csv の解析)。
- * <p>
  * CSV は4セクションからなる:
- * <pre>
- *   &lt;Config&gt;     name= / description= / useRealTime=
- *   &lt;Color&gt;      正規表現=0xRRGGBB   (列車名に一致したら文字色を強制)
- *   &lt;TimeTable&gt;  1行目=列車番号, 2行目=列車名, 3行目以降=駅ごとの EntryID 行
- *   &lt;Entry&gt;      1行目=列名, 2行目以降= ID,着時刻,発時刻,番線,乗車位置,両数
- * </pre>
- * 本家は行の分割に Java の {@code String.split(",")} を使っており、末尾の空フィールドが
- * 落ちる性質に頼っている ("," だけの行は長さ0になり読み飛ばされる)。ここでも同じにしないと
- * 行番号がずれるので、意図的に同じ挙動にしてある。
  */
 public class TimeTable {
     public final String fileName;
     public String name;
     public String description;
-    /**
-     * true=現実時間, false=マイクラ時間。
-     */
+    /** true=現実時間, false=マイクラ時間。 */
     public boolean useRealTime;
-    /**
-     * 列車名の正規表現 → 文字色。
-     */
+    /** 列車名の正規表現 → 文字色。 */
     public final Map<Pattern, Integer> textColorMap = new LinkedHashMap<>();
-    /**
-     * [駅index][列車index]。通過(ﾚ)や設定なし(･･)は null。
-     */
+    /** [駅index][列車index]。通過(ﾚ)や設定なし(･･)は null。 */
     public TTEntry[][] ttData = new TTEntry[0][];
-    /**
-     * 列車名 (列車index順)。
-     */
+    /** 列車名 (列車index順)。 */
     public String[] trainName = new String[0];
-    /**
-     * 駅名 → 駅index。
-     */
+    /** 駅名 → 駅index。 */
     public final Map<String, Integer> stationAxis = new LinkedHashMap<>();
     public final List<String> colNames = new ArrayList<>();
 
@@ -61,12 +41,12 @@ public class TimeTable {
 
         for (String[] sa : csv) {
             if (sa == null || sa.length == 0) {
-                //"," だけの行 (空行)。本家同様、行カウントも進めない。
+                // "," だけの行 (空行)。本家同様、行カウントも進めない。
                 continue;
             }
             String first = sa[0];
             if (first.startsWith("#")) {
-                //コメント行。本家は行カウントだけ進めるので合わせる。
+                // コメント行。本家は行カウントだけ進めるので合わせる。
                 ++sectionCount;
                 continue;
             }
@@ -96,18 +76,18 @@ public class TimeTable {
                         try {
                             this.textColorMap.put(Pattern.compile(kv[0]), Integer.decode(kv[1]));
                         } catch (Exception ignored) {
-                            //壊れた色指定は無視する (時刻表全体を落とさない)。
+                            // 壊れた色指定は無視する (時刻表全体を落とさない)。
                         }
                     }
                 }
                 case TimeTable -> {
                     if (sectionCount == 1) {
-                        //列車番号の行。本家は trainAxis に入れるだけで、表示には使わない。
+                        // 列車番号の行。本家は trainAxis に入れるだけで、表示には使わない。
                     } else if (sectionCount == 2) {
                         this.trainName = new String[Math.max(0, sa.length - 1)];
                         System.arraycopy(sa, 1, this.trainName, 0, this.trainName.length);
                     } else {
-                        //駅の行。1列目が駅名、2列目以降が EntryID。
+                        // 駅の行。1列目が駅名、2列目以降が EntryID。
                         this.stationAxis.putIfAbsent(first, stationRow);
                         List<String> ids = new ArrayList<>(sa.length - 1);
                         for (int i = 1; i < sa.length; i++) {
@@ -136,24 +116,20 @@ public class TimeTable {
             List<String> ids = idRows.get(i);
             TTEntry[] row = new TTEntry[ids.size()];
             for (int j = 0; j < ids.size(); j++) {
-                //通過(ﾚ)や未設定(･･)は entryMap に無いので null のまま。
+                // 通過(ﾚ)や未設定(･･)は entryMap に無いので null のまま。
                 row[j] = entryMap.get(ids.get(j));
             }
             this.ttData[i] = row;
         }
     }
 
-    /**
-     * "key=value" の value 側。value に '=' が含まれる場合も落とさない。
-     */
+    /** "key=value" の value 側。value に '=' が含まれる場合も落とさない。 */
     private static String parseValue(String s) {
         int i = s.indexOf('=');
         return i < 0 || i + 1 >= s.length() ? "" : s.substring(i + 1);
     }
 
-    /**
-     * 列車名にマッチする強制色。無ければ -1。
-     */
+    /** 列車名にマッチする強制色。無ければ -1。 */
     public int getForcedColor(String trainName) {
         if (trainName == null) {
             return -1;
@@ -194,9 +170,7 @@ public class TimeTable {
             }
         }
 
-        /**
-         * "H:MM" → 0時からの秒数。
-         */
+        /** "H:MM" → 0時からの秒数。 */
         private static int convertTime(String s) {
             String[] sa = s.split(":");
             if (sa.length < 2) {

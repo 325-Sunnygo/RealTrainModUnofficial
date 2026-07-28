@@ -11,9 +11,7 @@ import net.minecraft.world.level.Level;
 @SuppressWarnings("unused")
 public class WorldCompat {
     public final Level level;
-    /**
-     * 1.7.10 SRG: isRemote
-     */
+    /** 1.7.10 SRG: isRemote */
     public final boolean field_72995_K;
 
     public WorldCompat(Level level) {
@@ -25,9 +23,7 @@ public class WorldCompat {
         return this.level;
     }
 
-    /**
-     * getCelestialAngle
-     */
+    /** getCelestialAngle */
     public float func_72929_e(float partialTick) {
         return this.level.getTimeOfDay(partialTick);
     }
@@ -36,16 +32,12 @@ public class WorldCompat {
         return this.func_72929_e(partialTick);
     }
 
-    /**
-     * 1.12 SRG: getLightFor(EnumSkyBlock, BlockPos)
-     */
+    /** 1.12 SRG: getLightFor(EnumSkyBlock, BlockPos) */
     public int func_175642_b(Object skyBlock, Object pos) {
         return this.getLight(skyBlock, pos);
     }
 
-    /**
-     * 1.7.10 SRG: getSavedLightValue(EnumSkyBlock, x, y, z)
-     */
+    /** 1.7.10 SRG: getSavedLightValue(EnumSkyBlock, x, y, z) */
     public int func_72972_b(Object skyBlock, int x, int y, int z) {
         return this.getLight(skyBlock, new BlockPos(x, y, z));
     }
@@ -57,9 +49,7 @@ public class WorldCompat {
         return this.level.getBrightness(layer, bp);
     }
 
-    /**
-     * getWorldTime
-     */
+    /** getWorldTime */
     public long func_72820_D() {
         return this.level.getDayTime();
     }
@@ -74,8 +64,7 @@ public class WorldCompat {
 
     /**
      * func_82737_E = getTotalWorldTime。
-     * <p>E259 の ATS プラグイン (lib_ATS_*.js) が毎 tick これを読む。無いと
-     * 全 ATS スクリプトが TypeError で死ぬ。
+     * の ATS プラグイン (lib_ATS_*.js) が毎 tick これを読む。
      */
     public long func_82737_E() {
         return this.level.getGameTime();
@@ -83,8 +72,7 @@ public class WorldCompat {
 
     /**
      * func_72839_b = getEntitiesWithinAABBExcludingEntity(entity, aabb)。
-     * <p>列車検知器のサーバースクリプトが、自分の当たり判定に触れている列車を探すのに使う。
-     * スクリプトは戻り値に .forEach(function(e){...}) を呼ぶ (Java の List で通る)。
+     * 列車検知器のサーバースクリプトが、自分の当たり判定に触れている列車を探すのに使う。
      */
     public java.util.List<net.minecraft.world.entity.Entity> func_72839_b(Object exclude, Object aabb) {
         net.minecraft.world.phys.AABB box = AxisAlignedBB.unwrap(aabb);
@@ -97,7 +85,7 @@ public class WorldCompat {
 
     /**
      * getEntityByID。プレイヤーは PlayerCompat ラッパーで返す
-     * (SRB3 等が MCWrapperClient.getPlayer() の戻り値と === 比較するため)。
+     * (SRB3 等が MCWrapperClient.getPlayer の戻り値と === 比較するため)。
      */
     public Object func_73045_a(int id) {
         return wrapEntity(this.level.getEntity(id));
@@ -145,15 +133,9 @@ public class WorldCompat {
 
     /**
      * 1.7.10 のブロックメタのうち、1.21 でブロック状態に落とせないものをタイルエンティティへ移す。
-     *
-     * <p>RTM 設置物 (碍子・架線柱等) の<b>メタは取付面</b> (0=下 1=上 2=北 3=南 4=西 5=東) で、
+     * RTM 設置物 (碍子・架線柱等) のメタは取付面 (0=下 1=上 2=北 3=南 4=西 5=東) で、
      * 描画とワイヤー端点の両方がこれを見る
-     * ({@code InstalledObjectBlockEntityRenderer.rotateWirePosByMountFace})。
-     * 旧データ変換 ({@code LegacyRestorer}) も {@code setMountFace(rec.meta)} と対応付けている。
-     *
-     * <p>スクリプト設置はここを通るが、以前はメタを捨てていたため取付面が常に既定 (-1 = 地面置き) になり、
-     * 架線柱の向きが線路と揃わず傾いて見えていた:
-     * <pre>NGTOBuilder2!server_wire_catenary.js:91  new BlockSet(RTMBlock.insulator, pos[3], nbt)</pre>
+     * (InstalledObjectBlockEntityRenderer.rotateWirePosByMountFace)。
      */
     private void applyLegacyMeta(BlockPos pos, int meta) {
         if (meta < 0 || meta > 5) {
@@ -172,11 +154,8 @@ public class WorldCompat {
 
     /**
      * 1.7.10 の「1 ブロック + メタで 16 色」を 1.21 の色別ブロックに読み替える。
-     *
-     * <p>スクリプトは {@code setBlock(x,y,z, Blocks.field_150399_cn, 14, 3)} のように
-     * 「色付きガラス + メタ 14 (赤)」と書く。1.21 では色ごとに別ブロックなので、
-     * 白色版の登録名 (white_stained_glass) の "white" をメタの色に差し替える。
-     * 羊毛・コンクリート・テラコッタ・カーペット等すべて同じ規則で通る。
+     * スクリプトは setBlock(x,y,z, Blocks.field_150399_cn, 14, 3) のように
+     * 「色付きガラス + メタ 14 (赤)」と書く。
      */
     private static net.minecraft.world.level.block.state.BlockState withMeta(
             net.minecraft.world.level.block.Block block, int meta) {
@@ -209,11 +188,8 @@ public class WorldCompat {
 
     /**
      * コマンドブロックだけラッパーに包む。
-     *
-     * <p>検知器のスクリプトは {@code block instanceof TileEntityCommandBlock} で探すが、
-     * 1.21 の CommandBlockEntity には 1.7.10 のクラスを継承させられない。ここで包んで
-     * instanceof を成立させる。それ以外のブロックエンティティ (レールのコア等) は
-     * 素のまま返す — スクリプトが実クラスのメソッドを直接呼ぶため。
+     * 検知器のスクリプトは block instanceof TileEntityCommandBlock で探すが、
+     * 1.21 の CommandBlockEntity には 1.7.10 のクラスを継承させられない。
      */
     private static Object wrapBlockEntity(net.minecraft.world.level.block.entity.BlockEntity be) {
         if (be instanceof net.minecraft.world.level.block.entity.CommandBlockEntity cb) {
@@ -224,9 +200,7 @@ public class WorldCompat {
 
     /**
      * func_175625_s = getTileEntity(BlockPos) (1.12)。
-     * <p>★戻り値はバニラのまま。RTMU は {@code RTMCore.VERSION} に "1.7.10" を含むので、
-     * マルチターゲット対応のパックは 1.7.10 側の枝 ({@code func_147438_o}) を通る。
-     * ここでラッパーを返すと、通らない枝のために他パックの型を変えることになる。
+     * ★戻り値はバニラのまま。
      */
     public net.minecraft.world.level.block.entity.BlockEntity func_175625_s(BlockPos pos) {
         return pos != null ? this.level.getBlockEntity(pos) : null;
@@ -239,9 +213,8 @@ public class WorldCompat {
     }
 
     /**
-     * func_72805_g = getBlockMetadata。1.21 にメタは無いが、色ガラス/羊毛/テラコッタ等は
+     * func_72805_g = getBlockMetadata。
      * 色番号 (0-15, DyeColor 順) をメタとして返す。信号機のブロック検知がこのメタで灯火状態を読むため。
-     * それ以外のブロックは 0。
      */
     public int func_72805_g(double x, double y, double z) {
         BlockPos pos = new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z));
@@ -257,10 +230,8 @@ public class WorldCompat {
 
     /**
      * func_180495_p = getBlockState。
-     * <p>素の 1.21 {@code BlockState} を返すと、スクリプトが続けて呼ぶ
-     * {@code func_177230_c()} / {@code func_177228_b()} が存在せず失敗する。
-     * 1.7.10 のメタ互換を持つ {@link BlockStateCompat} で包んで返す
-     * ({@code func_147439_a} / {@code func_72805_g} と同じ色メタ方式)。
+     * 素の 1.21 BlockState を返すと、スクリプトが続けて呼ぶ
+     * func_177230_c / func_177228_b が存在せず失敗する。
      */
     public BlockStateCompat func_180495_p(BlockPos pos) {
         return pos != null ? new BlockStateCompat(this.level.getBlockState(pos)) : null;
@@ -279,17 +250,14 @@ public class WorldCompat {
         return null;
     }
 
-    /**
-     * isRemote 相当のアクセサ
-     */
+    /** isRemote 相当のアクセサ */
     public boolean isRemote() {
         return this.level.isClientSide;
     }
 
     /**
      * 本家 World.func_175688_a (spawnParticle, 1.8+): EnumParticleTypes を受ける粒子生成。
-     * SL パックが蒸気/煙を出すのに使う ({@code field_70170_p.func_175688_a(EnumParticleTypes.X, ...)})。
-     * 末尾の可変長 int (粒子パラメータ) は 1.21 では無視する。クライアント専用。
+     * SL パックが蒸気/煙を出すのに使う (field_70170_p.func_175688_a(EnumParticleTypes.X, ...))。
      */
     public void func_175688_a(Object particleType, double x, double y, double z,
                              double vx, double vy, double vz, int... params) {
@@ -304,9 +272,7 @@ public class WorldCompat {
         }
     }
 
-    /**
-     * 本家 World.func_72869_a (spawnParticle, 1.7.10): 粒子名 (文字列) を受ける旧経路。
-     */
+    /** 本家 World.func_72869_a (spawnParticle, 1.7.10): 粒子名 (文字列) を受ける旧経路。 */
     public void func_72869_a(String name, double x, double y, double z,
                             double vx, double vy, double vz) {
         if (this.level != null && this.level.isClientSide) {
@@ -315,8 +281,6 @@ public class WorldCompat {
         }
     }
 
-    /**
-     * rand 相当
-     */
+    /** rand 相当 */
     public final java.util.Random rand = new java.util.Random();
 }

@@ -13,17 +13,8 @@ import java.util.List;
 
 /**
  * パック README の初回同意画面 (タイトル画面上に表示)。
- *
- * <p>{@link PackConsent} が集めた「README あり・未決定」のパックを 1 つずつ表示し、README を表示して
+ * PackConsent が集めた「README あり・未決定」のパックを 1 つずつ表示し、README を表示して
  * 「同意する / 同意しない」を選ばせる。
- *
- * <p>描画の注意点 (このmod環境で実際に踏んだもの):
- * <ul>
- *   <li>{@code renderBackground()} はタイトル画面のブラーを掛け文字までぼやける → 呼ばず不透明塗り</li>
- *   <li>{@code enableScissor} でのクリップも文字がぼやける → 使わない</li>
- *   <li>文字はバッチ描画で最後にまとめて描かれるため、枠からはみ出た文字はボタンの上に
- *       重なって見える → 枠内に完全に収まる行だけを描く (行単位クリップ)</li>
- * </ul>
  */
 public final class PackConsentScreen extends Screen {
 
@@ -62,7 +53,7 @@ public final class PackConsentScreen extends Screen {
         this.scrollLine = 0;
         PackConsent.Pending cur = current();
 
-        //README を画面幅で折り返す (\n も尊重される)。描画は render() で行単位に行う。
+        // README を画面幅で折り返す (\n も尊重される)。描画は render で行単位に行う。
         this.lines = cur == null ? List.of()
                 : this.font.split(Component.literal(cur.readme()), this.width - 52);
 
@@ -112,18 +103,14 @@ public final class PackConsentScreen extends Screen {
     }
 
     private void finish() {
-        //同意したパックがあれば pack を reload して即反映する (タイトル画面=ワールド未ロードなので安全)。
+        // 同意したパックがあれば pack を reload して即反映する (タイトル画面=ワールド未ロードなので安全)。
         if (anyAgreed) {
             try {
                 com.portofino.realtrainmodunofficial.vehicle.VehiclePackLoader.reload();
                 com.portofino.realtrainmodunofficial.rail.RailPackLoader.reload();
-                //★車両/レールだけでなく<b>サウンド</b>も作り直す。以前はここで音を作り直して
-                //  いなかったため、README 同意が必要な SL パック等では「車両は出るのに走行音だけ
-                //  鳴らない」状態になっていた。原因: 生成サウンドパックは起動時 (AddPackFindersEvent
-                //  =同意より前) に一度だけ作られ、タイトルで同意したパックの名前空間 (sound_tkmtp 等)
-                //  がその時点では未同意で除外されるため。
-                //  生成パックはリソース扱いなので、作り直した後にリソースを再読込しないと SoundManager
-                //  に登録されない。タイトル画面 (ワールド未ロード) なので全体リロードして即反映する。
+                // ★車両/レールだけでなくサウンドも作り直す。
+                // いなかったため、README 同意が必要な SL パック等では「車両は出るのに走行音だけ
+                // 鳴らない」状態になっていた。
                 com.portofino.realtrainmodunofficial.client.sound.ExternalSoundPackBridge.rebuild();
                 this.minecraft.setScreen(this.parent);
                 this.minecraft.reloadResourcePacks();
@@ -136,9 +123,9 @@ public final class PackConsentScreen extends Screen {
     }
 
     /**
-     * ブラー無効化。既定の {@code Screen.renderBackground} はブラー(ぼかし)ポストエフェクトを適用し、
-     * その時点までに描いた文字までぼやけさせる ({@code super.render()} が内部で自動的に呼ぶため、
-     * render() 内で先に描いた README が全てぼやけていた)。不透明の暗色塗りだけに置き換える。
+     * ブラー無効化。既定の Screen.renderBackground はブラー(ぼかし)ポストエフェクトを適用し、
+     * その時点までに描いた文字までぼやけさせる (super.render が内部で自動的に呼ぶため、
+     * render 内で先に描いた README が全てぼやけていた)。不透明の暗色塗りだけに置き換える。
      */
     @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
@@ -147,10 +134,10 @@ public final class PackConsentScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        //super.render = renderBackground(上のオーバーライド=ブラー無し) + ウィジェット(見出し/ボタン)。
+        // super.render = renderBackground(上のオーバーライド=ブラー無し) + ウィジェット(見出し/ボタン)。
         super.render(g, mouseX, mouseY, partialTick);
 
-        //README はウィジェットの後に描く。枠内に完全に収まる行だけ描くのでボタンとは重ならない。
+        // README はウィジェットの後に描く。枠内に完全に収まる行だけ描くのでボタンとは重ならない。
         g.fill(20, viewTop - 6, this.width - 20, viewBottom + 6, 0xFF161616);
         g.renderOutline(20, viewTop - 6, this.width - 40, viewBottom - viewTop + 12, 0xFF666666);
         int lineH = this.font.lineHeight + 1;
@@ -162,7 +149,7 @@ public final class PackConsentScreen extends Screen {
             g.drawString(this.font, lines.get(i), 26, y, 0xF0F0F0, false);
             y += lineH;
         }
-        //スクロール位置の表示 (長い README のとき)
+        // スクロール位置の表示 (長い README のとき)
         if (isScrollable()) {
             String pos = (scrollLine + 1) + "-" + Math.min(lines.size(), scrollLine + visibleLineCount())
                     + " / " + lines.size() + " 行";
@@ -181,7 +168,7 @@ public final class PackConsentScreen extends Screen {
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        //矢印キー/PageUp/PageDown でもスクロールできるようにする。
+        // 矢印キー/PageUp/PageDown でもスクロールできるようにする。
         if (isScrollable()) {
             switch (keyCode) {
                 case 264 -> { scrollLine = Math.min(maxScrollLine(), scrollLine + 3); return true; }          //DOWN

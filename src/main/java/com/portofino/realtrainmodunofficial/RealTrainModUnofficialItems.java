@@ -24,8 +24,8 @@ public class RealTrainModUnofficialItems {
         "crossing_gate", () -> new InstalledObjectItem(InstalledObjectCategory.CROSSING)
     );
     // 以下のアイテムはユーザー要望により削除:
-    //   受信機(signal_receiver) / 受信機シグナル値(signal_value_receiver) / 電車検知ブロック(train_detector)
-    //   状態ブロック(signal_state) / スクリプトブロック(script_block) / 通信機(signal_communicator)
+    // 受信機(signal_receiver) / 受信機シグナル値(signal_value_receiver) / 電車検知ブロック(train_detector)
+    // 状態ブロック(signal_state) / スクリプトブロック(script_block) / 通信機(signal_communicator)
     // 道床(ballast)アイテムも廃止済み。ブロック自体は残るがアイテム(入手手段)は登録しない。
     public static final DeferredItem<MarkerItem> MARKER_ITEM = ITEMS.register(
         "marker", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get(), false)
@@ -52,14 +52,14 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<CarItem> CAR_ITEM = ITEMS.register(
         "car", CarItem::new
     );
-    //本家 itemMotorman (運転士)。列車に使うと運転台に乗り、信号/ダイヤ/マクロで自動運転する
+    // 本家 itemMotorman (運転士)。列車に使うと運転台に乗り、信号/ダイヤ/マクロで自動運転する
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.MotormanItem> MOTORMAN_ITEM = ITEMS.register(
         "motorman", com.portofino.realtrainmodunofficial.item.MotormanItem::new
     );
     public static final DeferredItem<IcCardItem> IC_CARD_ITEM = ITEMS.register(
         "ic_card", IcCardItem::new
     );
-    //MCTE 互換ミニチュア (最低限: ブロック範囲キャプチャ。NGTO Builder が使用)
+    // MCTE 互換ミニチュア (最低限: ブロック範囲キャプチャ。NGTO Builder が使用)
     /** ペインター (neo mcte)。 */
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.PainterItem> PAINTER_ITEM = ITEMS.register(
         "painter", com.portofino.realtrainmodunofficial.item.PainterItem::new
@@ -76,7 +76,7 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<CrowbarItem> CROWBAR_ITEM = ITEMS.register(
         "crowbar", CrowbarItem::new
     );
-    //本家 ItemWrench 忠実移植版 (旧 WrenchItem はレガシー系の参照維持のため残置)
+    // 本家 ItemWrench 忠実移植版 (旧 WrenchItem はレガシー系の参照維持のため残置)
     public static final DeferredItem<RtmWrenchItem> WRENCH_ITEM = ITEMS.register(
         "wrench", RtmWrenchItem::new
     );
@@ -103,10 +103,7 @@ public class RealTrainModUnofficialItems {
         "signal", () -> new InstalledObjectItem(InstalledObjectCategory.SIGNAL)
     );
     // 列車検知器(train_detector): 本家 RTM の列車検知器 (EntityTrainDetector)。
-    // レールの上に置くと、真下のレールに列車が乗っているかを見る。検知したら
-    // 指定座標のレッドストーンブロックを置く/消す (座標と動作は右クリックの GUI で設定)。
-    // ※旧「電車検知ブロック(TrainDetectorBlock)」とは別物。あちらは範囲内の列車を
-    //   AABB で探す独自実装で、アイテムは削除済み。
+    // レールの上に置くと、真下のレールに列車が乗っているかを見る。
     public static final DeferredItem<InstalledObjectItem> TRAIN_DETECTOR_ITEM = ITEMS.register(
         "train_detector", () -> new InstalledObjectItem(InstalledObjectCategory.TRAIN_DETECTOR)
     );
@@ -122,36 +119,36 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> SPEAKER_ITEM = ITEMS.register(
         "speaker", () -> new InstalledObjectItem(InstalledObjectCategory.SPEAKER)
     );
-    //本家 electric: 入力/出力コネクタ (配線網⇔レッドストーン)
+    // 本家 electric: 入力/出力コネクタ (配線網⇔レッドストーン)
     public static final DeferredItem<InstalledObjectItem> CONNECTOR_INPUT_ITEM = ITEMS.register(
         "connector_input", () -> new InstalledObjectItem(InstalledObjectCategory.CONNECTOR_INPUT)
     );
     public static final DeferredItem<InstalledObjectItem> CONNECTOR_OUTPUT_ITEM = ITEMS.register(
         "connector_output", () -> new InstalledObjectItem(InstalledObjectCategory.CONNECTOR_OUTPUT)
     );
-    //本家 electric: 信号変換器
+    // 本家 electric: 信号変換器
     public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_CONVERTER_ITEM = ITEMS.register(
         "signal_converter", () -> new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.SIGNAL_CONVERTER.get(), new net.minecraft.world.item.Item.Properties())
     );
 
     // ---- 本家 ItemInstalledObject のうち未移植だった設置物 ----
-    //本家 installed_object meta 0: ガラスの蛍光灯 (BlockFluorescent)。置くだけで光源 15。
+    // 本家 installed_object meta 0: ガラスの蛍光灯 (BlockFluorescent)。置くだけで光源 15。
     public static final DeferredItem<InstalledObjectItem> FLUORESCENT_ITEM = ITEMS.register(
         "fluorescent", () -> new InstalledObjectItem(InstalledObjectCategory.FLUORESCENT)
     );
-    //本家 installed_object meta 6: 標識 (BlockRailroadSign)。モデルでなくテクスチャを選ぶ。
+    // 本家 installed_object meta 6: 標識 (BlockRailroadSign)。モデルでなくテクスチャを選ぶ。
     public static final DeferredItem<InstalledObjectItem> RAILROAD_SIGN_ITEM = ITEMS.register(
         "railroad_sign", () -> new InstalledObjectItem(InstalledObjectCategory.RAILROAD_SIGN)
     );
-    //本家 installed_object meta 13: 車止め (EntityBumpingPost)。レールに吸着し列車を止める。
+    // 本家 installed_object meta 13: 車止め (EntityBumpingPost)。レールに吸着し列車を止める。
     public static final DeferredItem<InstalledObjectItem> BUMPING_POST_ITEM = ITEMS.register(
         "bumping_post", () -> new InstalledObjectItem(InstalledObjectCategory.BUMPING_POST)
     );
-    //本家 installed_object meta 16: 転轍機 (BlockPoint)。右クリックで切り替わるレッドストーン源。
+    // 本家 installed_object meta 16: 転轍機 (BlockPoint)。右クリックで切り替わるレッドストーン源。
     public static final DeferredItem<InstalledObjectItem> POINT_MACHINE_ITEM = ITEMS.register(
         "point_machine", () -> new InstalledObjectItem(InstalledObjectCategory.POINT)
     );
-    //本家 installed_object meta 18: 券売機 (BlockTicketVendor)。切符/回数券を発券する。
+    // 本家 installed_object meta 18: 券売機 (BlockTicketVendor)。切符/回数券を発券する。
     public static final DeferredItem<InstalledObjectItem> TICKET_VENDOR_ITEM = ITEMS.register(
         "ticket_vendor", () -> new InstalledObjectItem(InstalledObjectCategory.TICKET_VENDOR)
     );
@@ -186,15 +183,15 @@ public class RealTrainModUnofficialItems {
             default -> null;
         };
     }
-    //本家 ItemCamera: 撮り鉄用カメラ (望遠 / 被写界深度 / 流し撮り / 列車追尾AF)
+    // 本家 ItemCamera: 撮り鉄用カメラ (望遠 / 被写界深度 / 流し撮り / 列車追尾AF)
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.CameraItem> CAMERA_ITEM = ITEMS.register(
         "camera", com.portofino.realtrainmodunofficial.item.CameraItem::new
     );
-    //リモコン: 2つのブロックを無線レッドストーンでペアリング (シフト+右クリック)
+    // リモコン: 2つのブロックを無線レッドストーンでペアリング (シフト+右クリック)
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.RemoteItem> REMOTE_ITEM = ITEMS.register(
         "remote", com.portofino.realtrainmodunofficial.item.RemoteItem::new
     );
-    //本家 ItemTicket: 券売機が発券し改札が消費する。切符=1回, 回数券=11回。
+    // 本家 ItemTicket: 券売機が発券し改札が消費する。切符=1回, 回数券=11回。
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.TicketItem> TICKET_ITEM = ITEMS.register(
         "ticket", () -> new com.portofino.realtrainmodunofficial.item.TicketItem(1)
     );
@@ -202,7 +199,7 @@ public class RealTrainModUnofficialItems {
         "ticket_book", () -> new com.portofino.realtrainmodunofficial.item.TicketItem(11)
     );
 
-    //SignalControllerMod (masa300) 移植: 信号制御器 + 位置設定ツール×2
+    // SignalControllerMod (masa300) 移植: 信号制御器 + 位置設定ツール×2
     public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_CONTROLLER_ITEM = ITEMS.register(
         "signal_controller", () -> new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.SIGNAL_CONTROLLER.get(), new net.minecraft.world.item.Item.Properties())
     );

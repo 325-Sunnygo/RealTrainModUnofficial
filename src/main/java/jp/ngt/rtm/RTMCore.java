@@ -2,7 +2,7 @@ package jp.ngt.rtm;
 
 /**
  * 本家 jp.ngt.rtm.RTMCore の段階的移植。
- * VERSION はパックスクリプトが isLegacy() 判定 (indexOf("1.7.10")) に使うため
+ * VERSION はパックスクリプトが isLegacy 判定 (indexOf("1.7.10")) に使うため
  * "1.7.10" を含む文字列にする (legacy パス = RailProperty API を使わせる)。
  */
 @SuppressWarnings("unused")
@@ -36,7 +36,7 @@ public final class RTMCore {
     public static final int PacketSize = 512;
     public static final int ATOMIC_BOM_META = 2;
 
-    //GUI ID。本家は起動時に連番で振る。参照だけするスクリプトのため同順で固定値を置く
+    // GUI ID。本家は起動時に連番で振る。参照だけするスクリプトのため同順で固定値を置く
     public static short guiIdSelectEntityModel = 0;
     public static short guiIdSelectTileEntityModel = 1;
     public static short guiIdSelectItemModel = 2;

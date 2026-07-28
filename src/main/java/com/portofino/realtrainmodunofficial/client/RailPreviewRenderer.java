@@ -149,8 +149,8 @@ public final class RailPreviewRenderer {
         if (mc.level == null) {
             return result;
         }
-        //探索範囲 = 敷設上限 (コンフィグ連動)。ブロック総当たりではなくチャンクの BlockEntity
-        //一覧を走査する (旧実装は毎フレーム 129x21x129 回の getBlockEntity で重かった)。
+        // 探索範囲 = 敷設上限 (コンフィグ連動)。ブロック総当たりではなくチャンクの BlockEntity
+        // 一覧を走査する (旧実装は毎フレーム 129x21x129 回の getBlockEntity で重かった)。
         int range = Math.max(SEARCH_DISTANCE, com.portofino.realtrainmodunofficial.Config.railMarkerSearchRange());
         int height = Math.max(SEARCH_HEIGHT, com.portofino.realtrainmodunofficial.Config.railMarkerSearchHeight());
         int minCX = (center.getX() - range) >> 4, maxCX = (center.getX() + range) >> 4;
@@ -185,7 +185,6 @@ public final class RailPreviewRenderer {
         // マーカーの矢印が指す向きにメートルラベルを伸ばす。
         // anchorYaw を sin/cos に変換する方式は、マーカーの正準方向定義 (getDirStepX/Z) と
         // 一致せず、向きによって逆になっていた (ユーザーが両符号とも「逆」と報告)。
-        // anchorYaw から dir(0-7) を復元し、矢印と同じ getDirStep 定義で方向ベクトルを作る。
         int dir = ((int) Math.round(rp.anchorYaw / 45.0F)) & 7;
         // 矢印は getDirStep(dir) と逆向き(dir+4側)を指していたため符号を反転する。
         double dirX = -com.portofino.realtrainmodunofficial.block.MarkerBlock.getDirStepX(dir);
@@ -291,8 +290,7 @@ public final class RailPreviewRenderer {
             } else {
                 // アンカーの向き(水平)と長さは視線先で決めるが、ピッチは水平(0)を既定にする。
                 // 高い位置のマーカーを編集すると視線が地面(下)に当たり dy が大きく負になり、急な
-                // 下り勾配でレールが地下に潜って緑線も見えなくなっていた(ユーザー報告)。勾配は相手
-                // マーカーの高さ差から滑らかなS字カーブで自動的に付くため、端の接線は水平でよい。
+                // 下り勾配でレールが地下に潜って緑線も見えなくなっていた(ユーザー報告)。
                 WrenchItem.liveYaw = (float) Math.toDegrees(Math.atan2(dx, dz));
                 WrenchItem.liveLenH = (float) lenH;
                 WrenchItem.livePitch = 0.0F;
@@ -422,10 +420,8 @@ public final class RailPreviewRenderer {
     /**
      * 編集中マーカー(start)が既存レールの端点に接続しているか調べ、接続していればその端点の
      * RailPosition(接線=anchorYaw/anchorPitch を持つ)を返す。なければ null。
-     *
-     * <p>マーカー周辺を走査してレールコア(直接 or 当たり判定/道床から getCorePos で解決)を集め、
-     * その端点 posX/Y/Z がマーカー位置に十分近ければ「接続」とみなす。これによりレンチ編集時に
-     * 接続端のアンカーをレール接線にロックできる(本家RTM: 接続側は横に動かせず補正・伸ばしのみ)。</p>
+     * マーカー周辺を走査してレールコア(直接 or 当たり判定/道床から getCorePos で解決)を集め、
+     * その端点 posX/Y/Z がマーカー位置に十分近ければ「接続」とみなす。
      */
     private static RailPosition findConnectedRailEndpoint(net.minecraft.world.level.Level level, RailPosition start) {
         if (level == null || start == null) {

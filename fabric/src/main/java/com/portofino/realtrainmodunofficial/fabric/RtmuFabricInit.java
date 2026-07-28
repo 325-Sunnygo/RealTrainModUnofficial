@@ -21,13 +21,8 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 /**
  * Fabric の共通エントリポイント。
- *
- * <p>RTMU 本体は NeoForge の形 ({@code @Mod} コンストラクタ + イベントバス) のまま動かし、
- * {@code net.neoforged.*} は自前シムで受ける。ここは<b>そのシムを Fabric のコールバックへ
- * 繋ぐ配線だけ</b>を持つ。ロジックはここに書かない。
- *
- * <p>こうしているのは NeoForge 版と Fabric 版でロジックを二重管理しないため。1.21.1 は
- * バニラ API が両者で同じなので、差分は「登録・イベント・ネットワーク」に閉じ込められる。
+ * RTMU 本体は NeoForge の形 (@Mod コンストラクタ + イベントバス) のまま動かし、
+ * net.neoforged.* は自前シムで受ける。
  */
 public class RtmuFabricInit implements ModInitializer {
 
@@ -40,37 +35,33 @@ public class RtmuFabricInit implements ModInitializer {
     public void onInitialize() {
         ModContainer container = new ModContainer();
 
-        //★本体の生成 = レジストリ登録。NeoForge では @Mod のコンストラクタが担っていた所。
-        //  DeferredRegister のシムは register() の時点で即座にバニラへ入れるので、
-        //  ここを通せば登録が済む。
-        //
-        //  Dist は「専用サーバーか」で分かれる。クライアントでもこの初期化子は走るため、
-        //  実際の環境を FabricLoader から引く (決め打ちすると同意ゲート等の分岐を誤る)。
+        // ★本体の生成 = レジストリ登録。NeoForge では @Mod のコンストラクタが担っていた所。
+        // DeferredRegister のシムは register の時点で即座にバニラへ入れるので、
+        // ここを通せば登録が済む。
         Dist dist = net.fabricmc.loader.api.FabricLoader.getInstance().getEnvironmentType()
             == net.fabricmc.api.EnvType.CLIENT ? Dist.CLIENT : Dist.DEDICATED_SERVER;
         instance = new com.portofino.realtrainmodunofficial.RealTrainModUnofficial(
             MOD_BUS, container, dist);
 
-        //@EventBusSubscriber 相当。NeoForge はアノテーション走査で拾うが Fabric には無いので明示。
+        // @EventBusSubscriber 相当。NeoForge はアノテーション走査で拾うが Fabric には無いので明示。
         RtmuSubscribers.registerCommon();
 
-        //--- MOD バス: 起動時に 1 回流すもの ---
+        // --- MOD バス: 起動時に 1 回流すもの ---
         MOD_BUS.post(new RegisterTicketControllersEvent());
         MOD_BUS.post(new RegisterPayloadHandlersEvent());
         MOD_BUS.post(new FMLCommonSetupEvent());
 
-        //★エンティティ属性。NeoForge はイベントで集めて自前で登録するので、
-        //  こちらは集めた結果を Fabric のレジストリへ流す。これが無いと
-        //  生物系エンティティ (運転士 NPC) がスポーン時に落ちる。
+        // ★エンティティ属性。
+        // こちらは集めた結果を Fabric のレジストリへ流す。
         var attrEvent = new net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent();
         MOD_BUS.post(attrEvent);
         attrEvent.getAttributes().forEach((type, supplier) ->
             net.fabricmc.fabric.api.object.builder.v1.entity.FabricDefaultAttributeRegistry
                 .register(type, supplier));
 
-        //--- GAME バス: Fabric のライフサイクルから流す ---
+        // --- GAME バス: Fabric のライフサイクルから流す ---
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
-            //NeoForge の ServerLifecycleHooks.getCurrentServer() を成立させる
+            // NeoForge の ServerLifecycleHooks.getCurrentServer を成立させる
             ServerLifecycleHooks.setCurrentServer(server);
             NeoForge.EVENT_BUS.post(new ServerStartingEvent(server));
         });
@@ -88,9 +79,8 @@ public class RtmuFabricInit implements ModInitializer {
                     ? net.minecraft.commands.Commands.CommandSelection.DEDICATED
                     : net.minecraft.commands.Commands.CommandSelection.ALL)));
 
-        //★NeoForge の BlockEntity#onLoad をここで再現する。
-        //  バニラにこのフックは無く、レール・設置物は onLoad で自分を静的一覧へ登録している。
-        //  呼ばれないと例外は出ないまま「信号が反応しない」「レールが列車を拾わない」になる。
+        // ★NeoForge の BlockEntity#onLoad をここで再現する。
+        // バニラにこのフックは無く、レール・設置物は onLoad で自分を静的一覧へ登録している。
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerBlockEntityEvents.BLOCK_ENTITY_LOAD
             .register((be, level) -> {
                 if (be instanceof jp.ngt.mccompat.LoadAwareBlockEntity aware) {
@@ -98,7 +88,7 @@ public class RtmuFabricInit implements ModInitializer {
                 }
             });
 
-        //同じ理由でエンティティ側の onAddedToLevel も NeoForge 拡張。
+        // 同じ理由でエンティティ側の onAddedToLevel も NeoForge 拡張。
         net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_LOAD
             .register((entity, level) -> {
                 if (entity instanceof jp.ngt.rtm.entity.train.parts.EntityVehiclePart part) {

@@ -33,14 +33,12 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 /**
- * {@link ExternalBuildingBlocks} が発見した 1.7.10 建材ブロックぶんの
+ * ExternalBuildingBlocks が発見した 1.7.10 建材ブロックぶんの
  * blockstate / block model / item model / texture / lang を、ランタイム生成の
  * クライアントリソースパックとして注入する。
- *
- * <p>仕組みは {@code ExternalSoundPackBridge} と同一: {@code config/realtrainmodunofficial/
- * generated_building_pack} 以下にファイルを書き出し、{@link AddPackFindersEvent} で
- * {@link PathPackResources} として最優先で追加する。{@code AddPackFindersEvent} は
- * ブロックアトラス構築前に発火するため、コピーした PNG はアトラスに正しく焼かれる。
+ * 仕組みは ExternalSoundPackBridge と同一: {@code config/realtrainmodunofficial/
+ * generated_building_pack} 以下にファイルを書き出し、AddPackFindersEvent で
+ * PathPackResources として最優先で追加する。
  */
 public final class ExternalBuildingPackBridge {
     private static final String PACK_ID = "realtrainmodunofficial:external_building_bridge";
@@ -88,7 +86,7 @@ public final class ExternalBuildingPackBridge {
         }
         Files.createDirectories(PACK_ROOT);
         String ns = ExternalBuildingBlocks.NAMESPACE;
-        //同じ jar は 1 回だけ開く。
+        // 同じ jar は 1 回だけ開く。
         Map<Path, List<Entry>> byJar = new LinkedHashMap<>();
         for (Entry e : entries) {
             byJar.computeIfAbsent(e.sourceJar(), k -> new ArrayList<>()).add(e);
@@ -126,14 +124,14 @@ public final class ExternalBuildingPackBridge {
         String id = e.blockId();
         Path assets = PACK_ROOT.resolve("assets").resolve(ns);
 
-        //テクスチャ (1.7.10 の blocks/ を 1.21 の block/ へ移す)
+        // テクスチャ (1.7.10 の blocks/ を 1.21 の block/ へ移す)
         Path tex = assets.resolve("textures").resolve("block").resolve(id + ".png");
         Files.createDirectories(tex.getParent());
         try (InputStream in = zip.getInputStream(texEntry)) {
             Files.write(tex, in.readAllBytes(),
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
         }
-        //アニメーション .mcmeta があればそのままコピー (縦フレームのアニメ建材が動く)。
+        // アニメーション .mcmeta があればそのままコピー (縦フレームのアニメ建材が動く)。
         if (e.mcmetaEntry() != null) {
             ZipEntry mm = zip.getEntry(e.mcmetaEntry());
             if (mm != null) {
@@ -144,15 +142,15 @@ public final class ExternalBuildingPackBridge {
             }
         }
 
-        //blockstate
+        // blockstate
         writeString(assets.resolve("blockstates").resolve(id + ".json"),
             "{\"variants\":{\"\":{\"model\":\"" + ns + ":block/" + id + "\"}}}");
-        //block model (cube_all)。アルファ持ちは cutout、不透明は solid で描く。
+        // block model (cube_all)。アルファ持ちは cutout、不透明は solid で描く。
         String renderType = e.transparent() ? "minecraft:cutout" : "minecraft:solid";
         writeString(assets.resolve("models").resolve("block").resolve(id + ".json"),
             "{\"parent\":\"minecraft:block/cube_all\",\"render_type\":\"" + renderType
                 + "\",\"textures\":{\"all\":\"" + ns + ":block/" + id + "\"}}");
-        //item model
+        // item model
         writeString(assets.resolve("models").resolve("item").resolve(id + ".json"),
             "{\"parent\":\"" + ns + ":block/" + id + "\"}");
         return true;

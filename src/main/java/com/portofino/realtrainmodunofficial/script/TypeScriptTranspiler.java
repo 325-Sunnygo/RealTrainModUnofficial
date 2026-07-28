@@ -5,41 +5,10 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * パックスクリプトの TypeScript 対応。<b>型を消して JavaScript にするだけ</b>の変換器。
- *
- * <h2>なぜ型を消すだけで足りるのか</h2>
- * TypeScript は「JavaScript に型注釈を足したもの」なので、<b>注釈を取り除けばそのまま動く
- * JavaScript になる</b> (公式の {@code isolatedModules} / Node の {@code --strip-types} と同じ考え方)。
- * 型検査はエディタ側 (tsc / VSCode) がやればよく、ゲーム内では要らない。
- *
- * <h2>なぜ tsc を積まないのか</h2>
- * 本物の TypeScript コンパイラは 10 MB 超の JavaScript で、Nashorn の上で走らせると
- * パック 1 個の読み込みに数秒かかる。jar も一気に膨らむ。<b>型を消すだけ</b>ならこのファイル 1 枚で済み、
- * 依存も増えず、実測でスクリプト 1 本あたり 1 ミリ秒未満で終わる。
- *
- * <h2>既存の .js には一切触らない</h2>
- * 変換するのは <b>{@code .ts} 拡張子のファイルだけ</b> ({@link #isTypeScript})。
- * {@code .js} は 1 バイトも変えずに今までどおりの経路を通る。既存パックへの影響はゼロ。
- *
- * <h2>消したところは空白で埋める</h2>
- * 単純に削ると行と桁がずれ、Nashorn の例外に出る行番号が元のファイルと合わなくなる。
- * <b>改行だけ残して空白に置き換える</b>ので、行番号はそのまま使える。
- *
- * <h2>対応している構文</h2>
- * <ul>
- *   <li>型注釈 — 変数・引数・戻り値・クラスのプロパティ</li>
- *   <li>ジェネリクス — 宣言側 {@code function f<T>()} も呼び出し側 {@code f<T>()} も</li>
- *   <li>{@code interface} / {@code type} / {@code declare} / {@code import type}</li>
- *   <li>{@code as} / {@code satisfies} / 非 null 表明 {@code x!}</li>
- *   <li>省略可能 {@code a?: T} / 修飾子 {@code public private protected readonly abstract override}</li>
- *   <li>{@code implements} 節 / デコレータ {@code @Foo(...)}</li>
- *   <li>{@code enum} — TypeScript と同じ形 (数値なら逆引きつき) に展開する</li>
- *   <li>コンストラクタの引数プロパティ {@code constructor(private a: T)} — {@code this.a = a} を足す</li>
- * </ul>
- *
- * <p><b>未対応</b>: {@code namespace} / {@code module} と ES モジュールの
- * {@code import} / {@code export from}。パックスクリプトは 1 ファイルが 1 つのグローバル空間で、
- * 読み込みは {@code //include <...>} で行うため。使われていたら {@link #diagnose} が理由を返す。
+ * パックスクリプトの TypeScript 対応。型を消して JavaScript にするだけの変換器。
+ * なぜ型を消すだけで足りるのか
+ * TypeScript は「JavaScript に型注釈を足したもの」なので、注釈を取り除けばそのまま動く
+ * JavaScript になる (公式の isolatedModules / Node の --strip-types と同じ考え方)。
  */
 public final class TypeScriptTranspiler {
 
@@ -60,8 +29,8 @@ public final class TypeScriptTranspiler {
     }
 
     /**
-     * {@code .js} を探して見つからないときに試す {@code .ts} 側のパス。
-     * パック側が {@code "rendererPath": "scripts/Foo.js"} のまま {@code Foo.ts} を同梱していても動く。
+     * .js を探して見つからないときに試す .ts 側のパス。
+     * パック側が "rendererPath": "scripts/Foo.js" のまま Foo.ts を同梱していても動く。
      */
     public static String toTypeScriptPath(String jsPath) {
         if (jsPath == null || !jsPath.toLowerCase(Locale.ROOT).endsWith(".js")) {
@@ -94,9 +63,9 @@ public final class TypeScriptTranspiler {
                 return "ジェネレータ関数 (function*) はスクリプトエンジンが未対応です";
             }
         }
-        //★ここから下はスクリプトエンジン (Nashorn) 側の制限。
-        //  変換で消せる類ではないので、素通しして意味の分からない構文エラーを出すより
-        //  「何が使えないか」を先に伝えたほうがパック作者が直せる。
+        // ★ここから下はスクリプトエンジン (Nashorn) 側の制限。
+        // 変換で消せる類ではないので、素通しして意味の分からない構文エラーを出すより
+        // 「何が使えないか」を先に伝えたほうがパック作者が直せる。
         for (int i = 0; i < tokens.size(); i++) {
             Token t = tokens.get(i);
             if (t.type != TokenType.PUNCT) {
@@ -112,7 +81,7 @@ public final class TypeScriptTranspiler {
                 return "** (べき乗) はスクリプトエンジンが未対応です。Math.pow(a, b) を使ってください";
             }
             if (t.is("...")) {
-                //引数リストの ... は変換で消えるので、残るのは呼び出し側と分割代入
+                // 引数リストの ... は変換で消えるので、残るのは呼び出し側と分割代入
                 Token p = prev(tokens, i);
                 if (p != null && (p.is("(") || p.is(",")) && !isParameterListRest(tokens, i)) {
                     return "呼び出し側のスプレッド f(...a) はスクリプトエンジンが未対応です。"
@@ -123,7 +92,7 @@ public final class TypeScriptTranspiler {
                 }
             }
             if (t.is("[") || t.is("{")) {
-                //var [a, b] = ... / var {a} = ...
+                // var [a, b] = ... / var {a} = ...
                 Token p = prev(tokens, i);
                 if (p != null && p.type == TokenType.WORD
                         && (p.is("var") || p.is("let") || p.is("const"))) {
@@ -134,7 +103,7 @@ public final class TypeScriptTranspiler {
         return null;
     }
 
-    /** その {@code ...} が「関数の引数リストの可変長引数」か (= 変換で消せるか)。 */
+    /** その ... が「関数の引数リストの可変長引数」か (= 変換で消せるか)。 */
     private static boolean isParameterListRest(List<Token> tokens, int i) {
         int depth = 0;
         for (int j = i - 1; j >= 0; j--) {
@@ -164,9 +133,9 @@ public final class TypeScriptTranspiler {
                         }
                     }
                     Token after = next(tokens, close);
-                    //★戻り値の型注釈 ")" : T " {" を挟むので ":" も認める。
-                    //  ここを "{" だけにすると、型つきメソッドの可変長引数を
-                    //  「呼び出し側のスプレッド」と誤検知する。
+                    // ★戻り値の型注釈 ")" : T " {" を挟むので ":" も認める。
+                    // ここを "{" だけにすると、型つきメソッドの可変長引数を
+                    // 「呼び出し側のスプレッド」と誤検知する。
                     return after != null && (after.is("{") || after.is(":") || after.is("=>"));
                 }
                 depth--;
@@ -179,7 +148,6 @@ public final class TypeScriptTranspiler {
 
     /**
      * TypeScript を JavaScript にする。
-     *
      * @param source TypeScript のソース
      * @return 型を取り除いた JavaScript。行番号は元のまま
      */
@@ -188,30 +156,15 @@ public final class TypeScriptTranspiler {
             return source;
         }
         String stripped = new Rewriter(source, new Lexer(source).lex()).run();
-        //★2 段目: ES6 の class を ES5 のプロトタイプ形式へ落とす。
-        //  Nashorn は class を実装していない ("ES6 class declarations ... not yet implemented")。
-        //  型を消しただけでは TypeScript らしいコードが動かないので、ここまでやって初めて使える。
+        // ★2 段目: ES6 の class を ES5 のプロトタイプ形式へ落とす。
+        // Nashorn は class を実装していない ("ES6 class declarations ... not yet implemented")。
         return ClassLowering.run(stripped);
     }
 
     /**
-     * ES6 の {@code class} を ES5 のプロトタイプ形式へ落とす。
-     *
-     * <p>Nashorn は {@code class} を実装していないため、これが無いと
+     * ES6 の class を ES5 のプロトタイプ形式へ落とす。
+     * Nashorn は class を実装していないため、これが無いと
      * TypeScript でクラスを書いた瞬間に構文エラーになる。
-     *
-     * <p><b>行番号を保つ</b>のが設計の要。置き換えは<b>各行の中で完結</b>させ、
-     * メソッド本体はソースの位置をそのまま残す。
-     * <pre>
-     *   class C extends B {          →  var C = (function (_super) { __extends(C, _super);
-     *     constructor(a) {           →    function C(a) {
-     *       super(a);                →      _super.call(this, a);
-     *     }                          →    }
-     *     m() {                      →    C.prototype.m = function () {
-     *       return super.m();        →      return _super.prototype.m.call(this);
-     *     }                          →    };
-     *   }                            →    return C; })(B);
-     * </pre>
      */
     static final class ClassLowering {
 
@@ -233,7 +186,7 @@ public final class TypeScriptTranspiler {
                 Token t = tokens.get(i);
                 if (t.type == TokenType.WORD && t.is("class")) {
                     Token p = prev(tokens, i);
-                    //プロパティ名やメンバ名の "class" は対象外
+                    // プロパティ名やメンバ名の "class" は対象外
                     if (p != null && (p.is(".") || p.is(":"))) {
                         continue;
                     }
@@ -258,18 +211,14 @@ public final class TypeScriptTranspiler {
             for (Edit e : edits) {
                 work.replace(e.start, e.end, e.text);
             }
-            //★改行を足さずに 1 行目の先頭へ置く。改行を入れると以降の行番号が 1 ずれ、
-            //  Nashorn の例外に出る行が元のファイルと合わなくなる。
+            // ★改行を足さずに 1 行目の先頭へ置く。改行を入れると以降の行番号が 1 ずれ、
+            // Nashorn の例外に出る行が元のファイルと合わなくなる。
             return needsExtends ? HELPER + work : work.toString();
         }
 
         /**
-         * 可変長引数 {@code function f(a, ...rest)} を ES5 化する。
-         *
-         * <p>Nashorn は rest parameter を実装していない。引数リストから消して、
-         * 本体の先頭で {@code arguments} から切り出す。
-         * <b>アロー関数は対象外</b> — アローは {@code arguments} を持たないので、
-         * 同じ手が使えない ({@link #diagnose} で知らせる)。
+         * 可変長引数 function f(a, ...rest) を ES5 化する。
+         * Nashorn は rest parameter を実装していない。
          */
         private static boolean lowerRestParams(String src, List<Token> tokens, List<Edit> edits) {
             boolean any = false;
@@ -278,7 +227,7 @@ public final class TypeScriptTranspiler {
                 if (t.type != TokenType.PUNCT || !t.is("...")) {
                     continue;
                 }
-                //この "..." を含む括弧グループの開き位置を探す
+                // この "..." を含む括弧グループの開き位置を探す
                 int open = -1;
                 int depth = 0;
                 for (int j = i - 1; j >= 0; j--) {
@@ -310,7 +259,7 @@ public final class TypeScriptTranspiler {
                 if (nameIdx < 0 || tokens.get(nameIdx).type != TokenType.WORD) {
                     continue;
                 }
-                //先行する引数の数 = 深さ 0 のカンマの数
+                // 先行する引数の数 = 深さ 0 のカンマの数
                 int count = 0;
                 int d = 0;
                 for (int j = open + 1; j < i; j++) {
@@ -326,7 +275,7 @@ public final class TypeScriptTranspiler {
                         count++;
                     }
                 }
-                //直前のカンマごと消す (最初の引数なら "..." から)
+                // 直前のカンマごと消す (最初の引数なら "..." から)
                 int from = t.start;
                 int prevComma = prevIndex(tokens, i);
                 if (prevComma >= 0 && tokens.get(prevComma).is(",")) {
@@ -341,7 +290,7 @@ public final class TypeScriptTranspiler {
             return any;
         }
 
-        /** {@code extends} 用のヘルパー。tsc が出すものと同じ形。 */
+        /** extends 用のヘルパー。tsc が出すものと同じ形。 */
         private static final String HELPER =
             "var __extends = __extends || function (d, b) { for (var k in b) "
             + "if (Object.prototype.hasOwnProperty.call(b, k)) d[k] = b[k]; "
@@ -386,7 +335,7 @@ public final class TypeScriptTranspiler {
                 return classIdx;
             }
 
-            //--- ヘッダ ---
+            // --- ヘッダ ---
             StringBuilder header = new StringBuilder("var ").append(name).append(" = (function (");
             if (superExpr != null) {
                 header.append("_super");
@@ -398,7 +347,7 @@ public final class TypeScriptTranspiler {
             edits.add(new Edit(tokens.get(classIdx).start, tokens.get(open).end, header.toString()));
 
             boolean sawCtor = false;
-            //--- メンバ ---
+            // --- メンバ ---
             int j = nextIndex(tokens, open);
             while (j > 0 && j < close) {
                 Token t = tokens.get(j);
@@ -466,14 +415,14 @@ public final class TypeScriptTranspiler {
                         target + member + " = function "));
                     edits.add(new Edit(tokens.get(bodyClose).start, tokens.get(bodyClose).end, "};"));
                 }
-                //super の書き換え
+                // super の書き換え
                 if (superExpr != null) {
                     rewriteSuper(src, tokens, body, bodyClose, edits);
                 }
                 j = nextIndex(tokens, bodyClose);
             }
 
-            //--- コンストラクタが無ければ足す ---
+            // --- コンストラクタが無ければ足す ---
             StringBuilder tail = new StringBuilder();
             if (!sawCtor) {
                 tail.append(" function ").append(name).append("() {");
@@ -483,13 +432,13 @@ public final class TypeScriptTranspiler {
                 tail.append(" }");
                 edits.add(new Edit(tokens.get(open).end, tokens.get(open).end, tail.toString()));
             }
-            //--- 末尾 ---
+            // --- 末尾 ---
             edits.add(new Edit(tokens.get(close).start, tokens.get(close).end,
                 " return " + name + "; })(" + (superExpr == null ? "" : superExpr) + ");"));
             return close;
         }
 
-        /** メソッド本体の {@code super(...)} / {@code super.m(...)} を書き換える。 */
+        /** メソッド本体の super(...) / super.m(...) を書き換える。 */
         private static void rewriteSuper(String src, List<Token> tokens, int from, int to,
                                          List<Edit> edits) {
             for (int k = from; k < to; k++) {
@@ -502,7 +451,7 @@ public final class TypeScriptTranspiler {
                     continue;
                 }
                 if (tokens.get(n).is("(")) {
-                    //super(a, b) → _super.call(this, a, b)
+                    // super(a, b) → _super.call(this, a, b)
                     int c = matchPair(tokens, n, "(", ")");
                     boolean empty = c > 0 && nextIndex(tokens, n) == c;
                     edits.add(new Edit(t.start, tokens.get(n).end,
@@ -577,9 +526,7 @@ public final class TypeScriptTranspiler {
 
     /**
      * JavaScript/TypeScript の字句解析。
-     *
-     * <p>文字列・テンプレートリテラル・正規表現・コメントを正しく飛ばすのが目的。
-     * ここを手を抜いて正規表現で済ませると、文字列の中の {@code ": "} を型注釈と誤認して壊す。
+     * 文字列・テンプレートリテラル・正規表現・コメントを正しく飛ばすのが目的。
      */
     private static final class Lexer {
         private final String src;
@@ -662,7 +609,7 @@ public final class TypeScriptTranspiler {
             this.add(TokenType.STRING, start);
         }
 
-        /** テンプレートリテラル。{@code ${}} の中は入れ子になるので括弧を数える。 */
+        /** テンプレートリテラル。${} の中は入れ子になるので括弧を数える。 */
         private void template() {
             int start = this.pos;
             this.pos++;
@@ -686,7 +633,7 @@ public final class TypeScriptTranspiler {
                         } else if (d == '}') {
                             depth--;
                         } else if (d == '`') {
-                            //入れ子のテンプレートは飛ばす
+                            // 入れ子のテンプレートは飛ばす
                             this.pos++;
                             while (this.pos < this.src.length() && this.src.charAt(this.pos) != '`') {
                                 if (this.src.charAt(this.pos) == '\\') {
@@ -719,7 +666,7 @@ public final class TypeScriptTranspiler {
                     return false;
                 }
                 if (t.type == TokenType.WORD) {
-                    //値で終わる語の後は割り算、制御構文の後は正規表現
+                    // 値で終わる語の後は割り算、制御構文の後は正規表現
                     return !(t.is("this") || t.is("true") || t.is("false") || t.is("null")
                         || t.is("undefined") || t.is("super"));
                 }
@@ -856,7 +803,7 @@ public final class TypeScriptTranspiler {
         return j < 0 ? null : tokens.get(j);
     }
 
-    /** 文の先頭にあるか (直前が {@code ; } { }} か行頭)。 */
+    /** 文の先頭にあるか (直前が ;  { }} か行頭)。 */
     private static boolean isStatementStart(List<Token> tokens, int i) {
         Token p = prev(tokens, i);
         return p == null || p.is(";") || p.is("{") || p.is("}") || p.is(")");
@@ -918,7 +865,7 @@ public final class TypeScriptTranspiler {
             if (this.inserts.isEmpty()) {
                 return new String(this.out);
             }
-            //挿し込み位置の昇順で組み立てる
+            // 挿し込み位置の昇順で組み立てる
             Integer[] order = new Integer[this.inserts.size()];
             for (int i = 0; i < order.length; i++) {
                 order[i] = i;
@@ -950,17 +897,17 @@ public final class TypeScriptTranspiler {
 
         private int handleWord(int i) {
             Token t = this.tokens.get(i);
-            //--- 丸ごと消す宣言 ---
+            // --- 丸ごと消す宣言 ---
             if ((t.is("interface") || t.is("declare")) && isStatementStart(this.tokens, i)
                     && next(this.tokens, i) != null) {
                 return this.blankDeclaration(i);
             }
             if (t.is("type") && isStatementStart(this.tokens, i)) {
-                //type X = ... ; (プロパティ名の "type" と区別するため = があるかを見る)
+                // type X = ... ; (プロパティ名の "type" と区別するため = があるかを見る)
                 int n = nextIndex(this.tokens, i);
                 if (n >= 0 && this.tokens.get(n).type == TokenType.WORD) {
                     int a = nextIndex(this.tokens, n);
-                    //ジェネリクスを飛ばす
+                    // ジェネリクスを飛ばす
                     if (a >= 0 && this.tokens.get(a).is("<")) {
                         int close = this.matchAngle(a);
                         a = close < 0 ? a : nextIndex(this.tokens, close);
@@ -974,14 +921,14 @@ public final class TypeScriptTranspiler {
             if (t.is("import") && isStatementStart(this.tokens, i)) {
                 Token n = next(this.tokens, i);
                 if (n != null && n.is("type")) {
-                    //★import type は { } の後に from "..." が続く。宣言の汎用処理は
-                    //  波括弧で切り上げてしまうので、ここは行末/セミコロンまで消す。
+                    // ★import type は { } の後に from "..." が続く。宣言の汎用処理は
+                    // 波括弧で切り上げてしまうので、ここは行末/セミコロンまで消す。
                     return this.blankToLineEnd(i);
                 }
                 return i;
             }
-            //export は消すだけ。パックスクリプトは 1 グローバル空間なので、
-            //消せば「普通のグローバル宣言」になって従来どおり動く。
+            // export は消すだけ。パックスクリプトは 1 グローバル空間なので、
+            // 消せば「普通のグローバル宣言」になって従来どおり動く。
             if (t.is("export") && isStatementStart(this.tokens, i)) {
                 Token n = next(this.tokens, i);
                 if (n != null && n.is("type")) {
@@ -990,16 +937,16 @@ public final class TypeScriptTranspiler {
                 this.blank(t);
                 return i;
             }
-            //--- enum ---
+            // --- enum ---
             if (t.is("enum") && (isStatementStart(this.tokens, i)
                     || (prev(this.tokens, i) != null && prev(this.tokens, i).is("const")))) {
                 return this.rewriteEnum(i);
             }
-            //--- class ---
+            // --- class ---
             if (t.is("class")) {
                 return this.handleClass(i);
             }
-            //--- as / satisfies ---
+            // --- as / satisfies ---
             if ((t.is("as") || t.is("satisfies")) && prev(this.tokens, i) != null) {
                 Token p = prev(this.tokens, i);
                 boolean valueBefore = p.type == TokenType.WORD || p.type == TokenType.STRING
@@ -1017,11 +964,11 @@ public final class TypeScriptTranspiler {
                 }
                 return i;
             }
-            //--- 変数宣言の型注釈 ---
+            // --- 変数宣言の型注釈 ---
             if (t.is("var") || t.is("let") || t.is("const")) {
                 return this.handleVarDeclaration(i);
             }
-            //--- function 宣言のジェネリクスと戻り値 ---
+            // --- function 宣言のジェネリクスと戻り値 ---
             if (t.is("function")) {
                 return this.handleFunction(i);
             }
@@ -1030,7 +977,7 @@ public final class TypeScriptTranspiler {
 
         private int handlePunct(int i) {
             Token t = this.tokens.get(i);
-            //--- 非 null 表明 x! ---
+            // --- 非 null 表明 x! ---
             if (t.is("!")) {
                 Token p = prev(this.tokens, i);
                 Token n = next(this.tokens, i);
@@ -1039,12 +986,12 @@ public final class TypeScriptTranspiler {
                 boolean beforeOperator = n != null && (n.is(".") || n.is(";") || n.is(",") || n.is(")")
                     || n.is("]") || n.is("}") || n.is("(") || n.is("[") || n.is(":") || n.is("="));
                 if (afterValue && beforeOperator) {
-                    //a! : T (definite assignment) も a!.b も同じく ! を消すだけでよい
+                    // a! : T (definite assignment) も a!.b も同じく ! を消すだけでよい
                     this.blank(t);
                 }
                 return i;
             }
-            //--- デコレータ @Foo(...) ---
+            // --- デコレータ @Foo(...) ---
             if (t.is("@")) {
                 Token n = next(this.tokens, i);
                 if (n != null && n.type == TokenType.WORD) {
@@ -1063,7 +1010,7 @@ public final class TypeScriptTranspiler {
                 }
                 return i;
             }
-            //--- 呼び出し側ジェネリクス f<T>(...) ---
+            // --- 呼び出し側ジェネリクス f<T>(...) ---
             if (t.is("<")) {
                 Token p = prev(this.tokens, i);
                 if (p != null && (p.type == TokenType.WORD || p.is(")") || p.is("]"))) {
@@ -1078,7 +1025,7 @@ public final class TypeScriptTranspiler {
                 }
                 return i;
             }
-            //--- 引数リスト・関数の戻り値 ---
+            // --- 引数リスト・関数の戻り値 ---
             if (t.is("(")) {
                 return this.handleParenGroup(i);
             }
@@ -1086,11 +1033,9 @@ public final class TypeScriptTranspiler {
         }
 
         /**
-         * 括弧グループ。引数リストなら中の型注釈を消し、閉じ括弧の後の {@code : 型} も消す。
-         *
-         * <p>普通の式の括弧 {@code (a + b)} でも中に型注釈は現れないので、
-         * 「識別子の直後に {@code :} が来たら注釈」という判定で誤爆しない。
-         * ただし三項演算子と衝突するため、<b>引数リストらしさ</b>を確かめてから処理する。
+         * 括弧グループ。引数リストなら中の型注釈を消し、閉じ括弧の後の : 型 も消す。
+         * 普通の式の括弧 (a + b) でも中に型注釈は現れないので、
+         * 「識別子の直後に : が来たら注釈」という判定で誤爆しない。
          */
         private int handleParenGroup(int i) {
             int close = this.matchPair(i, "(", ")");
@@ -1100,7 +1045,7 @@ public final class TypeScriptTranspiler {
             if (this.looksLikeParameterList(i, close)) {
                 this.stripParameterTypes(i, close);
             }
-            //戻り値の型: ) : 型 の後に { か => が来る
+            // 戻り値の型: ) : 型 の後に { か => が来る
             int n = nextIndex(this.tokens, close);
             if (n >= 0 && this.tokens.get(n).is(":")) {
                 int end = this.scanType(nextIndex(this.tokens, n), true);
@@ -1122,15 +1067,7 @@ public final class TypeScriptTranspiler {
 
         /**
          * 引数リストか。
-         *
-         * <p><b>「閉じ括弧の後に {@code {} か {@code =>} が来るか」で判定する。</b>
-         * 中に {@code 識別子 :} があるかで見ていたときは、三項演算子を巻き込んで壊した:
-         * <pre>
-         *   (entity.seatRotation &lt; 0 ? lightF : lightB).render(renderer)
-         *                                        ~~~~~~~~ 型注釈と誤認して消していた
-         * </pre>
-         * 関数の引数リストなら必ず本体 {@code {} かアロー {@code =>} が続く。
-         * {@code if (a ? b : c) {} も本体が続くので、制御構文のキーワードだけ先に除く。
+         * 「閉じ括弧の後に { か => が来るか」で判定する。
          */
         private boolean looksLikeParameterList(int open, int close) {
             Token p = prev(this.tokens, open);
@@ -1145,7 +1082,7 @@ public final class TypeScriptTranspiler {
             if (n < 0) {
                 return false;
             }
-            //戻り値の型注釈を読み飛ばす
+            // 戻り値の型注釈を読み飛ばす
             if (this.tokens.get(n).is(":")) {
                 int e = this.scanType(nextIndex(this.tokens, n), true);
                 while (e < this.tokens.size() && (this.tokens.get(e).type == TokenType.WS
@@ -1161,7 +1098,7 @@ public final class TypeScriptTranspiler {
             return after.is("{") || after.is("=>");
         }
 
-        /** 引数リストの中の {@code ?} と {@code : 型} と修飾子を消す。 */
+        /** 引数リストの中の ? と : 型 と修飾子を消す。 */
         private void stripParameterTypes(int open, int close) {
             int localDepth = 0;
             List<String> paramProps = new ArrayList<>();
@@ -1203,7 +1140,7 @@ public final class TypeScriptTranspiler {
                 if (localDepth != 0 || t.type != TokenType.WORD) {
                     continue;
                 }
-                //引数プロパティ: constructor(private a: T) → this.a = a を足す
+                // 引数プロパティ: constructor(private a: T) → this.a = a を足す
                 if (t.is("public") || t.is("private") || t.is("protected") || t.is("readonly")
                         || t.is("override")) {
                     Token n = next(this.tokens, j);
@@ -1222,7 +1159,7 @@ public final class TypeScriptTranspiler {
                 }
             }
             if (!paramProps.isEmpty()) {
-                //コンストラクタ本体の先頭へ代入を差し込む
+                // コンストラクタ本体の先頭へ代入を差し込む
                 int brace = nextIndex(this.tokens, close);
                 if (brace >= 0 && this.tokens.get(brace).is("{")) {
                     StringBuilder sb = new StringBuilder();
@@ -1234,7 +1171,7 @@ public final class TypeScriptTranspiler {
             }
         }
 
-        /** {@code var x: T = ...} の型注釈を消す。 */
+        /** var x: T = ... の型注釈を消す。 */
         private int handleVarDeclaration(int i) {
             int j = nextIndex(this.tokens, i);
             while (j >= 0) {
@@ -1262,7 +1199,7 @@ public final class TypeScriptTranspiler {
             return i;
         }
 
-        /** {@code function f<T>(...)} のジェネリクスを消す。引数と戻り値は ( の側で処理される。 */
+        /** function f<T>(...) のジェネリクスを消す。引数と戻り値は ( の側で処理される。 */
         private int handleFunction(int i) {
             int j = nextIndex(this.tokens, i);
             if (j >= 0 && this.tokens.get(j).type == TokenType.WORD) {
@@ -1278,7 +1215,7 @@ public final class TypeScriptTranspiler {
             return i;
         }
 
-        /** クラス宣言。ジェネリクス・{@code implements} 節・本体の修飾子とプロパティ型を消す。 */
+        /** クラス宣言。ジェネリクス・implements 節・本体の修飾子とプロパティ型を消す。 */
         private int handleClass(int i) {
             int j = nextIndex(this.tokens, i);
             String className = null;
@@ -1294,7 +1231,7 @@ public final class TypeScriptTranspiler {
                     j = nextIndex(this.tokens, close);
                 }
             }
-            //extends Base<T> の型引数、implements 節
+            // extends Base<T> の型引数、implements 節
             while (j >= 0) {
                 Token t = this.tokens.get(j);
                 if (t.is("{")) {
@@ -1331,11 +1268,7 @@ public final class TypeScriptTranspiler {
 
         /**
          * クラス本体を 1 メンバずつ処理する。
-         *
-         * <p><b>フィールド宣言は消さないといけない。</b> Nashorn は ES6 までしか解釈できず、
-         * クラスフィールド ({@code name;} や {@code x = 1;}) は ES2022 の構文なので構文エラーになる。
-         * TypeScript 自身も「初期化子の無いフィールド宣言」は型情報だけなので出力から消す。
-         * 初期化子つきはコンストラクタの先頭へ移す (tsc の {@code useDefineForClassFields: false} と同じ)。
+         * フィールド宣言は消さないといけない。
          */
         private void stripClassBody(int openBrace, String className, boolean hasExtends) {
             int close = this.matchPair(openBrace, "{", "}");
@@ -1353,7 +1286,7 @@ public final class TypeScriptTranspiler {
                     j = nextIndex2(j);
                     continue;
                 }
-                //--- 修飾子を読み飛ばす ---
+                // --- 修飾子を読み飛ばす ---
                 boolean isStatic = false;
                 while (j >= 0 && j < close && this.tokens.get(j).type == TokenType.WORD
                         && isMemberModifier(this.tokens.get(j).text)) {
@@ -1372,7 +1305,7 @@ public final class TypeScriptTranspiler {
                 if (j < 0 || j >= close) {
                     break;
                 }
-                //--- get / set / async / * ---
+                // --- get / set / async / * ---
                 Token cur = this.tokens.get(j);
                 if (cur.type == TokenType.WORD && (cur.is("get") || cur.is("set") || cur.is("async"))) {
                     Token n = next(this.tokens, j);
@@ -1383,7 +1316,7 @@ public final class TypeScriptTranspiler {
                 if (j < 0 || j >= close) {
                     break;
                 }
-                //--- メンバ名 ---
+                // --- メンバ名 ---
                 int nameIdx = j;
                 Token nameTok = this.tokens.get(nameIdx);
                 String memberName = nameTok.type == TokenType.STRING
@@ -1393,7 +1326,7 @@ public final class TypeScriptTranspiler {
                     int b = this.matchPair(after, "[", "]");
                     after = b < 0 ? after : nextIndex2(b);
                 }
-                //--- ジェネリクス ---
+                // --- ジェネリクス ---
                 if (after >= 0 && this.tokens.get(after).is("<")) {
                     int a = this.matchAngle(after);
                     if (a > 0) {
@@ -1404,7 +1337,7 @@ public final class TypeScriptTranspiler {
                 if (after < 0 || after >= close) {
                     break;
                 }
-                //--- メソッド ---
+                // --- メソッド ---
                 if (this.tokens.get(after).is("(")) {
                     int paren = this.matchPair(after, "(", ")");
                     if (paren < 0) {
@@ -1430,13 +1363,13 @@ public final class TypeScriptTranspiler {
                         int bodyEnd = this.matchPair(body, "{", "}");
                         j = bodyEnd < 0 ? close : nextIndex2(bodyEnd);
                     } else {
-                        //本体なし = オーバーロード宣言。丸ごと消す
+                        // 本体なし = オーバーロード宣言。丸ごと消す
                         this.blank(nameTok.start, this.tokens.get(paren).end);
                         j = nextIndex2(paren);
                     }
                     continue;
                 }
-                //--- フィールド宣言 ---
+                // --- フィールド宣言 ---
                 int fieldEnd = after;
                 String init = null;
                 if (this.tokens.get(fieldEnd).is("?") || this.tokens.get(fieldEnd).is("!")) {
@@ -1495,7 +1428,7 @@ public final class TypeScriptTranspiler {
                 j = stop >= close ? -1 : nextIndex2(stop - 1);
             }
 
-            //初期化子つきフィールドはコンストラクタの先頭へ移す
+            // 初期化子つきフィールドはコンストラクタの先頭へ移す
             if (!instanceInits.isEmpty() && ctorBodyBrace >= 0) {
                 StringBuilder sb = new StringBuilder();
                 for (String s : instanceInits) {
@@ -1510,7 +1443,7 @@ public final class TypeScriptTranspiler {
                 sb.append(" }");
                 this.insertAt(this.tokens.get(openBrace).end, sb.toString());
             }
-            //静的フィールドはクラスの外へ (Nashorn は static フィールドを解釈できない)
+            // 静的フィールドはクラスの外へ (Nashorn は static フィールドを解釈できない)
             if (!staticInits.isEmpty() && className != null) {
                 StringBuilder sb = new StringBuilder();
                 for (String s : staticInits) {
@@ -1525,7 +1458,7 @@ public final class TypeScriptTranspiler {
             return nextIndex(this.tokens, i);
         }
 
-        /** {@code enum E { A, B = 2 }} を TypeScript と同じ形へ展開する。 */
+        /** enum E { A, B = 2 } を TypeScript と同じ形へ展開する。 */
         private int rewriteEnum(int i) {
             int nameIdx = nextIndex(this.tokens, i);
             if (nameIdx < 0 || this.tokens.get(nameIdx).type != TokenType.WORD) {
@@ -1560,7 +1493,7 @@ public final class TypeScriptTranspiler {
                 }
                 int eq = nextIndex(this.tokens, j);
                 if (eq >= 0 && eq < close && this.tokens.get(eq).is("=")) {
-                    //値つき。次の , か } まで
+                    // 値つき。次の , か } まで
                     int valueStart = nextIndex(this.tokens, eq);
                     int k = valueStart;
                     int d = 0;
@@ -1600,7 +1533,7 @@ public final class TypeScriptTranspiler {
                     }
                 }
             }
-            //const enum の const も消す
+            // const enum の const も消す
             int constIdx = prevIndex(this.tokens, i);
             int start = this.tokens.get(i).start;
             if (constIdx >= 0 && this.tokens.get(constIdx).is("const")) {
@@ -1612,7 +1545,7 @@ public final class TypeScriptTranspiler {
             return close;
         }
 
-        /** セミコロンか行末まで空白にする ({@code import type ... from "..."} 用)。 */
+        /** セミコロンか行末まで空白にする (import type ... from "..." 用)。 */
         private int blankToLineEnd(int i) {
             int j = i;
             for (int k = i + 1; k < this.tokens.size(); k++) {
@@ -1631,16 +1564,16 @@ public final class TypeScriptTranspiler {
             return j;
         }
 
-        /** {@code interface} / {@code declare} / {@code type X = ...} を丸ごと空白にする。 */
+        /** interface / declare / type X = ... を丸ごと空白にする。 */
         private int blankDeclaration(int i) {
             int j = i;
-            //本体 { } を持つならその末尾まで、無ければ ; か行末まで
+            // 本体 { } を持つならその末尾まで、無ければ ; か行末まで
             int limit = this.tokens.size();
             int braceStart = -1;
             for (int k = i + 1; k < limit; k++) {
                 Token t = this.tokens.get(k);
                 if (t.type == TokenType.WS && t.text.indexOf('\n') >= 0 && braceStart < 0) {
-                    //改行で終わる宣言 (type X = number)
+                    // 改行で終わる宣言 (type X = number)
                     int p = prevIndex(this.tokens, k);
                     if (p >= 0 && !this.tokens.get(p).is("=") && !this.tokens.get(p).is("|")
                             && !this.tokens.get(p).is("&") && !this.tokens.get(p).is(",")
@@ -1677,13 +1610,10 @@ public final class TypeScriptTranspiler {
         }
 
         /**
-         * 型を 1 つ読み飛ばす。戻り値は型の<b>次</b>のトークン添字。
-         *
+         * 型を 1 つ読み飛ばす。戻り値は型の次のトークン添字。
+         * 「直前が丸括弧グループだったか」で決まる。
          * @param i           型の先頭
-         * @param stopAtArrow 後方互換のため残しているが未使用。{@code =>} を型の一部と見なすかは
-         *                    「直前が丸括弧グループだったか」で決まる。こうすると
-         *                    {@code (a: number): boolean => ...} のアロー関数と
-         *                    {@code const g: (x: number) => string} の関数型を取り違えない
+         * @param stopAtArrow 後方互換のため残しているが未使用。=> を型の一部と見なすかは
          */
         private int scanType(int i, boolean stopAtArrow) {
             if (i < 0 || i >= this.tokens.size()) {
@@ -1702,7 +1632,7 @@ public final class TypeScriptTranspiler {
                 if (expectAtom) {
                     if (t.type == TokenType.WORD || t.type == TokenType.STRING
                             || t.type == TokenType.NUMBER) {
-                        //keyof / typeof / readonly / infer / new は前置なので atom を継続
+                        // keyof / typeof / readonly / infer / new は前置なので atom を継続
                         if (t.is("keyof") || t.is("typeof") || t.is("readonly")
                                 || t.is("infer") || t.is("new") || t.is("abstract")) {
                             j++;
@@ -1744,7 +1674,7 @@ public final class TypeScriptTranspiler {
                         continue;
                     }
                     if (t.is("|") || t.is("&")) {
-                        //先頭の | は許される (union の書き始め)
+                        // 先頭の | は許される (union の書き始め)
                         j++;
                         continue;
                     }
@@ -1754,7 +1684,7 @@ public final class TypeScriptTranspiler {
                     }
                     return j;
                 }
-                //中置の位置
+                // 中置の位置
                 if (t.is("|") || t.is("&") || t.is(".") || t.is("extends")) {
                     j++;
                     expectAtom = true;
@@ -1783,7 +1713,7 @@ public final class TypeScriptTranspiler {
                     continue;
                 }
                 if (t.is("?")) {
-                    //条件型 A extends B ? C : D
+                    // 条件型 A extends B ? C : D
                     j++;
                     expectAtom = true;
                     continue;
@@ -1814,7 +1744,7 @@ public final class TypeScriptTranspiler {
         }
 
         /**
-         * {@code <} に対応する {@code >} を探す。型に出てこないトークンが現れたら
+         * < に対応する > を探す。型に出てこないトークンが現れたら
          * ジェネリクスではないと判断して -1 を返す (比較演算子との取り違え防止)。
          */
         private int matchAngle(int i) {

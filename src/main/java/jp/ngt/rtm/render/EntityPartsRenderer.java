@@ -2,9 +2,7 @@ package jp.ngt.rtm.render;
 
 import net.minecraft.world.entity.Entity;
 
-/**
- * 本家 jp.ngt.rtm.render.EntityPartsRenderer の移植。
- */
+/** 本家 jp.ngt.rtm.render.EntityPartsRenderer の移植。 */
 public abstract class EntityPartsRenderer extends PartsRenderer {
 
     public EntityPartsRenderer(String... par1) {

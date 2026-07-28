@@ -131,8 +131,8 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 case "toggle_pantograph" -> controlTrain.setPantographUpForFormation(!controlTrain.isPantographUp());
                 case "toggle_reverse" -> controlTrain.setReverse(!controlTrain.isReverse());
                 case "set_reverser" -> controlTrain.setReverser(payload.value());
-                //↑↓ キーのレバーサ操作。↑=前(+1)/↓=後(-1) に 1 段ずつ。中立(0)を挟む 3 段。
-                //マスコンが 0 (力行/制動なし) のときだけ動かせる = 走行中の逆転を防ぐ。
+                // ↑↓ キーのレバーサ操作。↑=前(+1)/↓=後(-1) に 1 段ずつ。中立(0)を挟む 3 段。
+                // マスコンが 0 (力行/制動なし) のときだけ動かせる = 走行中の逆転を防ぐ。
                 case "reverser_up", "reverser_down" -> {
                     if (!driverPassenger) {
                         return;
@@ -193,7 +193,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
         switch (action) {
             case "mascon_power" -> train.addNotch(player, 1);
             case "mascon_brake" -> train.addNotch(player, -1);
-            //ノッチ 0 に戻すのもマスコン操作なので、本家 addNotch と同じレバー音を鳴らす
+            // ノッチ 0 に戻すのもマスコン操作なので、本家 addNotch と同じレバー音を鳴らす
             case "mascon_neutral" -> {
                 if (train.setNotch(0)) {
                     TrainSoundPayload.broadcast(train, "rtm:sounds/train/lever.ogg", 1.0F, 1.0F);
@@ -205,11 +205,8 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     train.setTrainDirection(1 - train.getTrainDirection());
                 }
             }
-            //↑↓ キーのレバーサ操作。<b>物理の前後判定は getTrainState(10)=State_Direction (Front/Back)</b>
-            //を読む (updateMotion)。以前は State_TrainDir を変えていたため列車が逆転せず
-            //「レバーサが切り替わらない」不具合になっていた。ここは State_Direction を書く。
-            //運転台が編成の向きと逆なら Front/Back を入れ替えて、↑ が常に「運転士の前方」になるようにする。
-            //マスコン 0 のときだけ動かせる = 走行中の逆転防止。
+            // ↑↓ キーのレバーサ操作。
+            // を読む (updateMotion)。
             case "reverser_up", "reverser_down" -> {
                 if (train.getNotch() == 0) {
                     var dirType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction;
@@ -234,11 +231,9 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 jp.ngt.rtm.entity.npc.macro.MacroRecorder.recDoor(player,
                         jp.ngt.rtm.entity.train.util.TrainState.getState(doorType.id, next));
             }
-            //ドアボタンの左右→ドアビット変換。車両自身のドア byte は「その車両の物理左右」
-            //なので、運転士から見た左右は運転台の向き (cabDirection) だけで決まる
-            //(編成内でその車両が逆向きに繋がれていても、運転士から見える左右は変わらない)。
-            //編成の他車への配布は Formation が操作車両基準で反転する。
-            //GUI の DoorButton も同じ cabDirection 基準で開閉表示している。
+            // ドアボタンの左右→ドアビット変換。
+            // なので、運転士から見た左右は運転台の向き (cabDirection) だけで決まる
+            // (編成内でその車両が逆向きに繋がれていても、運転士から見える左右は変わらない)。
             case "toggle_door_left" -> {
                 byte data = train.getTrainStateData(doorType.id);
                 boolean dir = (train.getCabDirection() & 1) == 0;
@@ -255,18 +250,18 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 jp.ngt.rtm.entity.npc.macro.MacroRecorder.recDoor(player,
                         jp.ngt.rtm.entity.train.util.TrainState.getState(doorType.id, next));
             }
-            //運転席GUI (ドアタブ) の速度設定。JSON から読まなくなったぶんをここで決める。
-            //value = 最高速度 (km/h)。0 で既定へ戻す。
+            // 運転席GUI (ドアタブ) の速度設定。JSON から読まなくなったぶんをここで決める。
+            // value = 最高速度 (km/h)。0 で既定へ戻す。
             case "set_max_speed" -> train.setConfiguredMaxSpeedKmh(value);
-            //value = 加速度 (km/h/s ×100)。0 で既定へ戻す。
+            // value = 加速度 (km/h/s ×100)。0 で既定へ戻す。
             case "set_acceleration" -> train.setConfiguredAccelCentiKmhS(value);
-            //ドアカット: この運転車両の開扉をカットする (物理でドアを開けない)。
+            // ドアカット: この運転車両の開扉をカットする (物理でドアを開けない)。
             case "toggle_door_cut" -> {
                 var cutType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_DoorCut;
                 byte data = train.getTrainStateData(cutType.id);
                 train.setTrainStateData(cutType.id, (byte) (data == 0 ? 1 : 0));
             }
-            //連結解除: value = 解除する台車側 (0/1)。運転台メニューのボタンから。
+            // 連結解除: value = 解除する台車側 (0/1)。運転台メニューのボタンから。
             case "decouple_rtm" -> {
                 jp.ngt.rtm.entity.train.util.Formation formation = train.getFormation();
                 if (formation != null) {
@@ -295,9 +290,8 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction.id, (byte) value);
             case "set_destination" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id, (byte) value);
-            //方向幕の送り/戻し。GUI (TrainControlScreen) はこの action を送るが、旧 EntityTrain
-            //(=設置される列車) 側ハンドラに case が無く、行先が一切変わらなかった (方向幕が空白のまま)。
-            //rollsignNames のコマ数で循環させ、スクリプトが読む State_Destination を更新する。
+            // 方向幕の送り/戻し。
+            // (=設置される列車) 側ハンドラに case が無く、行先が一切変わらなかった (方向幕が空白のまま)。
             case "next_destination", "prev_destination" -> {
                 VehicleDefinition destDef = VehicleRegistry.getById(train.getModelName());
                 int count = destDef != null ? Math.max(1, destDef.getRollsignNames().size()) : 1;
@@ -307,13 +301,13 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 int next = Math.floorMod(cur + step, count);
                 train.setTrainStateData(destType.id, (byte) next);
             }
-            //RTMU 追加: 種別幕の選択 (方向幕とは独立した State_Type)
+            // RTMU 追加: 種別幕の選択 (方向幕とは独立した State_Type)
             case "set_type" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Type.id, (byte) value);
             case "set_announcement" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Announcement.id, (byte) value);
-            //車内放送: 選択中のアナウンス (TrainState の Announcement が本家のインデックス) を鳴らす。
-            //本家 GuiVehicleControlPanel のボタン 129 と同じ。
+            // 車内放送: 選択中のアナウンス (TrainState の Announcement が本家のインデックス) を鳴らす。
+            // 本家 GuiVehicleControlPanel のボタン 129 と同じ。
             case "play_selected_announcement" -> {
                 VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
                 List<String> sounds = def != null ? def.getAnnouncementSounds() : List.of();
@@ -341,7 +335,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                         : (currentValue == 0 ? 1 : 0);
                 train.getResourceState().getDataMap().setInt("Button" + index, next, 1);
             }
-            //スライダー型カスタムボタン: 上位8bit=index, 下位8bit=値 (0-100)
+            // スライダー型カスタムボタン: 上位8bit=index, 下位8bit=値 (0-100)
             case "set_custom_button" -> {
                 int index = (value >>> 8) & 0xFF;
                 int sliderValue = value & 0xFF;
@@ -353,12 +347,9 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
     }
 
     /**
-     * 本家 {@code RTMKeyHandlerClient} の KEY_CHIME_NEXT/PREV と同じ。
-     * <pre>
+     * 本家 RTMKeyHandlerClient の KEY_CHIME_NEXT/PREV と同じ。
      * i0 = state + delta;
-     * i0 = i0 &lt; type.min ? type.max : (i0 &gt; type.max ? 0 : i0);
-     * </pre>
-     * {@code State_Announcement} は min=0 / max=127 で、<b>パックの件数では折り返さない</b>。
+     * i0 = i0 < type.min ? type.max : (i0 > type.max ? 0 : i0);
      */
     private static int resolveNextSoundIndex(TrainEntity controlTrain, int delta) {
         jp.ngt.rtm.entity.train.util.TrainState.TrainStateType type =
@@ -368,8 +359,8 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
     }
 
     /**
-     * 本家 {@code RTMKeyHandlerClient.playSound(player, 3)} と同じ。
-     * {@code if (sa0 != null && index < sa0.length)} で、<b>件数を超えた番号では何も鳴らさない</b>。
+     * 本家 RTMKeyHandlerClient.playSound(player, 3) と同じ。
+     * if (sa0 != null && index < sa0.length) で、件数を超えた番号では何も鳴らさない。
      */
     private static void playSelectedAnnouncement(TrainEntity sourceTrain, TrainEntity controlTrain) {
         VehicleDefinition definition = VehicleRegistry.getById(controlTrain.getVehicleId());

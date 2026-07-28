@@ -53,7 +53,7 @@ public class EntityFloor extends EntityVehiclePart {
 
     @Override
     public void onLoadVehicle() {
-        //setupFloors が新しいフロアを常にスポーンし直すため、旧セーブのフロアは破棄する
+        // setupFloors が新しいフロアを常にスポーンし直すため、旧セーブのフロアは破棄する
         if (!this.level().isClientSide) {
             this.discard();
         }
@@ -73,12 +73,11 @@ public class EntityFloor extends EntityVehiclePart {
     @Override
     public void tick() {
         super.tick();
-        //車体側の一覧へ自分を登録しておく (車体が移動後に位置を押し出すため)。
-        //本命は onAddedToLevel での登録。ここは spawn 時点でまだ車体が
-        //解決できなかった場合 (spawn パケットの到着順) の取りこぼし対策。
+        // 車体側の一覧へ自分を登録しておく (車体が移動後に位置を押し出すため)。
+        // 本命は onAddedToLevel での登録。
         this.registerToVehicle();
         if (!this.level().isClientSide) {
-            //スニークで降車 (バニラ経路が効かない場合の保険)
+            // スニークで降車 (バニラ経路が効かない場合の保険)
             for (Entity rider : new java.util.ArrayList<>(this.getPassengers())) {
                 if (rider instanceof Player player && player.isShiftKeyDown()) {
                     player.stopRiding();
@@ -88,9 +87,8 @@ public class EntityFloor extends EntityVehiclePart {
     }
 
     /**
-     * 当たり判定ボックスの持ち上げ量。slotPos (着座オフセット) は座面高さで台車と
+     * 当たり判定ボックスの持ち上げ量。
      * 同じ高さになるため、そのままだと台車をクリックしても座席が先に当たってしまう。
-     * 判定だけ着座した体 (胴体) の高さへ持ち上げる — 着座位置 (getPartVec) は不変。
      */
     private static final double HITBOX_LIFT = 0.55D;
 
@@ -108,8 +106,8 @@ public class EntityFloor extends EntityVehiclePart {
         if (this.getSeatType() == 0 || player.isShiftKeyDown()) {
             return InteractionResult.PASS;
         }
-        //バール所持中は着席しない。台車を狙ったクリックが手前の座席に吸われて
-        //連結モードに入れなくなるため、最寄りの台車へ転送する (本家の連結操作)。
+        // バール所持中は着席しない。台車を狙ったクリックが手前の座席に吸われて
+        // 連結モードに入れなくなるため、最寄りの台車へ転送する (本家の連結操作)。
         if (player.getMainHandItem().getItem() instanceof com.portofino.realtrainmodunofficial.item.CrowbarItem) {
             EntityVehicleBase<?> parentVehicle = this.getVehicle();
             if (parentVehicle instanceof jp.ngt.rtm.entity.train.EntityTrainBase train) {
@@ -131,8 +129,8 @@ public class EntityFloor extends EntityVehiclePart {
             }
             return InteractionResult.PASS;
         }
-        //作り直し: EntityFloor に乗せる旧方式は視点固定バグの温床だったため、
-        //列車本体へ座席オフセット付きで直接乗せる (運転席と同じ経路 = 視点フリー)。
+        // 作り直し: EntityFloor に乗せる旧方式は視点固定バグの温床だったため、
+        // 列車本体へ座席オフセット付きで直接乗せる (運転席と同じ経路 = 視点フリー)。
         EntityVehicleBase<?> vehicle = this.getVehicle();
         if (vehicle instanceof jp.ngt.rtm.entity.train.EntityTrainBase train) {
             jp.ngt.ngtlib.math.Vec3 pv = this.getPartVec();
@@ -141,7 +139,7 @@ public class EntityFloor extends EntityVehiclePart {
             }
             return InteractionResult.PASS;
         }
-        //列車以外の親 (保険): 従来方式
+        // 列車以外の親 (保険): 従来方式
         if (this.getPassengers().isEmpty()) {
             player.startRiding(this);
             return InteractionResult.CONSUME;
@@ -152,14 +150,14 @@ public class EntityFloor extends EntityVehiclePart {
     @Override
     protected void positionRider(Entity rider, Entity.MoveFunction move) {
         if (this.hasPassenger(rider)) {
-            //本家: posY + height + 0.25 (1.21 は着座姿勢分を引く)
+            // 本家: posY + height + 0.25 (1.21 は着座姿勢分を引く)
             move.accept(rider, this.getX(), this.getY() + this.getBbHeight() + 0.25D - 0.45D, this.getZ());
         }
     }
 
     @Override
     public net.minecraft.world.phys.Vec3 getDismountLocationForPassenger(net.minecraft.world.entity.LivingEntity rider) {
-        //車体の外 (左右) に降ろす
+        // 車体の外 (左右) に降ろす
         EntityVehicleBase<?> vehicle = this.getVehicle();
         float yaw = vehicle != null ? vehicle.getYRot() : this.getYRot();
         double side = 2.0D;

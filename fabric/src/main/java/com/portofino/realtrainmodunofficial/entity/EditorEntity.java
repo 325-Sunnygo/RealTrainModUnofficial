@@ -13,13 +13,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
 /**
- * エディタの選択範囲を持つエンティティ (neo mcte)。本家 MCTE {@code EntityEditor} の移植。
- *
- * <p>本家と同じく<b>選択範囲をエンティティとして世界に置く</b>方式。プレイヤーごとに 1 個で、
- * 範囲は {@code START_POS} / {@code END_POS} として同期される。エンティティにしてあるおかげで
- * 範囲の描画・保存・マルチプレイ同期をバニラの仕組みにそのまま乗せられる。
- *
- * <p>本家は当たり判定も動きも持たない不可視エンティティで、これも同じにしてある。
+ * エディタの選択範囲を持つエンティティ (neo mcte)。本家 MCTE EntityEditor の移植。
+ * 本家と同じく選択範囲をエンティティとして世界に置く方式。
  */
 public class EditorEntity extends Entity implements net.minecraft.world.Container {
 
@@ -39,8 +34,8 @@ public class EditorEntity extends Entity implements net.minecraft.world.Containe
         SynchedEntityData.defineId(EditorEntity.class, EntityDataSerializers.BOOLEAN);
 
     /**
-     * 埋めるブロック / 置換先ブロックのスロット (本家 {@code EntityEditor implements IInventory})。
-     * <p>0 = Fill、1 = Replace。本家の {@code ContainerEditor} が 72,152 と 72,172 に置くもの。
+     * 埋めるブロック / 置換先ブロックのスロット (本家 EntityEditor implements IInventory)。
+     * 0 = Fill、1 = Replace。本家の ContainerEditor が 72,152 と 72,172 に置くもの。
      */
     private final net.minecraft.core.NonNullList<net.minecraft.world.item.ItemStack> items =
         net.minecraft.core.NonNullList.withSize(2, net.minecraft.world.item.ItemStack.EMPTY);
@@ -99,8 +94,7 @@ public class EditorEntity extends Entity implements net.minecraft.world.Containe
 
     /**
      * 始点だけ動かす (終点と確定状態は保つ)。
-     * <p>編集モード中に視点で範囲を伸ばすときに使う。{@link #setStart} だと
-     * 動かすたびに範囲が未確定へ戻ってしまう。
+     * 編集モード中に視点で範囲を伸ばすときに使う。
      */
     public void setStartKeepEnd(BlockPos pos) {
         this.entityData.set(START_POS, pos);
@@ -146,7 +140,7 @@ public class EditorEntity extends Entity implements net.minecraft.world.Containe
 
     /**
      * 描画・当たり判定のためにエンティティ本体を範囲の近くへ置く。
-     * <p>選択範囲から離れた場所にエンティティがいると、範囲だけ画面外扱いになって描画が消える。
+     * 選択範囲から離れた場所にエンティティがいると、範囲だけ画面外扱いになって描画が消える。
      */
     private void snapTo(BlockPos pos) {
         this.setPos(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D);
@@ -156,7 +150,7 @@ public class EditorEntity extends Entity implements net.minecraft.world.Containe
 
     @Override
     public void tick() {
-        //本家と同じく自前では動かない。所有者が居なくなったら消える。
+        // 本家と同じく自前では動かない。所有者が居なくなったら消える。
         if (!level().isClientSide) {
             String owner = this.entityData.get(OWNER);
             if (owner.isEmpty()) {
@@ -181,13 +175,13 @@ public class EditorEntity extends Entity implements net.minecraft.world.Containe
 
     @Override
     public boolean shouldRenderAtSqrDistance(double distance) {
-        //選択範囲は広いことがあるので、遠くても描く
+        // 選択範囲は広いことがあるので、遠くても描く
         return distance < 256.0D * 256.0D;
     }
 
     @Override
     public AABB getBoundingBoxForCulling() {
-        //範囲全体を包む。これが無いと端に立ったとき枠が消える。
+        // 範囲全体を包む。これが無いと端に立ったとき枠が消える。
         return getSelectionBox().inflate(1.0D);
     }
 
@@ -274,7 +268,7 @@ public class EditorEntity extends Entity implements net.minecraft.world.Containe
 
     @Override
     public boolean stillValid(Player player) {
-        //本家 ContainerEditor.canInteractWith: エディタから 64 以内
+        // 本家 ContainerEditor.canInteractWith: エディタから 64 以内
         return isOwner(player) && player.distanceToSqr(this) <= 64.0D * 64.0D;
     }
 

@@ -143,8 +143,8 @@ public final class CrossingGateSoundManager {
             return CROSSING_SOUND_ID;
         }
         try {
-            //空白・大文字入りのサウンド名 (hi03 Train Melodies 等) を生成側と同じ規則で安全化する。
-            //揃えないと生成した SoundEvent と参照がずれ、踏切のデフォルトベル音に落ちて無音扱いになる。
+            // 空白・大文字入りのサウンド名 (hi03 Train Melodies 等) を生成側と同じ規則で安全化する。
+            // 揃えないと生成した SoundEvent と参照がずれ、踏切のデフォルトベル音に落ちて無音扱いになる。
             if (normalized.contains(":")) {
                 String[] split = normalized.split(":", 2);
                 String namespace = split[0].isBlank() ? "minecraft" : ExternalSoundPackBridge.sanitizeSoundPath(split[0]);

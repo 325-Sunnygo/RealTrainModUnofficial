@@ -13,7 +13,6 @@ import org.apache.logging.log4j.Logger;
 /**
  * 本家 NGTLib jp.ngt.ngtlib.io.NGTLog の移植。
  * ログ API (debug) はスクリプトからも呼ばれるためシグネチャを本家のまま維持。
- * チャット送信系は 1.7.10 の ICommandSender/IChatComponent → 1.21 の Player/Component に適合。
  */
 public final class NGTLog {
     private static final Logger logger = LogManager.getLogger("NGT");
@@ -33,9 +32,7 @@ public final class NGTLog {
         }
     }
 
-    /**
-     * フォーマットはこちらで行う
-     */
+    /** フォーマットはこちらで行う */
     public static void sendChatMessage(Player player, String message, Object... objects) {
         if (player == null) {
             return;
@@ -43,17 +40,13 @@ public final class NGTLog {
         player.displayClientMessage(Component.translatable(message, objects), false);
     }
 
-    /**
-     * PlayerCompat ラッパー (SRB3/NGTO のスクリプトが渡す) も受ける版
-     */
+    /** PlayerCompat ラッパー (SRB3/NGTO のスクリプトが渡す) も受ける版 */
     public static void sendChatMessage(Object player, String message, Object... objects) {
         Player real = jp.ngt.mccompat.PlayerCompat.unwrap(player);
         sendChatMessage(real, message, objects);
     }
 
-    /**
-     * フォーマットはこちらで行う
-     */
+    /** フォーマットはこちらで行う */
     public static void sendChatMessageToAll(String message, Object... objects) {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server == null) {

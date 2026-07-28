@@ -14,14 +14,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * {@code ViewportEvent.ComputeCameraAngles} と
- * {@code CalculateDetachedCameraDistanceEvent} の発火点。
- *
- * <p>乗車時の視点追従 (揺れの補間・首振り) がこのイベントで角度を書き換えている。
- * これが無いと乗っても視点が車体に付いてこない。
- *
- * <p>★{@link CameraMixin} は setup の TAIL でフリーカメラの<b>位置</b>を上書きする別物。
- * こちらは角度で、発火位置も違う (NeoForge と同じく位置確定より前)。
+ * ViewportEvent.ComputeCameraAngles と
+ * CalculateDetachedCameraDistanceEvent の発火点。
+ * 乗車時の視点追従 (揺れの補間・首振り) がこのイベントで角度を書き換えている。
+ * ★CameraMixin は setup の TAIL でフリーカメラの位置を上書きする別物。
  */
 @Mixin(Camera.class)
 public abstract class CameraAnglesMixin {

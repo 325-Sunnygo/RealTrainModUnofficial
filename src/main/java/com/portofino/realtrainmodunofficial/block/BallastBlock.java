@@ -20,7 +20,6 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * 道床ブロック。高さ1px(1/16) = カーペット相当の薄板。見た目あり（バラスト/砂利テクスチャ）。
  * 対応レールコア(LargeRailCore)位置を BlockEntity に保持し、道床を壊すとレールも撤去される
  * (ユーザー要望)。列車設置時のレール検出 (getRailMapAt) でも道床からコアを引ける。
- * 当たり判定はこのブロック自体(y-1)が持つため、列車/プレイヤーは道床の上に立つ。
  */
 public class BallastBlock extends BaseEntityBlock {
     public static final MapCodec<BallastBlock> CODEC = simpleCodec(p -> new BallastBlock());

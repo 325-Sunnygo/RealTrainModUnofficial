@@ -11,15 +11,8 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * エディタのコンテナ (neo mcte)。本家 MCTE {@code ContainerEditor} の移植。
- *
- * <p>スロット配置も本家そのまま:
- * <ul>
- *   <li>0: 埋めるブロック — (72, 152)</li>
- *   <li>1: 置換先ブロック — (72, 172)</li>
- *   <li>プレイヤーのホットバー 9 個 — (8 + i*20, 142)</li>
- * </ul>
- * ホットバーの間隔が 20 (バニラは 18) なのも本家どおり。
+ * エディタのコンテナ (neo mcte)。本家 MCTE ContainerEditor の移植。
+ * スロット配置も本家そのまま:
  */
 public class EditorMenu extends AbstractContainerMenu {
 
@@ -65,7 +58,7 @@ public class EditorMenu extends AbstractContainerMenu {
         }
         ItemStack stack = slot.getItem();
         ItemStack copy = stack.copy();
-        //本家と同じ: エディタ側 <-> ホットバー の往復だけ
+        // 本家と同じ: エディタ側 <-> ホットバー の往復だけ
         if (index < 2) {
             if (!moveItemStackTo(stack, 2, this.slots.size(), true)) {
                 return ItemStack.EMPTY;

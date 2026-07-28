@@ -15,16 +15,8 @@ import java.util.Map;
 
 /**
  * レール 1 本ぶんの描画を「1 つの統合メッシュ (VBO)」に焼いて使い回す。
- *
  * 本家 RTM 1.7.10 はレール 1 本をディスプレイリストに 1 回だけ焼き、以後は GPU 側に
- * 置きっぱなしにしていた。1.21 移植ではそれが「毎フレーム、0.5m 刻みの位置ごとに
- * モデルを描画呼び出し」になっており、50m のレール 1 本で 900 回以上の draw call
- * (setupRenderState + ユニフォーム転送 + bind/draw) を毎フレーム発行していた
- * (実測 2.83ms/本 = レール 10 本で 28ms/フレーム)。
- *
- * ここでは既存の描画コードに頂点を吐かせて (MeshCapture) それを 1 つにまとめ、
- * 毎フレームは RenderType ごとに 1 回だけ描く。頂点の中身も RenderType の選択も
- * 既存コードが決めたものをそのまま使うため、見た目は変わらない。
+ * 置きっぱなしにしていた。
  */
 public final class RailMeshCache {
 
@@ -34,32 +26,23 @@ public final class RailMeshCache {
      */
     private static final long MAX_MERGED_VERTICES = 4_000_000L;
 
-    /**
-     * 同時に保持するレールメッシュ数の上限 (VRAM 上限)。超えたら古いものから解放する。
-     */
+    /** 同時に保持するレールメッシュ数の上限 (VRAM 上限)。超えたら古いものから解放する。 */
     private static final int MAX_ENTRIES = 512;
 
     /**
-     * 1 フレームあたりに新規/再焼き込みするレールの上限。<b>スパイク対策の要。</b>
-     * <p>
+     * 1 フレームあたりに新規/再焼き込みするレールの上限。スパイク対策の要。
      * 駅・車両基地に入るとチャンクロードで多数のレールが一斉に初回焼き込みされ、
      * 1 フレームに集中して「レール負荷が普通 10 なのに時々 190」というスタッタになる
-     * (焼き込みは約 2.8ms/本)。ここで 1 フレームの焼き込みを N 本までに制限し、
-     * 残りは次フレーム以降へ回す。<b>最終的な見た目は同じ</b>で、初回だけ数フレーム遅れて
-     * 出る (再焼き待ちは古いメッシュをそのまま描くので不可視にならない)。
+     * (焼き込みは約 2.8ms/本)。
      */
     private static final int MAX_BAKES_PER_FRAME = 8;
 
     private static int bakesThisFrame;
 
     /**
-     * 同一レールを再焼き込みする最短フレーム間隔。<b>クロスポイント等の churn 対策。</b>
-     * <p>
+     * 同一レールを再焼き込みする最短フレーム間隔。クロスポイント等の churn 対策。
      * variant (トング位置) は 8 段階に量子化済みだが、量子化の境界でトングが揺れると
-     * variant が毎tick変わり得る。そのまま焼き直すと「静止して見えるのに毎tick再焼き込みされて
-     * 重い」(bake が下がらない) 状態になる。variant/light の変化による焼き直しは、直近に焼いて
-     * から最低このフレーム数は見送り、古いメッシュを描く。強制再焼き (パック再読込・モデル差替) は
-     * 対象外。実アニメは量子化で 8 段階なので、この間隔では見た目が変わらない。
+     * variant が毎tick変わり得る。
      */
     private static final int REBAKE_MIN_FRAMES = 8;
 
@@ -79,9 +62,7 @@ public final class RailMeshCache {
     private RailMeshCache() {
     }
 
-    /**
-     * @param variant 同じレールでも見た目が変わる要因 (分岐の開通方向など)。変われば焼き直す。
-     */
+    /** @param variant 同じレールでも見た目が変わる要因 (分岐の開通方向など)。変われば焼き直す。 */
     private record RailMesh(List<MeshCapture.Section> sections, MqoModelLoader.MqoModel model,
                             int light, long variant, int bakeFrame) {
         void close() {
@@ -93,7 +74,6 @@ public final class RailMeshCache {
 
     /**
      * 統合メッシュで 1 本を描く。
-     *
      * @param rebuilt true = 記録 (GLRecorder) が作り直された → メッシュも焼き直す
      * @return true = 描画した (呼び出し元は逐次描画をスキップする)
      */
@@ -111,12 +91,7 @@ public final class RailMeshCache {
 
     /**
      * 描画コードを渡して統合メッシュに焼き、以後は VBO を描くだけにする汎用版。
-     * <p>
      * GLRecorder を持たない経路 (分岐の旧パイプライン) からも使えるようにしたもの。
-     * {@code baker} は<b>単位行列の PoseStack</b> で呼ばれるので、頂点はレール原点
-     * (ブロック隅) 基準になる。毎フレームの描画時に本物の pose を掛けるため、結果は
-     * 逐次描画と数学的に同じ。
-     *
      * @param variant      見た目が変わる要因 (分岐の開通方向など)。変われば焼き直す
      * @param forceRebuild true = 強制的に焼き直す
      * @return true = 描画を予約した (呼び出し元は逐次描画をスキップする)
@@ -128,49 +103,33 @@ public final class RailMeshCache {
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
             return false;
         }
-        //★ Iris/Oculus 使用中も統合メッシュ (VBO) を使う。
-        //
-        //以前はここで諦めていた。理由は「レールが視点に貼り付いてついてくる」で、真因は
-        //drawWithShader に渡した行列を Iris の ExtendedShader が apply() で自前のものに
-        //上書きしてしまうこと。RailDrawQueue 側で<b>グローバルの ModelView に積んでから描く</b>
-        //ようにしたので、Iris が何を読んでもこのレールの pose が入っている。
-        //頂点フォーマットは MeshCapture が RenderType.format() で組むので Iris の拡張に追従する。
-        //ON/OFF が切り替わったときは RailDrawQueue が epoch を見て焼き直す。
+        // ★ Iris/Oculus 使用中も統合メッシュ (VBO) を使う。
+        // 以前はここで諦めていた。
         dropIfLevelChanged();
 
         RailMesh mesh = CACHE.get(pos);
-        //必ず焼く要因: 強制再焼き (パック再読込)・未焼き・モデル差替。
+        // 必ず焼く要因: 強制再焼き (パック再読込)・未焼き・モデル差替。
         boolean mustBake = forceRebuild || mesh == null || mesh.model() != model;
-        //任意で焼く要因: ライト or 見た目 (variant=トング位置) が変わった。
+        // 任意で焼く要因: ライト or 見た目 (variant=トング位置) が変わった。
         boolean lightChanged = !mustBake && mesh.light() != packedLight;
         boolean variantChanged = !mustBake && mesh.variant() != variant;
         boolean optionalBake = lightChanged || variantChanged;
-        //churn 対策: 任意再焼きは、直近に焼いてから REBAKE_MIN_FRAMES 経つまで見送り、古いメッシュを
-        //描く。量子化の境界でトングが揺れて variant が毎tick変わっても、再焼きは間隔内に制限される
-        //(静止して見えるクロスポイントが再焼きされ続けて重い、を解消)。見た目は最大数フレーム古いだけ。
-        //
-        //★ただしライト変化はこの遅延の対象外にする。ワールド入場直後はライトエンジンがまだ
-        //伝播しておらず、真っ暗な状態で焼かれることがある。そこに variant 用の遅延が重なると
-        //「読み込み済みのチャンクなのにレールだけ真っ黒のまま」になる (ユーザー報告)。
-        //ライトは連続的に変わるものではないので、churn の心配も無い。
-        //★再焼き込みの間隔制限は撤去した (本家に無い)。
-        //これは「トング位置を焼き込みキーに入れていたせいで、量子化の境界で毎tick焼き直る」
-        //churn を隠すための独自処理だった。可動部を本家どおり renderRailDynamic として
-        //焼き込みの外へ出し、キーを本家の createStaticRenderKey (形+明るさ+モデル) だけに
-        //したので、キーが動くのは実際に見た目が変わった時だけになった。
-        //間隔制限を残すと「変わったのに数フレーム古いまま描く」だけの害になる。
+        // churn 対策: 任意再焼きは、直近に焼いてから REBAKE_MIN_FRAMES 経つまで見送り、古いメッシュを
+        // 描く。
+        // (静止して見えるクロスポイントが再焼きされ続けて重い、を解消)。見た目は最大数フレーム古いだけ。
+        // ★ただしライト変化はこの遅延の対象外にする。
+        // ★再焼き込みの間隔制限は撤去した (本家に無い)。
         boolean needsBake = mustBake || optionalBake;
         if (needsBake) {
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
-                //★スパイク対策: このフレームの焼き込み枠を使い切った → 次フレームへ回す。
+                // ★スパイク対策: このフレームの焼き込み枠を使い切った → 次フレームへ回す。
                 if (mesh != null) {
-                    //再焼き待ち: 古いメッシュをそのまま描く (光/形が最大数フレーム古いだけ・
-                    //不可視にはしない)。needsBake は次フレームも真なので枠が空き次第焼き直る。
+                    // 再焼き待ち: 古いメッシュをそのまま描く (光/形が最大数フレーム古いだけ・
+                    // 不可視にはしない)。needsBake は次フレームも真なので枠が空き次第焼き直る。
                     // (下の描画へフォールスルー)
                 } else {
-                    //初回焼き待ち: まだ焼けていない。逐次描画に落とすと結局スパイクするので、
-                    //ここは「描かない」で次フレームへ回す (数フレームで焼けて出る = 分散)。
-                    //true を返すと呼び出し側は逐次描画フォールバックをしない。
+                    // 初回焼き待ち: まだ焼けていない。
+                    // ここは「描かない」で次フレームへ回す (数フレームで焼けて出る = 分散)。
                     return true;
                 }
             } else {
@@ -182,7 +141,7 @@ public final class RailMeshCache {
                 bakesThisFrame++;
                 mesh = bake(baker, model, packedLight, variant);
                 if (mesh == null) {
-                    //頂点数が上限超え等で焼けなかった → 毎フレーム逐次描画に落ちる (重い)
+                    // 頂点数が上限超え等で焼けなかった → 毎フレーム逐次描画に落ちる (重い)
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
                     return false;
                 }
@@ -192,10 +151,10 @@ public final class RailMeshCache {
         }
 
         for (MeshCapture.Section section : mesh.sections()) {
-            //即時描画はしない。RenderType ごとにまとめて描くためキューへ積む
-            //(GL のステート設定/破棄をレール 1 本ごとに走らせるのが重さの正体だった)。
+            // 即時描画はしない。RenderType ごとにまとめて描くためキューへ積む
+            // (GL のステート設定/破棄をレール 1 本ごとに走らせるのが重さの正体だった)。
             if (!RailDrawQueue.enqueue(section.vbo(), section.renderType(), poseStack)) {
-                //VBO が無効になった → このレールは統合メッシュを諦めて逐次描画に戻す
+                // VBO が無効になった → このレールは統合メッシュを諦めて逐次描画に戻す
                 CACHE.remove(pos);
                 mesh.close();
                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
@@ -209,7 +168,6 @@ public final class RailMeshCache {
     /**
      * 記録済みの描画コマンドを再生し、既存コードが吐いた頂点をそのまま 1 つの VBO に焼く。
      * 単位行列の PoseStack で再生するので、頂点はレール原点 (ブロック隅) 基準になる。
-     * 毎フレームの描画時に本物の pose を掛けるため、結果は逐次描画と数学的に同じ。
      */
     /** 統合メッシュに焼く描画コード。単位行列の PoseStack と捕獲用バッファが渡される。 */
     public interface Baker {
@@ -257,9 +215,7 @@ public final class RailMeshCache {
         }
     }
 
-    /**
-     * ワールドが変わったら全部解放する (VRAM を持ち越さない)。
-     */
+    /** ワールドが変わったら全部解放する (VRAM を持ち越さない)。 */
     private static void dropIfLevelChanged() {
         Level level = Minecraft.getInstance().level;
         if (level != lastLevel) {
@@ -275,9 +231,7 @@ public final class RailMeshCache {
         CACHE.clear();
     }
 
-    /**
-     * レールが壊された / 作り直された時に呼ぶ (VBO を解放する)。
-     */
+    /** レールが壊された / 作り直された時に呼ぶ (VBO を解放する)。 */
     public static void invalidate(BlockPos pos) {
         RailMesh mesh = CACHE.remove(pos);
         if (mesh != null) {

@@ -16,19 +16,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * MCTEUnofficial ({@code com.mattya.mcteunofficial}) のミニチュアを NGTO Builder から使えるようにする
- * <b>ソフト連携</b>ブリッジ。MCTEU には<b>一切コンパイル依存しない</b> (全てリフレクション、未導入なら
+ * MCTEUnofficial (com.mattya.mcteunofficial) のミニチュアを NGTO Builder から使えるようにする
+ * ソフト連携ブリッジ。
  * 無害に no-op で、RTMU 自前ミニチュアにフォールバックする)。
- *
- * <p>NGTO Builder のスクリプトは、手持ちアイテムの NBT に {@code "BlocksData"} (= 原作 MCTE / RTMU 自前
- * ミニチュアの {@link NGTObject} 形式) があるかで判定し、{@code ItemMiniature.getNGTObject()} で中身を取り出す。
- * MCTEU のミニチュアは全く別形式 ({@code MiniatureData}: BlockState ベースのブロックリストを {@code miniatureId}
- * で参照) なので、ここで MCTEU の {@code MiniatureData} を RTMU の {@link NGTObject} NBT ({@code "BlocksData"} を
- * 含む) へ変換して橋渡しする。{@link jp.ngt.mccompat.ItemStackCompat#func_77978_p()} から呼ばれる。
- *
- * <p>データ解決は {@code PlacedMiniatureManager.loadItemData(id)} を使う。これは MCTEU 内部のメモリキャッシュ
- * (サーバー保存 / マルチのクライアント同期の両方が入る) → {@code items/&lt;id&gt;.json} の順で解決するため、
- * サーバー (設置) とクライアント (プレビュー) の両方で機能する。
  */
 public final class McteuMiniatureBridge {
     /** MCTEU のミニチュアアイテムの登録 ID。 */
@@ -48,7 +38,6 @@ public final class McteuMiniatureBridge {
 
     // 変換済み NGTObject NBT を miniatureId でキャッシュ (毎tick の変換を避ける)。
     // MiniatureData のインスタンスが差し替わった (編集/再同期) ときは作り直す = 陳腐化しない。
-    // 各値は Object[]{MiniatureData, CompoundTag}。
     private static final Map<String, Object[]> CACHE = new ConcurrentHashMap<>();
 
     /** この ItemStack が MCTEU のミニチュアアイテムか (登録 ID で判定、MCTEU 未導入でも安全)。 */
@@ -61,9 +50,9 @@ public final class McteuMiniatureBridge {
     }
 
     /**
-     * MCTEU ミニチュアの中身を、NGTO Builder が読める {@link NGTObject} 形式の CompoundTag
-     * ({@code {ObjId,SizeX,SizeY,SizeZ,OrigX/Y/Z,BlocksData:[...]}}) に変換して返す。
-     * MCTEU 未導入 / データ未解決 (マルチで未同期等) / 変換失敗なら {@code null}
+     * MCTEU ミニチュアの中身を、NGTO Builder が読める NGTObject 形式の CompoundTag
+     * ({ObjId,SizeX,SizeY,SizeZ,OrigX/Y/Z,BlocksData:[...]}) に変換して返す。
+     * MCTEU 未導入 / データ未解決 (マルチで未同期等) / 変換失敗なら null
      * (呼び出し側は通常の NBT にフォールバックする)。
      */
     public static CompoundTag getBlocksDataTag(ItemStack stack) {
@@ -97,7 +86,7 @@ public final class McteuMiniatureBridge {
         }
     }
 
-    /** MCTEU の {@code MiniatureData} を RTMU の NGTObject NBT へ変換する。 */
+    /** MCTEU の MiniatureData を RTMU の NGTObject NBT へ変換する。 */
     private static CompoundTag convert(Object miniatureData) throws Exception {
         List<?> blocks = (List<?>) fBlocks.get(miniatureData);
         if (blocks == null || blocks.isEmpty()) {

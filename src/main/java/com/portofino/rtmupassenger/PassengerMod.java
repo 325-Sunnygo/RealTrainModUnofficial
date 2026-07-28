@@ -23,16 +23,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * 乗客シミュレーション (旧・別 jar rtmupassenger を RTMU 本体へ統合したもの)。
- *
- * <p>もう独立した mod ではない。ブロック/アイテム/エンティティは<b>すべて RTMU 本体
- * (realtrainmodunofficial 名前空間)</b> に登録される。本体の起動時に {@link #register(IEventBus)} を
- * 呼ぶことで初期化される。
- *
- * <ul>
- *   <li>駅ブロック: 右クリックで駅名・タグ (住宅街/オフィス街/工業地帯/…) を GUI で設定</li>
- *   <li>乗客: 需要 (時間帯 × タグ) に応じて駅で待ち、停車してドアが開いた列車に自動乗車、目的駅で降車</li>
- *   <li>列車が壊されたら乗車中の乗客は列車ごと消える</li>
- * </ul>
+ * もう独立した mod ではない。
  */
 public final class PassengerMod {
 
@@ -54,7 +45,7 @@ public final class PassengerMod {
     public static final DeferredItem<BlockItem> STATION_ITEM = ITEMS.register(
             "station", () -> new BlockItem(STATION.get(), new Item.Properties()));
 
-    //停止位置目標 (透明・当たり判定なしのマーカー)。乗客がここで列車を待つ。
+    // 停止位置目標 (透明・当たり判定なしのマーカー)。乗客がここで列車を待つ。
     public static final DeferredBlock<com.portofino.rtmupassenger.station.StopTargetBlock> STOP_TARGET = BLOCKS.register(
             "stop_target", () -> new com.portofino.rtmupassenger.station.StopTargetBlock(
                     BlockBehaviour.Properties.of().mapColor(MapColor.NONE).strength(0.5F)
@@ -82,9 +73,8 @@ public final class PassengerMod {
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);
         ENTITIES.register(modEventBus);
-        //★イベント型を明示すること。型消去でメソッド参照からは引数の型が取れないので、
-        //  型を渡さない形は Fabric 側のバスで受け取れない (起動時に落ちる)。
-        //  この形は NeoForge でも同じように使えるので、両方でこう書く。
+        // ★イベント型を明示すること。
+        // 型を渡さない形は Fabric 側のバスで受け取れない (起動時に落ちる)。
         modEventBus.addListener(EntityAttributeCreationEvent.class, PassengerMod::registerAttributes);
     }
 

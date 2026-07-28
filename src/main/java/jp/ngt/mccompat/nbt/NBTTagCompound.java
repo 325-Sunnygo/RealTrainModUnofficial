@@ -2,9 +2,7 @@ package jp.ngt.mccompat.nbt;
 
 import net.minecraft.nbt.CompoundTag;
 
-/**
- * 1.7.10/1.12 NBTTagCompound のスクリプト互換ラッパー (SRG メソッド名)。
- */
+/** 1.7.10/1.12 NBTTagCompound のスクリプト互換ラッパー (SRG メソッド名)。 */
 public final class NBTTagCompound {
     public final CompoundTag tag;
 

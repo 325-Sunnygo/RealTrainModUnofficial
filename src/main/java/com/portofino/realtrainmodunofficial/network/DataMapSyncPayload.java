@@ -15,8 +15,6 @@ import java.util.Map;
 /**
  * EntityVehicleBase (本家系列車/車両) の DataMap 同期 (server → client)。
  * flag=1 で書かれたエントリを EntityTrainBase が定期配信する。
- * 値は型プレフィクス付き文字列 ("I:5" / "D:1.5" / "B:true" / "S:xxx")。
- * ATSA の HUD (ATSAssist_HUD) や表示系スクリプトがサーバー側の値を読むために必要。
  */
 public record DataMapSyncPayload(int entityId, Map<String, String> data) implements CustomPacketPayload {
 

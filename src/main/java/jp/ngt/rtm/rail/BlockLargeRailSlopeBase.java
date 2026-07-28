@@ -53,7 +53,7 @@ public class BlockLargeRailSlopeBase extends BlockLargeRailBase {
 
     @Override
     protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        //本家 getCollisionBoundingBoxFromPool: 高さ = metadata * 0.0625
+        // 本家 getCollisionBoundingBoxFromPool: 高さ = metadata * 0.0625
         int l = state.getValue(HEIGHT);
         float f = l * 0.0625F;
         if (f <= 0.0F) {

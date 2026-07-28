@@ -2,9 +2,7 @@ package jp.ngt.rtm.entity.train.util;
 
 import java.util.Arrays;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.util.TrainState の忠実移植。
- */
+/** 本家 jp.ngt.rtm.entity.train.util.TrainState の忠実移植。 */
 public enum TrainState {
     Door_Close(TrainStateType.State_Door.id, 0, "close"),
     Door_OpenRight(TrainStateType.State_Door.id, 1, "open_right"),
@@ -60,9 +58,7 @@ public enum TrainState {
         State_ChunkLoader(7, "chunk_loader", 0, 8),
         State_Destination(8, "destination", 0, 127),
         State_Announcement(9, "announcement", 0, 127),
-        /**
-         * 編成内の位置(前,中,後)
-         */
+        /** 編成内の位置(前,中,後) */
         State_Direction(10, "direction", 0, 2),
         State_InteriorLight(11, "interior_light", 0, 2),
         /**
@@ -84,15 +80,8 @@ public enum TrainState {
         }
 
         // ---- 本家スクリプト互換のエイリアス ----
-        //
         // 本家のレンダースクリプトは TrainState.TrainStateType.Door のように「本家の定数名」で書く。
-        // RTMU は定数名に State_ を付けているため、そのままだとスクリプトからは undefined になり、
-        // 呼んだ瞬間に TypeError で落ちる (RTM 標準の Render223.js は 1 行目でこれを踏み、
-        // 223 系の車体が丸ごと透明になっていた)。
-        //
-        // ID は本家と同一なので、本家名の別名を張るだけで互換になる。
         // ★注意: 本家 Direction は id 0 (編成の進行方向)、本家 Role は id 10 (編成内の位置)。
-        //   RTMU の State_Direction は id 10 = 本家 Role にあたる。取り違えないこと。
         public static final TrainStateType Direction = State_TrainDir;
         public static final TrainStateType Notch = State_Notch;
         public static final TrainStateType Signal = State_Signal;

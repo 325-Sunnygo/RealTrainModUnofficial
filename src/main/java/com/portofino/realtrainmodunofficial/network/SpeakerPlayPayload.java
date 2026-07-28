@@ -11,8 +11,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * スピーカーがレッドストーン信号を受けて鳴るとき、サーバーが範囲内プレイヤーへ送る再生パケット。
- * クライアントは指定座標で {@code soundId} を再生する。
- * volume は可聴範囲(ブロック)から算出済みの値（MC の LINEAR 減衰は概ね volume×16 ブロック）。
+ * クライアントは指定座標で soundId を再生する。
  */
 public record SpeakerPlayPayload(double x, double y, double z, String soundId, float volume, float pitch)
         implements CustomPacketPayload {

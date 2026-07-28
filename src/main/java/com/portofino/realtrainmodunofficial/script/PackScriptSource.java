@@ -13,7 +13,6 @@ import java.util.regex.Pattern;
 /**
  * パックスクリプトの共通前処理 (クライアント/サーバー両用)。
  * //include 解決・文字コード判定・旧 FQN の互換リマップ・プリリュード。
- * VehicleScriptRenderers (クライアント描画) と CarServerScripts (サーバー) が共用する。
  */
 public final class PackScriptSource {
 
@@ -23,43 +22,42 @@ public final class PackScriptSource {
      */
     /**
      * GL 束縛だけを分離したもの。
-     * <p>モデル添付の描画スクリプト経路 ({@code TrainScriptSystem.loadScript}) は GL 呼び出しを
-     * {@code ScriptModelRenderer} の OpList に記録するため、GL11 は専用のシムを put 済みで、
-     * ここで上書きしてはいけない。そのため GL 以外の束縛を {@link #PRELUDE_NO_GL} として切り出す。
+     * モデル添付の描画スクリプト経路 (TrainScriptSystem.loadScript) は GL 呼び出しを
+     * ScriptModelRenderer の OpList に記録するため、GL11 は専用のシムを put 済みで、
+     * ここで上書きしてはいけない。そのため GL 以外の束縛を #PRELUDE_NO_GL として切り出す。
      */
     public static final String PRELUDE_GL =
             "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n" +
             "var GL12 = GL11;\n" +
-            //LWJGL2 の BufferUtils / 1.12 の OpenGlHelper (NGTO Builder 2 が行列バッファと
-            //ブレンド指定に使う)。未定義だとそこでスクリプトが止まる。
+            // LWJGL2 の BufferUtils / 1.12 の OpenGlHelper (NGTO Builder 2 が行列バッファと
+            // ブレンド指定に使う)。未定義だとそこでスクリプトが止まる。
             "var BufferUtils = Java.type('jp.ngt.ngtlib.renderer.BufferUtilsCompat');\n" +
             "var OpenGlHelper = Java.type('jp.ngt.ngtlib.renderer.OpenGlHelperCompat');\n"
-            //Parts も描画機構に依存する。実 jp.ngt.rtm.render.Parts は GLRecorder へ描くので、
-            //OpList 経路 (ScriptModelRenderer) が自前で用意した renderer 対応の Parts を
-            //上書きしてはいけない (上書きすると parts.render() が全て空振りする)。
+            // Parts も描画機構に依存する。実 jp.ngt.rtm.render.Parts は GLRecorder へ描くので、
+            // OpList 経路 (ScriptModelRenderer) が自前で用意した renderer 対応の Parts を
+            // 上書きしてはいけない (上書きすると parts.render が全て空振りする)。
             + bindOpt("Parts", "jp.ngt.rtm.render.Parts")
             + bindOpt("ActionParts", "jp.ngt.rtm.render.ActionParts");
 
     public static final String PRELUDE_NO_GL =
-            //rtm-ts の Multi-target 構成対策。base スクリプトは
-            //  var RTMX_COMPAT_TARGETS = RTMX_COMPAT_TARGETS || {};
-            //を先頭に置き、その後の loader 内で各ターゲット (kaizpatch/mc1710/mc1122) の
-            //IIFE が RTMX_COMPAT_TARGETS.<target> = ... を代入する設計。ところが resolveIncludes は
-            ////include 展開結果を「includes + source」で<b>先頭に prepend</b> するため、ターゲット IIFE が
-            //base の var 宣言より前で走り、RTMX_COMPAT_TARGETS が (巻き上げで) undefined のまま
-            //"Cannot read property \"kaizpatch\" from undefined" で全スクリプトが init 失敗していた。
-            //ここで最初に {} を確定させておけば、prepend された IIFE も安全に代入できる。
+            // rtm-ts の Multi-target 構成対策。
+            // var RTMX_COMPAT_TARGETS = RTMX_COMPAT_TARGETS || {};
+            // を先頭に置き、その後の loader 内で各ターゲット (kaizpatch/mc1710/mc1122) の
+            // IIFE が RTMX_COMPAT_TARGETS.<target> = ... を代入する設計。
             "var RTMX_COMPAT_TARGETS = (typeof RTMX_COMPAT_TARGETS !== 'undefined' && RTMX_COMPAT_TARGETS) ? RTMX_COMPAT_TARGETS : {};\n" +
             "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n" +
-            //importPackage(net.minecraft.util) 経由の裸 ResourceLocation を互換クラスへ束縛
-            //(net.minecraft.util に実クラスを置くとバニラと split package でモジュール解決が落ちる)
+            // importPackage(net.minecraft.util) 経由の裸 ResourceLocation を互換クラスへ束縛
+            // (net.minecraft.util に実クラスを置くとバニラと split package でモジュール解決が落ちる)
             "var ResourceLocation = Java.type('jp.ngt.mccompat.ResourceLocation');\n" +
-            //LWJGL2 入力 (SRB3/NGTO Builder)
+            // importPackage(net.minecraft.client) 経由の裸 Minecraft も同じ理由で束縛する。
+            // ★配布版は intermediary 名で動くのでパッケージ取り込み自体が効かない。
+            "var Minecraft = Java.type('jp.ngt.mccompat.Minecraft');\n" +
+            // LWJGL2 入力 (SRB3/NGTO Builder)
             "var Keyboard = Java.type('jp.ngt.mccompat.input.Keyboard');\n" +
             "var Mouse = Java.type('jp.ngt.mccompat.input.Mouse');\n" +
-            //1.7.10 net.minecraft.init.Blocks
+            // 1.7.10 net.minecraft.init.Blocks
             "var Blocks = Java.type('jp.ngt.mccompat.init.Blocks');\n" +
-            //1.7.10 ブロッククラス名 → 1.21 実クラス (instanceof 用)
+            // 1.7.10 ブロッククラス名 → 1.21 実クラス (instanceof 用)
             "var BlockStairs = Java.type('" + net.minecraft.world.level.block.StairBlock.class.getName() + "');\n" +
             "var BlockDoor = Java.type('" + net.minecraft.world.level.block.DoorBlock.class.getName() + "');\n" +
             "var BlockFenceGate = Java.type('" + net.minecraft.world.level.block.FenceGateBlock.class.getName() + "');\n" +
@@ -71,16 +69,16 @@ public final class PackScriptSource {
             "var BlockSlab = Java.type('" + net.minecraft.world.level.block.SlabBlock.class.getName() + "');\n" +
             "var Block = Java.type('" + net.minecraft.world.level.block.Block.class.getName() + "');\n" +
             "var ITileEntityProvider = Java.type('" + net.minecraft.world.level.block.EntityBlock.class.getName() + "');\n" +
-            //1.7.10 TextureMap (ブロックアトラス)。NGTO Builder のプレビューが field_110575_b を参照
+            // 1.7.10 TextureMap (ブロックアトラス)。NGTO Builder のプレビューが field_110575_b を参照
             "var TextureMap = Java.type('jp.ngt.mccompat.TextureMap');\n" +
             "var ItemBlock = Java.type('" + net.minecraft.world.item.BlockItem.class.getName() + "');\n" +
-            //1.7.10 NBT
+            // 1.7.10 NBT
             "var NBTTagCompound = Java.type('jp.ngt.mccompat.nbt.NBTTagCompound');\n" +
             "var NBTTagList = Java.type('jp.ngt.mccompat.nbt.NBTTagList');\n" +
-            //jp.ngt 系の確定バインド — importPackage 経由の遅延解決が実行時に
-            //"is not defined" になるケース (SRB3 の RTMItem 等) があるため、
-            //スクリプトが未修飾名で使うクラスはここで直接束縛する。
-            //(存在しないクラスでエンジンごと死なないよう個別 try)
+            // jp.ngt 系の確定バインド — importPackage 経由の遅延解決が実行時に
+            // "is not defined" になるケース (SRB3 の RTMItem 等) があるため、
+            // スクリプトが未修飾名で使うクラスはここで直接束縛する。
+            // (存在しないクラスでエンジンごと死なないよう個別 try)
             bindOpt("RTMCore", "jp.ngt.rtm.RTMCore") +
             bindOpt("RTMItem", "jp.ngt.rtm.RTMItem") +
             bindOpt("RTMBlock", "jp.ngt.rtm.RTMBlock") +
@@ -93,12 +91,12 @@ public final class PackScriptSource {
             bindOpt("TileEntityLargeRailBase", "jp.ngt.rtm.rail.TileEntityLargeRailBase") +
             bindOpt("TileEntityLargeRailCore", "jp.ngt.rtm.rail.TileEntityLargeRailCore") +
             bindOpt("NGTLog", "jp.ngt.ngtlib.io.NGTLog") +
-            //SL パックが蒸気/煙で使う (importPackage は no-op なので未修飾名を直接束縛)
+            // SL パックが蒸気/煙で使う (importPackage は no-op なので未修飾名を直接束縛)
             bindOpt("EnumParticleTypes", "jp.ngt.mccompat.EnumParticleTypes") +
             bindOpt("NGTMath", "jp.ngt.ngtlib.math.NGTMath") +
             bindOpt("Vec3", "jp.ngt.ngtlib.math.Vec3") +
-            //本家 RenderMotor / RenderClutch / RenderReversGear が
-            //renderer.getRotation(entity, Axis.POSITIVE_Y) で使う。
+            // 本家 RenderMotor / RenderClutch / RenderReversGear が
+            // renderer.getRotation(entity, Axis.POSITIVE_Y) で使う。
             bindOpt("Axis", "jp.ngt.ngtlib.math.Axis") +
             bindOpt("NGTUtil", "jp.ngt.ngtlib.util.NGTUtil") +
             bindOpt("NGTUtilClient", "jp.ngt.ngtlib.util.NGTUtilClient") +
@@ -114,7 +112,7 @@ public final class PackScriptSource {
             bindOpt("NGTObjectRenderer", "jp.ngt.ngtlib.renderer.NGTObjectRenderer") +
             bindOpt("MCTE", "jp.ngt.mcte.MCTE") +
             bindOpt("ItemMiniature", "jp.ngt.mcte.item.ItemMiniature") +
-            //車両/レール描画スクリプトが直接 new する描画クラス
+            // 車両/レール描画スクリプトが直接 new する描画クラス
             bindOpt("ActionType", "jp.ngt.rtm.render.ActionType") +
             bindOpt("ModelObject", "jp.ngt.rtm.render.ModelObject") +
             bindOpt("PartsRenderer", "jp.ngt.rtm.render.PartsRenderer") +
@@ -127,7 +125,7 @@ public final class PackScriptSource {
             bindOpt("TileEntityPartsRenderer", "jp.ngt.rtm.render.TileEntityPartsRenderer") +
             bindOpt("EntityPartsRenderer", "jp.ngt.rtm.render.EntityPartsRenderer") +
             bindOpt("RenderPass", "jp.ngt.rtm.render.RenderPass") +
-            //状態・設定 (スクリプトが最も多く触る)
+            // 状態・設定 (スクリプトが最も多く触る)
             bindOpt("ResourceState", "jp.ngt.rtm.modelpack.state.ResourceState") +
             bindOpt("DataMap", "jp.ngt.rtm.modelpack.state.DataMap") +
             bindOpt("TrainState", "jp.ngt.rtm.entity.train.util.TrainState") +
@@ -135,7 +133,7 @@ public final class PackScriptSource {
             bindOpt("ModelPackManager", "jp.ngt.rtm.modelpack.ModelPackManager") +
             bindOpt("Formation", "jp.ngt.rtm.entity.train.util.Formation") +
             bindOpt("EnumNotch", "jp.ngt.rtm.entity.train.util.EnumNotch") +
-            //レール
+            // レール
             bindOpt("Point", "jp.ngt.rtm.rail.util.Point") +
             bindOpt("RailMap", "jp.ngt.rtm.rail.util.RailMap") +
             bindOpt("RailProperty", "jp.ngt.rtm.rail.util.RailProperty") +
@@ -143,7 +141,7 @@ public final class PackScriptSource {
             bindOpt("MarkerState", "jp.ngt.rtm.rail.util.MarkerState") +
             bindOpt("TileEntityLargeRailSwitchCore", "jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore") +
             bindOpt("TileEntityMarker", "jp.ngt.rtm.rail.TileEntityMarker") +
-            //モデル (頂点操作をするスクリプト用)
+            // モデル (頂点操作をするスクリプト用)
             bindOpt("NGTTessellator", "jp.ngt.ngtlib.renderer.NGTTessellator") +
             bindOpt("ModelLoader", "jp.ngt.ngtlib.renderer.model.ModelLoader") +
             bindOpt("VecAccuracy", "jp.ngt.ngtlib.renderer.model.VecAccuracy") +
@@ -154,20 +152,20 @@ public final class PackScriptSource {
             bindOpt("TextureSet", "jp.ngt.ngtlib.renderer.model.TextureSet") +
             bindOpt("Material", "jp.ngt.ngtlib.renderer.model.Material") +
             bindOpt("PolygonModel", "jp.ngt.ngtlib.renderer.model.PolygonModel") +
-            //IO・ワールド
+            // IO・ワールド
             bindOpt("NGTText", "jp.ngt.ngtlib.io.NGTText") +
             bindOpt("NGTFileLoader", "jp.ngt.ngtlib.io.NGTFileLoader") +
             bindOpt("ScriptUtil", "jp.ngt.ngtlib.io.ScriptUtil") +
             bindOpt("NGTWorld", "jp.ngt.ngtlib.world.NGTWorld") +
             bindOpt("TileEntityPlaceable", "jp.ngt.ngtlib.block.TileEntityPlaceable") +
-            //電気
+            // 電気
             bindOpt("Connection", "jp.ngt.rtm.electric.Connection") +
             bindOpt("WireManager", "jp.ngt.rtm.electric.WireManager") +
             bindOpt("SignalLevel", "jp.ngt.rtm.electric.SignalLevel") +
             bindOpt("BlockInsulator", "jp.ngt.rtm.electric.BlockInsulator") +
             bindOpt("TileEntityInsulator", "jp.ngt.rtm.electric.TileEntityInsulator") +
             bindOpt("TileEntityConnectorBase", "jp.ngt.rtm.electric.TileEntityConnectorBase") +
-            //エンティティ・アイテム
+            // エンティティ・アイテム
             bindOpt("EntityVehicleBase", "jp.ngt.rtm.entity.vehicle.EntityVehicleBase") +
             bindOpt("EntityTrainBase", "jp.ngt.rtm.entity.train.EntityTrainBase") +
             bindOpt("EntityBogie", "jp.ngt.rtm.entity.train.EntityBogie") +
@@ -175,7 +173,7 @@ public final class PackScriptSource {
             bindOpt("ItemInstalledObject", "jp.ngt.rtm.item.ItemInstalledObject") +
             bindOpt("RTMResource", "jp.ngt.rtm.RTMResource") +
             bindOpt("EntityVehiclePart", "jp.ngt.rtm.entity.train.parts.EntityVehiclePart") +
-            //1.7.10 のバニラクラス名 (スクリプトが instanceof で使う)
+            // 1.7.10 のバニラクラス名 (スクリプトが instanceof で使う)
             bindOpt("Entity", net.minecraft.world.entity.Entity.class) +
             bindOpt("EntityPlayer", net.minecraft.world.entity.player.Player.class) +
             bindOpt("EntityLivingBase", net.minecraft.world.entity.LivingEntity.class) +
@@ -183,17 +181,14 @@ public final class PackScriptSource {
             bindOpt("ItemStack", net.minecraft.world.item.ItemStack.class) +
             bindOpt("Item", net.minecraft.world.item.Item.class) +
             bindOpt("TileEntity", net.minecraft.world.level.block.entity.BlockEntity.class) +
-            //1.12 Forge の mod 存在チェック (rtm-ts の mc1122 ターゲットが class body で呼ぶ)
+            // 1.12 Forge の mod 存在チェック (rtm-ts の mc1122 ターゲットが class body で呼ぶ)
             bindOpt("Loader", "net.minecraftforge.fml.common.Loader");
 
     /** GL 束縛込みの完全版 (描画を GLRecorder に記録する通常経路用)。 */
     /**
      * ES6 以降の組み込み関数の補完。
-     *
-     * <p>Nashorn は構文としては ES6 まで見るが、<b>標準ライブラリは ES5 のまま</b>で
-     * {@code Object.assign} や {@code Array.from} すら無い (実測)。
-     * TypeScript を書く人はまず使うので、無いものだけをここで足す。
-     * <b>既にあるものは触らない</b>ので、従来の {@code .js} パックの挙動は変わらない。
+     * Nashorn は構文としては ES6 まで見るが、標準ライブラリは ES5 のままで
+     * Object.assign や Array.from すら無い (実測)。
      */
     public static final String POLYFILL =
         "if (!Object.assign) Object.assign = function (t) { for (var i = 1; i < arguments.length; i++) "
@@ -238,23 +233,15 @@ public final class PackScriptSource {
     public static final String PRELUDE = PRELUDE_GL + PRELUDE_NO_GL + POLYFILL;
 
     /**
-     * ★<b>バニラのクラスはこちら (class リテラル版) を使うこと。</b>
-     *
-     * <p>クラス名を文字列で書くと、<b>Fabric の配布版では見つからない</b>。
-     * 配布版は intermediary 名 (class_2248 等) で動いており、
-     * ソース中の文字列は remap されないため。開発環境は mojmap なので<b>そこでは動いてしまい</b>、
-     * 配布して初めて「スクリプトが全部効かない」で気付くことになる (実際に踏んだ)。
-     *
-     * <p>class リテラルはビルド時に remap されるので、{@code getName()} は
-     * <b>その環境で実際に使われている名前</b>を返す。NeoForge (mojmap) でも同じ値になるので、
-     * 両版で同じコードのまま使える。
+     * ★バニラのクラスはこちら (class リテラル版) を使うこと。
+     * クラス名を文字列で書くと、Fabric の配布版では見つからない。
      */
     private static String bindOpt(String name, Class<?> type) {
         return bindOpt(name, type.getName());
     }
 
     private static String bindOpt(String name, String fqn) {
-        //失敗したクラス名は __bindFails に集約 (ScriptUtil.doScript がログに出す)
+        // 失敗したクラス名は __bindFails に集約 (ScriptUtil.doScript がログに出す)
         return "try { var " + name + " = Java.type('" + fqn + "'); } catch (__e) { "
                 + "if (typeof __bindFails === 'undefined') { __bindFails = ''; } "
                 + "__bindFails += '" + name + " '; }\n";
@@ -263,9 +250,9 @@ public final class PackScriptSource {
     private static final Pattern INCLUDE_PATTERN = Pattern.compile("^\\s*//include\\s*<([^>]+)>", Pattern.MULTILINE);
 
     private static final String[][] FQN_REMAP = {
-            //LWJGL直束縛 (var GL11 = Packages.org.lwjgl.opengl.GL11 等) を互換クラスへ。
-            //LWJGL3の実GL11に解決されると、固定機能関数(glPushMatrix等)は関数ポインタNULLで
-            //jni_FatalError→プロセスabort (SR1-200が設置直後に落ちていた原因)。
+            // LWJGL直束縛 (var GL11 = Packages.org.lwjgl.opengl.GL11 等) を互換クラスへ。
+            // LWJGL3の実GL11に解決されると、固定機能関数(glPushMatrix等)は関数ポインタNULLで
+            // jni_FatalError→プロセスabort (200が設置直後に落ちていた原因)。
             {"Packages.org.lwjgl.opengl.GL11", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
             {"Packages.org.lwjgl.opengl.GL12", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
             {"Packages.org.lwjgl.BufferUtils", "Packages.jp.ngt.ngtlib.renderer.BufferUtilsCompat"},
@@ -277,15 +264,13 @@ public final class PackScriptSource {
             {"Packages.net.minecraft.client.renderer.texture.DynamicTexture", "Packages.jp.ngt.mccompat.DynamicTexture"},
             {"Packages.net.minecraft.client.Minecraft", "Packages.jp.ngt.mccompat.Minecraft"},
             {"Packages.net.minecraft.util.math.BlockPos", "Packages." + net.minecraft.core.BlockPos.class.getName()},
-            // NGTO Builder が hasTileEntity() で使う: 1.7.10 ITileEntityProvider = 1.21 EntityBlock
+            // NGTO Builder が hasTileEntity で使う: 1.7.10 ITileEntityProvider = 1.21 EntityBlock
             // (BE を持つブロックのマーカーインタフェース)。未対応だと設置経路で instanceof が落ちる。
             {"Packages.net.minecraft.block.ITileEntityProvider", "Packages." + net.minecraft.world.level.block.EntityBlock.class.getName()},
-            //★1.7.10 のバニラ FQN。変換表に無いと Packages.<FQN> が何にも解決されず、
-            //  instanceof の右辺に渡った瞬間に
-            //  "instanceof must be called with a javascript or java object" で
-            //  スクリプトが停止する (NGTOBuilder2 のビーム設置が動かなかった原因)。
-            //  <b>長い名前から先に置換すること</b> (BlockLadder を Block より後に置くと
-            //  "LadderBlockLadder" のような壊れた名前になる)。
+            // ★1.7.10 のバニラ FQN。
+            // instanceof の右辺に渡った瞬間に
+            // "instanceof must be called with a javascript or java object" で
+            // スクリプトが停止する (NGTOBuilder2 のビーム設置が動かなかった原因)。
             {"Packages.net.minecraft.block.BlockFenceGate", "Packages." + net.minecraft.world.level.block.FenceGateBlock.class.getName()},
             {"Packages.net.minecraft.block.BlockLadder", "Packages." + net.minecraft.world.level.block.LadderBlock.class.getName()},
             {"Packages.net.minecraft.block.BlockButton", "Packages." + net.minecraft.world.level.block.ButtonBlock.class.getName()},
@@ -303,11 +288,9 @@ public final class PackScriptSource {
     };
 
     /**
-     * {@code Packages.net.minecraft.block.Block} (裸の Block 型)。
-     * <p>上の FQN_REMAP は単純な {@code String.replace} なので、ここに素の {@code Block} を
-     * 並べると未収録の {@code BlockXxx} まで前方一致で壊す。そのため<b>表の全置換が終わった後</b>に、
-     * 後ろに識別子文字が続かない場合だけ置換する。
-     * <pre>NGTO Builder.zip!.../Liner/render_Liner.js  instanceof Packages.net.minecraft.block.Block</pre>
+     * Packages.net.minecraft.block.Block (裸の Block 型)。
+     * 上の FQN_REMAP は単純な String.replace なので、ここに素の Block を
+     * 並べると未収録の BlockXxx まで前方一致で壊す。
      */
     private static final Pattern BARE_VANILLA_BLOCK =
         Pattern.compile("Packages\\.net\\.minecraft\\.block\\.Block(?![A-Za-z0-9_$])");
@@ -330,18 +313,16 @@ public final class PackScriptSource {
     private PackScriptSource() {
     }
 
+    /** include 解決 + 互換リマップ済みのソースを返す (プリリュードは含まない)。 */
     /**
-     * include 解決 + 互換リマップ済みのソースを返す (プリリュードは含まない)。
-     */
-    /**
-     * {@code .seatRotation} を {@code .getSeatRotationRaw()} に置き換えるためのパターン。
-     * {@code .getSeatRotation()} には (直前が "get" なので) マッチしない。
+     * .seatRotation を .getSeatRotationRaw に置き換えるためのパターン。
+     * .getSeatRotation には (直前が "get" なので) マッチしない。
      */
     private static final Pattern SEAT_ROTATION_FIELD = Pattern.compile("\\.seatRotation\\b(?!\\s*\\()");
 
     /**
-     * {@code var X = X;} (FQN リマップの結果生じる自己代入宣言)。
-     * <p>var は巻き上げられるので、宣言の時点でグローバル X が undefined に潰れ、
+     * var X = X; (FQN リマップの結果生じる自己代入宣言)。
+     * var は巻き上げられるので、宣言の時点でグローバル X が undefined に潰れ、
      * PRELUDE で束縛したクラスが見えなくなる。宣言ごと消すのが正しい。
      */
     private static final Pattern SELF_ASSIGN_DECL =
@@ -353,10 +334,8 @@ public final class PackScriptSource {
 
     /**
      * スクリプトを実行できる形にする。
-     *
-     * @param path 元のファイルのパス。<b>{@code .ts} のときだけ</b> TypeScript として
-     *             型を取り除き、{@code class} を ES5 化する。{@code null} や {@code .js} なら
-     *             従来どおり<b>一切変換しない</b>ので、既存パックへの影響はゼロ。
+     * 型を取り除き、class を ES5 化する。
+     * @param path 元のファイルのパス。.ts のときだけ TypeScript として
      */
     public static String prepare(String source, String path) {
         if (TypeScriptTranspiler.isTypeScript(path)) {
@@ -375,12 +354,10 @@ public final class PackScriptSource {
     }
 
     /**
-     * レシーバが<b>バニラのインスタンス</b>で、シムで包むことも継承することもできない
+     * レシーバがバニラのインスタンスで、シムで包むことも継承することもできない
      * MCP 名メソッドを、静的ヘルパー呼び出しへ書き換える。
-     *
-     * <p>{@code blockSet.block.func_149716_u()} の {@code block} は
-     * {@code jp.ngt.ngtlib.block.BlockSet} のフィールドで型はバニラの {@code Block}。
-     * 型を変えると RTMU 側 30 箇所超に波及するため、ここで呼び出し形を変える。
+     * blockSet.block.func_149716_u の block は
+     * jp.ngt.ngtlib.block.BlockSet のフィールドで型はバニラの Block。
      */
     private static String remapVanillaOnlyMethods(String source) {
         String out = VANILLA_HAS_TILE_ENTITY.matcher(source)
@@ -404,70 +381,57 @@ public final class PackScriptSource {
         return out;
     }
 
-    /** {@code <式>.func_177967_a(facing, n)} = BlockPos.offset。BlockPos は実バニラ型で拡張できない。 */
+    /** <式>.func_177967_a(facing, n) = BlockPos.offset。BlockPos は実バニラ型で拡張できない。 */
     private static final Pattern VANILLA_BLOCKPOS_OFFSET =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_177967_a\\(([^()]*)\\)");
 
-    /** {@code <式>.func_176745_a()} = EnumFacing.getIndex。 */
+    /** <式>.func_176745_a = EnumFacing.getIndex。 */
     private static final Pattern VANILLA_FACING_INDEX =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_176745_a\\(\\)");
 
-    /** {@code <式>.func_179223_d()} = ItemBlock.getBlock。 */
+    /** <式>.func_173_d = ItemBlock.getBlock。 */
     private static final Pattern VANILLA_ITEMBLOCK_GET_BLOCK =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_179223_d\\(\\)");
 
-    /** {@code <式>.func_174878_a(pos)} = TileEntity.setPos。 */
+    /** <式>.func_174878_a(pos) = TileEntity.setPos。 */
     private static final Pattern VANILLA_TILE_SET_POS =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_174878_a\\(([^()]*(?:\\([^()]*\\))?[^()]*)\\)");
 
-    /** {@code <式>.func_145839_a(nbt)} = TileEntity.readFromNBT。 */
+    /** <式>.func_145839_a(nbt) = TileEntity.readFromNBT。 */
     private static final Pattern VANILLA_TILE_READ_NBT =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_145839_a\\(([^()]*)\\)");
 
-    /** {@code <式>.func_145841_b(nbt)} / {@code func_189515_b} = TileEntity.writeToNBT。 */
+    /** <式>.func_145841_b(nbt) / func_189515_b = TileEntity.writeToNBT。 */
     private static final Pattern VANILLA_TILE_WRITE_NBT =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_(?:145841_b|189515_b)\\(([^()]*)\\)");
 
-    /** {@code <式>.func_110124_au()} = Entity.getUniqueID。 */
+    /** <式>.func_110124_au = Entity.getUniqueID。 */
     private static final Pattern VANILLA_ENTITY_UUID =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_110124_au\\(\\)");
 
-    /** {@code <式>.func_71053_j()} = EntityPlayer.closeScreen。 */
+    /** <式>.func_71053_j = EntityPlayer.closeScreen。 */
     private static final Pattern VANILLA_CLOSE_SCREEN =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_71053_j\\(\\)");
 
-    /** {@code <式>.func_149716_u()} = Block.hasTileEntity。 */
+    /** <式>.func_149716_u = Block.hasTileEntity。 */
     private static final Pattern VANILLA_HAS_TILE_ENTITY =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_149716_u\\(\\)");
 
     /**
      * Nashorn の「フィールドより getter を優先する」仕様を回避するための書き換え。
-     * <p>
-     * 本家 EntityVehicleBase は {@code public int seatRotation} と
-     * {@code float getSeatRotation()} (= seatRotation / 45) の<b>両方</b>を持つ。
-     * 実際のパック (小田急 30000 形 / E259 / E257-500 等) は生の値が要るので
-     * {@code entity.seatRotation / 45} と書き、RTM 標準の Render223.js は
-     * {@code entity.getSeatRotation() * 15} と書く。
-     * <p>
-     * ところが Nashorn (Dynalink) はプロパティ解決で getter を優先するため、
-     * {@code getSeatRotation()} を定義した瞬間に {@code entity.seatRotation} まで
-     * getter を返すようになり、パック側で 45 が二重に効いて座席が動かなくなる。
-     * <p>
-     * そこでスクリプト中の {@code .seatRotation} だけを {@code .getSeatRotationRaw()} に
-     * 書き換える。これで「フィールド参照は生の値」「getSeatRotation() は本家どおり」の
-     * 両方が成立する。
+     * 本家 EntityVehicleBase は public int seatRotation と
+     * float getSeatRotation (= seatRotation / 45) の両方を持つ。
      */
     public static String remapFieldAccess(String source) {
         String out = SEAT_ROTATION_FIELD.matcher(source).replaceAll(".getSeatRotationRaw()");
-        //tileEntity.field_145850_b = TileEntity.worldObj。レシーバがバニラ BlockEntity で
-        //フィールドを足せないため、静的ヘルパーへ回す。
-        //  NGTO Builder.zip!.../Wire/server_Wire.js:209  tileEntity.field_145850_b
+        // tileEntity.field_145850_b = TileEntity.worldObj。
+        // フィールドを足せないため、静的ヘルパーへ回す。
         out = TILE_WORLD_FIELD.matcher(out)
             .replaceAll("Packages.jp.ngt.mccompat.tileentity.TileEntityCompat.field_145850_b($1)");
         return out;
     }
 
-    /** {@code <式>.field_145850_b} = TileEntity.worldObj。 */
+    /** <式>.field_145850_b = TileEntity.worldObj。 */
     private static final Pattern TILE_WORLD_FIELD =
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.field_145850_b\\b(?!\\s*\\()");
 
@@ -476,26 +440,25 @@ public final class PackScriptSource {
         for (String[] pair : FQN_REMAP) {
             out = out.replace(pair[0], pair[1]);
         }
-        //Packages.net.minecraft.block.Block.func_xxx → 互換 static (先に FQN を素の形に落とす)
+        // Packages.net.minecraft.block.Block.func_xxx → 互換 static (先に FQN を素の形に落とす)
         out = out.replace("Packages.net.minecraft.block.Block.", "Block.");
-        //ItemBlock.field_150939_a (内包する Block)。1.21 の BlockItem に SRG フィールドは無いが
-        //ランタイムは mojmap なので getBlock() がそのまま呼べる。NGTO Builder のマスク機能が使う。
+        // ItemBlock.field_150939_a (内包する Block)。1.21 の BlockItem に SRG フィールドは無いが
+        // ランタイムは mojmap なので getBlock がそのまま呼べる。NGTO Builder のマスク機能が使う。
         out = out.replace(".field_150939_a", ".getBlock()");
-        //NGTO Builder の hasTileEntity() は 1.12 idiom: block.hasTileEntity(block.func_176203_a(meta))。
-        //1.21 の Block にこれらメソッドは無く、毎ブロック TypeError→catch で大量ログになる。1.21 では
-        //直前の instanceof EntityBlock (ITileEntityProvider) が BE 判定の正解なので、フォールバックは false に落とす。
+        // NGTO Builder の hasTileEntity は 1.12 idiom: block.hasTileEntity(block.func_176203_a(meta))。
+        // 1.21 の Block にこれらメソッドは無く、毎ブロック TypeError→catch で大量ログになる。
         out = out.replace("block.hasTileEntity(block.func_176203_a(blockSet.metadata))", "false");
         out = out.replace("block.hasTileEntity(blockSet.metadata)", "false");
         for (int i = 0; i < BLOCK_STATIC_PATTERNS.length; i++) {
             out = BLOCK_STATIC_PATTERNS[i].matcher(out).replaceAll(
                     Matcher.quoteReplacement(BLOCK_STATIC_REPLACEMENTS[i]));
         }
-        //残った素の Block 型 (instanceof の右辺など)。静的アクセス形は上で "Block." に落ちているので、
-        //ここに来るのは型として使われているものだけ。
+        // 残った素の Block 型 (instanceof の右辺など)。静的アクセス形は上で "Block." に落ちているので、
+        // ここに来るのは型として使われているものだけ。
         out = BARE_VANILLA_BLOCK.matcher(out)
             .replaceAll(Matcher.quoteReplacement(
-                //★クラス名を直書きしないこと。Fabric の配布版は intermediary 名で動くので
-                //  文字列だと解決できない。class リテラルならビルド時に remap される。
+                // ★クラス名を直書きしないこと。Fabric の配布版は intermediary 名で動くので
+                // 文字列だと解決できない。class リテラルならビルド時に remap される。
                 "Packages." + net.minecraft.world.level.block.Block.class.getName()));
         return out;
     }
@@ -514,7 +477,7 @@ public final class PackScriptSource {
                 continue;
             }
             String text = decode(bytes);
-            ////include で読んだ側も .ts なら型を落とす (混在してよい)
+            // //include で読んだ側も .ts なら型を落とす (混在してよい)
             if (TypeScriptTranspiler.isTypeScript(path)) {
                 text = TypeScriptTranspiler.toJavaScript(text);
             }

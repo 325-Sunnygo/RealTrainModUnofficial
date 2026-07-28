@@ -15,12 +15,7 @@ import net.neoforged.neoforge.client.event.RenderGuiEvent;
 
 /**
  * 選択範囲の状態を画面隅に出す (neo mcte 追加)。
- *
- * <p>本家も MCTEU も、いま何ブロック選んでいるのかは<b>エディタ画面を開かないと分からない</b>。
- * 範囲を決める作業は画面を閉じて行うので、これでは確認のたびに開き直すことになる。
- * 常に出しておけば、範囲を調整しながら大きさを見られる。
- *
- * <p>エディタを持っているときだけ出す。持っていなければ邪魔なので消える。
+ * 本家も MCTEU も、いま何ブロック選んでいるのかはエディタ画面を開かないと分からない。
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class SelectionHud {
@@ -67,7 +62,7 @@ public final class SelectionHud {
         }
         g.drawString(mc.font, Component.literal(sx + " x " + sy + " x " + sz), x, y, 0xFFFFFF);
         y += 11;
-        //10 万を超えると実行を断られるので、目安として色を変える
+        // 10 万を超えると実行を断られるので、目安として色を変える
         int color = volume > jp.ngt.mcte.editor.filter.EditorOps.MAX_BLOCKS ? 0xFF6060 : 0xA0A0A0;
         g.drawString(mc.font, Component.literal(String.format("%,d blocks", volume)), x, y, color);
     }

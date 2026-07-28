@@ -10,9 +10,7 @@ import jp.ngt.rtm.entity.vehicle.EntityVehicleBase;
  * パックの車両スクリプトが renderClass に指定する。
  */
 public class VehiclePartsRenderer extends EntityPartsRenderer {
-    /**
-     * 台車の場合はfalse
-     */
+    /** 台車の場合はfalse */
     private boolean isvehicle;
 
     public VehiclePartsRenderer(String... par1) {
@@ -32,8 +30,8 @@ public class VehiclePartsRenderer extends EntityPartsRenderer {
      */
     public void render(Object t, int pass, float partialTick) {
         this.currentPass = pass;
-        //スクリプトが落ちたらフラグを立てる (呼び出し側が素のモデル描画へ戻せるように)。
-        //黙って握りつぶすと「車体が丸ごと消える」ため。PartsRenderer.execRenderScript 参照。
+        // スクリプトが落ちたらフラグを立てる (呼び出し側が素のモデル描画へ戻せるように)。
+        // 黙って握りつぶすと「車体が丸ごと消える」ため。PartsRenderer.execRenderScript 参照。
         this.execRenderScript(t, pass, partialTick);
     }
 

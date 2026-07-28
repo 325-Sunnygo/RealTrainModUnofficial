@@ -22,7 +22,7 @@ public final class ModList {
 
     /**
      * NeoForge の ModFileInfo 相当。RTMU は
-     * {@code getModFileById(id).getFile().findResource(path...)} の形でしか使わないので、
+     * getModFileById(id).getFile.findResource(path...) の形でしか使わないので、
      * その形だけ Fabric の ModContainer.findPath へ写像する。
      */
     public ModFileShim getModFileById(String modId) {
@@ -47,9 +47,7 @@ public final class ModList {
 
         /**
          * mod 本体のファイル (jar) のパス。
-         * <p>NeoForge は jar の実体パスを直接返す。Fabric の {@code getRootPaths()} は
-         * jar 内を指す仮想パスなので、そこから元の jar を辿る。開発環境ではクラスの出力
-         * ディレクトリになる (jar が無いので当然)。
+         * NeoForge は jar の実体パスを直接返す。
          */
         public java.nio.file.Path getFilePath() {
             java.util.List<java.nio.file.Path> roots = container.getRootPaths();
@@ -57,18 +55,18 @@ public final class ModList {
                 return null;
             }
             java.nio.file.Path root = roots.get(0);
-            //jar 内の仮想パスなら、その jar 自身を返す
+            // jar 内の仮想パスなら、その jar 自身を返す
             java.nio.file.FileSystem fs = root.getFileSystem();
             if (!fs.equals(java.nio.file.FileSystems.getDefault())) {
                 try {
-                    //ZipFileSystem の識別子は jar の実パス
+                    // ZipFileSystem の識別子は jar の実パス
                     String uri = fs.toString();
                     java.nio.file.Path jar = java.nio.file.Path.of(uri);
                     if (java.nio.file.Files.exists(jar)) {
                         return jar;
                     }
                 } catch (Exception ignored) {
-                    //辿れなければ仮想パスのまま返す (呼び出し側は存在確認をしている)
+                    // 辿れなければ仮想パスのまま返す (呼び出し側は存在確認をしている)
                 }
             }
             return root;

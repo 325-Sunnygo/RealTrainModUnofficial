@@ -21,12 +21,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 /**
- * 選択範囲の描画 (neo mcte)。MCTEU {@code BlockSelectionRenderer} と同じ<b>レベル描画</b>方式。
- *
- * <p>★エンティティレンダラで描いてはいけない。1.21 は<b>見えているチャンクセクションに
- * 属するエンティティしか集めない</b>ので、選択範囲の起点が視界外のセクションにあると
- * 枠ごと消える (「前を向くと選択が見えない、後ろを向くと見える」)。
- * レベル描画なら視界に依らず必ず出る。
+ * 選択範囲の描画 (neo mcte)。MCTEU BlockSelectionRenderer と同じレベル描画方式。
+ * ★エンティティレンダラで描いてはいけない。
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class SelectionRenderer {
@@ -36,7 +32,7 @@ public final class SelectionRenderer {
     /** 確定後の色。 */
     private static final float[] COLOR_FIXED = {0.3F, 0.8F, 1.0F};
 
-    /** MCTEU {@code mcte_selection_faces} 相当。QUADS でないと三角に化ける。 */
+    /** MCTEU mcte_selection_faces 相当。QUADS でないと三角に化ける。 */
     private static final RenderType FACES = RenderType.create(
         "rtmu_selection_faces", DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS,
         1536, false, true,
@@ -48,7 +44,7 @@ public final class SelectionRenderer {
             .setWriteMaskState(RenderStateShard.COLOR_WRITE)
             .createCompositeState(false));
 
-    /** クローンの下見 (MCTEU {@code CopyPreviewRenderer} 相当)。 */
+    /** クローンの下見 (MCTEU CopyPreviewRenderer 相当)。 */
     private static final float[] COLOR_CLONE = {0.4F, 1.0F, 0.4F};
     private static int cloneDx;
     private static int cloneDy;
@@ -57,9 +53,8 @@ public final class SelectionRenderer {
 
     /**
      * ★最後に見えていた選択範囲。
-     * <p>エディタは Entity なので、遠くへ飛ぶ・上に上がるとクライアント側で追跡が切れて
-     * {@code find} が null になり、選択範囲が消えていた。表示用にここへ控えておき、
-     * 追跡が切れても描き続ける。解除 (N キー) で捨てる。
+     * エディタは Entity なので、遠くへ飛ぶ・上に上がるとクライアント側で追跡が切れて
+     * find が null になり、選択範囲が消えていた。
      */
     private static AABB cachedBox;
     private static boolean cachedHasEnd;
@@ -91,11 +86,9 @@ public final class SelectionRenderer {
         if (mc.player == null || mc.level == null) {
             return;
         }
-        //★持っているアイテムで出し分けない。
-        //MCTEU も pos1/pos2 があれば常に描く (BlockSelectionRenderer:36-41)。
-        //エディタを持っているときだけにすると、埋めるブロックへ持ち替えた瞬間に
-        //選択が消えたように見える。解除するまで出したままにする。
-        //★選択はクライアントの静的データ。ワールドに実体が無いので消えない。
+        // ★持っているアイテムで出し分けない。
+        // MCTEU も pos1/pos2 があれば常に描く (BlockSelectionRenderer:36-41)。
+        // ★選択はクライアントの静的データ。ワールドに実体が無いので消えない。
         AABB box = com.portofino.realtrainmodunofficial.client.ClientSelection.box();
         if (box == null) {
             return;
@@ -103,8 +96,8 @@ public final class SelectionRenderer {
         boolean hasEnd = com.portofino.realtrainmodunofficial.client.ClientSelection.hasEnd();
 
         if (!hasEnd) {
-            //1 点目だけのときは、見ている先を仮の 2 点目として箱を出す
-            //(本家 MCTE の「選択を始めると箱が視点についてくる」挙動)
+            // 1 点目だけのときは、見ている先を仮の 2 点目として箱を出す
+            // (本家 MCTE の「選択を始めると箱が視点についてくる」挙動)
             if (mc.hitResult instanceof BlockHitResult hit && hit.getType() == HitResult.Type.BLOCK) {
                 BlockPos a = com.portofino.realtrainmodunofficial.client.ClientSelection.pos1();
                 BlockPos b = hit.getBlockPos();
@@ -129,7 +122,7 @@ public final class SelectionRenderer {
         VertexConsumer lines = buffer.getBuffer(RenderType.lines());
         LevelRenderer.renderLineBox(poseStack, lines, box, c[0], c[1], c[2], 1.0F);
 
-        //クローンの下見: ずらした先を枠だけで出す (どこにいくつ落ちるかを見せる)
+        // クローンの下見: ずらした先を枠だけで出す (どこにいくつ落ちるかを見せる)
         if (hasEnd && cloneRepeat > 0 && (cloneDx != 0 || cloneDy != 0 || cloneDz != 0)) {
             for (int r = 1; r <= cloneRepeat; r++) {
                 AABB p = box.move(cloneDx * r, cloneDy * r, cloneDz * r);

@@ -28,15 +28,11 @@ public final class PooledVec3 extends Vec3 {
     }
 
     public static Vec3 create(double x, double y, double z) {
-		/*Vec3 vec = POOL.get();
-		vec.set(x, y, z);
-		return vec;*/
+		/* vec.set(x, y, z); */
         return new Vec3(x, y, z);
     }
 
-    /**
-     * @param par1 度
-     */
+    /** @param par1 度 */
     @Override
     public Vec3 rotateAroundX(float par1) {
         float rad = NGTMath.toRadians(par1);
@@ -48,9 +44,7 @@ public final class PooledVec3 extends Vec3 {
         return create(d0, d1, d2);
     }
 
-    /**
-     * @param par1 度
-     */
+    /** @param par1 度 */
     @Override
     public Vec3 rotateAroundY(float par1) {
         float rad = NGTMath.toRadians(par1);
@@ -62,9 +56,7 @@ public final class PooledVec3 extends Vec3 {
         return create(d0, d1, d2);
     }
 
-    /**
-     * @param par1 度
-     */
+    /** @param par1 度 */
     @Override
     public Vec3 rotateAroundZ(float par1) {
         float rad = NGTMath.toRadians(par1);
@@ -86,9 +78,7 @@ public final class PooledVec3 extends Vec3 {
         return create(this.getX() * num, this.getY() * num, this.getZ() * num);
     }
 
-    /**
-     * 外積
-     */
+    /** 外積 */
     @Override
     public Vec3 crossProduct(Vec3 par1) {
         return create(

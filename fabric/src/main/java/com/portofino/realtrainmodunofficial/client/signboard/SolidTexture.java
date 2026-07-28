@@ -7,10 +7,8 @@ import net.minecraft.resources.ResourceLocation;
 
 /**
  * 1x1 の白テクスチャ。
- * <p>
  * 本家の看板は板の側面と (backTexture==2 の) 裏面を「テクスチャ無しの単色」で塗っていた
- * ({@code glDisable(GL_TEXTURE_2D)} + 頂点カラー)。1.21 の RenderType は必ずテクスチャを
- * 要求するので、白1ピクセルを貼って頂点カラーで着色する形に置き換える。
+ * (glDisable(GL_TEXTURE_2D) + 頂点カラー)。
  */
 public final class SolidTexture {
     private static ResourceLocation white;

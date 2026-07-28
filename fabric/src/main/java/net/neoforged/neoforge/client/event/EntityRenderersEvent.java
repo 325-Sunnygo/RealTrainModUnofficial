@@ -21,9 +21,8 @@ public abstract class EntityRenderersEvent extends Event {
         }
 
         /**
-         * NeoForge と同じく<b>親クラス用のレンダラーを子の BlockEntityType へ</b>登録できる形にする。
-         * ({@code BlockEntityType<? extends T>})。RTMU はレール各種を 1 つの
-         * {@code RailCoreBlockEntityRenderer} で描くので、ここが厳密だと通らない。
+         * NeoForge と同じく親クラス用のレンダラーを子の BlockEntityType へ登録できる形にする。
+         * (BlockEntityType<? extends T>)。
          */
         @SuppressWarnings({"unchecked", "rawtypes"})
         public <T extends BlockEntity> void registerBlockEntityRenderer(

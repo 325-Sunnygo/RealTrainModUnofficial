@@ -3,8 +3,6 @@ package jp.ngt.ngtlib.renderer;
 /**
  * 本家 jp.ngt.ngtlib.renderer.NGTRenderer のスクリプト互換。
  * NGTO Builder の Prop/Liner ツールがミニチュア (NGTObject) のゴーストプレビューに使う。
- * 各ブロックを GLRecorder の RENDER_BLOCK として記録し、再生側
- * (VehicleScriptRenderers.replay) が BlockRenderDispatcher.renderSingleBlock で描く。
  */
 @SuppressWarnings("unused")
 public final class NGTRenderer {

@@ -25,11 +25,8 @@ import java.util.zip.InflaterInputStream;
 
 /**
  * 1.7.10 / 1.12.2 のリージョンファイル (.mca) を読む。
- *
- * <p>Anvil のリージョン形式は 1.2 から 1.21 まで変わっていない
+ * Anvil のリージョン形式は 1.2 から 1.21 まで変わっていない
  * (先頭 4KiB がチャンクの位置表、次の 4KiB がタイムスタンプ、以降 4KiB セクタ単位でチャンク本体)。
- * よってバニラの実装に頼らずに自前で読める。バニラの {@code RegionFile} は開いた時点で
- * ヘッダを検証・書き戻すことがあるため、<b>読み取り専用でここでは触らない</b>。
  */
 public final class LegacyRegion {
 
@@ -38,9 +35,7 @@ public final class LegacyRegion {
     private LegacyRegion() {
     }
 
-    /**
-     * リージョンファイル内の全チャンク NBT を返す (壊れたチャンクは飛ばす)。
-     */
+    /** リージョンファイル内の全チャンク NBT を返す (壊れたチャンクは飛ばす)。 */
     public static List<CompoundTag> readChunks(Path mca) {
         byte[] file;
         try {
@@ -83,9 +78,7 @@ public final class LegacyRegion {
         return chunks;
     }
 
-    /**
-     * チャンク番号 → NBT。書き戻すときに使う。
-     */
+    /** チャンク番号 → NBT。書き戻すときに使う。 */
     public static Map<Integer, CompoundTag> readChunksIndexed(Path mca) {
         Map<Integer, CompoundTag> chunks = new LinkedHashMap<>();
         byte[] file;
@@ -125,9 +118,7 @@ public final class LegacyRegion {
         return chunks;
     }
 
-    /**
-     * チャンクを書き戻す (zlib 圧縮、Anvil の 4KiB セクタ形式)。
-     */
+    /** チャンクを書き戻す (zlib 圧縮、Anvil の 4KiB セクタ形式)。 */
     public static void writeChunks(Path mca, Map<Integer, CompoundTag> chunks) throws IOException {
         byte[] header = new byte[SECTOR * 2];
         ByteArrayOutputStream body = new ByteArrayOutputStream();
@@ -135,16 +126,16 @@ public final class LegacyRegion {
 
         for (Map.Entry<Integer, CompoundTag> e : chunks.entrySet()) {
             byte[] compressed = compress(e.getValue());
-            //[長さ(4)][圧縮方式(1)][データ]
+            // [長さ(4)][圧縮方式(1)][データ]
             int total = compressed.length + 5;
             int sectors = (total + SECTOR - 1) / SECTOR;
             if (sectors > 255) {
-                //1MB 超のチャンクは外部ファイルになるが、旧ワールドでは実質発生しない
+                // 1MB 超のチャンクは外部ファイルになるが、旧ワールドでは実質発生しない
                 throw new IOException("chunk too large: " + e.getKey());
             }
             int location = (sector << 8) | sectors;
             writeInt(header, e.getKey() * 4, location);
-            //タイムスタンプはそのままで良いが、0 だと再生成されるので現在値を入れない (再現性のため 1)
+            // タイムスタンプはそのままで良いが、0 だと再生成されるので現在値を入れない (再現性のため 1)
             writeInt(header, SECTOR + e.getKey() * 4, 1);
 
             byte[] padded = new byte[sectors * SECTOR];

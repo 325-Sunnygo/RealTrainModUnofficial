@@ -33,7 +33,7 @@ public class MacroExecutor {
             return false;
         }
         this.executing = true;
-        //本家は worldTime だが、/time set の影響を受けない gameTime を使う (相対時刻なので挙動は同じ)
+        // 本家は worldTime だが、/time set の影響を受けない gameTime を使う (相対時刻なので挙動は同じ)
         this.startTime = level.getGameTime();
         return true;
     }
@@ -72,7 +72,7 @@ public class MacroExecutor {
                 case Door -> this.execDoor(train, TrainState.valueOf(param.toString()));
             }
         } catch (Exception ignored) {
-            //不正な行はスキップ (本家は printStackTrace)
+            // 不正な行はスキップ (本家は printStackTrace)
         }
     }
 

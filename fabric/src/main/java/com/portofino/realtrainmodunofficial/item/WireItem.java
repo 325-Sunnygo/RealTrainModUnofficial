@@ -26,11 +26,11 @@ import java.util.List;
 
 public class WireItem extends Item implements ModelSelectableItem {
     /**
-     * 本家 KaizPatchX の {@code customIconTexture} 用の描画器。
-     * <p>実際に使われるのは、選択中のモデルが {@code customIconTexture} を持つときだけ
-     * ({@link com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel} が判定する)。
+     * 本家 KaizPatchX の customIconTexture 用の描画器。
+     * 実際に使われるのは、選択中のモデルが customIconTexture を持つときだけ
+     * (com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel が判定する)。
      */
-    //★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
+    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
         consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {
@@ -84,7 +84,7 @@ public class WireItem extends Item implements ModelSelectableItem {
                 || cat == InstalledObjectCategory.CONNECTOR_INPUT
                 || cat == InstalledObjectCategory.CONNECTOR_OUTPUT;
         } else if (level.getBlockEntity(clickedPos) instanceof jp.ngt.rtm.electric.TileEntitySignalConverter) {
-            //信号変換器もワイヤー接続可能 (本家 IBlockConnective)
+            // 信号変換器もワイヤー接続可能 (本家 IBlockConnective)
             connective = true;
         }
         if (!connective) {
@@ -174,7 +174,7 @@ public class WireItem extends Item implements ModelSelectableItem {
         return id == null ? "" : id;
     }
 
-    /** 選択モデルの状態。スクリプトは {@code .type.subType} を読み、setConnectionTo にも渡す。 */
+    /** 選択モデルの状態。スクリプトは .type.subType を読み、setConnectionTo にも渡す。 */
     public WireModelState getModelState(Object stackLike) {
         return new WireModelState(getModelName(stackLike));
     }
@@ -184,7 +184,7 @@ public class WireItem extends Item implements ModelSelectableItem {
         return getModelName(stackLike);
     }
 
-    /** 本家 ResourceState の {@code .type.subType} を Nashorn から読めるようにする最小互換。 */
+    /** 本家 ResourceState の .type.subType を Nashorn から読めるようにする最小互換。 */
     public static final class WireModelState {
         public final String modelId;
         public final WireModelType type;

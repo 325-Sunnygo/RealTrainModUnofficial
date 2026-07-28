@@ -13,11 +13,8 @@ import java.util.List;
 
 /**
  * RTMU 設定画面 (ポーズメニューの「RTMU設定」ボタンから開く)。
- * <ul>
- *   <li>カーブ自動カント: ON / OFF</li>
- *   <li>レール自動高さ: 1〜5 (レンチ高さ単位)</li>
- * </ul>
- * 変更は即クライアントへ保存し、サーバーへ同期する。
+ * カーブ自動カント: ON / OFF
+ * レール自動高さ: 1〜5 (レンチ高さ単位)
  */
 public class RtmuSettingsScreen extends Screen {
 
@@ -28,7 +25,7 @@ public class RtmuSettingsScreen extends Screen {
         this.parent = parent;
     }
 
-    /** 「敷設」セクション見出しの y。render() でラベルを描くために保持。 */
+    /** 「敷設」セクション見出しの y。render でラベルを描くために保持。 */
     private int layingHeaderY;
     /** 「軽量化」セクション見出しの y。 */
     private int perfHeaderY;
@@ -39,7 +36,7 @@ public class RtmuSettingsScreen extends Screen {
     protected void init() {
         int cx = this.width / 2;
         int w = 220;
-        //上寄せ。項目が増えたので固定の開始位置から 24px 刻みで積む。
+        // 上寄せ。項目が増えたので固定の開始位置から 24px 刻みで積む。
         int y = 36;
 
         // ===== 敷設 =====
@@ -56,7 +53,7 @@ public class RtmuSettingsScreen extends Screen {
                 }));
 
         y += 24;
-        //レール自動高さ: 0=OFF、1〜16=高さ 0〜15 (1/16ブロック)。任意の高さ (9,10 等) を指定できる。
+        // レール自動高さ: 0=OFF、1〜16=高さ 0〜15 (1/16ブロック)。任意の高さ (9,10 等) を指定できる。
         addRenderableWidget(new AutoHeightSlider(cx - w / 2, y, w, 20));
 
         // ===== 軽量化 =====
@@ -64,11 +61,11 @@ public class RtmuSettingsScreen extends Screen {
         this.perfHeaderY = y;
         y += 14;
 
-        //レール描画距離: 64〜512 ブロック。遠くのレールが消えるときはこれを上げる。
+        // レール描画距離: 64〜512 ブロック。遠くのレールが消えるときはこれを上げる。
         addRenderableWidget(new RailDistanceSlider(cx - w / 2, y, w, 20));
 
         y += 24;
-        //車両描画距離: 0=無制限、32〜256。遠方車両を丸ごと省略して毎フレームのスクリプト実行を削る。
+        // 車両描画距離: 0=無制限、32〜256。遠方車両を丸ごと省略して毎フレームのスクリプト実行を削る。
         addRenderableWidget(new VehicleDistanceSlider(cx - w / 2, y, w, 20));
 
 
@@ -76,7 +73,7 @@ public class RtmuSettingsScreen extends Screen {
         y += 30;
         this.passengerHeaderY = y;
         y += 14;
-        //乗客の最大数: 0(湧かない)〜100、その先は無制限。
+        // 乗客の最大数: 0(湧かない)〜100、その先は無制限。
         addRenderableWidget(new PassengerCapSlider(cx - w / 2, y, w, 20));
 
         y += 30;
@@ -174,13 +171,13 @@ public class RtmuSettingsScreen extends Screen {
         protected void applyValue() {
             RtmuSettings.railRenderDistance = currentDistance();
             RtmuSettings.save();
-            //描画距離はクライアントのみ (サーバー同期不要)
+            // 描画距離はクライアントのみ (サーバー同期不要)
         }
     }
 
     /** 車両描画距離スライダー (0=無制限、32〜256、16刻み)。 */
     private static class VehicleDistanceSlider extends net.minecraft.client.gui.components.AbstractSliderButton {
-        //0(無制限) を左端、32〜256 を連続に並べる。内部 value 0.0 = 無制限。
+        // 0(無制限) を左端、32〜256 を連続に並べる。内部 value 0.0 = 無制限。
         private static final int MIN = 32;
         private static final int MAX = 256;
 
@@ -194,7 +191,7 @@ public class RtmuSettingsScreen extends Screen {
             if (d <= 0) {
                 return 0.0D;
             }
-            //無制限のぶん左端に幅を持たせる (value 0〜0.08 = 無制限帯)。
+            // 無制限のぶん左端に幅を持たせる (value 0〜0.08 = 無制限帯)。
             return 0.08D + (1.0D - 0.08D) * (d - MIN) / (double) (MAX - MIN);
         }
 
@@ -232,7 +229,7 @@ public class RtmuSettingsScreen extends Screen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 16, 0xFFFFFF);
-        //セクション見出し (左寄せ、少しくすんだ色)
+        // セクション見出し (左寄せ、少しくすんだ色)
         int cx = this.width / 2;
         int left = cx - 110;
         graphics.drawString(this.font, Component.literal("§l敷設"), left, this.layingHeaderY, 0xFFD0A040, false);
@@ -248,7 +245,7 @@ public class RtmuSettingsScreen extends Screen {
 
     @Override
     public void onClose() {
-        //閉じるときにも念のため同期
+        // 閉じるときにも念のため同期
         sync();
         if (minecraft != null) {
             minecraft.setScreen(parent);

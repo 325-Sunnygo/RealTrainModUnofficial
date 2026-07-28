@@ -14,9 +14,6 @@ import java.util.Calendar;
 /**
  * 本家 jp.ngt.rtm.entity.npc.RenderNPC の運転士ぶんの移植。
  * バニラのプレイヤーモデル + 同梱の運転士スキン (assets/rtm/textures/motorman.png)。
- *
- * <p>本家の季節スキンも移植: 1/1〜1/3 は獅子舞、12/24〜12/26 はサンタ。
- * (起動時に一度だけ判定 — 軽量)
  */
 @OnlyIn(Dist.CLIENT)
 public class MotormanRenderer extends MobRenderer<EntityMotorman, PlayerModel<EntityMotorman>> {
@@ -48,7 +45,7 @@ public class MotormanRenderer extends MobRenderer<EntityMotorman, PlayerModel<En
 
     @Override
     public ResourceLocation getTextureLocation(EntityMotorman entity) {
-        //GUI で選択したスキン (entityData で同期)。"" は既定 (季節スキン)。
+        // GUI で選択したスキン (entityData で同期)。"" は既定 (季節スキン)。
         String skin = entity.getSkin();
         if (skin.isEmpty()) {
             return ACTIVE_TEXTURE;

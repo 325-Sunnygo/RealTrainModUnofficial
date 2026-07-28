@@ -10,11 +10,7 @@ import net.minecraft.world.level.block.Blocks;
 
 /**
  * 本家 jp.ngt.rtm.rail.util.RailProperty の忠実移植。
- *
  * 1.21 移植差分:
- * - blockMetadata は 1.21 に存在しないが、本家 NBT 互換のためフィールド/キーを保持する。
- * - getModelSet() は Phase 4 (ModelPackManager) で本家型に置換予定。
- *   それまでは暫定的に既存の RailRegistry (RailDefinition) から ballastWidth を解決する。
  */
 public final class RailProperty {
     public final String railModel;
@@ -23,9 +19,7 @@ public final class RailProperty {
     public final float blockHeight;
     public final String unlocalizedName;
 
-    /**
-     * 本家では ItemRail.getDefaultProperty()。TODO(Phase 4): ItemRail 移植後に移動。
-     */
+    /** 本家では ItemRail.getDefaultProperty。TODO(Phase 4): ItemRail 移植後に移動。 */
     public static RailProperty getDefaultProperty() {
         return new RailProperty("", Blocks.GRAVEL, 0, 0.0625F);
     }
@@ -60,7 +54,7 @@ public final class RailProperty {
     }
 
     /**
-     * 道床幅。本家では getModelSet().getConfig().ballastWidth。
+     * 道床幅。本家では getModelSet.getConfig.ballastWidth。
      * TODO(Phase 4): ModelPackManager/ModelSetRail 移植後に本家 API へ置換。
      */
     public int getBallastWidth() {

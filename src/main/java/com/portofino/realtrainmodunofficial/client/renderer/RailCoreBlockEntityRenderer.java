@@ -31,24 +31,22 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
     private static int computeRailSampleMax(RailMap map, double length, RailDefinition definition) {
         // RTM本家 RailPartsRendererBase#createRailPos と同じ length*2 固定。
         // 枕木・バラスト・レールの間隔は視点距離で変えない (ユーザー要望「視界でレールの間隔が
-        // 変わる、変えないで」)。以前はカメラ距離で density / cap を下げて LOD していたが、
-        // 近づくと枕木の数が変わって見えていた。距離非依存の固定密度・固定キャップにする。
-        //★本家は切り捨て: int split = (int)(rm.getLength() * 2.0F);
-        //  (rtm_src RailPartsRendererBase.java:305 / :123)
-        //RTMU は Math.ceil にしていたため、長さ 10.7 なら本家 21 に対して 22 となり、
-        //枕木が 1 本多く入って間隔が本家とずれていた。切り捨てに揃える。
-        //短いレールの下限 (以前の length<2.5 で 12 本) も本家に無いので外す。
+        // 変わる、変えないで」)。
+        // ★本家は切り捨て: int split = (int)(rm.getLength * 2.0F);
+        // (rtm_src RailPartsRendererBase.java:305 / :123)
+        // RTMU は Math.ceil にしていたため、長さ 10.7 なら本家 21 に対して 22 となり、
+        // 枕木が 1 本多く入って間隔が本家とずれていた。切り捨てに揃える。
         int split = (int) (length * 2.0D);
-        //0 だと以降の割り算が壊れるので 1 は確保する (本家はループ回数 1 で成立する形)
+        // 0 だと以降の割り算が壊れるので 1 は確保する (本家はループ回数 1 で成立する形)
         int samples = Math.max(1, split);
-        //暴走よけの上限。本家には無いが、極端に長いレールで描画が破綻しないように残す。
+        // 暴走よけの上限。本家には無いが、極端に長いレールで描画が破綻しないように残す。
         return Math.min(samples, 768);
     }
 
 /**
-     * 直線のみ: Baru 等は全サンプルでレールを描くため Z-fighting しやすい。極小の Y オフセットで深度を分散。
-     * 曲線ではベジェと整合したサンプル間隔のためオフセットしない。
-     */
+ * 直線のみ: Baru 等は全サンプルでレールを描くため Z-fighting しやすい。極小の Y オフセットで深度を分散。
+ * 曲線ではベジェと整合したサンプル間隔のためオフセットしない。
+ */
     private static float depthJitter(int pos) {
         return ((pos & 15) - 7.5f) * 1.2e-6f;
     }
@@ -65,9 +63,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
     public RailCoreBlockEntityRenderer(BlockEntityRendererProvider.Context ctx) {
     }
 
-    /**
-     * packedLight (block/sky 各 16bit) を成分ごとに max 合成
-     */
+    /** packedLight (block/sky 各 16bit) を成分ごとに max 合成 */
     private static int maxPackedLight(int a, int b) {
         int blockA = a & 0xFFFF;
         int blockB = b & 0xFFFF;
@@ -84,11 +80,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             // ディスパッチャの packedLight はコア BE のブロック位置でサンプリングされる。
             // コアは道床/地面の中にあることが多く光量 0 になるので、ほぼ真っ暗な時だけ
             // レール上面 (1〜2 ブロック上) で取り直す。
-            //
-            // ★ここはあくまで「基準値」。実際の明るさは本家と同じく区間ごとに
-            //   サンプリングして記録に入れる (RailPartsRenderer.sampleBrightness)。
-            //   空の明るさで塗りつぶす応急処置は撤去した — 日陰やトンネルでもレールだけ
-            //   明るく浮くうえ、本来の「光が変われば焼き直す」判定を殺していた。
+            // ★ここはあくまで「基準値」。
             if (be.getLevel() != null) {
                 int blockL = packedLight & 0xFFFF;
                 int skyL = (packedLight >> 16) & 0xFFFF;
@@ -107,18 +99,16 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             RailMap[] maps = be.getAllRailMaps();
             if (maps == null || maps.length == 0) return;
 
-            //重ねレール (サブレール): 同じ RailMap 上に各サブレール定義のモデルを描く。メインより
-            //先に描く (どちらも不透明なので順序は問題にならない)。サブレールが無い通常のレールは
-            //この分岐に入らないので影響なし。
+            // 重ねレール (サブレール): 同じ RailMap 上に各サブレール定義のモデルを描く。
+            // 先に描く (どちらも不透明なので順序は問題にならない)。
             if (be.subRails != null && !be.subRails.isEmpty()) {
                 renderSubRails(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay);
             }
 
             // 本家式レール描画 (作り直し後の標準パス)。
-            //  スクリプト付き: renderRailStatic をスクリプトが実行し、デフォルト配置は
-            //  スクリプトが renderer.renderStaticParts を呼んだ時のみ (位置毎 shouldRenderObject
-            //  = 端トリミング/枕木循環)。スクリプト無し: renderStaticParts 相当のみ。
-            //  分岐コアのみ既存パイプラインへフォールバック (トング描画未移植)。
+            // スクリプト付き: renderRailStatic をスクリプトが実行し、デフォルト配置は
+            // スクリプトが renderer.renderStaticParts を呼んだ時のみ (位置毎 shouldRenderObject
+            // = 端トリミング/枕木循環)。スクリプト無し: renderStaticParts 相当のみ。
             com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
                 com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
             if (scripted != null) {
@@ -130,47 +120,19 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     be, maps, poseStack, buffer, packedLight, packedOverlay, model)) {
                 return;
             }
-            //ここから下は旧パイプライン。トング (可動レール) を持つ分岐コアだけがここに来る。
-            //
-            //かつてはここで毎フレーム「0.5m 刻みの位置ごとにモデルを描画呼び出し」していて、
-            //実測 12.4ms/本。視界に 1 本あるだけでレール描画時間のほぼ全部を食っていた。
-            //
-            //そこでこの経路も統合メッシュに焼く。トングは動くが、動くのは転てつを切り替えた
-            //一瞬だけなので、アニメ中だけ従来どおり逐次描画し、落ち着いたら焼いて使い回す。
-            //焼いたメッシュは「開通方向」をキーにしているので、転てつすれば自動で焼き直る。
+            // ここから下は旧パイプライン。トング (可動レール) を持つ分岐コアだけがここに来る。
+            // かつてはここで毎フレーム「0.5m 刻みの位置ごとにモデルを描画呼び出し」していて、
+            // 実測 12.4ms/本。視界に 1 本あるだけでレール描画時間のほぼ全部を食っていた。
             long legacyStart = ClientRenderProfiler.begin();
             try {
-                //★ 焼き直しのキーは「トングの位置」で決める。
-                //  以前は開通方向 (activeIndex) をキーにしていたが、トングの位置は
-                //  renderSwitchPoint が Point.getMovement() から読んでいるため、
-                //  開通方向だけ見ても転てつを検知できず、焼いたメッシュが固まったままだった。
-                //分岐トング付きレールも<b>常に焼き込み経路へ通す</b>。
-                //
-                //以前は「トングがアニメ中か」を movement が中間値かで判定し、中間値なら焼かず
-                //毎フレーム逐次描画 (実測 12〜16ms/本) していた。ところが BaruRail の高架レール等は
-                //トングが<b>中間値のまま静止</b>していて永遠に「アニメ中」と誤判定され、視界に数本
-                //あるだけで fps が一桁になっていた (RailOld スパイクの真因)。
-                //
-                //焼き込みキー variant には Point.getMovement() (トング位置) が入っているので、
-                //RailMeshCache は<b>トングが実際に動いた時だけ</b>焼き直す。さらに 1 フレームの
-                //焼き込み本数は上限付き ({@link RailMeshCache#MAX_BAKES_PER_FRAME}) で分散され、
-                //焼き直し待ちの間は直前のメッシュを描くので、静止分岐は焼いて使い回し (ほぼ0ms)、
-                //実際にトングが動いている一瞬もコストが跳ねない。見た目は変わらない。
-                //レールは統合メッシュへ焼く (軽量化)。焼いた VBO は AFTER_BLOCK_ENTITIES で
-                //まとめて描かれるため、車両より<b>先に</b>フレームバッファへ乗る。
-                //以前ここを疑って本家同様 MultiBufferSource 経由へ戻したが、症状は変わらなかった。
-                //真因は車両側の発光パスが深度を書いていなかったこと (MqoModelLoader の
-                //renderNamedGroupsEmissive)。深度さえ書かれていれば描画順は問題にならない。
-                //★焼き込みキーは本家 KaizPatchX の createStaticRenderKey <b>のみ</b>。
-                //  createRailPos (全 RailMap の 0.5m 刻み各点) + 各点の明るさ + モデル identity。
-                //
-                //  以前はここにトング位置 (switchVariantKey) を混ぜていた。可動部まで焼き込みに
-                //  入れていたためで、転てつのたびにレール全体を焼き直していた。可動部は
-                //  renderRailDynamic として焼き込みの外へ出した (本家 renderRail と同じ) ので、
-                //  <b>静的部の焼き込みはトング位置に依存しない</b>。本家もキーに入れていない。
+                // ★ 焼き直しのキーは「トングの位置」で決める。
+                // 以前は開通方向 (activeIndex) をキーにしていたが、トングの位置は
+                // renderSwitchPoint が Point.getMovement から読んでいるため、
+                // 開通方向だけ見ても転てつを検知できず、焼いたメッシュが固まったままだった。
+                // ★焼き込みキーは本家 KaizPatchX の createStaticRenderKey のみ。
                 long variant = staticRenderKey(be, model);
                 RailDefinition bakedDef = def;
-                //packedLight はこのメソッド内で再代入しているのでラムダに直接は渡せない
+                // packedLight はこのメソッド内で再代入しているのでラムダに直接は渡せない
                 final int bakedLight = packedLight;
                 final long bakedVariant = variant;
                 boolean forceRebuild = be.shouldRerenderRail;
@@ -194,9 +156,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
     }
 
     /**
-     * 重ねレール (サブレール) をすべて描く。各サブレールはメインと同じ RailMap 上に、
-     * サブレール定義<b>自身</b>のモデル+スクリプトで描かれる (RailScriptRenderers.renderSubRail)。
-     * これが無いと、重ねレールは追加・保存されても描画されず「重ねても見た目が変わらない」状態になる。
+     * 重ねレール (サブレール) をすべて描く。
+     * サブレール定義自身のモデル+スクリプトで描かれる (RailScriptRenderers.renderSubRail)。
      */
     private void renderSubRails(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
                                 PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
@@ -219,13 +180,12 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     /**
      * 焼いたメッシュの「見た目の要因」。トングの位置が変われば別物として焼き直す。
-     * <p>
-     * {@code Point.getMovement()} は {@code moveCount / MAX_COUNT} で、レッドストーン入力に
+     * Point.getMovement は moveCount / MAX_COUNT で、レッドストーン入力に
      * 応じて 0 〜 1 を毎 tick 1 段ずつ動く。ここを見ないと転てつしてもメッシュが更新されない。
      */
     /**
-     * 本家 KaizPatchX {@code createStaticRenderKey} 相当。レール形状 + 各点の明るさ + モデル。
-     * <p>失敗しても焼き込み自体は続けたいので 0 を返す (= 従来どおり variant だけで判定)。
+     * 本家 KaizPatchX createStaticRenderKey 相当。レール形状 + 各点の明るさ + モデル。
+     * 失敗しても焼き込み自体は続けたいので 0 を返す (= 従来どおり variant だけで判定)。
      */
     private static int staticRenderKey(TileEntityLargeRailCore be,
                                        com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model) {
@@ -248,16 +208,14 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         jp.ngt.rtm.rail.util.Point[] points = be.getSwitchPoints();
         if (points != null) {
             for (jp.ngt.rtm.rail.util.Point p : points) {
-                //getMovement() を 8 段階に量子化して混ぜる。トングは 80tick かけて動く
-                //(1 段 = 1/80 = 0.0125) ので、RS 入力の揺れで moveCount が ±1 微振動しても
-                //量子化値は変わらない。これをしないと、静止したはずのクロスポイント等が毎tick
-                //微振動で variant が変わり、<b>再焼き込みされ続けて重い</b> (bake が下がらない)。
-                //実際に転てつが動く時は 8 段階で焼き直すので見た目はほぼ同じ。
+                // getMovement を 8 段階に量子化して混ぜる。
+                // (1 段 = 1/80 = 0.0125) ので、RS 入力の揺れで moveCount が ±1 微振動しても
+                // 量子化値は変わらない。
                 int q = p == null ? 0 : Math.round(p.getMovement() * 8.0F);
                 key = key * 31L + q;
             }
         }
-        //Point を持たない分岐 (フォールバック描画) 用に開通方向も混ぜる
+        // Point を持たない分岐 (フォールバック描画) 用に開通方向も混ぜる
         key = key * 31L + be.getActiveSegmentIndex();
         key = key * 31L + be.getPreviousSegmentIndex();
         return key;
@@ -285,8 +243,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 int previousIndex = Mth.clamp(be.getPreviousSegmentIndex(), 0, maps.length - 1);
                 float switchProgress = be.getSwitchProgress(partialTick);
                 // 本家RTM準拠の分岐描画(LibRenderRail.js)。Point があるレールは:
-                //  ・base/ballast/sleeper は全 RailMap に沿って描画(地面なので重なりOK)
-                //  ・レール本体(railL/railR)とトング(L0/L1/R0/R1)は Point 単位で半分ずつ + トング分離アニメ
+                // ・base/ballast/sleeper は全 RailMap に沿って描画(地面なので重なりOK)
+                // ・レール本体(railL/railR)とトング(L0/L1/R0/R1)は Point 単位で半分ずつ + トング分離アニメ
                 // これでレール本体が二重に重ならず、転てつ時にトングが動く(本家と同じ)。
                 jp.ngt.rtm.rail.util.Point[] points = be.getSwitchPoints();
                 if (points != null && points.length > 0 && railModelHasSwitchParts(model)) {
@@ -385,8 +343,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         int[] clip = computeSwitchClip(map, mapIndex, layout, activeIndex, previousIndex, switchProgress, max);
         // 重なり除去: 基準ルート(primarySamples)と重なっている根元(先頭サンプル)は描かない。
         // ルート0と十分離れた(分岐した)位置から描くことで、トランクのレール二重描画を防ぐ。
-        // 閾値は「ルート0とほぼ一致しているトランク部分」だけを消す小さめの値にする。大きいと
-        // 分岐ルートがトランクから離れた所からしか描かれず、トランクと繋がらず「分岐に見えない」。
         int divergenceStart = primarySamples == null ? 0 : computeDivergenceStart(samples, primarySamples, 0.15);
         int startIndex = Math.min(Math.max(0, Math.max(clip[0], divergenceStart)), samples.length - 1);
         int endIndex = Math.max(startIndex, samples.length - 1 - Math.max(0, clip[1]));
@@ -564,7 +520,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 point.mainDirIsPositive, 0.0F, 0, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, 0.0F);
             return;
         }
-        //partialTick 補間版を使い、トングの動きを frame 間で滑らかにする (素の getMovement() は 20Hz でカクつく)。
+        // partialTick 補間版を使い、トングの動きを frame 間で滑らかにする (素の getMovement は 20Hz でカクつく)。
         float movement = point.getMovement(partialTick);
         int tongIndex = (int) Math.floor(point.rmMain.getLength() * 2.0 * TONG_POS);
         float move = movement * TONG_MOVE;
@@ -643,9 +599,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
      * RTM 互換: 分岐の非アクティブ方向をレールの「分岐点側」から徐々に切り詰めて
      * 「割れている」見た目を作る。
      * activeIndex / previousIndex / switchProgress で smoothstep 補間する。
-     *
-     * 戻り値は {clipFromStart, clipFromEnd} で、サンプル番号で何個分カットするかを表す。
-     * pos=0 を分岐点側と仮定し、非アクティブ側は clipFromStart を増やしてレールの根本を隠す。
      */
     private static int[] computeSwitchClip(RailMap map, int mapIndex, RenderSwitchLayout layout,
                                            int activeIndex, int previousIndex, float switchProgress, int sampleMax) {
@@ -685,7 +638,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
     /**
      * samples の先頭から、primary(基準ルート)と重なっている区間の長さ(クリップ数)を返す。
      * samples[i] が primary のどのサンプルからも threshold より離れたら、そこが分岐開始点。
-     * 分岐レールはこの位置から描けば、根元のトランクが基準ルートと二重に描かれない(本家RTM挙動)。
      */
     private static int computeDivergenceStart(RailSample[] samples, RailSample[] primary, double threshold) {
         if (samples == null || primary == null || samples.length == 0 || primary.length == 0) {
@@ -859,10 +811,9 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         float scale,
         MqoModelLoader.MqoModel model
     ) {
-        //本家 1.7.10 の TESR と同じく「レールのその区間の位置」の明るさで描く。
-        //コア 1 点の明るさ (常に埋没 → 上ブロック=空の明るさで救済) を全長に使うと、
-        //日陰・夜間・トンネル外でレールだけ明るく浮く。区間ごとにレール面すぐ上で
-        //サンプリングし、完全に真っ暗 (ブロック内サンプリング) の時だけ 1 つ上で救済。
+        // 本家 1.7.10 の TESR と同じく「レールのその区間の位置」の明るさで描く。
+        // コア 1 点の明るさ (常に埋没 → 上ブロック=空の明るさで救済) を全長に使うと、
+        // 日陰・夜間・トンネル外でレールだけ明るく浮く。
         if (blockEntity.getLevel() != null) {
             net.minecraft.core.BlockPos sp = net.minecraft.core.BlockPos.containing(wx, wy + 0.25D, wz);
             int segLight = net.minecraft.client.renderer.LevelRenderer.getLightColor(blockEntity.getLevel(), sp);
@@ -889,9 +840,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             groupName -> shouldRenderObject(blockEntity, groupName, max, pos),
             null
         );
-        //★半透明パスは距離で切らない。本家 BasicRailPartsRenderer.shouldRenderObject は
-        //無条件 true で、距離やグループ名でレールを間引く仕組みそのものが無い。
-        //ここで切ると遠くのレールからガラス/半透明部品だけが消える。
+        // ★半透明パスは距離で切らない。
+        // 無条件 true で、距離やグループ名でレールを間引く仕組みそのものが無い。
         if (model.hasTranslucentBatches()) {
             MqoModelLoader.renderModelWithoutScript(
                 model,
@@ -909,15 +859,9 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     /**
      * この位置でこのグループを描くか。
-     * <p>
-     * 本家 {@code RailPartsRenderer.shouldRenderObject(tile, objName, len, pos)} に丸投げする。
-     * スクリプトを持つパックはそこで枕木の周期・バラストの敷き方・端部品の出し方を決めており、
-     * スクリプトを持たないパックは本家 {@code BasicRailPartsRenderer} と同じく<b>無条件 true</b>。
-     * <p>
-     * ★以前はここで RTMU が独自に出し分けていた (ballast を {@code pos % 16} で回す、
-     * {@code sleeper_point} を常に隠す、{@code end/cap} は端だけ… など)。パック側の意図と
-     * 噛み合わず、特に分岐で道床と枕木がおかしくなっていた
-     * (分岐用枕木 {@code sleeper_point} が常に消えていた)。判断はパックに返す。
+     * 本家 RailPartsRenderer.shouldRenderObject(tile, objName, len, pos) に丸投げする。
+     * ★以前はここで RTMU が独自に出し分けていた (ballast を pos % 16 で回す、
+     * sleeper_point を常に隠す、end/cap は端だけ… など)。
      */
     private static boolean shouldRenderObject(TileEntityLargeRailCore be, String groupName, int max, int pos) {
         if (groupName == null || groupName.isBlank()) {
@@ -934,7 +878,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 }
             }
         } catch (Throwable ignored) {
-            //スクリプトが転んでもレールは描く (本家の既定と同じ true)
+            // スクリプトが転んでもレールは描く (本家の既定と同じ true)
         }
         return true;
     }
@@ -948,15 +892,15 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     @Override
     public boolean shouldRenderOffScreen(TileEntityLargeRailCore blockEntity) {
-        //true 必須: false だとコアブロックのあるチャンクセクションが視界から外れた瞬間に
-        //レール全体が消える (BE はセクション単位でカリングされるため)。本家 1.7.10 も
-        //ignoreFrustumCheck 相当で常時描画 (「レールはその場にある」)。
+        // true 必須: false だとコアブロックのあるチャンクセクションが視界から外れた瞬間に
+        // レール全体が消える (BE はセクション単位でカリングされるため)。本家 1.7.10 も
+        // ignoreFrustumCheck 相当で常時描画 (「レールはその場にある」)。
         return true;
     }
 
     @Override
     public int getViewDistance() {
-        //RTMU 設定でレール描画距離を変更可能 (既定 128)。「レールの描画が短い」対策。
+        // RTMU 設定でレール描画距離を変更可能 (既定 128)。「レールの描画が短い」対策。
         return com.portofino.realtrainmodunofficial.RtmuSettings.clampRailRenderDistance(
             com.portofino.realtrainmodunofficial.RtmuSettings.railRenderDistance);
     }

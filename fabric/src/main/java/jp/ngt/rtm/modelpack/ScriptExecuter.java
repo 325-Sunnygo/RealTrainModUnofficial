@@ -11,14 +11,8 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * 本家 jp.ngt.rtm.modelpack.ScriptExecuter 相当。
- *
- * <p>サーバースクリプト (serverScriptPath) は毎 tick
- * {@code onUpdate(entity, scriptExecuter)} として呼ばれ、第 2 引数にこれが渡る。
- * スクリプトはここから<b>バニラのコマンドを実行</b>できる。
- *
- * <p>本家は ICommandSender を実装していたが、1.21 のコマンドは
- * {@link CommandSourceStack} を取るので、実行のたびに組み立てる。
- * 権限レベルは本家と同じ 2 (コマンドブロック相当)、出力は捨てる。
+ * サーバースクリプト (serverScriptPath) は毎 tick
+ * onUpdate(entity, scriptExecuter) として呼ばれ、第 2 引数にこれが渡る。
  */
 public class ScriptExecuter {
 
@@ -30,8 +24,8 @@ public class ScriptExecuter {
     private final String name;
 
     /**
-     * 本家と同じ引数なし生成 (KaizPatchX ScriptExecuter は {@code new ScriptExecuter()})。
-     * world / 座標は本家同様 {@link #execScript} 時の caller から都度導出する
+     * 本家と同じ引数なし生成 (KaizPatchX ScriptExecuter は new ScriptExecuter)。
+     * world / 座標は本家同様 #execScript 時の caller から都度導出する
      * (本家 getEntityWorld / getPlayerCoordinates が caller を見るのと同じ)。
      */
     public ScriptExecuter() {
@@ -62,7 +56,7 @@ public class ScriptExecuter {
 
     /**
      * スクリプトから呼ばれる。バニラコマンドを実行する。
-     * 例: {@code scriptExecuter.execCommand("setblock 100 64 100 redstone_block")}
+     * 例: scriptExecuter.execCommand("setblock 100 64 100 redstone_block")
      */
     public void execCommand(String command) {
         if (command == null || command.isBlank() || this.level == null) {
@@ -143,7 +137,7 @@ public class ScriptExecuter {
 
     /**
      * 本家 callMethod: 対象のサーバースクリプト側の関数を名前で呼ぶ。
-     * 対象が {@code getServerScriptEngine()} を持てばそれを使う。
+     * 対象が getServerScriptEngine を持てばそれを使う。
      */
     public Object callMethod(Object selector, String name, Object... args) {
         if (selector == null || name == null) {
@@ -155,7 +149,7 @@ public class ScriptExecuter {
                 return jp.ngt.ngtlib.io.ScriptUtil.doScriptIgnoreError(se, name, args);
             }
         } catch (ReflectiveOperationException | RuntimeException ignored) {
-            //サーバースクリプトを持たない対象なら何もしない (本家も null を返す)
+            // サーバースクリプトを持たない対象なら何もしない (本家も null を返す)
         }
         return null;
     }

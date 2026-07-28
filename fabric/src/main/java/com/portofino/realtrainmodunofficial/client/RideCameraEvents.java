@@ -14,9 +14,6 @@ import net.neoforged.neoforge.client.event.InputEvent;
 /**
  * 列車に乗っているときだけ、三人称視点の距離をホイールで遠ざけられるようにする。
  * 編成全体を見渡せるように、バニラ固定の 4 ブロックより大きく引ける。
- *
- * <p>シネマカメラ ({@link RtmCamera}) が有効なときはそちらがホイールを持つので手を出さない。
- * 一人称のときも何もしない (通常のホットバー操作を残す)。
  */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class RideCameraEvents {
@@ -49,7 +46,7 @@ public final class RideCameraEvents {
         }
         double dy = event.getScrollDeltaY();
         if (dy != 0.0D) {
-            //ホイール奥 (up, dy>0) = 引く (遠ざける)、手前 (down) = 寄る。
+            // ホイール奥 (up, dy>0) = 引く (遠ざける)、手前 (down) = 寄る。
             distance = Mth.clamp(distance + (float) dy * STEP, MIN_DISTANCE, MAX_DISTANCE);
             event.setCanceled(true);
         }

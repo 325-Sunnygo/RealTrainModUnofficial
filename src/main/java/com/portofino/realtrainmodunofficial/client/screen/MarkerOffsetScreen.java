@@ -12,16 +12,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * マーカーの位置調整 (レンチのモード「マーカー位置調整」でマーカーを右クリック)。
- * <p>
  * 本家のマーカーはブロック単位でしか置けず、レールの端は必ず
- * 「ブロック中心 + 向きごとの固定オフセット ({@code RailPosition.REVISION})」に来る。
- * そのため線路の位置をブロック未満で詰めることができない。
- * <p>
- * ここで指定した値は {@link RailPosition#freePos} として保存され、
- * {@code posX/posY/posZ} が一次情報になる。曲線 ({@code RailMapBasic}) は元々 posXYZ だけを
- * 見ているので、これだけでレールの端が自由な位置に来る。
- * <p>
- * 単位は <b>1/16 ブロック</b>。マーカーの既定位置からのずれを入れる。
+ * 「ブロック中心 + 向きごとの固定オフセット (RailPosition.REVISION)」に来る。
  */
 public class MarkerOffsetScreen extends Screen {
 
@@ -96,18 +88,18 @@ public class MarkerOffsetScreen extends Screen {
         double dz = clamp(parse(fieldZ)) * 0.0625D;
 
         if (dx == 0.0D && dy == 0.0D && dz == 0.0D) {
-            //既定位置に戻す。freePos を降ろせば init() が本家どおり導出する。
+            // 既定位置に戻す。freePos を降ろせば init が本家どおり導出する。
             rp.freePos = false;
             rp.init();
         } else {
-            //posXYZ を一次情報にする (以後 init() は上書きしない)
+            // posXYZ を一次情報にする (以後 init は上書きしない)
             rp.freePos = true;
             rp.posX = base[0] + dx;
             rp.posY = base[1] + dy;
             rp.posZ = base[2] + dz;
         }
 
-        //ローカルのプレビュー再構築 + サーバーへ RP 全体を送信 (カント/アンカー編集と同じ経路)
+        // ローカルのプレビュー再構築 + サーバーへ RP 全体を送信 (カント/アンカー編集と同じ経路)
         marker.onChangeRailShape();
         PacketDistributor.sendToServer(new MarkerAnchorPayload(marker.getBlockPos(), rp.writeToNBT()));
     }

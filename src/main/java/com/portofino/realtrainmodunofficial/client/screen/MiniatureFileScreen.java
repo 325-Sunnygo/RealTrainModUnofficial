@@ -19,9 +19,6 @@ import java.util.List;
 /**
  * NGTO ファイルの選択 / 書き出し画面 (neo mcte)。
  * 本家 MCTE の「選択」「書き出し」ボタンから開く画面に相当する。
- *
- * <p>本家は選択ダイアログが無く、ファイル名を打つ形だった。neo mcte では<b>一覧から選ぶ</b>。
- * 何が入っているか分からないまま名前を打つのが、ミニチュアを扱うときの一番の手間だったため。
  */
 public class MiniatureFileScreen extends Screen {
 

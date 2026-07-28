@@ -1,21 +1,8 @@
 package jp.ngt.ngtlib.block;
 
 /**
- * 本家 {@code jp.ngt.ngtlib.block.TileEntityPlaceable} 相当。
- *
- * <p>NGTO Builder は設置の最後にこれで向きを与える:
- * <pre>
- * // lib_BlockBuilder.js:240-243
- * if (tile instanceof TileEntityPlaceable) {
- *     var rotation = tile.getRotation() + yaw;
- *     tile.setRotation(rotation, true);
- * }
- * </pre>
- *
- * <p>以前はダミーの<b>クラス</b>で、RTMU の実タイル (InstalledObjectBlockEntity) は
- * これを継承していなかった。そのため {@code instanceof} が常に false になり
- * <b>設置物の向きが一度も適用されず</b>、架線柱が線路と揃わず傾いて見えていた。
- * 実タイルに実装させるためインタフェースにしてある。
+ * 本家 jp.ngt.ngtlib.block.TileEntityPlaceable 相当。
+ * NGTO Builder は設置の最後にこれで向きを与える:
  */
 public interface TileEntityPlaceable {
 

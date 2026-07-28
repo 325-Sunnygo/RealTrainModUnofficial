@@ -51,7 +51,7 @@ public class ItemRail extends Item {
 
         Block block = world.getBlockState(pos).getBlock();
         if (block instanceof BlockMarker) {
-            //マーカーには BlockMarker 側の処理を通す
+            // マーカーには BlockMarker 側の処理を通す
             return InteractionResult.PASS;
         }
         if (!world.isClientSide && player != null) {
@@ -61,13 +61,11 @@ public class ItemRail extends Item {
                 if (core != null) {
                     RailProperty property = ItemRail.getProperty(itemStack);
                     if (property != null) {
-                        //本家はシフトで差し替え / 素で重ねレールだったが、通常のレールアイテム
-                        //(モデル選択式) を「右クリックでモデル差し替え」にしたので、こちらも
-                        //操作を揃える。両方のレールアイテムで挙動が逆だと混乱するため。
+                        // 本家と同じ操作。素で重ね、シフトで差し替え。
                         if (player.isShiftKeyDown()) {
-                            core.addSubRail(property);
-                        } else {
                             core.replaceRail(property);
+                        } else {
+                            core.addSubRail(property);
                         }
                     }
                 }
@@ -175,9 +173,9 @@ public class ItemRail extends Item {
 
     private static void setRPToItem(ItemStack stack, RailPosition[] rps) {
         CompoundTag nbt = getTag(stack);
-        //rps が null (レール変換中/破壊直後でコアがまだ RailPosition を持たない) の場合、
-        //rps.length で NPE になり WAILA のツールチップ表示だけでゲームが落ちていた。
-        //null/空なら Size=0 で書き込む (アイテムは形状情報無しでも成立する)。
+        // rps が null (レール変換中/破壊直後でコアがまだ RailPosition を持たない) の場合、
+        // rps.length で NPE になり WAILA のツールチップ表示だけでゲームが落ちていた。
+        // null/空なら Size=0 で書き込む (アイテムは形状情報無しでも成立する)。
         int size = rps == null ? 0 : rps.length;
         nbt.putByte("Size", (byte) size);
         for (int i = 0; i < size; ++i) {
@@ -202,7 +200,7 @@ public class ItemRail extends Item {
     private boolean placeRail(Level world, int x, int y, int z, ItemStack stack, Player player) {
         List<RailPosition> rps = getRPFromItem(stack);
         if (!rps.isEmpty()) {
-            //45刻みへ変換 (本家: BlockMarker.getMarkerDir(null, getFacing(player, false)))
+            // 45刻みへ変換 (本家: BlockMarker.getMarkerDir(null, getFacing(player, false)))
             int playerFacing = Mth.floor(jp.ngt.ngtlib.math.NGTMath.normalizeAngle(player.getYRot() + 180.0D) / 45.0D + 0.5D) & 7;
             playerFacing = playerFacing / 2 + (playerFacing % 2 == 0 ? 0 : 4);
             int i0 = playerFacing & 3;

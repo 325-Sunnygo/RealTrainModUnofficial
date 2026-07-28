@@ -15,9 +15,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
- * 最小イベントバス。@SubscribeEvent の static/インスタンスメソッドを型別に登録し、
- * post() で「イベント型に代入可能なリスナー全部」へ配送する。
- * NeoForge の優先度/継承階層キャッシュ等は RTMU が使っていないため持たない。
+ * 最小イベントバス。
+ * post で「イベント型に代入可能なリスナー全部」へ配送する。
  */
 public final class ShimEventBus implements IEventBus {
 
@@ -30,10 +29,8 @@ public final class ShimEventBus implements IEventBus {
     @Override
     @SuppressWarnings("unchecked")
     public <T extends Event> void addListener(Consumer<T> listener) {
-        //型引数はランタイム消去で取れない。総称 addListener はラムダ登録に使われるが、
-        //RTMU では型明示版 or @SubscribeEvent 経由が大半。ここでは Event 全体に登録し
-        //ハンドラ内で ClassCastException にならないよう type=Event で受けるのは危険なので、
-        //リフレクションでラムダの引数型を推定できない以上、明示版の使用を必須にする。
+        // 型引数はランタイム消去で取れない。
+        // RTMU では型明示版 or @SubscribeEvent 経由が大半。
         throw new UnsupportedOperationException(
             "型消去のため addListener(Consumer) は使えません。addListener(Class, Consumer) を使ってください");
     }

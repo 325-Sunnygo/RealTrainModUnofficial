@@ -20,9 +20,9 @@ public final class MovingObjectPosition {
     public final int field_72310_e;
     /**
      * sideHit (1.8+ の EnumFacing 版)。
-     * <pre>NGTO Builder.zip!.../Wire/render_Wire.js:538  mop.field_178784_b</pre>
-     * スクリプトは続けて {@code .func_176745_a()} でインデックスを取るため、
-     * 生の {@link net.minecraft.core.Direction} を持たせる。
+     * NGTO Builder.zip!.../Wire/render_Wire.js:538  mop.field_178784_b
+     * スクリプトは続けて .func_176745_a でインデックスを取るため、
+     * 生の net.minecraft.core.Direction を持たせる。
      */
     public final net.minecraft.core.Direction field_178784_b;
 
@@ -50,9 +50,7 @@ public final class MovingObjectPosition {
         return null;
     }
 
-    /**
-     * 1.7.10 Vec3 互換 (xCoord/yCoord/zCoord の SRG 名)。
-     */
+    /** 1.7.10 Vec3 互換 (xCoord/yCoord/zCoord の SRG 名)。 */
     public static final class Vec3Compat {
         /** xCoord */
         public final double field_72450_a;

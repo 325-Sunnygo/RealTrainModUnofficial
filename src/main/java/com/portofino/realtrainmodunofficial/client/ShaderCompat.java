@@ -5,12 +5,11 @@ import java.lang.reflect.Method;
 /**
  * Detects whether an Iris/Oculus shader pack is currently active, via reflection so
  * Iris is not a hard dependency.
- *
- * <p>Used by the model renderer: the "fullbright" fast direct-GL path renders the
+ * Used by the model renderer: the "fullbright" fast direct-GL path renders the
  * train body with flat shading and bypasses the shader pipeline, which makes vertex
  * normal smoothing disappear under shaders. When a shader pack is in use we fall back
  * to the buffered, normal-lit render path so smoothing works. No model/normal/light
- * numeric values are changed — only the render path is chosen.</p>
+ * numeric values are changed — only the render path is chosen.
  */
 public final class ShaderCompat {
     private static Boolean available;
@@ -24,7 +23,7 @@ public final class ShaderCompat {
     /** シェーダーパックの ON/OFF が切り替わるたびに増える。焼き込みの作り直し判定に使う。 */
     private static int epoch;
 
-    /** フレーム頭で 1 回呼ぶ。切り替わったら {@link #epoch()} が動く。 */
+    /** フレーム頭で 1 回呼ぶ。切り替わったら #epoch が動く。 */
     public static void refresh() {
         boolean now = isShaderPackInUse();
         if (now != cachedActive) {
@@ -33,7 +32,7 @@ public final class ShaderCompat {
         }
     }
 
-    /** 直近の {@link #refresh()} 時点でシェーダーパックが有効か (リフレクション無し)。 */
+    /** 直近の #refresh 時点でシェーダーパックが有効か (リフレクション無し)。 */
     public static boolean active() {
         return cachedActive;
     }

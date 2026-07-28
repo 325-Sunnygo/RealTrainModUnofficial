@@ -3,14 +3,8 @@ package com.portofino.realtrainmodunofficial.client;
 import net.minecraft.core.BlockPos;
 
 /**
- * クライアントが持つ選択範囲 (neo mcte)。MCTEU {@code MCTEUnoffficialClient.pos1/pos2} と同じ持ち方。
- *
- * <p>★ワールドに実体を置かない。エンティティにしていた頃は
- * 「離れると追跡が切れて消える」「チャンクが退避すると引けない」で選択がすぐ消えていた。
- * ただの静的フィールドなので、どこへ飛んでも消えない。
- *
- * <p>サーバ側は {@code EditorSelection} が同じ内容をプレイヤー単位で持つ。
- * 操作 (フィルタ実行) のたびにここの値を送って揃える。
+ * クライアントが持つ選択範囲 (neo mcte)。MCTEU MCTEUnoffficialClient.pos1/pos2 と同じ持ち方。
+ * ★ワールドに実体を置かない。
  */
 public final class ClientSelection {
 
@@ -19,8 +13,7 @@ public final class ClientSelection {
 
     /**
      * 直前までの選択 (neo mcte 追加)。
-     * <p>広い範囲を組み直したあとで「さっきの範囲に戻したい」ことが多い。
-     * 確定した範囲だけを積む。
+     * 広い範囲を組み直したあとで「さっきの範囲に戻したい」ことが多い。
      */
     private static final java.util.ArrayDeque<BlockPos[]> HISTORY = new java.util.ArrayDeque<>();
     private static final int MAX_HISTORY = 16;
@@ -56,7 +49,7 @@ public final class ClientSelection {
     }
 
     public static void setEnd(BlockPos pos) {
-        //確定するたびに 1 つ前の範囲を控える
+        // 確定するたびに 1 つ前の範囲を控える
         if (pos1 != null && pos2 != null && !pos2.equals(pos)) {
             HISTORY.push(new BlockPos[]{pos1, pos2});
             while (HISTORY.size() > MAX_HISTORY) {
