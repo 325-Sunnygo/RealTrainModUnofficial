@@ -336,27 +336,10 @@ public final class VehicleScriptRenderers {
         /** このモデルの素テクスチャパス集合 (小文字正規化)。復帰bindの判定に使う。 */
         private final java.util.Set<String> defaultTexPaths = new java.util.HashSet<>();
 
-        /**
-         * 使い回す記録の置き場。
-         *
-         * <p>1 両を描く間に通常パス・発光下地・発光パス…と複数の記録が<b>同時に生きる</b>ので、
-         * 1 本では足りない。{@code renderReal} の頭で番号を 0 に戻し、必要になった順に配る。
-         * 車両をまたぐと同じインスタンスが再利用される (前の車両のぶんは描き終わっている)。
-         *
-         * <p>★半透明パスだけはここから配らない。あれは後回しキューに積まれてフレーム後半まで
-         * 生き残るので、使い回すと次の車両の記録で中身が書き換わってしまう。
-         */
-        private final java.util.List<GLRecorder> scratch = new java.util.ArrayList<>();
-        private int scratchIndex;
-
-        private GLRecorder nextScratch() {
-            if (this.scratchIndex == this.scratch.size()) {
-                this.scratch.add(new GLRecorder());
-            }
-            GLRecorder rec = this.scratch.get(this.scratchIndex++);
-            rec.clear();
-            return rec;
-        }
+        //★以前あった「車両をまたいで使い回す記録の置き場」は撤去した。
+        //  記録はエンティティごとに持つようになり (recordCache)、
+        //  次の車両の描画で中身が書き換わることが無くなったため。
+        //  半透明パスを別扱いしていたのも同じ理由で不要になった。
 
         Scripted(VehiclePartsRenderer renderer, ScriptEngine engine, ModelObject modelObject, String defId) {
             this.defId = defId;
@@ -465,8 +448,6 @@ public final class VehicleScriptRenderers {
         private boolean renderReal(Object entity, float partialTick, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight, int packedOverlay,
                                    MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
-            //この車両ぶんの記録の配り直し (前の車両のぶんは描き終わっている)
-            this.scratchIndex = 0;
             //本家 RenderVehicleBase.doRender: 通常描画 (RenderPass.NORMAL) → 発光描画 (renderBodyLight)
             GLRecorder normal = record(entity, RenderPass.NORMAL.id, partialTick);
             //★ isEmpty ではなく hasGeometry で判定する。スクリプトが何も描かずに落ちると
@@ -791,31 +772,116 @@ public final class VehicleScriptRenderers {
         }
 
         /** スクリプトの render(entity, pass, partialTick) を 1 パスぶん記録する。 */
-        private GLRecorder record(Object entity, int pass, float partialTick) {
-            return record(entity, pass, partialTick, false);
+
+        // ------------------------------------------------------------------
+        // スクリプト実行をフレームレートから切り離す
+        // ------------------------------------------------------------------
+
+        /**
+         * <b>1 tick を何分割まで記録し直すか。</b>
+         *
+         * <p>車両の描画は毎フレーム Nashorn の {@code render()} を呼び直している。
+         * 60fps 前提の設計なので、Vulkan / Nvidium 等で 2000fps 出る環境では
+         * <b>1 秒に 2000 回 × パス数 × 両数</b>だけスクリプトが走り、CPU がそこで詰まる。
+         * 地形をいくら速くしても縮まないのはこのため (これは描画ではなく計算)。
+         *
+         * <p>そこで<b>記録し直す間隔に下限</b>を設ける。4 分割 = 1 tick 50ms なので
+         * 12.5ms ごと = 最大 80Hz。
+         *
+         * <pre>
+         *   60fps  … 毎フレーム記録し直す (60 &lt; 80 なので<b>従来と完全に同じ</b>)
+         *   2000fps… 80Hz に丸まる (25 分の 1)。見た目は変わらない
+         * </pre>
+         *
+         * <p>★これは<b>描画を削る変更ではない</b>。描くものは毎フレーム描く。
+         * 減らすのは「同じ結果になる計算を何度もやり直す」ぶんだけ。
+         */
+        private static final int RECORD_QUANTA_PER_TICK = 4;
+
+        /** 1 スロット = ある (パス, マテリアル) の記録と、それを録った時刻。 */
+        private static final class RecordSlot {
+            GLRecorder rec;
+            long quantum = Long.MIN_VALUE;
+            boolean failed;
         }
 
         /**
-         * @param fresh true = 使い回さず新しい記録を作る。フレーム後半まで持ち越すもの (半透明パス) 用
+         * エンティティごとの記録。<b>弱参照</b>なので、車両が消えれば一緒に消える。
+         * <p>描画スレッドからしか触らないので同期は不要。
          */
-        private GLRecorder record(Object entity, int pass, float partialTick, boolean fresh) {
+        private final java.util.WeakHashMap<Object, java.util.Map<Integer, RecordSlot>> recordCache =
+            new java.util.WeakHashMap<>();
+
+        /**
+         * いまの「記録時刻」。tick とフレーム内位置をまとめて量子化した値。
+         * <p>ワールドが取れないときは {@link Long#MIN_VALUE} を返し、呼び出し側は必ず録り直す。
+         */
+        private static long recordQuantum(Object entity, float partialTick) {
+            long gameTime;
+            if (entity instanceof net.minecraft.world.entity.Entity e && e.level() != null) {
+                gameTime = e.level().getGameTime();
+            } else {
+                net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+                if (mc.level == null) {
+                    return Long.MIN_VALUE;
+                }
+                gameTime = mc.level.getGameTime();
+            }
+            float clamped = partialTick < 0.0F ? 0.0F : (partialTick > 1.0F ? 1.0F : partialTick);
+            return gameTime * RECORD_QUANTA_PER_TICK + (long) (clamped * RECORD_QUANTA_PER_TICK);
+        }
+
+        /**
+         * 記録を取り直すか、前のものを使い回すかを決める。
+         *
+         * @param matId 0 = 本体パス、それ以外 = マテリアル別オーバーレイ
+         * @return 記録。スクリプトが何も描かずに落ちたときは null
+         */
+        private GLRecorder recordCached(Object entity, int pass, int matId, float partialTick) {
+            long quantum = recordQuantum(entity, partialTick);
+            //エンティティが無い (モデル選択画面のプレビュー等) / 時刻が取れない場合は
+            //使い回さない。使い回す相手を特定できないため。
+            if (entity == null || quantum == Long.MIN_VALUE) {
+                return recordFresh(entity, pass, matId, partialTick, new GLRecorder());
+            }
+            java.util.Map<Integer, RecordSlot> perPass =
+                this.recordCache.computeIfAbsent(entity, k -> new java.util.HashMap<>());
+            int key = (pass << 16) | (matId & 0xFFFF);
+            RecordSlot slot = perPass.computeIfAbsent(key, k -> new RecordSlot());
+            if (slot.quantum == quantum) {
+                //同じ量子の中: 何度呼ばれても結果は同じなので録り直さない
+                return slot.failed ? null : slot.rec;
+            }
+            if (slot.rec == null) {
+                slot.rec = new GLRecorder();
+            }
+            GLRecorder result = recordFresh(entity, pass, matId, partialTick, slot.rec);
+            slot.quantum = quantum;
+            slot.failed = result == null;
+            return result;
+        }
+
+        /** 実際にスクリプトを走らせて {@code target} へ録る。 */
+        private GLRecorder recordFresh(Object entity, int pass, int matId, float partialTick,
+                                       GLRecorder target) {
             long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
-            GLRecorder rec = fresh ? new GLRecorder() : nextScratch();
-            GLRecorder.activate(rec);
+            target.clear();
+            GLRecorder.activate(target);
             try {
-                this.renderer.currentMatId = 0;
+                this.renderer.currentMatId = matId;
                 this.renderer.currentPass = pass;
                 this.renderer.render(entity, pass, partialTick);
             } catch (Throwable t) {
                 //以前は車両ごとに 1 回しかログしなかったため、起動直後の別要因で 1 回出ると
                 //以後の失敗が全て無音になっていた。失敗の種類 (メッセージ) ごとに 1 回出す。
-                String key = pass + "|" + String.valueOf(t);
-                if (this.loggedFailures.size() < 32 && this.loggedFailures.add(key)) {
+                String logKey = pass + "|" + String.valueOf(t);
+                if (matId == 0 && this.loggedFailures.size() < 32 && this.loggedFailures.add(logKey)) {
                     RealTrainModUnofficial.LOGGER.warn("[RTMU] スクリプト描画に失敗: {} (pass={})",
                             this.defId, pass, t);
                 }
                 return null;
             } finally {
+                this.renderer.currentMatId = 0;
                 this.renderer.currentPass = 0;
                 GLRecorder.deactivate();
                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
@@ -825,7 +891,20 @@ public final class VehicleScriptRenderers {
             //(発光パスの途中で落ちる車両が多く、記録ごと捨てるとライトが消える)。
             //「何も描かずに落ちた」かどうかは呼び出し側が rec.hasGeometry() で判断する。
             this.renderer.consumeScriptFailure();
-            return rec;
+            return target;
+        }
+
+        private GLRecorder record(Object entity, int pass, float partialTick) {
+            return record(entity, pass, partialTick, false);
+        }
+
+        /**
+         * @param fresh 使わない。記録はエンティティごとに持つようになったので、
+         *              フレーム後半まで持ち越しても他の車両に壊されない
+         *              (以前は使い回しバッファだったので専用の記録が要った)
+         */
+        private GLRecorder record(Object entity, int pass, float partialTick, boolean fresh) {
+            return recordCached(entity, pass, 0, partialTick);
         }
 
         /**
@@ -888,24 +967,7 @@ public final class VehicleScriptRenderers {
 
         /** render() を指定 matId で 1 パス記録する (tessellator オーバーレイ捕捉用)。 */
         private GLRecorder recordMat(Object entity, int pass, float partialTick, int matId) {
-            long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
-            GLRecorder rec = new GLRecorder();
-            GLRecorder.activate(rec);
-            try {
-                this.renderer.currentMatId = matId;
-                this.renderer.currentPass = pass;
-                this.renderer.render(entity, pass, partialTick);
-            } catch (Throwable t) {
-                return null;
-            } finally {
-                this.renderer.currentMatId = 0;
-                this.renderer.currentPass = 0;
-                GLRecorder.deactivate();
-                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
-                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_RECORD, secStart);
-            }
-            this.renderer.consumeScriptFailure();
-            return rec;
+            return recordCached(entity, pass, matId, partialTick);
         }
 
         /** マテリアル matId のテクスチャ (MqoModel が matId 順に解決済みで保持)。 */
