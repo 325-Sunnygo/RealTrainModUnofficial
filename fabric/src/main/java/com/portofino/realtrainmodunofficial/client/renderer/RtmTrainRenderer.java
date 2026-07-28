@@ -178,7 +178,46 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                         interiorLightingActive ? def.getInteriorLights() : null,
                         interiorLightState == 2, entity.level().getGameTime() * 50L);
                     try {
-                        MqoModelLoader.renderModel(model, poseStack, buffer, bodyLight, filter, doorTransform, entity);
+                        //★<b>静的な車体は VBO へ焼いて使い回す。</b>
+                        //
+                        //ここは以前まで<b>毎フレーム全頂点を CPU で変換して書き出して</b>いた。
+                        //スクリプトを持つ車両は焼き込み (VehicleMeshCache) に載っていたが、
+                        //素の車両はこの経路なので載っておらず、300 系のような同梱車両でも
+                        //1 両置くだけで描画時間が跳ね上がっていた。
+                        //
+                        //焼けないフレーム (枠が埋まった・毎フレーム絵が変わる) は
+                        //<b>自動で下の CPU 経路へ落ちる</b>ので、最悪でも従来と同じ。
+                        //走行中やドア開閉中は VehicleMeshCache が「動く車両」と判定して
+                        //焼くのを諦めるため、焼き直しで却って重くなることも無い。
+                        //★<b>動く部品と動かない車体を分ける。</b>
+                        //
+                        //一緒に焼くと、ドアやパンタが少し動いただけで<b>車体まるごと</b>
+                        //焼き直しになる。動くグループは車体全体から見ればごく一部なので、
+                        //そこだけ毎フレーム CPU で描き、残りは焼いたまま使い回す。
+                        //こうすると焼き込みキーからドアの開き具合が消え、
+                        //ドアを開け閉めしても車体は焼き直されない。
+                        MqoModelLoader.GroupPredicate staticFilter =
+                            n -> filter.shouldRender(n) && !doorTransform.mayModify(n);
+                        MqoModelLoader.GroupPredicate movingFilter =
+                            n -> filter.shouldRender(n) && doorTransform.mayModify(n);
+
+                        int bakeKey = bodyBakeKey(entity, bodyLight,
+                            interiorLightingActive, interiorLightState);
+                        //同じ車両定義・同じ状態なら<b>編成の全車で 1 本の VBO を共有</b>する。
+                        boolean bodyBaked = com.portofino.realtrainmodunofficial.client.render
+                            .VehicleMeshCache.draw(def.getId(), entity, 2, poseStack, bakeKey,
+                                //焼くときは単位行列で再生する
+                                //(カメラ相対の pose で焼くと視点に付いてくる)。
+                                //動く部品は入れないので変換も渡さない。
+                                buf -> MqoModelLoader.renderModel(model, new PoseStack(), buf,
+                                    bodyLight, staticFilter, null, entity));
+                        if (!bodyBaked) {
+                            MqoModelLoader.renderModel(model, poseStack, buffer, bodyLight,
+                                staticFilter, null, entity);
+                        }
+                        //動く部品 (ドア・パンタ等)。持たない車両ならここは何も描かない。
+                        MqoModelLoader.renderModel(model, poseStack, buffer, bodyLight,
+                            movingFilter, doorTransform, entity);
                     } finally {
                         com.portofino.realtrainmodunofficial.client.render.InteriorLighting.end();
                     }
@@ -244,6 +283,34 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
      * ヘルパーグループ (shadow/guide/atari/影ms/連結曲げ変種) の除外。
      * 台車グループは別台車モデルがある場合のみ非表示 (EntityBogie 側が描画)。
      */
+
+    /**
+     * 焼いた車体を使い回してよいかの判定キー。
+     *
+     * <p>頂点の中身が変わる要素を全部混ぜる。<b>1 つでも入れ忘れると古い絵が残る</b>
+     * (踏切のランプが固まったのと同じ壊れ方をする)。
+     *
+     * <ul>
+     *   <li>明るさ … 車両ごとに 1 つ。頂点へ焼き込まれる</li>
+     *   <li>ドアの開き具合 … 部品の位置が動く</li>
+     *   <li>室内灯 … 頂点色が変わる。<b>点いている間は時刻も混ぜる</b>ので、
+     *       明滅する実装でも固まらない (そのぶん焼き直しになるが、
+     *       VehicleMeshCache が動く車両と判定して CPU 経路へ落とす)</li>
+     * </ul>
+     */
+    private static int bodyBakeKey(jp.ngt.rtm.entity.train.EntityTrainBase entity, int bodyLight,
+                                   boolean interiorLightingActive, int interiorLightState) {
+        //★ドアの開き具合は<b>入れない</b>。動く部品は焼き込みに含めず毎フレーム描くので、
+        //  ここに入れるとドアを触るたび車体が焼き直しになるだけで意味が無い。
+        int key = bodyLight;
+        key = 31 * key + (interiorLightingActive ? 1 : 0);
+        key = 31 * key + interiorLightState;
+        if (interiorLightingActive) {
+            key = 31 * key + (int) entity.level().getGameTime();
+        }
+        return key;
+    }
+
     private static boolean shouldRenderGroup(String groupName) {
         if (groupName == null || groupName.isBlank()) {
             return true;

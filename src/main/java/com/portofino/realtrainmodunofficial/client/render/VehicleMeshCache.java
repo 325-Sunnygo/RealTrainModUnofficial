@@ -71,38 +71,60 @@ public final class VehicleMeshCache {
     private static int bakesThisFrame;
     private static int frameCounter;
 
-    private static final class Entry {
-        int key;
-        boolean hasKey;
+    /**
+     * 焼いたメッシュ 1 つ。<b>形が同じ車両どうしで共有する。</b>
+     *
+     * <p>以前は「車両 1 両につき 1 つ」だったので、10 両編成では<b>中身が完全に同じ VBO を
+     * 10 本</b>焼いて 10 両ぶんの VRAM を使っていた。同じ車両定義・同じ状態なら絵は同一なので、
+     * 1 本を全車で使い回す。編成が長いほど効く。
+     *
+     * <p>明るさは頂点に焼き込まれるため、先頭がトンネル・後ろが屋外のように
+     * <b>明るさが違う車は別のメッシュ</b>になる (それでも同じ明るさの車どうしは共有される)。
+     */
+    private static final class Mesh {
         List<MeshCapture.Section> sections = List.of();
-        int churn;
-        boolean dynamic;
-        int retryAtFrame;
 
         void close() {
             for (MeshCapture.Section s : sections) {
                 s.close();
             }
             sections = List.of();
-            hasKey = false;
         }
     }
 
-    private static final Map<Object, Entry[]> CACHE =
-        new LinkedHashMap<>(32, 0.75F, true) {
+    /** メッシュを引くキー。「どの形を」「どの枠で」「どの状態で」焼いたか。 */
+    private record MeshKey(Object shape, int slot, int key) {
+    }
+
+    /**
+     * 「毎フレーム絵が変わる車両か」の判定は<b>車両ごとに</b>持つ。
+     *
+     * <p>メッシュ側を状態ごとに分けたので、走行中は毎フレーム別のキーになる。
+     * ここを共有してしまうと「キーが変わった」を検知できず、<b>毎フレーム新しい VBO を
+     * 焼き続ける</b>ことになる (一番やってはいけない壊れ方)。だから判定だけは車両ごと。
+     */
+    private static final class Churn {
+        int lastKey;
+        boolean hasKey;
+        int count;
+        boolean dynamic;
+        int retryAtFrame;
+    }
+
+    private static final Map<MeshKey, Mesh> MESHES =
+        new LinkedHashMap<>(64, 0.75F, true) {
             @Override
-            protected boolean removeEldestEntry(Map.Entry<Object, Entry[]> eldest) {
+            protected boolean removeEldestEntry(Map.Entry<MeshKey, Mesh> eldest) {
                 if (size() > MAX_ENTRIES) {
-                    for (Entry e : eldest.getValue()) {
-                        if (e != null) {
-                            e.close();
-                        }
-                    }
+                    eldest.getValue().close();
                     return true;
                 }
                 return false;
             }
         };
+
+    /** 車両 (弱参照) → 枠ごとの churn 判定。車両が消えれば一緒に消える。 */
+    private static final Map<Object, Churn[]> CHURN = new java.util.WeakHashMap<>();
 
     private VehicleMeshCache() {
     }
@@ -122,61 +144,85 @@ public final class VehicleMeshCache {
      */
     public static boolean draw(Object entity, int slot, PoseStack poseStack, int key,
                                Consumer<MultiBufferSource> baker) {
-        if (entity == null || poseStack == null || baker == null || slot < 0 || slot >= SLOTS) {
+        return draw(entity, entity, slot, poseStack, key, baker);
+    }
+
+    /**
+     * 焼き込みで描く。
+     *
+     * @param shape 同じ絵になる車両どうしで<b>共有する単位</b> (車両定義 ID 等)。
+     *              {@code entity} を渡すと従来どおり 1 両ごとに焼く
+     * @param key   焼き直し判定キー (本家 createStaticRenderKey 相当)
+     * @param baker キーが変わったときだけ呼ばれる。<b>単位行列基準</b>で描くこと
+     * @return true = 描画した (呼び出し元は CPU 経路へ落とさない)
+     */
+    public static boolean draw(Object shape, Object entity, int slot, PoseStack poseStack, int key,
+                               Consumer<MultiBufferSource> baker) {
+        if (shape == null || entity == null || poseStack == null || baker == null
+                || slot < 0 || slot >= SLOTS) {
             return false;
         }
 
-        Entry[] slots = CACHE.computeIfAbsent(entity, k -> new Entry[SLOTS]);
-        Entry entry = slots[slot];
-        if (entry == null) {
-            entry = new Entry();
-            slots[slot] = entry;
+        Churn[] churnSlots = CHURN.computeIfAbsent(entity, k -> new Churn[SLOTS]);
+        Churn churn = churnSlots[slot];
+        if (churn == null) {
+            churn = new Churn();
+            churnSlots[slot] = churn;
         }
 
-        if (entry.dynamic) {
-            if (frameCounter - entry.retryAtFrame < 0) {
+        if (churn.dynamic) {
+            if (frameCounter - churn.retryAtFrame < 0) {
                 return false;
             }
-            entry.dynamic = false;
-            entry.churn = 0;
+            churn.dynamic = false;
+            churn.count = 0;
         }
 
-        boolean valid = entry.hasKey && entry.key == key && isUsable(entry.sections);
+        MeshKey meshKey = new MeshKey(shape, slot, key);
+        Mesh mesh = MESHES.get(meshKey);
+        boolean valid = mesh != null && isUsable(mesh.sections);
         if (!valid) {
             //★キーが変わったのに焼き直せないときは<b>古い絵を描かない</b>。
             //  以前はここで前フレームのメッシュを描いて次へ回していたが、枠が空かない限り
             //  古い絵のまま固まる。踏切のランプが「音は鳴るのに点滅しない」のはこれ。
             //  焼けないフレームは CPU 経路へ落とす。1 フレームぶん重いだけで絵は必ず合う。
+            if (mesh != null) {
+                mesh.close();
+                MESHES.remove(meshKey);
+            }
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
                 return false;
-            } else if (entry.hasKey && ++entry.churn >= DYNAMIC_AFTER) {
-                //走行中・ドア開閉中など、毎フレーム絵が変わる車両。焼くほうが高くつく。
-                entry.close();
-                entry.dynamic = true;
-                entry.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
-                return false;
-            } else {
-                bakesThisFrame++;
-                entry.close();
-                List<MeshCapture.Section> baked = bake(baker);
-                if (baked == null) {
-                    entry.dynamic = true;
-                    entry.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
-                    return false;
-                }
-                entry.sections = baked;
-                entry.key = key;
-                entry.hasKey = true;
             }
-        } else {
-            entry.churn = 0;
+            //この車両にとって「前回と違うキー」なら、絵が動いている可能性を数える。
+            //別の車が既に焼いたメッシュに当たっただけなら数えない (共有の恩恵を潰さないため)。
+            if (churn.hasKey && churn.lastKey != key && ++churn.count >= DYNAMIC_AFTER) {
+                //走行中・ドア開閉中など、毎フレーム絵が変わる車両。焼くほうが高くつく。
+                churn.dynamic = true;
+                churn.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
+                return false;
+            }
+            bakesThisFrame++;
+            List<MeshCapture.Section> baked = bake(baker);
+            if (baked == null) {
+                churn.dynamic = true;
+                churn.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
+                return false;
+            }
+            mesh = new Mesh();
+            mesh.sections = baked;
+            MESHES.put(meshKey, mesh);
+        } else if (churn.hasKey && churn.lastKey == key) {
+            //同じ絵が続いている = 止まっている車両
+            churn.count = 0;
         }
+        churn.lastKey = key;
+        churn.hasKey = true;
         //台数の集計は通常パスだけで取る (発光パスまで数えると命中率が読めなくなる)。
         if (slot == 0) {
             com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(valid);
         }
 
-        return drawSections(entry.sections, poseStack);
+        return drawSections(mesh.sections, poseStack);
     }
 
     /**
@@ -253,13 +299,11 @@ public final class VehicleMeshCache {
 
     /** リソースリロード・シェーダー切替時などに全部捨てる。 */
     public static void clear() {
-        for (Entry[] slots : CACHE.values()) {
-            for (Entry e : slots) {
-                if (e != null) {
-                    e.close();
-                }
-            }
+        for (Mesh m : MESHES.values()) {
+            m.close();
         }
-        CACHE.clear();
+        MESHES.clear();
+        //焼き直しの判定も白紙に戻す (捨てた直後に「動いている車両」と誤判定しないため)
+        CHURN.clear();
     }
 }
