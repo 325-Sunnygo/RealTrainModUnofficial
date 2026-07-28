@@ -421,9 +421,81 @@ public class TrainScriptSystem {
         if (scriptEngine == null) {
             return;
         }
-        if (LOGGED_SCRIPT_FAILURES.add(System.identityHashCode(scriptEngine) + "\u0000" + phase)) {
+        String key = System.identityHashCode(scriptEngine) + "\u0000" + phase;
+        if (LOGGED_SCRIPT_FAILURES.add(key)) {
             reportScriptError(scriptEngine, phase, error);
         }
+        noteScriptFailure(key, scriptEngine, phase, error);
+    }
+
+    // ------------------------------------------------------------------
+    // 壊れたスクリプトを呼び続けない
+    // ------------------------------------------------------------------
+
+    /**
+     * <b>失敗し続けるスクリプトは呼ぶのをやめる。</b>
+     *
+     * <p>以前は失敗しても<b>ログを 1 回出すだけで毎 tick 呼び続けて</b>いた。
+     * 例外を投げるだけならまだしも、{@code StackOverflowError} は深く積んだスタックを
+     * 巻き戻すので<b>1 回が桁違いに高い</b>。毎 tick 出ると fps が 1 まで落ちる
+     * (あるパックで実際に発生。前提の音ライブラリが入っておらず、パック側の
+     * {@code onUpdate → sound_includeSoundLib → onUpdate} が無限再帰していた)。
+     *
+     * <p><b>パックの作りが悪くてもゲームは遊べないといけない。</b>
+     *
+     * <h2>止め方</h2>
+     * <ul>
+     *   <li>{@code StackOverflowError} / {@code OutOfMemoryError} … <b>即座に</b>止める。
+     *       一時的な失敗ではありえないし、投げ続けるコストが一番大きい</li>
+     *   <li>それ以外 … 連続 {@value #SCRIPT_FAILURE_LIMIT} 回で止める。
+     *       読み込み途中で 1〜2 回失敗するだけの物を殺さないため</li>
+     * </ul>
+     *
+     * <p>成功したら数え直すので、直った物はそのまま動き続ける。
+     */
+    private static final int SCRIPT_FAILURE_LIMIT = 5;
+
+    /** (エンジン, 呼び口) → 連続失敗回数。負値 = 停止済み。 */
+    private static final java.util.Map<String, Integer> SCRIPT_FAILURE_COUNT =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static void noteScriptFailure(String key, ScriptEngine scriptEngine, String phase,
+                                          Throwable error) {
+        boolean fatal = error instanceof StackOverflowError || error instanceof OutOfMemoryError;
+        Integer prev = SCRIPT_FAILURE_COUNT.get(key);
+        if (prev != null && prev < 0) {
+            return;
+        }
+        int count = fatal ? SCRIPT_FAILURE_LIMIT : (prev == null ? 1 : prev + 1);
+        if (count >= SCRIPT_FAILURE_LIMIT) {
+            SCRIPT_FAILURE_COUNT.put(key, -1);
+            Object rawScriptPath = scriptEngine.get(SCRIPT_PATH_KEY);
+            RealTrainModUnofficial.LOGGER.warn(
+                "[RTMU Script] {} の {} を呼ぶのをやめました ({})。"
+                + "前提パックが足りていないか、スクリプトが壊れています。",
+                rawScriptPath == null ? "(unknown script)" : rawScriptPath,
+                phase,
+                fatal ? error.getClass().getSimpleName() : "失敗が " + count + " 回続いた");
+        } else {
+            SCRIPT_FAILURE_COUNT.put(key, count);
+        }
+    }
+
+    /** この呼び口を止めてあるか。 */
+    private static boolean isScriptDisabled(ScriptEngine scriptEngine, String phase) {
+        if (scriptEngine == null) {
+            return false;
+        }
+        Integer v = SCRIPT_FAILURE_COUNT.get(System.identityHashCode(scriptEngine) + "\u0000" + phase);
+        return v != null && v < 0;
+    }
+
+    /** 成功したので連続失敗の数を捨てる。 */
+    private static void noteScriptSuccess(ScriptEngine scriptEngine, String phase) {
+        if (scriptEngine == null) {
+            return;
+        }
+        SCRIPT_FAILURE_COUNT.remove(System.identityHashCode(scriptEngine) + "\u0000" + phase);
     }
 
     /** 既に 1 度ログした (engine, phase) の組。 */
@@ -473,11 +545,20 @@ public class TrainScriptSystem {
         } catch (Throwable ignored) {
         }
         Invocable invocable = (Invocable) scriptEngine;
+        //★止めてあるものは呼ばない (noteScriptFailure の説明を参照)。
+        //  サーバースクリプトは編成の全車ぶん毎 tick 走るので、
+        //  失敗し続けると tick 時間がそのまま溶ける。
+        if (isScriptDisabled(scriptEngine, "onUpdate(entity, executer) [server]")
+                || isScriptDisabled(scriptEngine, "onUpdate(entity, executer) [server-runtime]")) {
+            return;
+        }
         try {
             invocable.invokeFunction("onUpdate", entity, executer);
             if (executer != null) {
                 ++executer.count;
             }
+            noteScriptSuccess(scriptEngine, "onUpdate(entity, executer) [server]");
+            noteScriptSuccess(scriptEngine, "onUpdate(entity, executer) [server-runtime]");
             return;
         } catch (NoSuchMethodException ignored) {
         } catch (ScriptException e) {
@@ -616,8 +697,13 @@ public class TrainScriptSystem {
         //本家 SoundUpdaterVehicle.update():45 は 1 本だけ:
         //  ScriptUtil.doScriptIgnoreError(modelset.se, "onUpdate", this);
         //update(su,1.0F) / tick(su) というフックは本家に存在しないため持たない。
+        //★止めてあるものは呼ばない。壊れたスクリプトを毎 tick 呼ぶと fps が落ちる
+        if (isScriptDisabled(scriptEngine, "onUpdate(su) [sound]")) {
+            return;
+        }
         try {
             invocable.invokeFunction("onUpdate", su);
+            noteScriptSuccess(scriptEngine, "onUpdate(su) [sound]");
         } catch (NoSuchMethodException ignored) {
             //onUpdate を持たないサウンドスクリプト = 本家では何も鳴らない
         } catch (Throwable e) {

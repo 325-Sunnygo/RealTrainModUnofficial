@@ -2312,6 +2312,8 @@ public final class MqoModelLoader {
                     windowLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_win");
                     Minecraft.getInstance().getTextureManager().register(windowLoc, windowTex);
+                    //スクリプト経路からも引けるようにする (opaqueVariantOf / windowVariantOf)
+                    TEXTURE_ALPHA_SPLIT.put(baseLoc, new ResourceLocation[]{opaqueLoc, windowLoc});
                 }
                 // 発光解決はサブライトテクスチャがあるときのみ(無条件だと二重描画)
                 TextureInfo info = new TextureInfo(baseLoc, resolveLegacyLightTextures(binding, opener, img), alphaBlendOption || partialAlpha || glassBand, partialAlpha, glassBand, opaqueLoc, windowLoc);
@@ -2493,6 +2495,40 @@ public final class MqoModelLoader {
         }
     }
 
+
+    /**
+     * 基本テクスチャ → {@code {α==255 のみ, α<255 のみ}} の貼り分け。
+     *
+     * <p>本家は 1 枚のテクスチャをアルファ関数でパスごとに切り分ける。
+     *
+     * <pre>
+     *   pass0  glAlphaFunc(GL_EQUAL, 1.0)  → α==255 の画素だけ
+     *   pass1  glAlphaFunc(GL_LESS,  1.0)  → α&lt;255 の画素だけ (ブレンド)
+     * </pre>
+     *
+     * <p>RTMU は 1.21 にアルファ関数が無いので、<b>読み込み時に 2 枚へ焼き分けて</b>
+     * 同じことをしている。バッチ経路 ({@code Batch.opaqueTexture/windowTexture}) は
+     * 既にこれを使っているが、<b>スクリプト経路が使えていなかった</b>。
+     *
+     * <p>そのためスクリプトが描く物は「1 枚を全部ブレンドで描く」になり、
+     * 本家なら pass1 でうっすら乗るだけの<b>偽の影ポリゴン (α&lt;255) が
+     * 真っ黒な板として台車を覆う</b>、といったことが起きていた。
+     */
+    public static ResourceLocation opaqueVariantOf(ResourceLocation base) {
+        ResourceLocation[] pair = base == null ? null : TEXTURE_ALPHA_SPLIT.get(base);
+        return pair == null ? base : pair[0];
+    }
+
+    /** {@link #opaqueVariantOf} の pass1 側。分割が無い (= α<255 が無い) なら null。 */
+    public static ResourceLocation windowVariantOf(ResourceLocation base) {
+        ResourceLocation[] pair = base == null ? null : TEXTURE_ALPHA_SPLIT.get(base);
+        return pair == null ? null : pair[1];
+    }
+
+    /** 基本 → {不透明のみ, 半透明のみ}。分割を作ったテクスチャだけ入る。 */
+    private static final java.util.Map<ResourceLocation, ResourceLocation[]> TEXTURE_ALPHA_SPLIT =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
     private static boolean shouldTreatFaceAsTranslucent(TextureInfo textureInfo, String groupName, float[] uvs, int vertexCount, float avgY) {
         if (textureInfo == null) {
             return false;
@@ -2556,7 +2592,8 @@ public final class MqoModelLoader {
      */
     private static final boolean PIN_CPU_TRANSFORM = true;
 
-    private static boolean shouldCullModelFaces(Object rawEntity) {
+    /** 描画中の車両の doCulling。スクリプト経路 (VehicleScriptRenderers) からも使う。 */
+    public static boolean shouldCullModelFaces(Object rawEntity) {
         //replay経路はentityがnullのため、描画中の車両からdoCullingを引く
         Object entity = rawEntity != null ? rawEntity
             : com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.currentVehicle();
@@ -4494,6 +4531,10 @@ public final class MqoModelLoader {
                             || shouldForceShaderSafeCutout(entity, batch, lowerGroupName, false);
                         depthBias = batch.cachedDepthBiasNoScriptTex;
                     }
+                    //調査用: /rtm hidegroup で隠した部品は描かない
+                    if (com.portofino.realtrainmodunofficial.client.DebugHiddenGroups.isHidden(batch.groupName)) {
+                        continue;
+                    }
                     boolean needsBlend = (translucent && batch.translucent)
                         || (!forceCutout && (scriptTexture || scriptPassNow >= 2));
 
@@ -4527,19 +4568,23 @@ public final class MqoModelLoader {
                     //半透明はソートを失うと窓の重なりが崩れるため四角形のまま。
                     boolean useTriangles = !needsBlend
                         && com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
-                    if (needsBlend && com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
-                        //★シェーダー時は深度を書かない。ガラスはレールより先に描かれるので、
-                        //深度を書くと後から来るレールが落ちて車内から線路が見えなくなる。
-                        //バニラは「ガラスを後回し」で解決しているが、その経路は Iris だと
+                    if (needsBlend) {
+                        //★<b>半透明は深度を書かない</b> (シェーダーの有無に関わらず)。
+                        //
+                        //以前はシェーダー使用時だけ深度を書かないようにしていた。理由は
+                        //「ガラスはレールより先に描かれるので、深度を書くと後から来るレールが
+                        //落ちて車内から線路が見えなくなる」から。同じことが<b>台車</b>でも起きる:
+                        //ガラスや、パックが車体下に持つ半透明の板が先に深度を書くと、
+                        //後から描かれる台車が深度テストで落ちて<b>丸ごと消える</b>
+                        //(半透明の窓と、車体下に持つ半透明の板で実際に発生)。
+                        //
+                        //バニラは「半透明を後回し」で解決するが、後回し経路は Iris だと
                         //ガラスが空へ飛ぶ (RtmuRenderTypes.glassNoDepthWrite の説明を参照)。
+                        //深度を書かないのは半透明の描き方として普通で、重なりの前後は
+                        //提出順 (NoSort) が決めるので従来どおり安定する。
                         renderType = cullThisBatch
                             ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWriteCull(texture)
                             : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWrite(texture);
-                    } else if (needsBlend) {
-                        //半透明も doCulling に従う (本家厳密化)。深度書き込み無し・提出順は据え置き。
-                        renderType = cullThisBatch
-                            ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthCull(texture)
-                            : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepth(texture);
                     } else if (useTriangles) {
                         renderType = cullThisBatch
                             ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.entityCutoutTriangles(texture)

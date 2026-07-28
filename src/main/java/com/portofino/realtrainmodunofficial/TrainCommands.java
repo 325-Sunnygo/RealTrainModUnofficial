@@ -69,6 +69,15 @@ public final class TrainCommands {
                     .requires(source -> source.hasPermission(2))
                     .executes(context -> executeNashornTest(context.getSource()))
                 )
+                .then(Commands.literal("hidegroup")
+                    .executes(context -> executeHideGroup(context.getSource(), null))
+                    .then(Commands.argument("name", com.mojang.brigadier.arguments.StringArgumentType.string())
+                        .executes(context -> executeHideGroup(
+                            context.getSource(),
+                            com.mojang.brigadier.arguments.StringArgumentType.getString(context, "name")
+                        ))
+                    )
+                )
                 .then(Commands.literal("serverscript")
                     .requires(source -> source.hasPermission(2))
                     .then(Commands.argument("id", com.mojang.brigadier.arguments.StringArgumentType.string())
@@ -365,6 +374,36 @@ public final class TrainCommands {
         }
         source.sendSuccess(() -> Component.literal(
             id + " のサーバースクリプトを読み込めました (" + definition.getServerScriptPath() + ")"), false);
+        return 1;
+    }
+
+
+    /**
+     * 調査用: モデルのグループを名前で隠す / 戻す。引数なしで一覧と全解除。
+     *
+     * <p>「変な板が出ている」の類は<b>どの部品かを先に確定させないと直せない</b>。
+     * 描画経路を当てずっぽうで変えても当たらず、確認の往復が増えるだけになる。
+     *
+     * <p>{@code /rtm hidegroup glass} のように使う。隠れれば犯人が確定する。
+     * 保存はしないのでワールドを出れば戻る。
+     */
+    private static int executeHideGroup(CommandSourceStack source, String name) {
+        if (name == null || name.isBlank()) {
+            var hidden = com.portofino.realtrainmodunofficial.client.DebugHiddenGroups.listHidden();
+            if (hidden.isEmpty()) {
+                source.sendSuccess(() -> Component.literal(
+                    "隠している部品はありません。/rtm hidegroup <名前> で切り替えます"), false);
+            } else {
+                String list = String.join(", ", hidden);
+                com.portofino.realtrainmodunofficial.client.DebugHiddenGroups.clear();
+                source.sendSuccess(() -> Component.literal(
+                    "隠していた部品を全て戻しました: " + list), false);
+            }
+            return 1;
+        }
+        boolean hidden = com.portofino.realtrainmodunofficial.client.DebugHiddenGroups.toggle(name);
+        source.sendSuccess(() -> Component.literal(
+            "部品 \"" + name + "\" を" + (hidden ? "隠しました" : "表示に戻しました")), false);
         return 1;
     }
 

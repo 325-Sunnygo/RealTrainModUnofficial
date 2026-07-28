@@ -1381,6 +1381,12 @@ public final class VehicleScriptRenderers {
                                        float colR, float colG, float colB, float colA, boolean smoothing,
                                        int legacyPass) {
         long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
+        //調査用: /rtm hidegroup で隠した部品は描かない
+        if (com.portofino.realtrainmodunofficial.client.DebugHiddenGroups.isHidden(groupName)) {
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_MODELGRP, secStart);
+            return;
+        }
         float[] flat = flatGroupVerts(pm, groupName, smoothing);
         if (flat.length == 0) {
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
@@ -1406,20 +1412,64 @@ public final class VehicleScriptRenderers {
         //スムージングしても効き目が見えなかった (パックによって出たり出なかったりするのは、
         //半透明パスにどれだけ光を入れるかがパックごとに違うため)。
         //
-        //不透明パス (本家 pass0 = α==255 のみ) の不透明な描画に限って entityCutout にすると、
-        //パックの不透明エンティティ経路に入って法線と影が効く。本家の pass 分けとも一致する。
-        //バニラでは経路を変えない (今まで動いていたものに触らない)。
-        boolean opaqueForShader = legacyPass == RenderPass.NORMAL.id
-                && colA >= 1.0F
-                && !lightOverlay
+        //★<b>本家と同じアルファの切り分けをする。</b>
+        //
+        //本家は 1 枚のテクスチャをパスごとにアルファ関数で切る。
+        //  pass0  glAlphaFunc(GL_EQUAL, 1.0)  → α==255 の画素だけ (不透明・ブレンド無し)
+        //  pass1  glAlphaFunc(GL_LESS,  1.0)  → α<255 の画素だけ  (ブレンド)
+        //
+        //RTMU は 1.21 にアルファ関数が無いので、読み込み時に 2 枚へ焼き分けて同じことをする。
+        //バッチ経路は既にそうしていたが<b>スクリプト経路だけ 1 枚を全部ブレンドで描いて</b>いた。
+        //そのため:
+        //  ・偽の影ポリゴン (α<255) が<b>真っ黒な板として台車を覆う</b>
+        //  ・不透明なドアが半透明扱いになり<b>陰影が付かない / ガラス越しに消える</b>
+        //  (半透明どうしは描いた順で勝敗が決まる)
+        //名前で「影」を弾く手もあるが、本家にそんな判定は無い。アルファで切れば済む。
+        boolean normalPass = legacyPass == RenderPass.NORMAL.id;
+        if (!lightOverlay) {
+            ResourceLocation split = normalPass
+                ? MqoModelLoader.opaqueVariantOf(tex)
+                : MqoModelLoader.windowVariantOf(tex);
+            if (!normalPass && split == null) {
+                //α<255 の画素が無いテクスチャ = pass1 で描く物が無い (本家も同じ)
+                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_MODELGRP, secStart);
+                return;
+            }
+            if (split != null) {
+                tex = split;
+            }
+        }
+        //pass0 は不透明として描く。α==255 だけ残したテクスチャなので cutout で正しく抜ける。
+        boolean opaqueDraw = normalPass && colA >= 1.0F && !lightOverlay;
+        //シェーダー使用時は<b>三角形</b>で送る必要があるので経路を分ける (下の説明を参照)
+        boolean opaqueForShader = opaqueDraw
                 && com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
         //★シェーダー時は<b>三角形</b>で送る。Iris は四角形だと法線を面法線で上書きしてしまい、
         //スムージングが消える (RtmuRenderTypes.entityCutoutTriangles の説明を参照)。
+        //★<b>本家の doCulling に従う。</b>
+        //
+        //本家は片面だけ描く設定 (doCulling=true) を尊重する。RTMU のバッチ経路は
+        //従っていたが<b>スクリプト経路だけ常に両面描き</b>だった。
+        //そのため、パックが持つ「地面に落とす偽の影」のような<b>上を向いた 1 枚板</b>が
+        //下から見ても描かれ、<b>台車を黒く覆う</b>。本家では裏面が捨てられるので見えない。
+        boolean cull = MqoModelLoader.shouldCullModelFaces(null);
         RenderType groupType = lightOverlay ? RenderType.eyes(tex)
                 : opaqueForShader
+                    ? (cull
+                        ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
+                            .entityCutoutTriangles(tex)
+                        : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
+                            .entityCutoutNoCullTriangles(tex))
+                : opaqueDraw
+                    ? (cull ? RenderType.entityCutout(tex) : RenderType.entityCutoutNoCull(tex))
+                //★半透明は深度を書かない。書くと後から描く台車やレールが落ちて消える
+                //  (MqoModelLoader 側の同じ判断と揃える)。
+                : (cull
                     ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
-                        .entityCutoutTriangles(tex)
-                : RenderType.entityTranslucent(tex);
+                        .glassNoDepthWriteCull(tex)
+                    : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
+                        .glassNoDepthWrite(tex));
         VertexConsumer vc = buffer.getBuffer(groupType);
         PoseStack.Pose pose = poseStack.last();
         Matrix4f mat = pose.pose();
