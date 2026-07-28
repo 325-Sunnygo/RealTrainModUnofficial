@@ -2530,33 +2530,29 @@ public final class MqoModelLoader {
     /**
      * 車体の頂点変換を<b>CPU 側に固定</b>するか。
      *
-     * <p>静的 VBO の高速経路は {@code mv = ModelView × pose} を CPU で合成して
-     * <b>頂点変換を GPU</b>で行うが、発光パスやスクリプト描画は<b>CPU</b>で pose を掛けて提出する。
-     * {@code (A·B)·v} と {@code A·(B·v)} は float32 で数 ULP ずれ、同一面でも深度が一致せず z-fighting する。
+     * <p><b>これは「死んだ定数」ではない。</b>いま生きている
+     * {@code drawBatchWithEntityVbo} (ライトマップを持つ VBO 経路) も、
+     * これが true の間は<b>一切使われない</b>。false にすると挙動が変わる。
+     * 以前ここに「fullbright が false なので実質無効」と書いてあったが、
+     * <b>誤り</b>だった (その説明は撤去した fullbright 経路の話)。
      *
-     * <p>さらに VBO を使うかの判定には<b>フレームごとに変わる条件</b>が含まれる:
-     * {@code InteriorLighting.isActive()} (車両位置の明るさ)、
-     * {@code groupTransform != null} (座席回転・ドア・パンタが動いている間だけ CPU)、
-     * スクリプトの色指定や UV 変換。そのため「動いている間は CPU / 止まると VBO」と
-     * 経路が入れ替わり、切り替わった瞬間だけ深度がずれて一瞬重なって見える。
+     * <h2>なぜ固定しているか</h2>
+     * VBO 経路は {@code mv = ModelView × pose} を CPU で合成して<b>頂点変換を GPU</b>で行うが、
+     * 発光パスやスクリプト描画は<b>CPU</b>で pose を掛けてから提出する。
+     * {@code (A·B)·v} と {@code A·(B·v)} は float32 で数 ULP ずれるため、
+     * 同一面でも深度が一致せず z-fighting する (内装がまだら状にちらつく)。
      *
-     * <p>【実測】この定数が効く {@code canUseStaticVbo} は {@code if (fullbright)} の内側にあり、
-     * その {@code fullbright} は呼び出し元で<b>ハードコード false</b>。つまり静的 VBO 経路は
-     * 現状<b>到達不能</b>で、この定数は実質無効。将来 fullbright 経路を復活させるときの
-     * 安全弁として残してある。
+     * <p>さらに VBO を使うかの判定には<b>フレームごとに変わる条件</b>が含まれる
+     * (室内灯・ドア/パンタの変換・スクリプトの色や UV)。そのため
+     * 「動いている間は CPU / 止まると VBO」と経路が入れ替わり、
+     * 切り替わった瞬間だけ深度がずれて一瞬重なって見える。
      *
-     * <p>本家は変換経路が 1 つしかないのでこの問題自体が存在しない。
+     * <p>本家は変換経路が 1 つしかないので、この問題自体が存在しない。
      *
-     * <p>★さらに VBO 経路は<b>明るさが間違っている</b>。頂点フォーマットが
-     * {@code POSITION_TEX_COLOR_NORMAL} でライトマップ (UV2) を持たず、
-     * 描画も {@code getRendertypeCloudsShader} なのでライトマップを参照しない
-     * = <b>常に全明</b>で描かれる。CPU 経路は {@code setLight(packedLight)} で実際の明るさを使う。
-     *
-     * <p>発光材質だけを CPU 側へ寄せると、同じ車両の中で
-     * 「Light 材質 = 実際の明るさ / それ以外 = 全明」という<b>明るさの混在</b>が起きる。
-     * 実機で kiha600 (材質 'Light') だけが暗く、kiha600_rusty (オプション無し) は
-     * 明るいままという形で出た。暗い側が正しく、明るい側が誤り。
-     * 揃えるため CPU 経路へ固定する。
+     * <h2>外すなら</h2>
+     * 経路を 2 つ持つのをやめる (全部 VBO にする) しかない。
+     * その場合は発光パスも VBO 側へ寄せて、変換の順番を揃えること。
+     * 片方だけ動かすと必ず z-fighting が戻る。
      */
     private static final boolean PIN_CPU_TRANSFORM = true;
 
@@ -3978,7 +3974,6 @@ public final class MqoModelLoader {
                 }
             }
             Object entity = scriptRenderer != null ? scriptRenderer.getCurrentEntity() : null;
-            boolean fullbright = false;
             //door_*は除外を無視して常に描く(スライドで開閉を表現)
             GroupPredicate exclusionFilter = (excludedGroups == null || excludedGroups.isEmpty())
                 ? null
@@ -3990,7 +3985,7 @@ public final class MqoModelLoader {
                     return !excludedGroups.contains(g);
                 };
             renderSelectedBatches(ordered, poseStack, buffer, packedLight, overlay, translucent,
-                exclusionFilter, null, scriptRenderer, entity, fullbright);
+                exclusionFilter, null, scriptRenderer, entity);
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GROUPS, secStart);
         }
@@ -4396,25 +4391,21 @@ public final class MqoModelLoader {
         private void renderInternal(PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
                                     boolean translucent, GroupPredicate groupFilter, GroupTransform groupTransform,
                                     TrainScriptSystem.ScriptModelRenderer scriptRenderer, Object entity) {
-            boolean fullbright = false;
-            renderSelectedBatches(this.batches, poseStack, buffer, packedLight, overlay, translucent, groupFilter, groupTransform, scriptRenderer, entity, fullbright);
+            renderSelectedBatches(this.batches, poseStack, buffer, packedLight, overlay, translucent, groupFilter, groupTransform, scriptRenderer, entity);
         }
 
         private void renderSelectedBatches(List<Batch> selectedBatches, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
-                                           boolean translucent, TrainScriptSystem.ScriptModelRenderer scriptRenderer, Object entity, boolean fullbright) {
-            renderSelectedBatches(selectedBatches, poseStack, buffer, packedLight, overlay, translucent, null, null, scriptRenderer, entity, fullbright);
+                                           boolean translucent, TrainScriptSystem.ScriptModelRenderer scriptRenderer, Object entity) {
+            renderSelectedBatches(selectedBatches, poseStack, buffer, packedLight, overlay, translucent, null, null, scriptRenderer, entity);
         }
 
         private void renderSelectedBatches(List<Batch> selectedBatches, PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
                                            boolean translucent, GroupPredicate groupFilter, GroupTransform groupTransform,
-                                           TrainScriptSystem.ScriptModelRenderer scriptRenderer, Object entity, boolean fullbright) {
-            // シェーダー(Iris/Oculus)有効時は、フラットな直接GL経路ではなく法線付きの
-            // バッファ経路で描画する。直接GL経路は頂点法線スムージングが効かず、影modで
-            // 車体がカクついて見えるため(数値は一切変更しない・経路のみ切替)。
+                                           TrainScriptSystem.ScriptModelRenderer scriptRenderer, Object entity) {
+            //★以前ここには「フラットな直接 GL 経路 (fullbright)」があり、影 mod のときだけ
+            //  バッファ経路へ切り替えていた。その経路は<b>呼び出し元が全て false</b> で
+            //  到達不能なまま残っていたので撤去した。今はバッファ経路の 1 本だけ。
             long secLoop = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
-            if (fullbright && com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
-                fullbright = false;
-            }
             // ループ全体で保持する直近値。再設定を skip するため。
             int gr = scriptRenderer != null ? scriptRenderer.getColorRed255()   : 255;
             int gg = scriptRenderer != null ? scriptRenderer.getColorGreen255() : 255;
@@ -4423,15 +4414,6 @@ public final class MqoModelLoader {
             int lastBlendMode = -1; // 0=disabled, 1=blend(depthMask=false), 2=cutout(depthMask=true)
             int lastCullMode = -1;  // 0=両面(cull無効), 1=片面(cull有効)。batch ごとに切替。
             boolean useCull = shouldCullModelFaces(entity);
-            // fullbright経路は周囲光をsetShaderColor係数で疑似再現する
-            float lightFactor = fullbright ? computeFlatBrightness(packedLight) : 1.0F;
-            if (fullbright) {
-                RenderSystem.enableDepthTest();
-                // カリングはbatchごとに切替。色は先頭で1度だけ設定
-                RenderSystem.setShader(GameRenderer::getRendertypeCloudsShader);
-                RenderSystem.setShaderColor(gr / 255f * lightFactor, gg / 255f * lightFactor, gb / 255f * lightFactor, ga / 255f);
-            }
-
             for (Batch batch : selectedBatches) {
                 if (scriptRenderer != null && shouldSkipLegacyPlaceholderGroup(batch.groupName)) {
                     continue;
@@ -4531,298 +4513,178 @@ public final class MqoModelLoader {
                         scriptBlue  = Math.round(scriptBlue  * batch.baseColorB);
                     }
 
-                    if (fullbright) {
-                        // Direct OpenGL path: fullbright, no lightmap (trains/entities)
-                        // テクスチャは batch ごとに変わる可能性があるので毎回設定 (RenderSystem 内部
-                        // で同値なら GL バインドはスキップされる)。
-                        RenderSystem.setShaderTexture(0, texture);
-                        // 色は通常スクリプトが頻繁には変えないので、ループ先頭で設定済みのものを
-                        // 使う (scriptRed/Green/Blue/Alpha がループ内で変わったら更新)。
-                        if (scriptRed != gr || scriptGreen != gg || scriptBlue != gb || scriptAlpha != ga) {
-                            RenderSystem.setShaderColor(scriptRed / 255f * lightFactor, scriptGreen / 255f * lightFactor, scriptBlue / 255f * lightFactor, scriptAlpha / 255f);
-                            gr = scriptRed; gg = scriptGreen; gb = scriptBlue; ga = scriptAlpha;
-                        }
-                        // カリングはdoCulling一括(本家準拠)。false=全両面/true=全片面
-                        int desiredCull = useCull ? 1 : 0;
-                        if (desiredCull != lastCullMode) {
-                            lastCullMode = desiredCull;
-                            if (desiredCull == 1) {
-                                RenderSystem.enableCull();
-                            } else {
-                                RenderSystem.disableCull();
-                            }
-                        }
-                        // ブレンドはバッチ単位。translucent/emissiveのみON。depthMaskは常にON
-                        int desiredBlend = (batch.translucent || scriptTexture || scriptPassNow >= 2) ? 1 : 0;
-                        if (desiredBlend != lastBlendMode) {
-                            lastBlendMode = desiredBlend;
-                            if (desiredBlend == 1) {
-                                RenderSystem.enableBlend();
-                                RenderSystem.blendFuncSeparate(
-                                    GlStateManager.SourceFactor.SRC_ALPHA,
-                                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-                                    GlStateManager.SourceFactor.ONE,
-                                    GlStateManager.DestFactor.ZERO);
-                                // RTM本家どおり pass1 の depthMask は ON(デフォルトのまま)。窓は pass0 で
-                                // 既にアルファテスト不透明描画されており、pass1 は同じ位置にブレンドを重ねる。
-                                RenderSystem.depthMask(true);
-                            } else if (desiredBlend == 2) {
-                                RenderSystem.enableBlend();
-                                RenderSystem.blendFuncSeparate(
-                                    GlStateManager.SourceFactor.SRC_ALPHA,
-                                    GlStateManager.DestFactor.ONE_MINUS_SRC_ALPHA,
-                                    GlStateManager.SourceFactor.ONE,
-                                    GlStateManager.DestFactor.ZERO);
-                                RenderSystem.depthMask(true);
-                            } else {
-                                RenderSystem.disableBlend();
-                                RenderSystem.depthMask(true);
-                            }
-                        }
-                        // GPU VBO 高速経路: depthBias=0 かつ scriptRenderer の UV 変換が無ければ
-                        // 静的 VBO を再利用。
-                        //★発光テクスチャを持つ材質は VBO 高速経路に載せない。
-                        //VBO 経路は mv = ModelView × pose を CPU で合成して<b>頂点変換を GPU 側</b>で行うが、
-                        //発光パス (renderNamedGroupsEmissive) は<b>CPU 側</b>で pose を掛けてから提出する。
-                        //(A·B)·v と A·(B·v) は float32 で数 ULP ずれるため、同一面なのに深度が一致せず、
-                        //pass0 と発光パスが z-fighting を起こす (ライト点灯時だけ内装がちらつく原因)。
-                        //本家は変換経路が 1 つしかないのでこの問題自体が存在しない。
-                        //経路を揃えるため、発光する材質は CPU 変換側に統一する。
-                        boolean canUseStaticVbo = !PIN_CPU_TRANSFORM
-                            && !com.portofino.realtrainmodunofficial.client.render
-                                .InteriorLighting.isActive()
-                            && depthBias == 0.0F
-                            && batch.emissiveTextures.length == 0
-                            && (scriptRenderer == null || !scriptRenderer.hasUvWindow());
-                        com.mojang.blaze3d.vertex.VertexBuffer cachedVbo = canUseStaticVbo
-                            ? batch.getOrBuildFullbrightVbo()
-                            : null;
-                        if (cachedVbo != null && !cachedVbo.isInvalid()) {
-                            // drawWithShader の第1引数は完全な ModelView 行列が必要。
-                            // poseStack.last().pose() はエンティティローカル変換のみ (カメラ view を含まない) なので、
-                            // RenderSystem の ModelView を左から掛けないとカメラ空間描画になりカメラに追従する。
-                            org.joml.Matrix4f mv = new org.joml.Matrix4f(RenderSystem.getModelViewMatrix()).mul(poseStack.last().pose());
-                            cachedVbo.bind();
-                            cachedVbo.drawWithShader(
-                                mv,
-                                RenderSystem.getProjectionMatrix(),
-                                net.minecraft.client.renderer.GameRenderer.getRendertypeCloudsShader());
-                            com.mojang.blaze3d.vertex.VertexBuffer.unbind();
-                        } else {
-                            // CPU フォールバック (scriptRenderer の UV/色変換が必要なフレーム等)
-                            BufferBuilder builder = Tesselator.getInstance().begin(
-                                VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
-                            Matrix4f mat = poseStack.last().pose();
-                            Matrix3f norm = poseStack.last().normal();
-                            float[] normalOut = new float[3];
-                            for (int i = 0; i < batch.vertexCount; i++) {
-                                int o = i * 8;
-                                float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
-                                float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
-                                float u = batch.data[o + 6], v = batch.data[o + 7];
-                                if (depthBias != 0.0F) {
-                                    //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
-                                    float bnx = nx, bny = ny, bnz = nz;
-                                    if (batch.biasNormals != null) {
-                                        int bo = i * 3;
-                                        bnx = batch.biasNormals[bo]; bny = batch.biasNormals[bo + 1]; bnz = batch.biasNormals[bo + 2];
-                                    }
-                                    float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, bnx*bnx + bny*bny + bnz*bnz)));
-                                    x += bnx*il*depthBias; y += bny*il*depthBias; z += bnz*il*depthBias;
-                                }
-                                if (scriptRenderer != null) {
-                                    u = scriptRenderer.mapU(u, batch.minU, batch.maxU);
-                                    v = scriptRenderer.mapV(v, batch.minV, batch.maxV);
-                                }
-                                float tx = mat.m00()*x + mat.m10()*y + mat.m20()*z + mat.m30();
-                                float ty = mat.m01()*x + mat.m11()*y + mat.m21()*z + mat.m31();
-                                float tz = mat.m02()*x + mat.m12()*y + mat.m22()*z + mat.m32();
-                                float tnx = norm.m00()*nx + norm.m10()*ny + norm.m20()*nz;
-                                float tny = norm.m01()*nx + norm.m11()*ny + norm.m21()*nz;
-                                float tnz = norm.m02()*nx + norm.m12()*ny + norm.m22()*nz;
-                                normalizeNormal(tnx, tny, tnz, normalOut);
-                                builder.addVertex(tx, ty, tz)
-                                    .setUv(u, v)
-                                    .setColor(255, 255, 255, 255)
-                                    .setNormal(normalOut[0], normalOut[1], normalOut[2]);
-                            }
-                            if (batch.vertexCount > 0) {
-                                RenderSystem.setShader(GameRenderer::getRendertypeCloudsShader);
-                                BufferUploader.drawWithShader(builder.buildOrThrow());
-                            }
-                        }
+                    // Lightmap-aware path: block entities (rails, installed objects)
+                    //本家厳密移植 (ユーザー選択): カリングは doCulling 一括 (不透明も半透明も同じ)。
+                    //doCulling=false で両面、true で片面。「半透明だけ両面」は本家に無い。
+                    boolean cullThisBatch = useCull;
+                    //pass1 も深度は書く (本家 depthMask 既定 ON)。書かないと後で描くレールが透ける。
+                    RenderType renderType;
+                    //★シェーダーパック使用中は<b>不透明を三角形で</b>送る。
+                    //Iris の MixinBufferBuilder.fillExtendedData は、四角形かつワールド描画中のとき
+                    //面法線を計算して全頂点の法線に memPutInt で書き戻す。こちらが送った
+                    //スムージング済みの頂点法線が塗り潰され、丸みが消える (影は座標由来なので出る)。
+                    //三角形の枝は法線を読むだけで書き戻さないので、そちらへ逃がす。
+                    //半透明はソートを失うと窓の重なりが崩れるため四角形のまま。
+                    boolean useTriangles = !needsBlend
+                        && com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
+                    if (needsBlend && com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
+                        //★シェーダー時は深度を書かない。ガラスはレールより先に描かれるので、
+                        //深度を書くと後から来るレールが落ちて車内から線路が見えなくなる。
+                        //バニラは「ガラスを後回し」で解決しているが、その経路は Iris だと
+                        //ガラスが空へ飛ぶ (RtmuRenderTypes.glassNoDepthWrite の説明を参照)。
+                        renderType = cullThisBatch
+                            ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWriteCull(texture)
+                            : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWrite(texture);
+                    } else if (needsBlend) {
+                        //半透明も doCulling に従う (本家厳密化)。深度書き込み無し・提出順は据え置き。
+                        renderType = cullThisBatch
+                            ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthCull(texture)
+                            : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepth(texture);
+                    } else if (useTriangles) {
+                        renderType = cullThisBatch
+                            ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.entityCutoutTriangles(texture)
+                            : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.entityCutoutNoCullTriangles(texture);
                     } else {
-                        // Lightmap-aware path: block entities (rails, installed objects)
-                        //本家厳密移植 (ユーザー選択): カリングは doCulling 一括 (不透明も半透明も同じ)。
-                        //doCulling=false で両面、true で片面。「半透明だけ両面」は本家に無い。
-                        boolean cullThisBatch = useCull;
-                        //pass1 も深度は書く (本家 depthMask 既定 ON)。書かないと後で描くレールが透ける。
-                        RenderType renderType;
-                        //★シェーダーパック使用中は<b>不透明を三角形で</b>送る。
-                        //Iris の MixinBufferBuilder.fillExtendedData は、四角形かつワールド描画中のとき
-                        //面法線を計算して全頂点の法線に memPutInt で書き戻す。こちらが送った
-                        //スムージング済みの頂点法線が塗り潰され、丸みが消える (影は座標由来なので出る)。
-                        //三角形の枝は法線を読むだけで書き戻さないので、そちらへ逃がす。
-                        //半透明はソートを失うと窓の重なりが崩れるため四角形のまま。
-                        boolean useTriangles = !needsBlend
-                            && com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
-                        if (needsBlend && com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
-                            //★シェーダー時は深度を書かない。ガラスはレールより先に描かれるので、
-                            //深度を書くと後から来るレールが落ちて車内から線路が見えなくなる。
-                            //バニラは「ガラスを後回し」で解決しているが、その経路は Iris だと
-                            //ガラスが空へ飛ぶ (RtmuRenderTypes.glassNoDepthWrite の説明を参照)。
-                            renderType = cullThisBatch
-                                ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWriteCull(texture)
-                                : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWrite(texture);
-                        } else if (needsBlend) {
-                            //半透明も doCulling に従う (本家厳密化)。深度書き込み無し・提出順は据え置き。
-                            renderType = cullThisBatch
-                                ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthCull(texture)
-                                : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepth(texture);
-                        } else if (useTriangles) {
-                            renderType = cullThisBatch
-                                ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.entityCutoutTriangles(texture)
-                                : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.entityCutoutNoCullTriangles(texture);
-                        } else {
-                            renderType = cullThisBatch ? RenderType.entityCutout(texture)
-                                : RenderType.entityCutoutNoCull(texture);
-                        }
-                        //静的VBO高速経路。落ちたゲートを記録する(F8のVBO行)
-                        int vboReason;
-                        if (PIN_CPU_TRANSFORM) {
-                            //経路固定 (PIN_CPU_TRANSFORM 参照)。VBO は使わない。
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
-                        } else if (captureMode) {
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_CAPTURE;
-                        } else if (needsBlend) {
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BLEND;
-                        } else if (groupTransform != null) {
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_TRANSFORM;
-                        } else if (depthBias != 0.0F) {
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
-                        } else if (batch.emissiveTextures.length > 0) {
-                            //★発光する材質は VBO 経路に載せない。
-                            //VBO は mv = ModelView × pose を CPU 合成して<b>頂点変換を GPU</b>で行うが、
-                            //発光パス (renderNamedGroupsEmissive) は<b>CPU</b>で pose を掛けてから提出する。
-                            //(A·B)·v と A·(B·v) は float32 で数 ULP ずれるため、同一面でも深度が一致せず、
-                            //pass0 と発光パスが画素単位で z-fighting する (内装がまだら状にちらつく)。
-                            //本家は変換経路が 1 つしかないのでこの問題自体が存在しない。経路を CPU 側へ揃える。
-                            //★判定は<b>バッチ単位</b>。モデル単位にすると発光しない面まで CPU 変換になり、
-                            //発光を持つ車両の描画負荷が上がる (実機で悪化を確認)。
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
-                        } else if (overlay != net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY) {
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OVERLAY;
-                        } else if (scriptRed != 255 || scriptGreen != 255 || scriptBlue != 255 || scriptAlpha != 255) {
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_COLOR;
-                        } else if (scriptRenderer != null && scriptRenderer.hasUvWindow()) {
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_UV;
-                        } else if (com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_SHADER;
-                        } else {
-                            long secVbo = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
-                            boolean vboDrawn = drawBatchWithEntityVbo(batch, renderType, poseStack, packedLight);
-                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
-                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_VBO, secVbo);
-                            if (vboDrawn) {
-                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countVbo(
-                                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK);
-                                //VBO 経路もドローコール数は同じだけ掛かる。重複描画が無いか一緒に数える。
-                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatch(
-                                    batch.groupName, batch.vertexCount,
-                                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK);
-                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatchIdentity(
-                                    batch.groupName,
-                                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK,
-                                    System.identityHashCode(batch));
-                                continue;
-                            }
-                            vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BUILD;
-                        }
-                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countVbo(vboReason);
-                        MultiBufferSource targetBuffer = buffer;
-                        //★pass1 は<b>面を間引かない</b>。
-                        //以前は「窓テクセルを踏む面だけ提出する」独自最適化を入れていたが、
-                        //テクスチャの解像度や UV の取り方によっては車体の面まで落ちてしまい、
-                        //そこが穴になって手前に描いてあるレールが覗く。本家 pass1 は
-                        //材質の面を全部描いて alpha で抜くだけなので、そちらに合わせる。
-                        float[] vData = batch.data;
-                        float[] vBias = batch.biasNormals;
-                        int vCount = batch.vertexCount;
-                        if (vCount <= 0) {
+                        renderType = cullThisBatch ? RenderType.entityCutout(texture)
+                            : RenderType.entityCutoutNoCull(texture);
+                    }
+                    //静的VBO高速経路。落ちたゲートを記録する(F8のVBO行)
+                    int vboReason;
+                    if (PIN_CPU_TRANSFORM) {
+                        //経路固定 (PIN_CPU_TRANSFORM 参照)。VBO は使わない。
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
+                    } else if (captureMode) {
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_CAPTURE;
+                    } else if (needsBlend) {
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BLEND;
+                    } else if (groupTransform != null) {
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_TRANSFORM;
+                    } else if (depthBias != 0.0F) {
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
+                    } else if (batch.emissiveTextures.length > 0) {
+                        //★発光する材質は VBO 経路に載せない。
+                        //VBO は mv = ModelView × pose を CPU 合成して<b>頂点変換を GPU</b>で行うが、
+                        //発光パス (renderNamedGroupsEmissive) は<b>CPU</b>で pose を掛けてから提出する。
+                        //(A·B)·v と A·(B·v) は float32 で数 ULP ずれるため、同一面でも深度が一致せず、
+                        //pass0 と発光パスが画素単位で z-fighting する (内装がまだら状にちらつく)。
+                        //本家は変換経路が 1 つしかないのでこの問題自体が存在しない。経路を CPU 側へ揃える。
+                        //★判定は<b>バッチ単位</b>。モデル単位にすると発光しない面まで CPU 変換になり、
+                        //発光を持つ車両の描画負荷が上がる (実機で悪化を確認)。
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BIAS;
+                    } else if (overlay != net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY) {
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OVERLAY;
+                    } else if (scriptRed != 255 || scriptGreen != 255 || scriptBlue != 255 || scriptAlpha != 255) {
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_COLOR;
+                    } else if (scriptRenderer != null && scriptRenderer.hasUvWindow()) {
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_UV;
+                    } else if (com.portofino.realtrainmodunofficial.client.ShaderCompat.isShaderPackInUse()) {
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_SHADER;
+                    } else {
+                        long secVbo = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
+                        boolean vboDrawn = drawBatchWithEntityVbo(batch, renderType, poseStack, packedLight);
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_VBO, secVbo);
+                        if (vboDrawn) {
+                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countVbo(
+                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK);
+                            //VBO 経路もドローコール数は同じだけ掛かる。重複描画が無いか一緒に数える。
+                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatch(
+                                batch.groupName, batch.vertexCount,
+                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK);
+                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatchIdentity(
+                                batch.groupName,
+                                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_OK,
+                                System.identityHashCode(batch));
                             continue;
                         }
-                        //どのグループが CPU 経路に落ちているかをログに出す。
-                        //※間引き<b>後</b>の実提出数を渡すこと。batch.vertexCount を渡していたときは
-                        //  最適化が効いても数字が動かず、効果を読み違えた。
-                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatch(
-                            batch.groupName, vCount, vboReason);
-                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatchIdentity(
-                            batch.groupName, vboReason, System.identityHashCode(batch));
-                        long secBuf = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
-                        VertexConsumer consumer = targetBuffer.getBuffer(renderType);
-                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
-                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GETBUF, secBuf);
-                        //計測: CPU が毎フレーム流している頂点数 (F8 オーバーレイに出す)
-                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.addVertices(vCount);
-                        long secSub = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
-                        PoseStack.Pose pose = poseStack.last();
-                        Matrix4f mat = pose.pose();
-                        Matrix3f norm = pose.normal();
-                        float[] normalOut = new float[3];
-                        //三角形で送るときは四角形 4 頂点を 6 頂点へ並べ替える (中身は同じ)。
-                        int submitCount = useTriangles ? (vCount / 4) * 6 : vCount;
-                        for (int vi = 0; vi < submitCount; vi++) {
-                            int i = useTriangles
-                                ? (vi / 6) * 4 + com.portofino.realtrainmodunofficial.client.render
-                                    .RtmuRenderTypes.TRI_ORDER[vi % 6]
-                                : vi;
-                            int o = i * 8;
-                            float x = vData[o], y = vData[o + 1], z = vData[o + 2];
-                            float nx = vData[o + 3], ny = vData[o + 4], nz = vData[o + 5];
-                            float u = vData[o + 6], v = vData[o + 7];
-                            if (depthBias != 0.0F) {
-                                //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
-                                float bnx = nx, bny = ny, bnz = nz;
-                                if (vBias != null) {
-                                    int bo = i * 3;
-                                    bnx = vBias[bo]; bny = vBias[bo + 1]; bnz = vBias[bo + 2];
-                                }
-                                float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, bnx*bnx + bny*bny + bnz*bnz)));
-                                x += bnx*il*depthBias; y += bny*il*depthBias; z += bnz*il*depthBias;
-                            }
-                            if (scriptRenderer != null) {
-                                u = scriptRenderer.mapU(u, batch.minU, batch.maxU);
-                                v = scriptRenderer.mapV(v, batch.minV, batch.maxV);
-                            }
-                            float tnx = norm.m00()*nx + norm.m10()*ny + norm.m20()*nz;
-                            float tny = norm.m01()*nx + norm.m11()*ny + norm.m21()*nz;
-                            float tnz = norm.m02()*nx + norm.m12()*ny + norm.m22()*nz;
-                            normalizeNormal(tnx, tny, tnz, normalOut);
-                            //頂点ごとのVector3f確保を避ける(GC削減)
-                            //本家 enableCustomLighting 相当: 室内灯の方を向いた面を明るくする。
-                            int vr = scriptRed;
-                            int vg = scriptGreen;
-                            int vb = scriptBlue;
-                            if (com.portofino.realtrainmodunofficial.client.render.InteriorLighting.isActive()) {
-                                float f = com.portofino.realtrainmodunofficial.client.render
-                                    .InteriorLighting.factor(x, y, z, nx, ny, nz);
-                                vr = Math.min(255, Math.round(vr * f
-                                    * com.portofino.realtrainmodunofficial.client.render.InteriorLighting.red()));
-                                vg = Math.min(255, Math.round(vg * f
-                                    * com.portofino.realtrainmodunofficial.client.render.InteriorLighting.green()));
-                                vb = Math.min(255, Math.round(vb * f
-                                    * com.portofino.realtrainmodunofficial.client.render.InteriorLighting.blue()));
-                            }
-                            VertexWriter.addVertex(consumer, mat, x, y, z)
-                                .setColor(vr, vg, vb, scriptAlpha)
-                                .setUv(u, v)
-                                .setOverlay(overlay)
-                                .setLight(packedLight)
-                                .setNormal(normalOut[0], normalOut[1], normalOut[2]);
-                        }
-                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
-                            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_SUBMIT, secSub);
+                        vboReason = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.VBO_BUILD;
                     }
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countVbo(vboReason);
+                    MultiBufferSource targetBuffer = buffer;
+                    //★pass1 は<b>面を間引かない</b>。
+                    //以前は「窓テクセルを踏む面だけ提出する」独自最適化を入れていたが、
+                    //テクスチャの解像度や UV の取り方によっては車体の面まで落ちてしまい、
+                    //そこが穴になって手前に描いてあるレールが覗く。本家 pass1 は
+                    //材質の面を全部描いて alpha で抜くだけなので、そちらに合わせる。
+                    float[] vData = batch.data;
+                    float[] vBias = batch.biasNormals;
+                    int vCount = batch.vertexCount;
+                    if (vCount <= 0) {
+                        continue;
+                    }
+                    //どのグループが CPU 経路に落ちているかをログに出す。
+                    //※間引き<b>後</b>の実提出数を渡すこと。batch.vertexCount を渡していたときは
+                    //  最適化が効いても数字が動かず、効果を読み違えた。
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatch(
+                        batch.groupName, vCount, vboReason);
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatchIdentity(
+                        batch.groupName, vboReason, System.identityHashCode(batch));
+                    long secBuf = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
+                    VertexConsumer consumer = targetBuffer.getBuffer(renderType);
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GETBUF, secBuf);
+                    //計測: CPU が毎フレーム流している頂点数 (F8 オーバーレイに出す)
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.addVertices(vCount);
+                    long secSub = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
+                    PoseStack.Pose pose = poseStack.last();
+                    Matrix4f mat = pose.pose();
+                    Matrix3f norm = pose.normal();
+                    float[] normalOut = new float[3];
+                    //三角形で送るときは四角形 4 頂点を 6 頂点へ並べ替える (中身は同じ)。
+                    int submitCount = useTriangles ? (vCount / 4) * 6 : vCount;
+                    for (int vi = 0; vi < submitCount; vi++) {
+                        int i = useTriangles
+                            ? (vi / 6) * 4 + com.portofino.realtrainmodunofficial.client.render
+                                .RtmuRenderTypes.TRI_ORDER[vi % 6]
+                            : vi;
+                        int o = i * 8;
+                        float x = vData[o], y = vData[o + 1], z = vData[o + 2];
+                        float nx = vData[o + 3], ny = vData[o + 4], nz = vData[o + 5];
+                        float u = vData[o + 6], v = vData[o + 7];
+                        if (depthBias != 0.0F) {
+                            //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
+                            float bnx = nx, bny = ny, bnz = nz;
+                            if (vBias != null) {
+                                int bo = i * 3;
+                                bnx = vBias[bo]; bny = vBias[bo + 1]; bnz = vBias[bo + 2];
+                            }
+                            float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, bnx*bnx + bny*bny + bnz*bnz)));
+                            x += bnx*il*depthBias; y += bny*il*depthBias; z += bnz*il*depthBias;
+                        }
+                        if (scriptRenderer != null) {
+                            u = scriptRenderer.mapU(u, batch.minU, batch.maxU);
+                            v = scriptRenderer.mapV(v, batch.minV, batch.maxV);
+                        }
+                        float tnx = norm.m00()*nx + norm.m10()*ny + norm.m20()*nz;
+                        float tny = norm.m01()*nx + norm.m11()*ny + norm.m21()*nz;
+                        float tnz = norm.m02()*nx + norm.m12()*ny + norm.m22()*nz;
+                        normalizeNormal(tnx, tny, tnz, normalOut);
+                        //頂点ごとのVector3f確保を避ける(GC削減)
+                        //本家 enableCustomLighting 相当: 室内灯の方を向いた面を明るくする。
+                        int vr = scriptRed;
+                        int vg = scriptGreen;
+                        int vb = scriptBlue;
+                        if (com.portofino.realtrainmodunofficial.client.render.InteriorLighting.isActive()) {
+                            float f = com.portofino.realtrainmodunofficial.client.render
+                                .InteriorLighting.factor(x, y, z, nx, ny, nz);
+                            vr = Math.min(255, Math.round(vr * f
+                                * com.portofino.realtrainmodunofficial.client.render.InteriorLighting.red()));
+                            vg = Math.min(255, Math.round(vg * f
+                                * com.portofino.realtrainmodunofficial.client.render.InteriorLighting.green()));
+                            vb = Math.min(255, Math.round(vb * f
+                                * com.portofino.realtrainmodunofficial.client.render.InteriorLighting.blue()));
+                        }
+                        VertexWriter.addVertex(consumer, mat, x, y, z)
+                            .setColor(vr, vg, vb, scriptAlpha)
+                            .setUv(u, v)
+                            .setOverlay(overlay)
+                            .setLight(packedLight)
+                            .setNormal(normalOut[0], normalOut[1], normalOut[2]);
+                    }
+                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
+                        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_SUBMIT, secSub);
+                    
+
                 } finally {
                     if (willTransform) {
                         poseStack.popPose();
@@ -4832,12 +4694,6 @@ public final class MqoModelLoader {
 
             // (床下の蓋は撤去: ユーザー報告「床に敷いた影のように見えて邪魔」のため。)
 
-            if (fullbright) {
-                RenderSystem.enableCull();
-                RenderSystem.depthMask(true);
-                RenderSystem.disableBlend();
-                RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 1.0f);
-            }
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_LOOP, secLoop);
         }
@@ -5185,25 +5041,6 @@ public final class MqoModelLoader {
             return packedLight;
         }
 
-        /** packedLightからフラット明るさ係数(0..1)を計算する。 */
-        private static float computeFlatBrightness(int packedLight) {
-            try {
-                Minecraft mc = Minecraft.getInstance();
-                net.minecraft.client.multiplayer.ClientLevel level = mc.level;
-                if (level == null) return 1.0F;
-                net.minecraft.world.level.dimension.DimensionType dim = level.dimensionType();
-                int blockLevel = net.minecraft.client.renderer.LightTexture.block(packedLight);
-                int skyLevel = net.minecraft.client.renderer.LightTexture.sky(packedLight);
-                float skyMul = level.getSkyDarken(1.0F) * 0.95F + 0.05F;
-                float skyB = net.minecraft.client.renderer.LightTexture.getBrightness(dim, skyLevel) * skyMul;
-                float blockB = net.minecraft.client.renderer.LightTexture.getBrightness(dim, blockLevel);
-                float b = Math.max(skyB, blockB);
-                // 完全な暗黒で真っ黒にならないよう下限を少し残す(バニラも 0.04 程度のグレー混合がある)。
-                return net.minecraft.util.Mth.clamp(b, 0.05F, 1.0F);
-            } catch (Throwable ignored) {
-                return 1.0F;
-            }
-        }
 
         private static void normalizeNormal(float nx, float ny, float nz, float[] out) {
             float lenSq = nx * nx + ny * ny + nz * nz;
@@ -5550,9 +5387,6 @@ public final class MqoModelLoader {
         // GPU VBO キャッシュ。フルブライト経路の同じ batch を毎フレーム再
         // ビルドしていた CPU コストを 1 回ビルド + GPU 側 modelview 変換に
         // 置き換える。scriptRenderer のテクスチャ/UV/色変更が無い場合のみ使用。
-        volatile com.mojang.blaze3d.vertex.VertexBuffer fullbrightVbo;
-        volatile boolean vboBuildAttempted;
-        volatile boolean vboBuildFailed;
 
         /** {@link TextureInfo#lightOptionDeclared} の引き継ぎ。 */
         boolean lightOptionDeclared;
@@ -5748,102 +5582,15 @@ public final class MqoModelLoader {
             }
         }
 
-        com.mojang.blaze3d.vertex.VertexBuffer getOrBuildFullbrightVbo() {
-            return getOrBuildFullbrightVbo(0.0F);
-        }
-
-        private volatile java.util.Map<Float, com.mojang.blaze3d.vertex.VertexBuffer> biasedVbos;
-
-        com.mojang.blaze3d.vertex.VertexBuffer getOrBuildFullbrightVbo(float bias) {
-            if (bias == 0.0F) {
-                if (vboBuildFailed) return null;
-                if (fullbrightVbo != null) return fullbrightVbo;
-                synchronized (this) {
-                    if (fullbrightVbo == null && !vboBuildFailed) {
-                        vboBuildAttempted = true;
-                        com.mojang.blaze3d.vertex.VertexBuffer vbo = buildVbo(0.0F);
-                        if (vbo == null) vboBuildFailed = true;
-                        else fullbrightVbo = vbo;
-                    }
-                }
-                return fullbrightVbo;
-            }
-            // bias != 0: 別キャッシュ
-            java.util.Map<Float, com.mojang.blaze3d.vertex.VertexBuffer> map = biasedVbos;
-            if (map != null) {
-                com.mojang.blaze3d.vertex.VertexBuffer cached = map.get(bias);
-                if (cached != null) return cached;
-            }
-            synchronized (this) {
-                if (biasedVbos == null) biasedVbos = new java.util.HashMap<>(2);
-                com.mojang.blaze3d.vertex.VertexBuffer cached = biasedVbos.get(bias);
-                if (cached != null) return cached;
-                com.mojang.blaze3d.vertex.VertexBuffer vbo = buildVbo(bias);
-                if (vbo != null) biasedVbos.put(bias, vbo);
-                return vbo;
-            }
-        }
-
-        private com.mojang.blaze3d.vertex.VertexBuffer buildVbo(float bias) {
-            if (vertexCount <= 0) return null;
-            try {
-                com.mojang.blaze3d.vertex.BufferBuilder bb = com.mojang.blaze3d.vertex.Tesselator.getInstance().begin(
-                    com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
-                    com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX_COLOR_NORMAL);
-                for (int i = 0; i < vertexCount; i++) {
-                    int o = i * 8;
-                    float x = data[o], y = data[o + 1], z = data[o + 2];
-                    float nx = data[o + 3], ny = data[o + 4], nz = data[o + 5];
-                    float u = data[o + 6], v = data[o + 7];
-                    if (bias != 0.0F) {
-                        //押し出しは biasNormals (同位置の全面平均)。面割れ防止。
-                        float bnx = nx, bny = ny, bnz = nz;
-                        if (biasNormals != null) {
-                            int bo = i * 3;
-                            bnx = biasNormals[bo]; bny = biasNormals[bo + 1]; bnz = biasNormals[bo + 2];
-                        }
-                        float il = (float)(1.0D / Math.sqrt(Math.max(1.0E-8F, bnx*bnx + bny*bny + bnz*bnz)));
-                        x += bnx*il*bias; y += bny*il*bias; z += bnz*il*bias;
-                    }
-                    bb.addVertex(x, y, z)
-                        .setUv(u, v)
-                        .setColor(255, 255, 255, 255)
-                        .setNormal(nx, ny, nz);
-                }
-                com.mojang.blaze3d.vertex.MeshData mesh = bb.build();
-                if (mesh == null) return null;
-                com.mojang.blaze3d.vertex.VertexBuffer vbo = new com.mojang.blaze3d.vertex.VertexBuffer(
-                    com.mojang.blaze3d.vertex.VertexBuffer.Usage.STATIC);
-                vbo.bind();
-                vbo.upload(mesh);
-                com.mojang.blaze3d.vertex.VertexBuffer.unbind();
-                return vbo;
-            } catch (Throwable t) {
-                return null;
-            }
-        }
 
         /** このバッチのGPU VBOを解放する(描画スレッドで呼ぶこと)。 */
         void closeVbosNow() {
-            if (fullbrightVbo != null) {
-                if (!fullbrightVbo.isInvalid()) fullbrightVbo.close();
-                fullbrightVbo = null;
-            }
-            vboBuildFailed = false;
-            vboBuildAttempted = false;
             if (entityVbo != null) {
                 if (!entityVbo.isInvalid()) entityVbo.close();
                 entityVbo = null;
             }
             entityVboLight = Integer.MIN_VALUE;
             entityVboFailed = false;
-            java.util.Map<Float, com.mojang.blaze3d.vertex.VertexBuffer> bv = biasedVbos;
-            if (bv != null) {
-                for (com.mojang.blaze3d.vertex.VertexBuffer v : bv.values()) {
-                    if (v != null && !v.isInvalid()) v.close();
-                }
-                biasedVbos = null;
-            }
         }
     }
 
