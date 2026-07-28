@@ -116,59 +116,72 @@ public final class RtmCamera {
         if (flash > 0) {
             --flash;
         }
-        if (!active || mc.level == null || mc.player == null) {
-            return;
-        }
         // GUI を開いている間は操作しない (チャット等)
-        if (mc.screen != null) {
+        if (!active || mc.level == null || mc.player == null || mc.screen != null) {
+            // ★固定キーは自前で立ち上がりを見ているので、ここで「離した」状態に戻す。
+            // 戻さないと GUI 中に離されたキーが押しっぱなし扱いのまま効かなくなる。
+            heldKeys.clear();
             return;
         }
         handleKeys(mc);
         updateFocus(mc);
     }
 
+    /** 前 tick に押されていたキー。KeyMapping#consumeClick の代わり。 */
+    private final java.util.Set<Integer> heldKeys = new java.util.HashSet<>();
+
+    /** 押した瞬間だけ true (押しっぱなしでは繰り返さない)。 */
+    private boolean pressed(int key) {
+        if (CameraKeyMappings.isDown(key)) {
+            // 追加できた = 前 tick は押されていなかった = 立ち上がり
+            return heldKeys.add(key);
+        }
+        heldKeys.remove(key);
+        return false;
+    }
+
     private void handleKeys(Minecraft mc) {
-        if (CameraKeyMappings.ZOOM_IN.isDown()) {
+        if (CameraKeyMappings.isDown(CameraKeyMappings.ZOOM_IN)) {
             state.zoom(1.0F);
         }
-        if (CameraKeyMappings.ZOOM_OUT.isDown()) {
+        if (CameraKeyMappings.isDown(CameraKeyMappings.ZOOM_OUT)) {
             state.zoom(-1.0F);
         }
         if (state.getFocusMode() == CameraState.FocusMode.MF) {
-            if (CameraKeyMappings.FOCUS_FAR.isDown()) {
+            if (CameraKeyMappings.isDown(CameraKeyMappings.FOCUS_FAR)) {
                 state.stepFocus(1.0F);
             }
-            if (CameraKeyMappings.FOCUS_NEAR.isDown()) {
+            if (CameraKeyMappings.isDown(CameraKeyMappings.FOCUS_NEAR)) {
                 state.stepFocus(-1.0F);
             }
         }
-        // 押しっぱなしで連続変化させたくないもの (段階的な設定) は consumeClick
-        while (CameraKeyMappings.APERTURE_OPEN.consumeClick()) {
+        // 押しっぱなしで連続変化させたくないもの (段階的な設定) は立ち上がりだけ拾う
+        if (pressed(CameraKeyMappings.APERTURE_OPEN)) {
             state.stepAperture(-1);
         }
-        while (CameraKeyMappings.APERTURE_CLOSE.consumeClick()) {
+        if (pressed(CameraKeyMappings.APERTURE_CLOSE)) {
             state.stepAperture(1);
         }
-        while (CameraKeyMappings.SHUTTER_FASTER.consumeClick()) {
+        if (pressed(CameraKeyMappings.SHUTTER_FASTER)) {
             state.stepShutter(-1);
         }
-        while (CameraKeyMappings.SHUTTER_SLOWER.consumeClick()) {
+        if (pressed(CameraKeyMappings.SHUTTER_SLOWER)) {
             state.stepShutter(1);
         }
-        while (CameraKeyMappings.FOCUS_MODE.consumeClick()) {
+        if (pressed(CameraKeyMappings.FOCUS_MODE)) {
             state.cycleFocusMode();
             trackedTrain = null;
         }
-        while (CameraKeyMappings.CYCLE_GRID.consumeClick()) {
+        if (pressed(CameraKeyMappings.CYCLE_GRID)) {
             state.cycleGrid();
         }
-        while (CameraKeyMappings.CYCLE_ASPECT.consumeClick()) {
+        if (pressed(CameraKeyMappings.CYCLE_ASPECT)) {
             state.cycleAspectGuide();
         }
-        while (CameraKeyMappings.TOGGLE_LEVEL.consumeClick()) {
+        if (pressed(CameraKeyMappings.TOGGLE_LEVEL)) {
             state.toggleLevel();
         }
-        while (CameraKeyMappings.SHOOT.consumeClick()) {
+        if (pressed(CameraKeyMappings.SHOOT)) {
             shoot(mc);
         }
     }

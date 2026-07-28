@@ -136,7 +136,7 @@ public final class RealTrainModUnofficialClientModEvents {
     @SubscribeEvent
     public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
         TrainControlKeyMappings.register(event);
-        com.portofino.realtrainmodunofficial.client.camera.CameraKeyMappings.register(event);
+        // カメラのキーは固定 (キーコンフィグに出さない)。CameraKeyMappings 参照。
     }
 
     /** カメラの被写界深度 / 流し撮り用コアシェーダー */
