@@ -187,31 +187,79 @@ public final class VehicleMeshCache {
         Matrix4f modelView = new Matrix4f(RenderSystem.getModelViewMatrix())
             .mul(poseStack.last().pose());
         Matrix4f projection = RenderSystem.getProjectionMatrix();
-        boolean drew = false;
-        for (MeshCapture.Section s : sections) {
-            VertexBuffer vbo = s.vbo();
-            if (vbo == null || vbo.isInvalid()) {
-                continue;
-            }
-            RenderType type = s.renderType();
-            type.setupRenderState();
+        // ★焼き込みは単位行列で録るので、頂点法線は車両ローカルのまま。
+        // 平行光の向きを車両ローカルへ回してから描く (CPU 経路と同じ陰影になる)。
+        // これが無いと、焼き込みで描く車体と CPU で描く可動部 (ドア) で
+        // 明るさが食い違う (向きによってドアだけ陰影が乗らない)。
+        org.joml.Vector3f origL0 = null;
+        org.joml.Vector3f origL1 = null;
+        java.lang.reflect.Field field = lightDirsField();
+        if (field != null) {
             try {
-                ShaderInstance shader = RenderSystem.getShader();
-                if (shader == null) {
+                if (field.get(null) instanceof org.joml.Vector3f[] dirs
+                        && dirs.length >= 2 && dirs[0] != null && dirs[1] != null) {
+                    origL0 = new org.joml.Vector3f(dirs[0]);
+                    origL1 = new org.joml.Vector3f(dirs[1]);
+                    org.joml.Matrix3f invRot =
+                        new org.joml.Matrix3f(poseStack.last().normal()).transpose();
+                    RenderSystem.setShaderLights(
+                        invRot.transform(new org.joml.Vector3f(origL0)),
+                        invRot.transform(new org.joml.Vector3f(origL1)));
+                }
+            } catch (Throwable ignored) {
+                origL0 = null;
+                origL1 = null;
+            }
+        }
+        boolean drew = false;
+        try {
+            for (MeshCapture.Section s : sections) {
+                VertexBuffer vbo = s.vbo();
+                if (vbo == null || vbo.isInvalid()) {
                     continue;
                 }
-                vbo.bind();
-                vbo.drawWithShader(modelView, projection, shader);
-                VertexBuffer.unbind();
-                drew = true;
-            } catch (Throwable t) {
-                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
-                    "Vehicle mesh draw failed", t);
-            } finally {
-                type.clearRenderState();
+                RenderType type = s.renderType();
+                type.setupRenderState();
+                try {
+                    ShaderInstance shader = RenderSystem.getShader();
+                    if (shader == null) {
+                        continue;
+                    }
+                    vbo.bind();
+                    vbo.drawWithShader(modelView, projection, shader);
+                    VertexBuffer.unbind();
+                    drew = true;
+                } catch (Throwable t) {
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                        "Vehicle mesh draw failed", t);
+                } finally {
+                    type.clearRenderState();
+                }
+            }
+        } finally {
+            if (origL0 != null) {
+                RenderSystem.setShaderLights(origL0, origL1);
             }
         }
         return drew;
+    }
+
+    /** RenderSystem.shaderLightDirections。取れなければ null (補正なしで描く)。 */
+    private static java.lang.reflect.Field shaderLightDirsField;
+    private static boolean shaderLightDirsFailed;
+
+    private static java.lang.reflect.Field lightDirsField() {
+        if (shaderLightDirsField != null || shaderLightDirsFailed) {
+            return shaderLightDirsField;
+        }
+        try {
+            java.lang.reflect.Field f = RenderSystem.class.getDeclaredField("shaderLightDirections");
+            f.setAccessible(true);
+            shaderLightDirsField = f;
+        } catch (Throwable t) {
+            shaderLightDirsFailed = true;
+        }
+        return shaderLightDirsField;
     }
 
     private static List<MeshCapture.Section> bake(Consumer<MultiBufferSource> baker) {
