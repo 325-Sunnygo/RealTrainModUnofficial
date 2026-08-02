@@ -147,6 +147,19 @@ public final class MachineScriptRenderers {
         }
 
         /** @return true = 描画を担当した */
+        /**
+         * モデル選択画面のプレビュー用。BlockEntity が無い状態でスクリプトを走らせる。
+         *
+         * <p>本家のスクリプトは entity が null のときを「アイテム/GUI 表示」として扱っており
+         * (RenderConnectablePole.js が明示的に分岐している)、ランプ等は既定の見た目で描かれる。
+         * これを通さないと、在ワールドでは点くライトがプレビューに出ない。
+         */
+        public boolean renderForPreview(PoseStack poseStack, MultiBufferSource buffer,
+                                        int packedLight, int packedOverlay,
+                                        MqoModelLoader.MqoModel model) {
+            return renderInner(null, 0.0F, poseStack, buffer, packedLight, packedOverlay, model);
+        }
+
         public boolean render(InstalledObjectBlockEntity be, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {

@@ -263,8 +263,10 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         // 照明 (本家 LIGHT + rotateByMetadata、サーチライト等): 本家 ItemInstalledObject は
         // setBlock(..., sideIndex=クリック面, 3) + setRotation(player, 15.0F, true)。
         // だけを保存し、向きは 15 度刻みに丸める。
-        boolean lightRotateByMeta = category == InstalledObjectCategory.LIGHT
-                && definition.isRotateByMetadata();
+        // ★rotateByMetadata は本家では「機械共通の設定フラグ」。カテゴリで絞らない。
+        // 以前は照明だけ通していたので、同じフラグを持つスピーカーが面回転を受けず、
+        // 本家と違う場所・向きに描かれていた (同梱で該当するのは照明4種とスピーカー2種)。
+        boolean rotateByMeta = definition.isRotateByMetadata();
         // 蛍光灯: 本家 ItemInstalledObject は取付方向 (0..7) だけを持たせ、平行移動と回転は
         // レンダースクリプト側でやる。汎用の壁挿し/逆さ設置には乗せない。
         boolean fluorescent = category == InstalledObjectCategory.FLUORESCENT;
@@ -286,7 +288,7 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         if (railSnap != null) {
             placeYaw = railSnap.yaw();
             placeMountPitch = railSnap.pitch();
-        } else if (uprightOnly || lightRotateByMeta) {
+        } else if (uprightOnly || rotateByMeta) {
             placeYaw = honkeRotation(player);
         } else if (fluorescent || gridAligned) {
             placeYaw = 0.0F;
@@ -322,7 +324,7 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
                     // RenderFluorescent.js が getDir を読んで自分で寄せて回す。
                     blockEntity.setFluorescentDir(fluorescentDir(clickedFace, player.getYRot()));
                     blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
-                } else if (lightRotateByMeta) {
+                } else if (rotateByMeta) {
                     // 本家 meta = クリック面 (0-5)。RenderMachine と同じ面回転+向きで描くための保存。
                     blockEntity.setMountFace(clickedFace.ordinal());
                     blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);

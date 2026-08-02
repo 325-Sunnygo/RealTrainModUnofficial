@@ -450,8 +450,16 @@ public final class InstalledObjectPackLoader {
             def.setWireAttachPos(parseVec3(obj, "wirePos", 1.0));
             // 本家 connectorType ("Relay"/"Input"/"Output")。NGTO Builder がリレー碍子判定に使う。
             def.setSubType(firstNonBlank(getString(obj, "connectorType"), getString(obj, "ConnectorType")));
-            // 本家 MachineConfig.rotateByMetadata。true の照明はクリック面 (meta) で回して置く。
-            def.setRotateByMetadata(getBoolean(obj, "rotateByMetadata", false));
+            // 本家 MachineConfig.rotateByMetadata。true の設置物はクリック面 (meta) で回して置く。
+            // ★model 側にも書けるようにする (customIconTexture 等と同じ扱い)。
+            // 以前は top-level しか見ておらず、model の中に書いたパックで無視されていた。
+            boolean rotByMeta = getBoolean(obj, "rotateByMetadata", false)
+                || (model != null && getBoolean(model, "rotateByMetadata", false));
+            def.setRotateByMetadata(rotByMeta);
+            if (rotByMeta) {
+                // 効いているかを起動時に確認できるようにする (該当は数件だけ)
+                RealTrainModUnofficial.LOGGER.info("[設置物] rotateByMetadata=true: {}", def.getId());
+            }
             // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate が回るスクリプト
             // (列車検知器は全ての処理をここに書く)。
             def.setServerScriptPath(getString(obj, "serverScriptPath"));

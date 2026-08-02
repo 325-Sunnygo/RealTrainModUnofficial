@@ -319,7 +319,7 @@ public class ModelSelectScreen extends Screen {
             MultiBufferSource.BufferSource buf = Minecraft.getInstance().renderBuffers().bufferSource();
             Object previewEnt = (vehicleDef != null && (model.hasRenderScript() || vehicleDef.hasScript()))
                 ? getOrCreatePreviewEntity(vehicleDef, model) : null;
-            renderPreviewModel(model, vehicleDef, ps, buf, previewEnt);
+            renderPreviewModel(model, vehicleDef, ps, buf, previewEnt, info.id());
             buf.endBatch();
 
             RenderSystem.disableDepthTest();
@@ -353,7 +353,31 @@ public class ModelSelectScreen extends Screen {
             ps.scale(1.5F, 1.5F, 1.5F);
             return;
         }
-        // ModelSetMachineClient / ModelSetOrnamentClient (設置物はこちら)
+        // ここから設置物。本家は種類ごとに別クラスで配置が違うので、それに合わせて分ける。
+        // 以前は全部 ModelSetMachineClient の配置で描いていたため、信号機が 1/5 の大きさになり、
+        // 碍子・コネクタ・架線は距離も傾きも本家と別物になっていた。
+        var objDef = com.portofino.realtrainmodunofficial.installedobject
+            .InstalledObjectRegistry.getById(id);
+        var category = objDef == null ? null : objDef.getCategory();
+        if (category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.SIGNAL) {
+            // 本家 ModelSetSignalClient
+            ps.translate(3.0F, -2.0F, -10.0F);
+            ps.mulPose(Axis.YP.rotationDegrees(-50.0F));
+            ps.scale(5.0F, 5.0F, 5.0F);
+            return;
+        }
+        if (category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.INSULATOR
+                || category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.CONNECTOR_INPUT
+                || category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.CONNECTOR_OUTPUT
+                || category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.WIRE) {
+            // 本家 ModelSetConnectorClient / ModelSetWireClient (レールと同じ配置)
+            ps.translate(3.0F, -2.0F, -6.0F);
+            ps.mulPose(Axis.ZP.rotationDegrees(10.0F));
+            ps.mulPose(Axis.YP.rotationDegrees(-50.0F));
+            ps.scale(1.5F, 1.5F, 1.5F);
+            return;
+        }
+        // 本家 ModelSetMachineClient / ModelSetOrnamentClient (踏切・照明・スピーカー・架線柱等)
         ps.translate(3.0F, -1.0F, -10.0F);
         ps.mulPose(Axis.YP.rotationDegrees(-60.0F));
     }
@@ -364,7 +388,7 @@ public class ModelSelectScreen extends Screen {
      */
     private static void renderPreviewModel(MqoModelLoader.MqoModel model, VehicleDefinition vehicleDef,
                                            PoseStack poseStack, MultiBufferSource.BufferSource buffer,
-                                           Object previewEnt) {
+                                           Object previewEnt, String previewDefinitionId) {
         poseStack.pushPose();
         try {
             if (vehicleDef != null) {
@@ -378,7 +402,26 @@ public class ModelSelectScreen extends Screen {
             }
 
             boolean rendered = false;
-            if (vehicleDef != null && vehicleDef.hasScript()) {
+            // ★設置物 (信号/照明/踏切等) はパックのスクリプトが「どのランプを出すか」を決める。
+            // ここでスクリプトを走らせないと、在ワールドでは点くライトがプレビューに出ない。
+            // 本家 ModelSetMachineClient.renderModelInGui もスクリプト経由で描く。
+            // entity は null。本家スクリプトは null を「アイテム/GUI 表示」として扱う
+            // (RenderConnectablePole.js 等が明示的に分岐している)。
+            if (vehicleDef == null) {
+                try {
+                    var objDef = com.portofino.realtrainmodunofficial.installedobject
+                        .InstalledObjectRegistry.getById(previewDefinitionId);
+                    if (objDef != null && objDef.getScriptPath() != null && !objDef.getScriptPath().isBlank()) {
+                        var machineScripted = com.portofino.realtrainmodunofficial.client.render
+                            .MachineScriptRenderers.get(objDef);
+                        rendered = machineScripted != null && machineScripted.renderForPreview(
+                            poseStack, buffer, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, model);
+                    }
+                } catch (Throwable ignored) {
+                    rendered = false;
+                }
+            }
+            if (!rendered && vehicleDef != null && vehicleDef.hasScript()) {
                 try {
                     com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.Scripted scripted =
                         com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(vehicleDef);
