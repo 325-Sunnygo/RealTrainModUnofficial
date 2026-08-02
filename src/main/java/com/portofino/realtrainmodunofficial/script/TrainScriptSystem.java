@@ -3415,6 +3415,7 @@ public class TrainScriptSystem {
         }
 
         public int getTick(Object entity) {
+            jp.ngt.rtm.render.PartsRenderer.markTimeAccessed();
             try {
                 if (entity instanceof LegacyScriptExecutor exec) {
                     return (int) exec.getTick();
@@ -3433,6 +3434,7 @@ public class TrainScriptSystem {
         }
 
         public long getSystemTime() {
+            jp.ngt.rtm.render.PartsRenderer.markTimeAccessed();
             return System.currentTimeMillis() / 1000L;
         }
 
@@ -3494,6 +3496,7 @@ public class TrainScriptSystem {
         }
 
         private long getWorldDayTime(Object entity) {
+            jp.ngt.rtm.render.PartsRenderer.markTimeAccessed();
             try {
                 if (entity instanceof Entity e) {
                     return e.level() == null ? 0 : e.level().dayTime();
@@ -4065,7 +4068,10 @@ public class TrainScriptSystem {
 
         // ---- System clock helpers ----
 
-        public long getSystemTimeMillis() { return System.currentTimeMillis(); }
+        public long getSystemTimeMillis() {
+            jp.ngt.rtm.render.PartsRenderer.markTimeAccessed();
+            return System.currentTimeMillis();
+        }
 
         public int getSystemHour() {
             return java.time.LocalTime.now().getHour();

@@ -137,7 +137,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     if (!driverPassenger) {
                         return;
                     }
-                    if (controlTrain.getNotch() == 0) {
+                    if (controlTrain.getNotch() == -controlTrain.getMaxBrakeNotch()) {
                         int delta = payload.action().equals("reverser_up") ? 1 : -1;
                         int next = Math.max(-1, Math.min(1, controlTrain.getReverser() + delta));
                         if (next != controlTrain.getReverser()) {
@@ -207,8 +207,10 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             }
             // ↑↓ キーのレバーサ操作。
             // を読む (updateMotion)。
+            // ★動かせるのはマスコンが非常ブレーキ位置のとき (ユーザー要望)。
+            // 連結すると必ず非常位置になるので、ニュートラル条件だと連結後に切り替えられなかった。
             case "reverser_up", "reverser_down" -> {
-                if (train.getNotch() == 0) {
+                if (train.getNotch() == train.getEmergencyBrakeNotch()) {
                     var dirType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction;
                     boolean flip = (train.getCabDirection() & 1) != (train.getTrainDirection() & 1);
                     byte front = flip

@@ -26,6 +26,43 @@ public final class GL11Facade {
     }
 
     /**
+     * 記録 (GLRecorder) を通さずに描く経路のための、実際の行列スタック。
+     *
+     * <p>★これが無いと、記録に何も出さないスクリプト (焼き込みモデルが本体で、
+     * スクリプトは向きだけ変えるもの) の {@code glRotatef} 等が<b>黙って捨てられる</b>。
+     * ミラーボール・赤色灯が通電しても回らなかったのはこれ。
+     * 型は Object で持つ (専用サーバーで client 型を触らないため)。
+     */
+    private static final ThreadLocal<Object> FALLBACK_POSE = new ThreadLocal<>();
+    /** フォールバック側で積んだ push の数。スクリプトが pop し忘れても戻せるように数える。 */
+    private static final ThreadLocal<int[]> FALLBACK_DEPTH = ThreadLocal.withInitial(() -> new int[1]);
+
+    /** スクリプト実行の前後で呼ぶ。記録が無いときの変換先を差し替える。 */
+    public static void setFallbackPose(Object poseStack) {
+        FALLBACK_POSE.set(poseStack);
+        FALLBACK_DEPTH.get()[0] = 0;
+    }
+
+    /** 差し替えを解除する。スクリプトが積みっぱなしにした push はここで戻す。 */
+    public static void clearFallbackPose() {
+        com.mojang.blaze3d.vertex.PoseStack ps = fallback();
+        int[] depth = FALLBACK_DEPTH.get();
+        if (ps != null) {
+            while (depth[0] > 0) {
+                ps.popPose();
+                depth[0]--;
+            }
+        }
+        depth[0] = 0;
+        FALLBACK_POSE.remove();
+    }
+
+    private static com.mojang.blaze3d.vertex.PoseStack fallback() {
+        Object o = FALLBACK_POSE.get();
+        return o instanceof com.mojang.blaze3d.vertex.PoseStack ps ? ps : null;
+    }
+
+    /**
      * glPushAttrib / glPopAttrib は 1.21 に対応する状態スタックが無い。
      * 記録側 (GLRecorder) は行列とテクスチャ・色しか持たないので、受けるだけの空実装。
      */
@@ -60,17 +97,41 @@ public final class GL11Facade {
 
     public static void glPushMatrix() {
         GLRecorder r = rec();
-        if (r != null) r.push();
+        if (r != null) {
+            r.push();
+            return;
+        }
+        com.mojang.blaze3d.vertex.PoseStack ps = fallback();
+        if (ps != null) {
+            ps.pushPose();
+            FALLBACK_DEPTH.get()[0]++;
+        }
     }
 
     public static void glPopMatrix() {
         GLRecorder r = rec();
-        if (r != null) r.pop();
+        if (r != null) {
+            r.pop();
+            return;
+        }
+        com.mojang.blaze3d.vertex.PoseStack ps = fallback();
+        int[] depth = FALLBACK_DEPTH.get();
+        if (ps != null && depth[0] > 0) {
+            ps.popPose();
+            depth[0]--;
+        }
     }
 
     public static void glTranslatef(double x, double y, double z) {
         GLRecorder r = rec();
-        if (r != null) r.translate((float) x, (float) y, (float) z);
+        if (r != null) {
+            r.translate((float) x, (float) y, (float) z);
+            return;
+        }
+        com.mojang.blaze3d.vertex.PoseStack ps = fallback();
+        if (ps != null) {
+            ps.translate(x, y, z);
+        }
     }
 
     public static void glTranslated(double x, double y, double z) {
@@ -79,7 +140,16 @@ public final class GL11Facade {
 
     public static void glRotatef(double deg, double x, double y, double z) {
         GLRecorder r = rec();
-        if (r != null) r.rotate((float) deg, (float) x, (float) y, (float) z);
+        if (r != null) {
+            r.rotate((float) deg, (float) x, (float) y, (float) z);
+            return;
+        }
+        com.mojang.blaze3d.vertex.PoseStack ps = fallback();
+        if (ps != null && deg != 0.0D) {
+            ps.mulPose(new org.joml.Quaternionf().rotateAxis(
+                (float) Math.toRadians(deg),
+                (float) x, (float) y, (float) z));
+        }
     }
 
     public static void glRotated(double deg, double x, double y, double z) {
@@ -88,7 +158,14 @@ public final class GL11Facade {
 
     public static void glScalef(double x, double y, double z) {
         GLRecorder r = rec();
-        if (r != null) r.scale((float) x, (float) y, (float) z);
+        if (r != null) {
+            r.scale((float) x, (float) y, (float) z);
+            return;
+        }
+        com.mojang.blaze3d.vertex.PoseStack ps = fallback();
+        if (ps != null) {
+            ps.scale((float) x, (float) y, (float) z);
+        }
     }
 
     public static void glScaled(double x, double y, double z) {

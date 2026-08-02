@@ -75,6 +75,22 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     public void onLoad() {
         super.onLoad();
         LOADED_CORES.add(this);
+        // ★道床はレールベース側のブロックが描くが、形はこのコアの線形から引く。
+        // ベースのチャンクが先に焼かれているとコアが無い状態で焼かれていて道床が出ない。
+        // コアが届いた今、レール一帯を焼き直させる。
+        this.refreshBallastArea();
+    }
+
+    /** レール一帯 (道床の敷かれている範囲) の道床を焼き直させる。クライアントのみ。 */
+    public void refreshBallastArea() {
+        if (this.level == null || !this.level.isClientSide() || !this.isLoaded()) {
+            return;
+        }
+        int[] size = this.getRailSize();
+        int pad = (this.getProperty().getBallastWidth() >> 1) + 2;
+        com.portofino.realtrainmodunofficial.ClientHooks.refreshRailBallast(this.level,
+                size[0] - pad, size[1] - 3, size[2] - pad,
+                size[3] + pad, size[4] + 3, size[5] + pad);
     }
 
     public TileEntityLargeRailCore(BlockEntityType<?> type, BlockPos pos, BlockState state) {
@@ -90,6 +106,8 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         // 同期・再読込時にキャッシュを無効化
         this.railmap = null;
         this.shouldRerenderRail = true;
+        // 線形や道床ブロックが変わったら道床も焼き直す (level 未設定なら中で弾かれる)
+        this.refreshBallastArea();
     }
 
     public void readRailProperties(CompoundTag nbt) {

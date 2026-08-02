@@ -4203,6 +4203,9 @@ public final class MqoModelLoader {
                 if (scriptRenderer != null) {
                     scriptRenderer.setRenderContext(poseStack, buffer, packedLight, overlay, pass, entity);
                 }
+                // ★記録 (GLRecorder) を通さない経路でも、スクリプトの glRotatef/glTranslatef が
+                // 効くように実際の行列を渡しておく。渡さないと黙って捨てられる。
+                jp.ngt.ngtlib.renderer.GL11Facade.setFallbackPose(poseStack);
                 // RTM スクリプトは model.renderPart("...") で部品を描画する。
                 // ScriptModel が現在の renderer を知らないと描画できないため、毎フレーム差し替える。
                 if (scriptModel != null && scriptRenderer != null) {
@@ -4264,6 +4267,7 @@ public final class MqoModelLoader {
                         pass, legacyScriptFailureCount, e);
                 }
             } finally {
+                jp.ngt.ngtlib.renderer.GL11Facade.clearFallbackPose();
                 if (scriptRenderer != null) {
                     // スクリプトが pushMatrix/popMatrix のバランスを崩したまま終了した場合に
                     // matrixDepth を 0 に戻す。残った push は外側の executeScript 呼び出し元の

@@ -126,7 +126,16 @@ public final class RailScriptRenderers {
         return previous == null || previous != signature;
     }
 
-    /** レール上の等間隔サンプル点の明るさから作る指紋。 */
+    /**
+     * レール上の等間隔サンプル点から作る指紋。<b>明るさと線形の両方</b>を混ぜる。
+     *
+     * <p>★線形を入れるのが要点。記録 (GLRecorder) は
+     * {@code shouldRerenderRail} が立った 1 フレームだけで作られ、そのとき線形が
+     * まだ揃っていないと<b>短い/空の記録が焼かれて固定される</b>。
+     * 呼び出し側はその場でフラグを降ろすので、以後どこからも作り直されない
+     * (敷いた直後のカーブが出ず、リログでだけ直る症状)。
+     * 線形を指紋に入れておけば、次の点検で違いに気付いて自動で作り直す。
+     */
     private static long lightSignature(TileEntityLargeRailCore be, RailMap[] maps) {
         net.minecraft.world.level.Level level = be.getLevel();
         if (level == null || maps == null) {
@@ -137,11 +146,18 @@ public final class RailScriptRenderers {
         long signature = 1L;
         for (RailMap map : maps) {
             if (map == null) {
+                signature = signature * 31L + 7L;   //null も状態の一部
                 continue;
             }
+            // 長さ = サンプル数 (renderStaticParts の分割数) の元。ここがずれた記録は作り直す。
+            signature = signature * 31L + Math.round(map.getLength() * 64.0D);
             for (int i = 0; i <= probes; i++) {
                 double[] p = map.getRailPos(probes, i);
                 double h = map.getRailHeight(probes, i);
+                // 1/64 ブロックに量子化。誤差では変わらず、線形が変われば必ず変わる。
+                signature = signature * 31L + Math.round(p[0] * 64.0D);
+                signature = signature * 31L + Math.round(p[1] * 64.0D);
+                signature = signature * 31L + Math.round(h * 64.0D);
                 net.minecraft.core.BlockPos sp = net.minecraft.core.BlockPos.containing(p[1], h + 0.25D, p[0]);
                 int light = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, sp);
                 if (light == 0) {

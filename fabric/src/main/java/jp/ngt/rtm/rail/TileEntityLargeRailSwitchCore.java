@@ -158,6 +158,10 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
     public String getRailShapeName() {
         SwitchType st = this.getSwitch();
         int[] box = this.getRailSize();
+        if (box == null || box.length < 6) {
+            // 置いた直後はまだ寸法が出ない。ここで落とすとクライアントごと落ちる
+            return "Type:Switch";
+        }
         return "Type:Switch " + (st != null ? st.getName() : "?") + ", " +
                 "X:" + (box[3] - box[0]) + ", " +
                 "Y:" + (box[4] - box[1]) + ", " +

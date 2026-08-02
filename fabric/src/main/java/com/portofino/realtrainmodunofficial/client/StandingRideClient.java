@@ -34,8 +34,31 @@ public final class StandingRideClient {
     private static long lastCarriedGameTime = -1000L;
     /** ローカルプレイヤーを最後に運んだ game tick (ヒステリシス判定用)。 */
     private static long lastRideGameTime = -1000L;
-
     private StandingRideClient() {
+    }
+
+    /**
+     * この車両で、その足元の高さに一番近い車内床の Y。
+     *
+     * <p>床は客席 (slotPos) の高さから出す ({@link EntityTrainBase#getInteriorFloorY()} 参照)。
+     * 2 階建てのように床が複数ある車両でも、今いる段の床に合わせる。
+     */
+    private static double floorY(EntityTrainBase train, double feetY) {
+        double[] levels = train.getInteriorFloorLevels();
+        if (levels.length == 0) {
+            return train.getInteriorFloorY();
+        }
+        double best = train.getY() + levels[0];
+        double bestDist = Math.abs(feetY - best);
+        for (int i = 1; i < levels.length; i++) {
+            double y = train.getY() + levels[i];
+            double d = Math.abs(feetY - y);
+            if (d < bestDist) {
+                bestDist = d;
+                best = y;
+            }
+        }
+        return best;
     }
 
     /**
@@ -111,7 +134,7 @@ public final class StandingRideClient {
         }
 
         double feetY = player.getBoundingBox().minY;
-        double floorY = train.getInteriorFloorY();
+        double floorY = floorY(train, feetY);
         return feetY >= floorY - yMargin && feetY <= floorY + 0.5D;
     }
 
@@ -146,7 +169,7 @@ public final class StandingRideClient {
             addZ = dz;
         }
 
-        double floorY = train.getInteriorFloorY();
+        double floorY = floorY(train, player.getBoundingBox().minY);
         double yError = floorY - player.getY();
         double yCorrection = Mth.clamp(yError * Y_CORRECTION_FACTOR, -MAX_Y_CORRECTION, MAX_Y_CORRECTION);
 

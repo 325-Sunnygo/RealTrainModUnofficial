@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.portofino.realtrainmodunofficial.client.PackButtonTextureCache;
+import com.portofino.realtrainmodunofficial.RtmuSettings;
 import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 import com.portofino.realtrainmodunofficial.client.renderer.BogieRenderer;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
@@ -111,7 +112,14 @@ public class ModelSelectScreen extends Screen {
                              String initialName, int initialColor) {
         super(title);
         // 本家どおり名前順ソート (カテゴリを名前より優先)
+        // ★同梱モデルを隠す設定が ON なら、ここで一覧から落とす。
+        // 落とすのは<b>表示だけ</b>で、読み込みは通常どおり行う
+        // (既に設置されている物やパックからの参照が壊れないようにするため)。
+        // 選択中の物だけは、隠す設定でも消さない (今何を選んでいるか分からなくなる)。
         this.allModels = models.stream()
+            .filter(i -> !RtmuSettings.hideBundledModels
+                || !RtmuSettings.isBundledPack(i.packName())
+                || (initialSelectedId != null && initialSelectedId.equals(i.id())))
             .sorted(Comparator
                 .comparing((ModelInfo i) -> safe(i.category()), String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(i -> safe(i.displayName()), String.CASE_INSENSITIVE_ORDER)
@@ -646,6 +654,35 @@ public class ModelSelectScreen extends Screen {
             if (filtered.get(i).id().equals(id)) return i;
         }
         return -1;
+    }
+
+    /**
+     * 決定/キャンセルの後に戻る画面。null なら従来どおりプレイ画面へ戻る。
+     *
+     * <p>★{@link #onDone()} は「選択を通知 → onClose()」の順なので、通知の中で
+     * 画面を開いても直後に閉じられてしまう。戻り先はここに持たせて onClose に決めさせる。
+     */
+    private java.util.function.Supplier<net.minecraft.client.gui.screens.Screen> returnScreen;
+
+    /** 決定/キャンセルの後にこの画面へ戻る (編成の編集画面などから使う)。 */
+    public ModelSelectScreen withReturnScreen(
+            java.util.function.Supplier<net.minecraft.client.gui.screens.Screen> factory) {
+        this.returnScreen = factory;
+        return this;
+    }
+
+    @Override
+    public void onClose() {
+        java.util.function.Supplier<net.minecraft.client.gui.screens.Screen> factory = this.returnScreen;
+        this.returnScreen = null;
+        if (factory != null && this.minecraft != null) {
+            net.minecraft.client.gui.screens.Screen next = factory.get();
+            if (next != null) {
+                this.minecraft.setScreen(next);
+                return;
+            }
+        }
+        super.onClose();
     }
 
     private void onDone() {

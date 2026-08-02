@@ -175,6 +175,23 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
     }
 
     /**
+     * 本家 {@code TileEntityPlaceable.setRotation(player, interval, sync)} と同じ向きの出し方。
+     *
+     * <pre>yaw = floor(normalizeAngle(-playerYaw + 180 + interval/2) / interval) * interval</pre>
+     *
+     * <p>刻みは本家と同じで <b>通常 15 度 / スニークで 1 度</b>。
+     * RTMU は 22.5 度刻み (スニークで生の角度) にしていたので、斜めに置いたときの向きが
+     * 本家とずれていた。符号と +180 も本家に無いと 180 度反対を向く。
+     */
+    private static float honkeRotation(net.minecraft.world.entity.player.Player player) {
+        float interval = player.isShiftKeyDown() ? 1.0F : 15.0F;
+        double a = jp.ngt.ngtlib.math.NGTMath.normalizeAngle(
+                -player.getYRot() + 180.0D + (interval / 2.0D));
+        int steps = net.minecraft.util.Mth.floor(a / interval);
+        return (float) steps * interval;
+    }
+
+    /**
      * 本家 ItemInstalledObject の看板向き:
      * floor(normalizeAngle(yaw + 180) / 90 + 0.5) & 3
      */
@@ -270,7 +287,7 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
             placeYaw = railSnap.yaw();
             placeMountPitch = railSnap.pitch();
         } else if (uprightOnly || lightRotateByMeta) {
-            placeYaw = Math.round(player.getYRot() / 15.0F) * 15.0F;
+            placeYaw = honkeRotation(player);
         } else if (fluorescent || gridAligned) {
             placeYaw = 0.0F;
         } else if (!honkeFaceMount && !railMounted
@@ -289,9 +306,7 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         if (railSnap == null && !gridAligned && !fluorescent && !wallMounted
                 && category != InstalledObjectCategory.SIGNAL
                 && category != InstalledObjectCategory.WIRE) {
-            placeYaw = player.isShiftKeyDown()
-                ? player.getYRot()                                  // Shift: 細かく (生の角度)
-                : Math.round(player.getYRot() / 22.5F) * 22.5F;     // 通常: 22.5 度刻み (16 方向)
+            placeYaw = honkeRotation(player);
         }
         if (!level.isClientSide) {
             level.setBlock(placePos, RealTrainModUnofficialBlocks.INSTALLED_OBJECT.get().defaultBlockState(), 3);

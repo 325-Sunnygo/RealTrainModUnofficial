@@ -23,10 +23,15 @@ public class StationBlockEntity extends BlockEntity {
 
     /** 列車・ホームの検知半径。 */
     public static final int RADIUS = 8;
-    /** 1 駅あたりの待機乗客の上限。 */
-    private static final int MAX_WAITING = 6;
-    /** 待機乗客を湧かせる間隔 (tick)。 */
-    private static final int SPAWN_INTERVAL = 120;
+    /**
+     * 待機乗客を補充する間隔 (tick)。
+     *
+     * <p>設定した人数を切ったらすぐ埋め直したいので短くしてある (旧: 120)。
+     * 1 回の補充で湧かせるのは足りない人数まで (最大 {@link #SPAWN_BURST} 人)。
+     */
+    private static final int SPAWN_INTERVAL = 40;
+    /** 1 回の補充で湧かせる上限。まとめて出すと目の前にポンと並ぶので少しずつ。 */
+    private static final int SPAWN_BURST = 2;
     /**
      * 「列車のドアがこの停止位置目標に付いている」とみなす距離の2乗 (車体軸からの水平距離)。
      * 停止位置目標は車体側面 (軸から約2m) に置くので 4m もあれば十分。
@@ -142,44 +147,71 @@ public class StationBlockEntity extends BlockEntity {
     }
 
     /**
-     * 需要 (タグ × 時刻) に応じて待機乗客を湧かせる。
-     * タグの出発需要が高い時間帯ほど湧きやすい (= NPC の人数が時間帯で変わる)。
+     * 待機乗客を「出る人数」まで補充する。
+     *
+     * <p><b>設定した人数は必ず埋める。</b> 待っている人が減ったら (列車に乗った・
+     * 殴られて消えた等) その差分をここで湧かせ直す。
+     *
+     * <p>★以前は需要 (タグ × 時刻) の抽選でここを弾いていた。タグ無しの駅だと
+     * 1 回あたり約 10% しか通らず、6 秒間隔なので 1 人湧くのに平均 1 分・
+     * 16 人埋まるのに 15 分かかっていた。これが「人数を上げても増えない」の正体。
+     * 需要は<b>湧く速さ</b> (1 回に何人出すか) にだけ効かせる。
      */
     private void trySpawn(ServerLevel level) {
         if (this.stopTargets.isEmpty()) {
             return; //停止位置目標が無ければ湧かせない
         }
-        // 出発需要による抽選 (SPAWN_INTERVAL ごと)。ラッシュ時はほぼ毎回、閑散時はまれ。
-        float hour = StationTag.hourOf(level.getDayTime());
-        int bits = StationRegistry.get(level).tagBits(this.worldPosition);
-        float chance = Math.min(0.9F, 0.30F * StationTag.originWeight(bits, hour));
-        if (level.random.nextFloat() >= chance) {
+        // ★出る人数は駅ブロックごとの設定 (右クリック GUI)。0 なら湧かせない = 行き先専用駅。
+        StationRegistry registry = StationRegistry.get(level);
+        int capacity = registry.capacity(this.worldPosition);
+        if (capacity <= 0) {
             return;
         }
-        // 上限は「プレイヤーから見える乗客の数」で判定する (RTMU 設定「乗客の最大数」)。
-        // ワールド全体の総数で見ると、遠くの駅に湧いた乗客のせいで目の前の駅が
-        // いつまでも無人になる。見えている範囲で数えれば、どこにいても同じ密度になる。
-        if (this.visiblePassengerCount(level)
-                >= com.portofino.realtrainmodunofficial.RtmuSettings.serverMaxPassengers()) {
+        // ★人数の上限は駅ブロックの GUI だけで決める。
+        // 以前はここで RTMU 設定「乗客の最大数」(ワールド共通) が上から蓋をしていて、
+        // 駅ごとに増やしても近くの他の駅の乗客に押し出されて増えなかった。
+        // 残すのは「誰も見ていない駅では湧かせない」だけ (チャンクローダーで回り続けている駅に、
+        // 誰も見ないまま乗客が溜まるのを防ぐ)。
+        if (!this.hasViewer(level)) {
             return;
         }
+        // 今ホームで待っている人数。乗り込み始めた人 (ENTERING 以降) は数えないので、
+        // 列車に乗った瞬間に空きができて次が湧く。
         int waitingCount = level.getEntitiesOfClass(PassengerEntity.class,
                 this.platformArea().inflate(6.0D, 3.0D, 6.0D),
                 p -> p.getState() == PassengerEntity.State.WAITING
                         || p.getState() == PassengerEntity.State.BOARDING).size();
-        if (waitingCount >= MAX_WAITING) {
+        int shortfall = capacity - waitingCount;
+        if (shortfall <= 0) {
             return;
         }
+
+        float hour = StationTag.hourOf(level.getDayTime());
+        int bits = registry.tagBits(this.worldPosition);
+        // 需要が高い時間帯ほどまとめて湧く。低くても必ず 1 人は湧かせる。
+        int burst = Math.round(StationTag.originWeight(bits, hour));
+        burst = Math.max(1, Math.min(SPAWN_BURST, burst));
+        int toSpawn = Math.min(shortfall, burst);
+
+        for (int i = 0; i < toSpawn; i++) {
+            if (!this.spawnOne(level, hour, registry)) {
+                return; //行き先が無い等。次の間隔でやり直す
+            }
+        }
+    }
+
+    /** 待機乗客を 1 人湧かせる。行き先が取れなければ false。 */
+    private boolean spawnOne(ServerLevel level, float hour, StationRegistry registry) {
         // 行き先は到着需要の重み付き抽選 (朝はオフィス街行き、夕方は住宅街行きが多い)。
-        BlockPos dest = StationRegistry.get(level).pickDestination(this.worldPosition, hour, level.random);
+        BlockPos dest = registry.pickDestination(this.worldPosition, hour, level.random);
         if (dest == null) {
-            return; //行き先 (他の駅) が無ければ湧かせない
+            return false; //行き先 (他の駅) が無ければ湧かせない
         }
         BlockPos waitSpot = this.stopTargets.get(level.random.nextInt(this.stopTargets.size()));
 
         PassengerEntity p = PassengerMod.PASSENGER.get().create(level);
         if (p == null) {
-            return;
+            return false;
         }
         // ★停止位置目標 (ホームの開けた足場) の真上に出す。
         // 寄せて出していたが、駅ブロックが壁の裏だと乗客が壁の中に湧いて動けなくなっていた。
@@ -188,35 +220,25 @@ public class StationBlockEntity extends BlockEntity {
         p.initPassenger(this.worldPosition, dest, waitSpot);
         p.finalizeSpawn(level, level.getCurrentDifficultyAt(this.worldPosition), MobSpawnType.TRIGGERED, null);
         level.addFreshEntity(p);
+        return true;
     }
 
     /**
-     * この駅を見ているプレイヤーの視界内にいる乗客の数 (見ている人の中での最大値)。
-     * 誰も見ていない駅では Integer#MAX_VALUE を返して湧かせない
+     * この駅を視界に入れているプレイヤーが 1 人でも居るか。
+     * 誰も見ていない駅では湧かせない
      * (チャンクローダーで回り続けている駅に、誰も見ないまま乗客が溜まるのを防ぐ)。
      */
-    private int visiblePassengerCount(ServerLevel level) {
+    private boolean hasViewer(ServerLevel level) {
         double r = level.getServer().getPlayerList().getViewDistance() * 16.0D;
         double rSq = r * r;
-        int max = 0;
-        boolean anyViewer = false;
         for (net.minecraft.server.level.ServerPlayer player : level.players()) {
-            // この駅がそのプレイヤーの視界外なら、その人にとっては関係ない
             if (player.distanceToSqr(this.worldPosition.getX() + 0.5D,
                     this.worldPosition.getY() + 0.5D,
-                    this.worldPosition.getZ() + 0.5D) > rSq) {
-                continue;
+                    this.worldPosition.getZ() + 0.5D) <= rSq) {
+                return true;
             }
-            anyViewer = true;
-            double px = player.getX();
-            double py = player.getY();
-            double pz = player.getZ();
-            int count = level.getEntitiesOfClass(PassengerEntity.class,
-                    new net.minecraft.world.phys.AABB(px - r, py - r, pz - r, px + r, py + r, pz + r),
-                    p -> true).size();
-            max = Math.max(max, count);
         }
-        return anyViewer ? max : Integer.MAX_VALUE;
+        return false;
     }
 
     /** ブロック破壊時: 駅登録を解除する。 */

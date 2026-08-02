@@ -65,7 +65,7 @@ public class StationBlock extends BaseEntityBlock {
             reg.add(pos);
             net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(sp,
                     new com.portofino.realtrainmodunofficial.network.OpenStationScreenPayload(
-                            pos, reg.tagBits(pos)));
+                            pos, reg.tagBits(pos), reg.capacity(pos)));
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }

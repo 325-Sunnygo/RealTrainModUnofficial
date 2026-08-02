@@ -165,31 +165,25 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                         interiorLightingActive ? def.getInteriorLights() : null,
                         interiorLightState == 2, entity.level().getGameTime() * 50L);
                     try {
-                        // ★静的な車体は VBO へ焼いて使い回す。
-                        // ここは以前まで毎フレーム全頂点を CPU で変換して書き出していた。
-                        // ★動く部品と動かない車体を分ける。
+                        // ★焼き込みはしない。本家 1.7.10 も車両は毎フレーム投げ直している。
+                        // 代わりに LocalSpaceBatch が pose を GPU 側の ModelView へ移すので、
+                        // 頂点あたりの CPU 行列演算がゼロになる。
+                        // 動かない車体と動く部品を分けるのは変換の適用範囲を絞るためで、
+                        // 焼くためではない (分けたまま残す)。
                         MqoModelLoader.GroupPredicate staticFilter =
                             n -> filter.shouldRender(n) && !doorTransform.mayModify(n);
                         MqoModelLoader.GroupPredicate movingFilter =
                             n -> filter.shouldRender(n) && doorTransform.mayModify(n);
-
-                        int bakeKey = bodyBakeKey(entity, bodyLight,
-                            interiorLightingActive, interiorLightState);
-                        // 同じ車両定義・同じ状態なら編成の全車で 1 本の VBO を共有する。
-                        boolean bodyBaked = com.portofino.realtrainmodunofficial.client.render
-                            .VehicleMeshCache.draw(def.getId(), entity, 2, poseStack, bakeKey,
-                                // 焼くときは単位行列で再生する
-                                // (カメラ相対の pose で焼くと視点に付いてくる)。
-                                // 動く部品は入れないので変換も渡さない。
-                                buf -> MqoModelLoader.renderModel(model, new PoseStack(), buf,
-                                    bodyLight, staticFilter, null, entity));
-                        if (!bodyBaked) {
-                            MqoModelLoader.renderModel(model, poseStack, buffer, bodyLight,
-                                staticFilter, null, entity);
-                        }
-                        // 動く部品 (ドア・パンタ等)。持たない車両ならここは何も描かない。
-                        MqoModelLoader.renderModel(model, poseStack, buffer, bodyLight,
-                            movingFilter, doorTransform, entity);
+                        final int lightForBody = bodyLight;
+                        com.portofino.realtrainmodunofficial.client.render.LocalSpaceBatch.run(
+                            poseStack, buffer, (localPose, localBuffer) -> {
+                                MqoModelLoader.renderModel(model, localPose, localBuffer,
+                                    lightForBody, staticFilter, null, entity);
+                                // 動く部品 (ドア・パンタ等)。持たない車両ならここは何も描かない。
+                                MqoModelLoader.renderModel(model, localPose, localBuffer,
+                                    lightForBody, movingFilter, doorTransform, entity);
+                                return true;
+                            });
                     } finally {
                         com.portofino.realtrainmodunofficial.client.render.InteriorLighting.end();
                     }
@@ -251,23 +245,6 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
      * ヘルパーグループ (shadow/guide/atari/影ms/連結曲げ変種) の除外。
      * 台車グループは別台車モデルがある場合のみ非表示 (EntityBogie 側が描画)。
      */
-
-    /**
-     * 焼いた車体を使い回してよいかの判定キー。
-     * 頂点の中身が変わる要素を全部混ぜる。
-     */
-    private static int bodyBakeKey(jp.ngt.rtm.entity.train.EntityTrainBase entity, int bodyLight,
-                                   boolean interiorLightingActive, int interiorLightState) {
-        // ★ドアの開き具合は入れない。動く部品は焼き込みに含めず毎フレーム描くので、
-        // ここに入れるとドアを触るたび車体が焼き直しになるだけで意味が無い。
-        int key = bodyLight;
-        key = 31 * key + (interiorLightingActive ? 1 : 0);
-        key = 31 * key + interiorLightState;
-        if (interiorLightingActive) {
-            key = 31 * key + (int) entity.level().getGameTime();
-        }
-        return key;
-    }
 
     private static boolean shouldRenderGroup(String groupName) {
         if (groupName == null || groupName.isBlank()) {

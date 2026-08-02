@@ -353,8 +353,13 @@ public final class VehicleScriptRenderers {
             // 以前はここで「完全静止した車両は描画結果を GLRecorder ごとキャッシュし、
             // 一定フレーム間隔でだけ描き直す」間引きをしていた。
             com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(false);
-            return renderReal(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
-                    bodyModel, null);
+            // ★1 両ぶんをまとめてモデルローカル空間で描く (本家 1.7.10 の glPushMatrix 相当)。
+            // 中では単位行列の pose が渡るので、頂点ごとの CPU 行列演算が消える。
+            // 車体・発光・半透明を全部この 1 つの空間で描くので、
+            // 「同じ面を別経路で変換して深度が数 ULP ずれる」問題も起きない。
+            return LocalSpaceBatch.run(poseStack, buffer,
+                    (localPose, localBuffer) -> renderReal(entity, partialTick, localPose,
+                            localBuffer, packedLight, packedOverlay, bodyModel, null));
         }
 
 
@@ -421,27 +426,14 @@ public final class VehicleScriptRenderers {
             GLRecorder preLight0 = recordLight0IfNeeded(entity, partialTick, bodyModel);
             java.util.Set<String> coveredGroups = groupsDrawnBy(preLight0);
             MqoModelLoader.setLightCoveredGroups(coveredGroups);
-            // pass0 を焼けたか。発光パスの焼き込みはこれに連動させる。
-            // 片方だけ GPU 変換にすると (A·B)·v と A·(B·v) が数 ULP ずれて同じ面の深度が
-            // 一致せず、点灯時にちらつく。1 両の中では全パスを同じ経路に揃える。
-            boolean bodyBaked = false;
+            // ★焼き込み (VBO キャッシュ) はしない。本家 1.7.10 も車両は毎フレーム投げ直している。
+            // 焼くと「いつ焼き直すか」の判定が要り、そこがバグの温床だった
+            // (静止判定・内容キーの衝突・可動部との陰影の食い違い)。
+            // 代わりに LocalSpaceBatch が pose を GPU 側へ移しているので、
+            // 毎フレーム投げても頂点あたりの CPU 演算はゼロで済む。
             try {
-                // ★本家 RailPartsRenderer.renderRailStatic と同じ「内容キーが同じなら焼き直さない」。
-                // pass0 は不透明しか出さないので、描く順番が変わっても結果が変わらない。
-                // ★Set.hashCode は要素ハッシュの単純な総和なので、L/R 対の名前
-                // (door_l/door_r 等) が構造的に衝突する。GLRecorder.setKey で撹拌する。
-                int bakeKey = 31 * (31 * (31 * jp.ngt.ngtlib.renderer.GLRecorder.mixKey(normal.contentKey())
-                        + packedLight)
-                        + jp.ngt.ngtlib.renderer.GLRecorder.setKey(excluded))
-                        + jp.ngt.ngtlib.renderer.GLRecorder.setKey(coveredGroups);
-                bodyBaked = VehicleMeshCache.draw(entity, 0, poseStack, bakeKey,
-                        // 焼くときは単位行列で再生する (カメラ相対の pose で焼くと視点に付いてくる)。
-                        buf -> replay(normal, new PoseStack(), buf, packedLight, packedOverlay,
-                                bodyModel, graph, RenderPass.NORMAL.id, excluded));
-                if (!bodyBaked) {
-                    replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
-                            RenderPass.NORMAL.id, excluded);
-                }
+                replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
+                        RenderPass.NORMAL.id, excluded);
             } finally {
                 MqoModelLoader.setLightCoveredGroups(null);
             }
@@ -462,7 +454,7 @@ public final class VehicleScriptRenderers {
             // ★本家の描画順を GPU 上でも保証する。
             flushBatch(buffer);
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
-                    bodyModel, graph, sink, preLight0, bodyBaked);
+                    bodyModel, graph, sink, preLight0);
             flushBatch(buffer);
             // ★半透明パス (TRANSPARENT=1)。
             // pass1(半透明) を回すが、RTMU は従来 pass1 を飛ばしていた。
@@ -570,7 +562,7 @@ public final class VehicleScriptRenderers {
         private void renderBodyLight(Object entity, float partialTick, PoseStack poseStack,
                                      MultiBufferSource buffer, int packedLight, int packedOverlay,
                                      MqoModelLoader.MqoModel bodyModel, PolygonModel graph, List<CachedPass> sink,
-                                     GLRecorder preLight0, boolean allowBake) {
+                                     GLRecorder preLight0) {
             if (!(entity instanceof EntityTrainBase train)) {
                 return;
             }
@@ -609,18 +601,9 @@ public final class VehicleScriptRenderers {
                 if (rec == null || !rec.hasGeometry()) {
                     continue;
                 }
-                // ★発光パスも焼く。
-                // 本家の pass0 → 発光 → 半透明 の順序はそのまま保たれる。
-                final GLRecorder lightRec = rec;
-                final int lightPass = pass;
-                int lightKey = 31 * (31 * lightRec.contentKey() + packedLight) + lightPass;
-                boolean lightBaked = allowBake
-                        && VehicleMeshCache.draw(entity, 1 + i, poseStack, lightKey,
-                                buf -> replay(lightRec, new PoseStack(), buf, packedLight, packedOverlay,
-                                        bodyModel, graph, lightPass));
-                if (!lightBaked) {
-                    replay(rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, pass);
-                }
+                // 発光パスも本体と同じ経路で描く。本家の pass0 → 発光 → 半透明 の順序は
+                // flushBatch で保たれる。
+                replay(rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, pass);
                 if (sink != null) {
                     sink.add(new CachedPass(rec, pass, null));
                 }

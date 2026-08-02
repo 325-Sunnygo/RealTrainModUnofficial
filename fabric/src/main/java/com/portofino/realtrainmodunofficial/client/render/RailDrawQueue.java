@@ -89,7 +89,6 @@ public final class RailDrawQueue {
             if (com.portofino.realtrainmodunofficial.client.ShaderCompat.epoch() != prevEpoch) {
                 RailMeshCache.clear();
                 ObjectMeshCache.clear();
-                VehicleMeshCache.clear();
             }
             VehicleScriptRenderers.beginLevelRender();
             return;
@@ -102,7 +101,6 @@ public final class RailDrawQueue {
         RailMeshCache.beginFrame();
         // 設置物の焼き込みも同じ枠でスパイクを散らす (ObjectMeshCache)
         ObjectMeshCache.beginFrame();
-        VehicleMeshCache.beginFrame();
         RailScriptRenderers.beginFrame();
         flush();
         // ★レールを描き終えた「あと」に車両の半透明を描く。

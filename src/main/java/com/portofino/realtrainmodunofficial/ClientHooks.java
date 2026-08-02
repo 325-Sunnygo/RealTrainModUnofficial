@@ -47,6 +47,11 @@ public final class ClientHooks {
         invokeClient("openVehicleFormationScreen", new Class<?>[]{ItemStack.class}, stack);
     }
 
+    /** 編成アイテムの編集画面 (＋ボタンと車両ボタンの並び)。 */
+    public static void openFormationScreen(ItemStack stack) {
+        invokeClient("openFormationScreen", new Class<?>[]{ItemStack.class}, stack);
+    }
+
     public static void openCarSelectScreen(Player player, ItemStack stack) {
         invokeClient("openCarSelectScreen", new Class<?>[]{Player.class, ItemStack.class}, player, stack);
     }
@@ -137,8 +142,9 @@ public final class ClientHooks {
     }
 
     /** 駅ブロック右クリック → 現在のタグを添えて駅設定 GUI を開く (client のみ)。 */
-    public static void openStationScreen(BlockPos pos, int bits) {
-        invokeClient("openStationScreen", new Class<?>[]{BlockPos.class, int.class}, pos, bits);
+    public static void openStationScreen(BlockPos pos, int bits, int capacity) {
+        invokeClient("openStationScreen", new Class<?>[]{BlockPos.class, int.class, int.class},
+            pos, bits, capacity);
     }
 
     public static void stopCrossingGateSound(Level level, BlockPos pos) {
@@ -151,6 +157,18 @@ public final class ClientHooks {
 
     public static void showScriptErrorMessage(String message) {
         invokeClient("showScriptErrorMessage", new Class<?>[]{String.class}, message);
+    }
+
+    /**
+     * 道床 (レール下の砂利) を焼き直させる。
+     *
+     * <p>道床はレールベースのブロックがチャンクメッシュへ焼くが、形はレールコアの線形から
+     * 引くので、コアが後から届くとベース側は「コア無し」で焼かれたままになる。
+     */
+    public static void refreshRailBallast(Level level, int x0, int y0, int z0, int x1, int y1, int z1) {
+        invokeClient("refreshRailBallast",
+            new Class<?>[]{Level.class, int.class, int.class, int.class, int.class, int.class, int.class},
+            level, x0, y0, z0, x1, y1, z1);
     }
 
     // 軽量化: 解決済み Class / Method をキャッシュする。踏切・スピーカー等の走行音つき設置物は

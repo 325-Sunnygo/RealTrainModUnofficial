@@ -13,10 +13,9 @@ import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * 駅設定 GUI で選んだタグ (住宅街/工業地帯/…) をサーバーへ送り、駅のタグを更新する。
- * (旧: Shift+右クリックでの 1 個ずつのタグ切替を置き換え)
+ * 駅設定 GUI で選んだタグ (住宅街/工業地帯/…) と出る人数をサーバーへ送り、駅の設定を更新する。
  */
-public record SetStationTagsPayload(BlockPos pos, int bits) implements CustomPacketPayload {
+public record SetStationTagsPayload(BlockPos pos, int bits, int capacity) implements CustomPacketPayload {
 
     public static final Type<SetStationTagsPayload> TYPE = new Type<>(
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "set_station_tags"));
@@ -24,6 +23,7 @@ public record SetStationTagsPayload(BlockPos pos, int bits) implements CustomPac
     public static final StreamCodec<ByteBuf, SetStationTagsPayload> STREAM_CODEC = StreamCodec.composite(
         BlockPos.STREAM_CODEC, SetStationTagsPayload::pos,
         ByteBufCodecs.VAR_INT, SetStationTagsPayload::bits,
+        ByteBufCodecs.VAR_INT, SetStationTagsPayload::capacity,
         SetStationTagsPayload::new);
 
     @Override
@@ -42,7 +42,8 @@ public record SetStationTagsPayload(BlockPos pos, int bits) implements CustomPac
                     payload.pos().getZ() + 0.5D) > 64.0D) {
                 return;
             }
-            StationRegistry.get(sl).setBits(payload.pos(), payload.bits());
+            // 出る人数はクライアントの言い値を信じず、ここで有効範囲へ丸める。
+            StationRegistry.get(sl).setStation(payload.pos(), payload.bits(), payload.capacity());
         });
     }
 }

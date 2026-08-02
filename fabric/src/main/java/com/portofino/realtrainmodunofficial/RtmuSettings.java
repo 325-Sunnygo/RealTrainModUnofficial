@@ -38,6 +38,25 @@ public final class RtmuSettings {
 
 
 
+    // ---- 表示 (見た目だけの設定。読み込み自体は変えない) ----
+    /**
+     * MOD に同梱している既定のモデル (車両・照明など) をモデル選択画面から隠すか。
+     *
+     * <p><b>読み込みは止めない。</b> 既に設置されている物や、パックがこれらを参照している場合に
+     * 壊れてしまうため、隠すのは<b>選択画面の一覧だけ</b>にする。
+     */
+    public static boolean hideBundledModels = false;
+
+    /** その pack 名が MOD 同梱の物か (選択画面で隠す判定)。 */
+    public static boolean isBundledPack(String packName) {
+        if (packName == null || packName.isBlank()) {
+            return false;
+        }
+        String n = packName.trim();
+        return n.equalsIgnoreCase(RealTrainModUnofficial.MODID)
+            || BundledPackStore.isBundledPackName(n);
+    }
+
     // ---- カメラ (撮り鉄カメラの装着レンズ。クライアントのみ・所持アイテムで切替) ----
 
     // ---- 乗客シミュレーション ----
@@ -128,6 +147,7 @@ public final class RtmuSettings {
             railRenderDistance = clampRailRenderDistance(parseInt(p.getProperty("railRenderDistance", "128"), 128));
             vehicleRenderDistance = clampVehicleRenderDistance(parseInt(p.getProperty("vehicleRenderDistance", "0"), 0));
             maxPassengers = clampMaxPassengers(parseInt(p.getProperty("maxPassengers", "30"), 30));
+            hideBundledModels = Boolean.parseBoolean(p.getProperty("hideBundledModels", "false"));
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("RTMU: failed to load settings", e);
         }
@@ -142,6 +162,7 @@ public final class RtmuSettings {
             p.setProperty("railRenderDistance", Integer.toString(railRenderDistance));
             p.setProperty("vehicleRenderDistance", Integer.toString(vehicleRenderDistance));
             p.setProperty("maxPassengers", Integer.toString(maxPassengers));
+            p.setProperty("hideBundledModels", Boolean.toString(hideBundledModels));
             try (OutputStream out = Files.newOutputStream(FILE)) {
                 p.store(out, "RTMU client settings");
             }

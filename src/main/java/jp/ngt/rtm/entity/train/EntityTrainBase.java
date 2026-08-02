@@ -72,10 +72,10 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     public static final float TRAIN_WIDTH = 2.75F;
     public static final float TRAIN_HEIGHT = 1.25F - 0.0625F;//レールに合わせ高さ修正
     /**
-     * 立ち乗り・乗客が立つ車内床の Y オフセット。
-     * (= ボックス天面) なので、実際の車内床へ下げるための負値。
+     * 客席 (slotPos) を持たない車両だけで使う、車内床の Y オフセットの控え。
+     * 通常は {@link #getInteriorFloorY()} が slotPos から床を出すので使われない。
      */
-    public static final double INTERIOR_FLOOR_OFFSET = -0.75D;
+    public static final double INTERIOR_FLOOR_OFFSET = -0.875D;
     /** 運転席の座り高さ補正。JSON playerPos_Y に足すオフセット。「高すぎる」指摘で JSON より少し下げる (負値)。 */
     public static final double DRIVER_SEAT_Y_OFFSET = -0.2D;
 
@@ -1055,10 +1055,59 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
-    /** 立ち乗り・乗客が立つ車内床の Y (ワールド)。#INTERIOR_FLOOR_OFFSET 参照。 */
+    /**
+     * 立ち乗り・乗客が立つ車内床の Y (ワールド)。
+     *
+     * <p>★<b>客席 (slotPos) の高さをそのまま床にする。</b>
+     * {@link #positionRider} が座らせる位置は「slotPos の Y + 0.15」なので、
+     * slotPos の Y は<b>椅子の座面ではなく椅子の下＝車内の床</b>を指している
+     * (旧 EntityFloor をそこへ置き、その 0.15 上に座らせていた名残)。
+     * だから立ち乗りはここに立たせれば、座っている人よりわずかに低い正しい高さになる。
+     *
+     * <p>slotPos は車両ごとに違うので、これで<b>車両ごとの床の高さの違いが自動で合う</b>。
+     * 以前は {@link #INTERIOR_FLOOR_OFFSET} の一律値だったため、車両によって
+     * 床から浮いたりめり込んだりしていた。slotPos を持たない車両だけ従来の一律値に戻る。
+     *
+     * <p>2 階建て等で床が複数あるときは一番低い床。段ごとに選びたい側は
+     * {@link #getInteriorFloorLevels()} を使う。
+     */
     public double getInteriorFloorY() {
+        double[] levels = this.getInteriorFloorLevels();
+        if (levels.length > 0) {
+            return this.getY() + levels[0];
+        }
         return this.getY() + TRAIN_HEIGHT + INTERIOR_FLOOR_OFFSET;
     }
+
+    /**
+     * 車内の床の高さ (車体ローカル Y) を低い順に。客席 (slotPos) の Y を重複無しで集めたもの。
+     * 2 階建てなら 2 段返る。slotPos が無ければ空。
+     */
+    public double[] getInteriorFloorLevels() {
+        TrainConfig cfg = this.getConfig();
+        float[][] slots = cfg == null ? null : cfg.getSlotPos();
+        if (slots == null || slots.length == 0) {
+            return EMPTY_FLOOR_LEVELS;
+        }
+        java.util.TreeSet<Double> set = new java.util.TreeSet<>();
+        for (float[] slot : slots) {
+            if (slot != null && slot.length >= 2 && Float.isFinite(slot[1])) {
+                // 1/16 に丸めてから集める。誤差だけ違う席で段が増えないように。
+                set.add(Math.round(slot[1] * 16.0F) / 16.0D);
+            }
+        }
+        if (set.isEmpty()) {
+            return EMPTY_FLOOR_LEVELS;
+        }
+        double[] out = new double[set.size()];
+        int i = 0;
+        for (double d : set) {
+            out[i++] = d;
+        }
+        return out;
+    }
+
+    private static final double[] EMPTY_FLOOR_LEVELS = new double[0];
 
     /**
      * 車体ローカル座標 (x=幅, y=高, z=長) をワールド座標へ変換する。
@@ -1437,9 +1486,25 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return false;
     }
 
+    /**
+     * 非常ブレーキのノッチ番号 (最も深いブレーキ)。車両ごとの段数で決まる。
+     * レバーサ (↑↓) を動かせる位置の判定にも使う。
+     */
+    public int getEmergencyBrakeNotch() {
+        try {
+            int steps = this.getConfig().deccelerations.length;
+            if (steps > 1) {
+                return -(steps - 1);
+            }
+        } catch (Throwable ignored) {
+            //パック未読込など
+        }
+        return -8;   //本家 EnumNotch.emergency_brake と同じ既定
+    }
+
     public void setEBNotch() {
         int prevNotch = this.getNotch();
-        int ebNotch = -(this.getConfig().deccelerations.length - 1);
+        int ebNotch = this.getEmergencyBrakeNotch();
         if (prevNotch != ebNotch) {
             this.setByteToDataWatcher(TrainStateType.State_Notch.id, (byte) ebNotch);
         }

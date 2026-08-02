@@ -150,10 +150,16 @@ public final class ClientHooksClient {
         com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.toggle();
     }
 
-    /** 駅設定 GUI を開く (現在のタグビット付き)。 */
-    public static void openStationScreen(net.minecraft.core.BlockPos pos, int bits) {
+    /** 編成アイテムの編集画面。 */
+    public static void openFormationScreen(ItemStack stack) {
         Minecraft.getInstance().setScreen(
-            new com.portofino.rtmupassenger.client.StationScreen(pos, bits));
+            new com.portofino.realtrainmodunofficial.client.screen.FormationEditScreen(stack));
+    }
+
+    /** 駅設定 GUI を開く (現在のタグビット付き)。 */
+    public static void openStationScreen(net.minecraft.core.BlockPos pos, int bits, int capacity) {
+        Minecraft.getInstance().setScreen(
+            new com.portofino.rtmupassenger.client.StationScreen(pos, bits, capacity));
     }
 
     /** 券売機 (本家 GuiTicketVendor): 切符 / 回数券 の2ボタン */
@@ -188,5 +194,44 @@ public final class ClientHooksClient {
             return;
         }
         minecraft.player.displayClientMessage(Component.literal("[RTMU Script] " + message), false);
+    }
+
+    /**
+     * 指定範囲のレールベースに道床を焼き直させる。
+     *
+     * <p>2 つ要る:
+     * <ol>
+     *   <li>{@code requestModelDataUpdate} — これを申請した BlockEntity だけが
+     *       次のチャンク焼きで {@code getModelData()} を呼び直される</li>
+     *   <li>{@code setBlocksDirty} — チャンクを焼き直させる</li>
+     * </ol>
+     * 片方だけだと、焼き直しても中身が古いまま / 中身は新しいのに焼かれないまま になる。
+     */
+    public static void refreshRailBallast(Level level, int x0, int y0, int z0, int x1, int y1, int z1) {
+        if (level == null || !level.isClientSide()) {
+            return;
+        }
+        int minCX = x0 >> 4, maxCX = x1 >> 4;
+        int minCZ = z0 >> 4, maxCZ = z1 >> 4;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                if (!level.hasChunk(cx, cz)) {
+                    continue;
+                }
+                // ブロック総当たりではなくチャンクの BlockEntity 一覧を見る (敷設範囲は最大 64m)
+                for (var be : level.getChunk(cx, cz).getBlockEntities().values()) {
+                    if (!(be instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase rail)) {
+                        continue;
+                    }
+                    BlockPos p = rail.getBlockPos();
+                    if (p.getX() < x0 || p.getX() > x1 || p.getY() < y0 || p.getY() > y1
+                            || p.getZ() < z0 || p.getZ() > z1) {
+                        continue;
+                    }
+                    rail.requestModelDataUpdate();
+                }
+            }
+        }
+        Minecraft.getInstance().levelRenderer.setBlocksDirty(x0, y0, z0, x1, y1, z1);
     }
 }

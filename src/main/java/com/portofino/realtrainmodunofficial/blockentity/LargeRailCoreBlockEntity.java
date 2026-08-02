@@ -34,6 +34,14 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
     private RailPosition[] railPositions;
     private RailMap railMap;
     private String railDefinitionId = "";
+    /**
+     * このレールの道床ブロック (砂利など)。
+     *
+     * <p><b>敷いたときのアイテムで決まり、あとから変わらない。</b>
+     * 本家もレールアイテム 1 つ 1 つに道床が焼き込まれていて、
+     * 敷設後にレールをいじっても道床は変わらない。
+     */
+    private String ballastBlockId = "";
     private int activeSegmentIndex;
     private int previousSegmentIndex;
     private float switchProgress = 1.0F;
@@ -74,6 +82,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
             tag.put("RailSegments", list);
         }
         tag.putString("RailDefinitionId", railDefinitionId == null ? "" : railDefinitionId);
+        tag.putString("BallastBlockId", ballastBlockId == null ? "" : ballastBlockId);
         tag.putInt("ActiveSegmentIndex", activeSegmentIndex);
         tag.putInt("PreviousSegmentIndex", previousSegmentIndex);
         tag.putFloat("SwitchProgress", switchProgress);
@@ -137,6 +146,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
             }
         }
         this.railDefinitionId = tag.getString("RailDefinitionId");
+        this.ballastBlockId = tag.getString("BallastBlockId");
         this.activeSegmentIndex = tag.getInt("ActiveSegmentIndex");
         this.previousSegmentIndex = tag.getInt("PreviousSegmentIndex");
         this.switchProgress = tag.contains("SwitchProgress") ? tag.getFloat("SwitchProgress") : 1.0F;
@@ -521,6 +531,15 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
                 be.setChanged();
             }
         }
+    }
+
+    public String getBallastBlockId() {
+        return this.ballastBlockId == null ? "" : this.ballastBlockId;
+    }
+
+    /** 敷設時に 1 度だけ入れる。以後は変えない (本家と同じ)。 */
+    public void setBallastBlockId(String ballastBlockId) {
+        this.ballastBlockId = ballastBlockId == null ? "" : ballastBlockId;
     }
 
     public void setRailDefinitionId(String railDefinitionId) {

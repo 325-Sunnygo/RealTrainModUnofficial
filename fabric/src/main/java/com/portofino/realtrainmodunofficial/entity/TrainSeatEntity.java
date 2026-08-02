@@ -203,9 +203,14 @@ public final class TrainSeatEntity extends Entity {
         }
     }
 
+    /**
+     * 座席はプレイヤーを素通しにする (jp.ngt 側の {@code EntityFloor} と同じ扱い)。
+     * 立ち乗りで車内を歩くときに座席が壁になるのを防ぐ。
+     * 右クリックで座るのは {@link #isPickable()} 側なので効いたまま。
+     */
     @Override
     public boolean canBeCollidedWith() {
-        return !isRemoved();
+        return false;
     }
 
     @Override

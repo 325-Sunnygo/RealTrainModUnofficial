@@ -119,13 +119,17 @@ public class TrainItem extends Item {
                 RealTrainModUnofficial.LOGGER.warn(
                     "[RTMU] selected train '{}' not found in registry; placing default", serverSel);
             }
-            def = VehicleRegistry.getAll().stream()
-                .filter(this::accepts)
-                .findFirst()
-                .orElse(null);
+            // ★勝手に既定車両を出さない。
+            // 何も選ばずに置くと登録順の先頭 (戦艦などの重いモデル) が出てしまい、
+            // 意図しない上に重かった。選ばせる。
+            def = null;
         }
         if (def == null) {
-            return InteractionResult.PASS;
+            if (!level.isClientSide) {
+                player.displayClientMessage(
+                    Component.translatable("message.realtrainmodunofficial.train.no_model_selected"), true);
+            }
+            return InteractionResult.FAIL;
         }
         // 本家 ItemTrain.onItemUse 準拠 (Phase 2: jp.ngt.rtm.entity.train.EntityTrain をスポーン)
         BlockPos cp = context.getClickedPos();

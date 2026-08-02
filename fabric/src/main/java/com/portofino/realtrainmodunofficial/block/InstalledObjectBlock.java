@@ -101,21 +101,56 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         return 0;
     }
 
+    // ===== 本家の当たり判定 =====
+    // 本家は設置物ごとに別のブロッククラスで、それぞれ setBlockBounds を持っている。
+    // RTMU は 1 つのブロックに設置物を集約しているので、種類で振り分けて同じ形にする。
+    // 値の出典は KaizPatchX の各ブロック (jp.ngt.rtm.block / jp.ngt.rtm.electric)。
+
+    /** 標識 (BlockRailroadSign): 7/16〜9/16 の細い柱。高さ 1.5。 */
+    private static final VoxelShape SIGN_SHAPE =
+        Shapes.box(7.0D / 16.0D, 0.0D, 7.0D / 16.0D, 9.0D / 16.0D, 1.5D, 9.0D / 16.0D);
+    /** 標識: 上に何かある場合は下へ 0.5 伸ばして高さ 1.0 まで (本家 setBlockBoundsBasedOnState)。 */
+    private static final VoxelShape SIGN_SHAPE_UNDER =
+        Shapes.box(7.0D / 16.0D, -0.5D, 7.0D / 16.0D, 9.0D / 16.0D, 1.0D, 9.0D / 16.0D);
+    /** 転てつ機 (BlockPoint): 高さ 5/16 の板。 */
+    private static final VoxelShape POINT_SHAPE = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 0.3125D, 1.0D);
+    /** 遮断機 (BlockCrossingGate): 2/16〜14/16、高さ 3。 */
+    private static final VoxelShape CROSSING_SHAPE =
+        Shapes.box(0.125D, 0.0D, 0.125D, 0.875D, 3.0D, 0.875D);
+    /** 碍子・コネクタ (BlockConnector): 中心の 0.25〜0.75 の小箱。 */
+    private static final VoxelShape CONNECTOR_SHAPE =
+        Shapes.box(0.25D, 0.25D, 0.25D, 0.75D, 0.75D, 0.75D);
+
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity blockEntity) {
             if (blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
                 return EMPTY_SHAPE;
             }
-            return RTM_SELECTION_SHAPE;
+            return outlineShape(blockEntity.getCategory(), level, pos);
         }
         return RTM_SELECTION_SHAPE;
     }
 
+    /** 種類ごとの見た目どおりの形 (選択枠)。本家の setBlockBounds と同じ。 */
+    private static VoxelShape outlineShape(InstalledObjectCategory category, BlockGetter level, BlockPos pos) {
+        if (category == null) {
+            return RTM_SELECTION_SHAPE;
+        }
+        return switch (category) {
+            case RAILROAD_SIGN -> level.getBlockState(pos.above()).isAir() ? SIGN_SHAPE : SIGN_SHAPE_UNDER;
+            case POINT -> POINT_SHAPE;
+            case CROSSING -> CROSSING_SHAPE;
+            case INSULATOR, CONNECTOR_INPUT, CONNECTOR_OUTPUT -> CONNECTOR_SHAPE;
+            // 信号・架線柱・看板・券売機・スピーカー・照明などは本家も BlockContainer 既定の
+            // 1 ブロックのまま (setBlockBounds を持っていない)。
+            default -> RTM_SELECTION_SHAPE;
+        };
+    }
+
     /**
-     * 設置物は本家と同じく 1 ブロックぶんの当たり判定を持つ。
-     * 本家 RTM の設置物は BlockContainerCustom を継承しており、
-     * 既定の当たり判定が (0,0,0)-(1,1,1) のまま使われている。
+     * ぶつかる判定。本家で {@code getCollisionBoundingBoxFromPool} が null を返す設置物は、
+     * <b>すり抜けられるが壊せる</b> (選択枠だけ残る)。蛍光灯がこれ。
      */
     @Override
     public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
@@ -123,13 +158,18 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             if (blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
                 return EMPTY_SHAPE;
             }
-            if (blockEntity.getCategory() == InstalledObjectCategory.TICKET_GATE
-                && blockEntity.isTicketGateOpen()) {
-                return EMPTY_SHAPE;
+            InstalledObjectCategory category = blockEntity.getCategory();
+            if (category == InstalledObjectCategory.TICKET_GATE && blockEntity.isTicketGateOpen()) {
+                return EMPTY_SHAPE;   //本家 BlockTurnstile: 開いていれば null
             }
+            if (category == InstalledObjectCategory.FLUORESCENT) {
+                return EMPTY_SHAPE;   //本家 BlockFluorescent: 当たり判定なし (壊せはする)
+            }
+            return outlineShape(category, level, pos);
         }
         return RTM_SELECTION_SHAPE;
     }
+
 
     @Nullable
     @Override

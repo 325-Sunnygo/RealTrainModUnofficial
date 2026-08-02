@@ -52,6 +52,16 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<CarItem> CAR_ITEM = ITEMS.register(
         "car", CarItem::new
     );
+    /**
+     * 編成アイテム。右クリックで編成を組み、線路へ右クリックで連結した状態のまま設置する。
+     * 1 両ずつ置く TRAIN_ITEM とは別物 (あちらはそのまま)。
+     */
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.FormationItem> FORMATION_ITEM =
+        ITEMS.register("formation", com.portofino.realtrainmodunofficial.item.FormationItem::new);
+
+    /** 編成バール。殴った車両の編成をまるごと消す (1 両ずつ壊す CROWBAR_ITEM とは別)。 */
+    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.FormationCrowbarItem> FORMATION_CROWBAR_ITEM =
+        ITEMS.register("formation_crowbar", com.portofino.realtrainmodunofficial.item.FormationCrowbarItem::new);
     // 本家 itemMotorman (運転士)。列車に使うと運転台に乗り、信号/ダイヤ/マクロで自動運転する
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.MotormanItem> MOTORMAN_ITEM = ITEMS.register(
         "motorman", com.portofino.realtrainmodunofficial.item.MotormanItem::new

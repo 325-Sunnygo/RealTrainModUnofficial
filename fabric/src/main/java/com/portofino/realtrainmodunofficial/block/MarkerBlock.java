@@ -180,7 +180,32 @@ public class MarkerBlock extends BaseEntityBlock {
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 
+    /**
+     * 今まさに敷いているレールの道床。
+     *
+     * <p>本家と同じで<b>アイテムに焼き込まれた道床</b>をそのままレールへ渡す。
+     * 敷設の入口から実際にコアを作る所までは呼び出しが何段も挟まるので、
+     * 引数を増やす代わりにここへ置いて持ち回る。敷設はサーバースレッドの 1 本道なので競合しない。
+     */
+    private static String pendingBallast = "";
+
+    /** アイテムに焼き込まれた道床を、これから作るレールへ渡す。 */
+    public static void setPendingBallast(ItemStack stack) {
+        String id = stack == null ? null
+            : stack.get(RealTrainModUnofficialComponents.SELECTED_BALLAST.get());
+        pendingBallast = id == null ? "" : id;
+    }
+
+    /** そのレールに焼き込む道床。アイテムに無ければレール定義の既定。 */
+    private static String ballastFor(@Nullable RailDefinition def) {
+        if (pendingBallast != null && !pendingBallast.isBlank()) {
+            return pendingBallast;
+        }
+        return def == null ? "" : def.getBallastBlockId();
+    }
+
     public static boolean placeRailFromItem(Level level, BlockPos pos, Player player, ItemStack stack, @Nullable String selectedModelId) {
+        setPendingBallast(stack);
         ItemStack previewStack = stack;
         CompoundTag startTag = stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get());
         if (startTag == null) {
@@ -535,6 +560,7 @@ public class MarkerBlock extends BaseEntityBlock {
         if (coreBe instanceof LargeRailCoreBlockEntity core) {
             core.setRailPositions(new RailPosition[]{start, end});
             if (selected != null) core.setRailDefinitionId(selected.getId());
+            core.setBallastBlockId(ballastFor(selected));
             core.createRailMap();
             core.setChanged();
             level.sendBlockUpdated(corePos, core.getBlockState(), core.getBlockState(), Block.UPDATE_ALL);
@@ -578,6 +604,7 @@ public class MarkerBlock extends BaseEntityBlock {
 
         if (selected != null) {
             core.setRailDefinitionId(selected.getId());
+            core.setBallastBlockId(ballastFor(selected));
         }
         core.updateSignalStrength(level.getBestNeighborSignal(corePos));
         core.setChanged();
@@ -633,6 +660,7 @@ public class MarkerBlock extends BaseEntityBlock {
         RailDefinition selected = resolveRailDef(selectedModelId);
         if (selected != null) {
             coreEntity.setRailDefinitionId(selected.getId());
+            coreEntity.setBallastBlockId(ballastFor(selected));
         }
         coreEntity.createRailMap();
         coreEntity.setChanged();

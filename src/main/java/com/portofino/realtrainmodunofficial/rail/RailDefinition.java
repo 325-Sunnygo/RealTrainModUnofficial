@@ -18,6 +18,15 @@ public class RailDefinition {
     private final int ballastWidth;
     /** 道床に敷くブロックID (例: "minecraft:gravel")。空なら道床無し。 */
     private final String ballastBlockId;
+    /**
+     * 道床の候補一式 (本家 RailConfig.defaultBallast)。
+     * 本家はこの 1 つ 1 つが「00_砂利」のような別々のレールアイテムになる。
+     */
+    private final java.util.List<Ballast> ballastSets;
+
+    /** 道床 1 種類。ブロック名・メタ・厚み。 */
+    public record Ballast(String blockId, int meta, float height) {
+    }
 
     public RailDefinition(String id, String displayName, String packName, String packResourcePath,
                           String modelFile, String scriptPath, String buttonTexture, Map<String, String> textureOverrides,
@@ -29,6 +38,14 @@ public class RailDefinition {
     public RailDefinition(String id, String displayName, String packName, String packResourcePath,
                           String modelFile, String scriptPath, String buttonTexture, Map<String, String> textureOverrides,
                           Vec3 modelOffset, float modelScale, int ballastWidth, String ballastBlockId) {
+        this(id, displayName, packName, packResourcePath, modelFile, scriptPath, buttonTexture,
+            textureOverrides, modelOffset, modelScale, ballastWidth, ballastBlockId, java.util.List.of());
+    }
+
+    public RailDefinition(String id, String displayName, String packName, String packResourcePath,
+                          String modelFile, String scriptPath, String buttonTexture, Map<String, String> textureOverrides,
+                          Vec3 modelOffset, float modelScale, int ballastWidth, String ballastBlockId,
+                          java.util.List<Ballast> ballastSets) {
         this.id = id;
         this.displayName = displayName;
         this.packName = packName;
@@ -41,6 +58,7 @@ public class RailDefinition {
         this.modelScale = modelScale <= 0 ? 1.0F : modelScale;
         this.ballastWidth = Math.max(0, ballastWidth);
         this.ballastBlockId = ballastBlockId == null ? "" : ballastBlockId;
+        this.ballastSets = ballastSets == null ? java.util.List.of() : java.util.List.copyOf(ballastSets);
     }
 
     public String getId() { return id; }
@@ -55,4 +73,5 @@ public class RailDefinition {
     public float getModelScale() { return modelScale; }
     public int getBallastWidth() { return ballastWidth; }
     public String getBallastBlockId() { return ballastBlockId; }
+    public java.util.List<Ballast> getBallastSets() { return ballastSets; }
 }

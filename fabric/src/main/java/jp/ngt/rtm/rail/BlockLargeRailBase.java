@@ -52,9 +52,12 @@ public class BlockLargeRailBase extends BaseEntityBlock {
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
-        // 道床の見た目はレールモデル (MQO の base/ballast/sleeper グループ) が描画する。
-        // ブロック自体は当たり判定/構造用 (静的スラブ描画は浮き・二重描画になるため廃止)。
-        return RenderShape.INVISIBLE;
+        // ★道床 (レール下の砂利) はこのブロックが描く。本家 1.7.10 も同じで、
+        // BlockLargeRailBase.getRenderType() = RTMBlock.renderIdBlockRail →
+        // RenderBlockLargeRail (ISimpleBlockRenderingHandler) がチャンクへ焼いていた。
+        // 1.21 では BallastModel / BallastFabricModel が同じ 6 面を出す。
+        // INVISIBLE に戻すと道床が丸ごと消える (レールの MQO モデルは砂利を描かない)。
+        return RenderShape.MODEL;
     }
 
     @Nullable
@@ -118,7 +121,13 @@ public class BlockLargeRailBase extends BaseEntityBlock {
         if (tileEntity instanceof TileEntityLargeRailBase) {
             TileEntityLargeRailCore coreTile = ((TileEntityLargeRailBase) tileEntity).getRailCore();
             if (coreTile != null) {
-                return jp.ngt.rtm.item.ItemRail.copyItemFromRail(coreTile);
+                try {
+                    return jp.ngt.rtm.item.ItemRail.copyItemFromRail(coreTile);
+                } catch (Throwable t) {
+                    // ★ここは他 MOD (WAILA 等) から毎tick呼ばれる。
+                    // 敷設途中のレールは中身が揃っていないので、落とさず空を返す。
+                    return net.minecraft.world.item.ItemStack.EMPTY;
+                }
             }
         }
         return net.minecraft.world.item.ItemStack.EMPTY;
@@ -171,12 +180,15 @@ public class BlockLargeRailBase extends BaseEntityBlock {
     @Override
     protected void neighborChanged(BlockState state, Level world, BlockPos pos, net.minecraft.world.level.block.Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
         super.neighborChanged(state, world, pos, neighborBlock, neighborPos, movedByPiston);
-        // RS 変化で分岐の開通状態 (isOpen/activeRails) を更新
-        if (!world.isClientSide) {
-            BlockEntity be = world.getBlockEntity(pos);
-            if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore switchCore) {
-                switchCore.onBlockChanged();
-            }
-        }
+        // ★ここでは分岐の状態を触らない。本家 BlockLargeRailSwitchBase /
+        // BlockLargeRailSwitchCore の onNeighborBlockChange は<b>空実装</b>で、
+        // レッドストーンは毎tickのポーリングだけで見ている
+        // (SwitchType.onUpdate → Point.onUpdate → rpRoot.checkRSInput、
+        //  進路は Point.getActiveRailMap がその場で引く)。
+        //
+        // 以前ここで onBlockChanged() を呼んでいたが、あれは activeRails を消して
+        // 「両端が同時に通電しているか」という別の規則で組み直す。
+        // 毎tickのポーリングと規則が食い違うため、<b>レッドストーンをつないだ瞬間に
+        // 分岐が切り替わらなくなる</b>。本家と同じく何もしないのが正しい。
     }
 }

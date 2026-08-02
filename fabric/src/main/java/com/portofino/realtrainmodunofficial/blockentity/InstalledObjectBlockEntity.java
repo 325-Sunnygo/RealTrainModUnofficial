@@ -1228,7 +1228,15 @@ public class InstalledObjectBlockEntity extends BlockEntity
             if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
                 com.portofino.realtrainmodunofficial.script.InstalledObjectServerScripts.tick(serverLevel, be);
             }
-            return;
+            // ★ここで return してよいのは検知器だけ。
+            // 検知器は出力の奪い合いになるのでパック任せにするが、それ以外の設置物の
+            // サーバースクリプトは「おまけ」であって内蔵処理の代わりではない。
+            // 例: ミラーボールの scripts/server/MirrorBall.js はジャンプ強化を配るだけで、
+            // 通電判定は持っていない。ここで抜けていたため powered が更新されず、
+            // 照明が一切光らず回らなかった。
+            if (be.getCategory() == InstalledObjectCategory.TRAIN_DETECTOR) {
+                return;
+            }
         }
         // 看板: 本家 TileEntitySignBoard.update — レッドストーン状態とランダム点滅を更新し、
         // 明るさが変わったらライトエンジンに再計算させる。
@@ -1318,6 +1326,21 @@ public class InstalledObjectBlockEntity extends BlockEntity
             if (changed) {
                 be.setChanged();
                 level.sendBlockUpdated(pos, state, state, 3);
+            }
+            return;
+        }
+        // 照明 (ミラーボール・赤色灯・サーチライト等): レッドストーンで点灯/回転する。
+        // ★ここが丸ごと抜けていて powered が一度も更新されず、
+        // renderer.getLightState が常に -1 (消灯) を返していた。
+        // 本家のスクリプトは state == 1 のときだけ回すので、回転が始まらなかった。
+        if (be.getCategory() == InstalledObjectCategory.LIGHT) {
+            boolean redstone = be.redstoneOn(level, pos);
+            if (be.powered != redstone) {
+                be.powered = redstone;
+                be.setChanged();
+                level.sendBlockUpdated(pos, state, state, 3);
+                // 光源レベルが powered で変わる (InstalledObjectBlock.getLightEmission)
+                level.getLightEngine().checkBlock(pos);
             }
             return;
         }
@@ -1507,6 +1530,8 @@ public class InstalledObjectBlockEntity extends BlockEntity
             }
             values.put("powered", blockEntity.isPowered() ? 1 : 0);
             values.put("isPowered", blockEntity.isPowered());
+            // 本家 TileEntityMachineBase.isGettingPower。同梱の MirrorBall.js 等が読む
+            values.put("isGettingPower", blockEntity.isPowered());
             values.put("barMoveCount", blockEntity.getBarMoveCount());
             values.put("lightCount", blockEntity.getLightCount());
             values.put("signal", blockEntity.getSignal());

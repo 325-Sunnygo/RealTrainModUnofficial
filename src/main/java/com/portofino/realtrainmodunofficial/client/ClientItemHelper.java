@@ -223,6 +223,24 @@ public final class ClientItemHelper {
         ));
     }
 
+    /**
+     * 編成の編集画面から呼ぶモデル選択。決めたら編集画面へ戻る。
+     * @param index 差し替える車両の番号。-1 なら末尾へ追加
+     */
+    public static void openTrainSelectForFormation(ItemStack stack, int index) {
+        List<ModelSelectScreen.ModelInfo> infos = getVisibleTrainModels();
+        // 決定でもキャンセルでも編成の編集画面へ戻す (戻り先は画面側が onClose で処理する)
+        Minecraft.getInstance().setScreen(new ModelSelectScreen(
+            Component.translatable("screen.realtrainmodunofficial.select_train"),
+            infos,
+            selection -> com.portofino.realtrainmodunofficial.client.screen.FormationEditScreen
+                .applySelection(stack, index, selection.modelId()),
+            null,
+            ""
+        ).withReturnScreen(() ->
+            new com.portofino.realtrainmodunofficial.client.screen.FormationEditScreen(stack)));
+    }
+
     public static void openVehicleFormationScreen(ItemStack stack) {
         Minecraft.getInstance().setScreen(new TrainFormationScreen(stack));
     }

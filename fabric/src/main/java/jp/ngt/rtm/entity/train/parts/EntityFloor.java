@@ -92,6 +92,21 @@ public class EntityFloor extends EntityVehiclePart {
      */
     private static final double HITBOX_LIFT = 0.55D;
 
+    /**
+     * 座席はプレイヤーを<b>素通しにする</b>。
+     *
+     * <p>立ち乗りで車内を歩くとき、座席の当たり判定が壁になって通れなかった。
+     * クリック判定 ({@code isPickable}) は残るので、右クリックで座るのは今までどおり。
+     *
+     * <p>ぶつかる判定 ({@code canBeCollidedWith}) とクリック判定 ({@code isPickable}) は
+     * 別物なので、片方だけ落とせる。台車など他のパーツは {@link EntityVehiclePart} の
+     * 既定のままで、当たり判定を持ち続ける (座席だけの話)。
+     */
+    @Override
+    public boolean canBeCollidedWith() {
+        return false;
+    }
+
     @Override
     public void updatePartPos(EntityVehicleBase<?> vehicle) {
         super.updatePartPos(vehicle);

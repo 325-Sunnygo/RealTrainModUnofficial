@@ -62,7 +62,10 @@ public class RailCollisionBlock extends BaseEntityBlock {
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
-        return RenderShape.INVISIBLE;
+        // ★道床 (レール脇の砂利) はこのブロックが描く。
+        // 本家 1.7.10 も、レール本体を幅ぶん敷き詰めて砂利のテクスチャで描いていた。
+        // BallastBlock は登録だけされていて実際には置かれない。
+        return RenderShape.MODEL;
     }
 
     @Override

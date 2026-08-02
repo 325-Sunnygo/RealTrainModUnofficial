@@ -271,6 +271,7 @@ public class RailPackLoader {
             // defaultBallast から敷設ブロック (gravel=砂利 等) を拾う。幅未指定ならここで既定 3。
             JsonElement ballastEl = obj.has("defaultBallast") ? obj.get("defaultBallast")
                 : (model.has("defaultBallast") ? model.get("defaultBallast") : null);
+            java.util.List<RailDefinition.Ballast> ballastSets = allBallastSets(ballastEl);
             if (ballastEl != null) {
                 String firstBlock = firstBallastBlockName(ballastEl);
                 if (firstBlock != null && !firstBlock.isBlank()) {
@@ -290,7 +291,8 @@ public class RailPackLoader {
                     ballast = 3;
                 }
             }
-            LOADED.add(new RailDefinition(id, displayName, packName, packName, modelFile, scriptPath, buttonTexture, tex, offset, scale, ballast, ballastBlockId));
+            LOADED.add(new RailDefinition(id, displayName, packName, packName, modelFile, scriptPath,
+                buttonTexture, tex, offset, scale, ballast, ballastBlockId, ballastSets));
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse rail json in {}: {}", packName, e.getMessage());
         }
@@ -304,6 +306,55 @@ public class RailPackLoader {
         } catch (Exception ignored) {
         }
         return def;
+    }
+
+    /**
+     * defaultBallast の<b>全部</b>を取り出す。
+     *
+     * <p>本家はこの 1 つ 1 つが別々のレールアイテムになる (「00_砂利」のような並び)。
+     * 以前は最初の 1 つしか見ていなかったので、道床の種類を選べなかった。
+     */
+    private static java.util.List<RailDefinition.Ballast> allBallastSets(JsonElement el) {
+        java.util.List<RailDefinition.Ballast> out = new java.util.ArrayList<>();
+        if (el == null) {
+            return out;
+        }
+        try {
+            if (el.isJsonArray()) {
+                for (JsonElement e : el.getAsJsonArray()) {
+                    addBallastSet(out, e);
+                }
+            } else {
+                addBallastSet(out, el);
+            }
+        } catch (Exception ignored) {
+            //壊れた記述は黙って捨てる。1 件でも読めれば道床は選べる
+        }
+        return out;
+    }
+
+    private static void addBallastSet(java.util.List<RailDefinition.Ballast> out, JsonElement e) {
+        if (e == null) {
+            return;
+        }
+        String block = null;
+        int meta = 0;
+        float height = 0.0625F;
+        if (e.isJsonObject()) {
+            block = getString(e.getAsJsonObject(), "blockName");
+            meta = readIntSafe(e.getAsJsonObject().get("blockMetadata"), 0);
+            JsonElement h = e.getAsJsonObject().get("height");
+            if (h != null && h.isJsonPrimitive() && h.getAsJsonPrimitive().isNumber()) {
+                height = h.getAsFloat();
+            }
+        } else if (e.isJsonPrimitive() && e.getAsJsonPrimitive().isString()) {
+            block = e.getAsString();
+        }
+        if (block == null || block.isBlank()) {
+            return;
+        }
+        out.add(new RailDefinition.Ballast(normalizeBlockId(block), meta,
+            height <= 0.0F ? 0.0625F : height));
     }
 
     /** defaultBallast (配列/オブジェクト/文字列) から最初の blockName を取り出す。 */
@@ -506,14 +557,7 @@ public class RailPackLoader {
         String scriptFileName = scriptPath.contains("/")
             ? scriptPath.substring(scriptPath.lastIndexOf('/') + 1).toLowerCase()
             : scriptPath.toLowerCase();
-        // ★パックがフォルダのこともある (展開済みパック・開発実行時の mod 自身)。
-        // zip として開くと「Is a directory」で転び、スクリプト無しの白い面に落ちる。
-        if (packPath != null && Files.isDirectory(packPath)) {
-            String found = readScriptFromDirectory(packPath, scriptPath, scriptFileName);
-            if (found != null) {
-                return found;
-            }
-        } else if (packPath != null) {
+        if (packPath != null) {
         try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(Files.newInputStream(packPath))) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
@@ -536,32 +580,6 @@ public class RailPackLoader {
                 return PackTextDecoder.readText(new java.io.ByteArrayInputStream(bytes));
             }
         } catch (Exception ignored) {
-        }
-        return null;
-    }
-
-    /**
-     * フォルダ形式のパックからスクリプトを読む。zip 走査と同じ突き合わせ方をする
-     * (完全一致 → 末尾一致 → ファイル名一致)。見つからなければ null。
-     */
-    private static String readScriptFromDirectory(Path packDir, String scriptPath, String scriptFileName) {
-        try (var stream = Files.walk(packDir)) {
-            for (Path file : (Iterable<Path>) stream::iterator) {
-                if (!Files.isRegularFile(file)) {
-                    continue;
-                }
-                String name = normalize(packDir.relativize(file).toString());
-                if (name.equalsIgnoreCase(scriptPath)
-                        || name.toLowerCase().endsWith("/" + scriptFileName)
-                        || name.toLowerCase().equals(scriptFileName)) {
-                    try (InputStream in = Files.newInputStream(file)) {
-                        return PackTextDecoder.readText(in);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to read script {} from folder pack {}",
-                scriptPath, packDir, e);
         }
         return null;
     }

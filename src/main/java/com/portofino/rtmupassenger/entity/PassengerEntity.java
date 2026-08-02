@@ -35,8 +35,14 @@ public class PassengerEntity extends PathfinderMob {
 
     /** 車内歩行の 1 tick の歩幅 (ゆっくり)。 */
     private static final double WALK_STEP = 0.11D;
-    /** 車内で歩く/立つ床の追加下げ量 (立ち乗りの床より NPC はこのぶん低く歩く)。高すぎたので下げる。 */
-    private static final double NPC_FLOOR_LOWER = 0.4D;
+    /**
+     * 車内で歩く/立つ床の追加下げ量。
+     *
+     * <p>★0。以前は 0.4 下げていたが、それは車内床が一律の値で出ていて高すぎたぶんの
+     * 打ち消しだった。今は床を客席 (slotPos) の高さから出す
+     * ({@code EntityTrainBase.getInteriorFloorY}) ので、そのまま立たせるのが正しい。
+     */
+    private static final double NPC_FLOOR_LOWER = 0.0D;
 
     /** 「目的駅に着いた」とみなす、列車の車体軸から目的駅ブロックまでの距離の2乗 (10m)。 */
     private static final double ALIGHT_DIST_SQ = 100.0D;

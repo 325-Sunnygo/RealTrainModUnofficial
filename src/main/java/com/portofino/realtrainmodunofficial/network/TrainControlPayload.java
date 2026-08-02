@@ -132,12 +132,13 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 case "toggle_reverse" -> controlTrain.setReverse(!controlTrain.isReverse());
                 case "set_reverser" -> controlTrain.setReverser(payload.value());
                 // ↑↓ キーのレバーサ操作。↑=前(+1)/↓=後(-1) に 1 段ずつ。中立(0)を挟む 3 段。
-                // マスコンが 0 (力行/制動なし) のときだけ動かせる = 走行中の逆転を防ぐ。
+                // ★動かせるのは<b>マスコンが非常ブレーキ位置のとき</b> (ユーザー要望)。
+                // 連結すると必ず非常位置になるので、ニュートラル条件だと連結後に切り替えられなかった。
                 case "reverser_up", "reverser_down" -> {
                     if (!driverPassenger) {
                         return;
                     }
-                    if (controlTrain.getNotch() == 0) {
+                    if (controlTrain.getNotch() == -controlTrain.getMaxBrakeNotch()) {
                         int delta = payload.action().equals("reverser_up") ? 1 : -1;
                         int next = Math.max(-1, Math.min(1, controlTrain.getReverser() + delta));
                         if (next != controlTrain.getReverser()) {
@@ -206,9 +207,10 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 }
             }
             // ↑↓ キーのレバーサ操作。
-            // を読む (updateMotion)。
+            // ★動かせるのは<b>マスコンが非常ブレーキ位置のとき</b> (ユーザー要望)。
+            // 連結すると必ず非常位置になるので、ニュートラル条件だと連結後に切り替えられなかった。
             case "reverser_up", "reverser_down" -> {
-                if (train.getNotch() == 0) {
+                if (train.getNotch() == train.getEmergencyBrakeNotch()) {
                     var dirType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction;
                     boolean flip = (train.getCabDirection() & 1) != (train.getTrainDirection() & 1);
                     byte front = flip

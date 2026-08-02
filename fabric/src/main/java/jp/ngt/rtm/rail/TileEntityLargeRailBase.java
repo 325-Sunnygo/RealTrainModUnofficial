@@ -276,11 +276,18 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
 
     private float[] getBlockHeights(int x, int y, int z, float defaultHeight) {
         TileEntityLargeRailCore core = this.getRailCore();
-        if (core == null) {
-            return null;
-        }
+        return blockHeightsOf(core == null ? null : core.getAllRailMaps(), x, y, z, defaultHeight);
+    }
 
-        RailMap[] rms = core.getAllRailMaps();
+    /**
+     * レールコアの線形から、そのブロックの 4 隅の高さを出す。
+     *
+     * <p>道床 (BallastBlock) からも同じ計算が要るので static に切り出してある。
+     * レール本体と道床で別々の式にすると、隣り合うブロックの継ぎ目がずれる。
+     *
+     * @return {xNzP, xPzP, xPzN, xNzN}。出せなければ null
+     */
+    public static float[] blockHeightsOf(RailMap[] rms, int x, int y, int z, float defaultHeight) {
         if (rms == null) {
             return null;
         }

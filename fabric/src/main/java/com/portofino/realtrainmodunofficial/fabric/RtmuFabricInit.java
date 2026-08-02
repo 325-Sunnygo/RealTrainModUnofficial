@@ -73,6 +73,19 @@ public class RtmuFabricInit implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(server ->
             NeoForge.EVENT_BUS.post(new ServerTickEvent.Post(server)));
 
+        // 編成バール: 殴った車両の編成をまるごと消す。
+        // NeoForge は Item#onLeftClickEntity で受けるが、Fabric にその拡張は無いのでここで受ける。
+        net.fabricmc.fabric.api.event.player.AttackEntityCallback.EVENT.register(
+            (player, world, hand, entity, hitResult) -> {
+                if (player.getItemInHand(hand).getItem()
+                        instanceof com.portofino.realtrainmodunofficial.item.FormationCrowbarItem
+                        && com.portofino.realtrainmodunofficial.item.FormationCrowbarItem
+                            .handleAttack(player, entity)) {
+                    return net.minecraft.world.InteractionResult.SUCCESS;
+                }
+                return net.minecraft.world.InteractionResult.PASS;
+            });
+
         CommandRegistrationCallback.EVENT.register((dispatcher, registry, env) ->
             NeoForge.EVENT_BUS.post(new RegisterCommandsEvent(dispatcher, registry,
                 env == net.minecraft.commands.Commands.CommandSelection.DEDICATED

@@ -150,10 +150,16 @@ public final class ClientHooksClient {
         com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.toggle();
     }
 
-    /** 駅設定 GUI を開く (現在のタグビット付き)。 */
-    public static void openStationScreen(net.minecraft.core.BlockPos pos, int bits) {
+    /** 編成アイテムの編集画面。 */
+    public static void openFormationScreen(ItemStack stack) {
         Minecraft.getInstance().setScreen(
-            new com.portofino.rtmupassenger.client.StationScreen(pos, bits));
+            new com.portofino.realtrainmodunofficial.client.screen.FormationEditScreen(stack));
+    }
+
+    /** 駅設定 GUI を開く (現在のタグビット付き)。 */
+    public static void openStationScreen(net.minecraft.core.BlockPos pos, int bits, int capacity) {
+        Minecraft.getInstance().setScreen(
+            new com.portofino.rtmupassenger.client.StationScreen(pos, bits, capacity));
     }
 
     /** 券売機 (本家 GuiTicketVendor): 切符 / 回数券 の2ボタン */
@@ -188,5 +194,18 @@ public final class ClientHooksClient {
             return;
         }
         minecraft.player.displayClientMessage(Component.literal("[RTMU Script] " + message), false);
+    }
+
+    /**
+     * 指定範囲のレールベースに道床を焼き直させる。
+     *
+     * <p>FRAPI は {@code emitBlockQuads} にワールドと座標が渡るので、NeoForge のように
+     * モデルデータを作り直させる必要はない。チャンクを焼き直させるだけでよい。
+     */
+    public static void refreshRailBallast(Level level, int x0, int y0, int z0, int x1, int y1, int z1) {
+        if (level == null || !level.isClientSide()) {
+            return;
+        }
+        Minecraft.getInstance().levelRenderer.setBlocksDirty(x0, y0, z0, x1, y1, z1);
     }
 }

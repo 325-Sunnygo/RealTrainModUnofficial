@@ -14,6 +14,12 @@ public class TileEntityLargeRailNormalCore extends TileEntityLargeRailCore {
     @Override
     public String getRailShapeName() {
         RailMap map = this.getRailMap(null);
+        if (map == null || map.getStartRP() == null || map.getEndRP() == null) {
+            // ★レールを置いた直後は RailMap がまだ無い。
+            // WAILA 系 MOD は見ているブロックへ毎tick getCloneItemStack を呼ぶので、
+            // ここで落ちるとレール設置の瞬間にクライアントごと落ちる (実測)。
+            return "Type:Normal";
+        }
         return "Type:Normal, " +
                 "X:" + (map.getEndRP().blockX - map.getStartRP().blockX) + ", " +
                 "Y:" + (map.getEndRP().blockY - map.getStartRP().blockY) + ", " +

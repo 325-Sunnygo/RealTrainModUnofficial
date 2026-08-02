@@ -22,8 +22,13 @@ public class PartsRenderer {
     // VehicleScriptRenderers はこれを見て、その車両を「静止でも毎フレーム再実行」に切り替える。
     private static boolean timeAccessed;
 
-    /** 時刻系APIが呼ばれたら立てる。 */
-    protected static void markTimeAccessed() {
+    /**
+     * 時刻系APIが呼ばれたら立てる。
+     * ★public。実際にスクリプトへ束縛されるのは TrainScriptSystem 側の ScriptRenderer なので、
+     * あちらの時刻 API からも立てないと「時間で動く物」を検知できない
+     * (ミラーボール・赤色灯が回らなかった原因)。
+     */
+    public static void markTimeAccessed() {
         timeAccessed = true;
     }
 

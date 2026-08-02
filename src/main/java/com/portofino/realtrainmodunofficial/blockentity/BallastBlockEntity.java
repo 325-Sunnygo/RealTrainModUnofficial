@@ -24,6 +24,27 @@ public class BallastBlockEntity extends BlockEntity {
         setChanged();
     }
 
+    /**
+     * チャンクを組み立てるときに、道床の形 (4 隅の高さと貼るブロック) を渡す。
+     *
+     * <p>これがチャンクのメッシュへ焼かれるので、描いたあとは毎フレームの負担が無い。
+     * レールを敷き直したときは {@code requestModelDataUpdate} で作り直させる。
+     */
+    @Override
+    public net.neoforged.neoforge.client.model.data.ModelData getModelData() {
+        if (this.level == null) {
+            return net.neoforged.neoforge.client.model.data.ModelData.EMPTY;
+        }
+        var shape = com.portofino.realtrainmodunofficial.client.render.BallastGeometry
+            .shapeAt(this.level, this.worldPosition);
+        if (shape == null) {
+            return net.neoforged.neoforge.client.model.data.ModelData.EMPTY;
+        }
+        return net.neoforged.neoforge.client.model.data.ModelData.builder()
+            .with(com.portofino.realtrainmodunofficial.client.render.BallastModel.SHAPE, shape)
+            .build();
+    }
+
     public BlockPos getCorePos() {
         return corePos;
     }

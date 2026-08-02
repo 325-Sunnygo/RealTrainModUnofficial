@@ -537,8 +537,9 @@ public class BlockMarker extends BaseEntityBlock {
                         com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
                 model = def != null ? def.getId() : "";
             }
-            RailProperty prop = new RailProperty(model == null ? "" : model,
-                    net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+            RailProperty prop = propertyFor(model == null ? "" : model,
+                    item.get(com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents
+                            .SELECTED_BALLAST.get()));
             setLastUsedProperty(prop);
             return prop;
         }
@@ -557,12 +558,61 @@ public class BlockMarker extends BaseEntityBlock {
                 def = all.isEmpty() ? null : all.get(0);
             }
             if (def != null) {
-                return new RailProperty(def.getId(), net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+                return propertyFor(def.getId(), null);
             }
             return RailProperty.getDefaultProperty();
         }
 
         return null;
+    }
+
+    /**
+     * レール種類と道床から RailProperty を組む。
+     *
+     * <p>道床 (block / meta / 厚み) は本家と同じく<b>アイテムに焼き込まれたもの</b>を使う。
+     * ここで決めた {@code prop.block} がそのまま道床のテクスチャになり、
+     * {@code prop.blockHeight} が道床の厚みの下限になる (RenderBlockLargeRail と同じ)。
+     * 以前は常に砂利・厚み 1/16 決め打ちだったので、パックの defaultBallast が効かなかった。
+     *
+     * @param ballastId アイテムに焼き込まれた道床ブロック ID。null ならレール定義の既定
+     */
+    private static RailProperty propertyFor(String railModel, @javax.annotation.Nullable String ballastId) {
+        com.portofino.realtrainmodunofficial.rail.RailDefinition def =
+                (railModel == null || railModel.isEmpty()) ? null
+                        : com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(railModel);
+
+        String blockId = (ballastId == null || ballastId.isBlank())
+                ? (def == null ? "" : def.getBallastBlockId())
+                : ballastId;
+
+        //その道床に対応する厚み/メタ (本家 RailConfig.defaultBallast の 1 行)
+        int meta = 0;
+        float height = 0.0625F;
+        if (def != null) {
+            for (com.portofino.realtrainmodunofficial.rail.RailDefinition.Ballast set : def.getBallastSets()) {
+                if (set.blockId() != null && set.blockId().equals(blockId)) {
+                    meta = set.meta();
+                    if (set.height() > 0.0F) {
+                        height = set.height();
+                    }
+                    break;
+                }
+            }
+        }
+
+        // ★道床はパックの defaultBallast の記述どおりにする。
+        // 書いていないレール (桁・高架・ガード・モノレール等) は道床なし = 空気。
+        // ここを砂利にフォールバックさせると、本家では道床が付かないレールにまで
+        // 砂利が敷かれる (ユーザー報告「道床がないレールモデルでも砂利が出る」)。
+        net.minecraft.world.level.block.Block block = net.minecraft.world.level.block.Blocks.AIR;
+        if (blockId != null && !blockId.isBlank()) {
+            net.minecraft.resources.ResourceLocation rl =
+                    net.minecraft.resources.ResourceLocation.tryParse(blockId);
+            if (rl != null && net.minecraft.core.registries.BuiltInRegistries.BLOCK.containsKey(rl)) {
+                block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(rl);
+            }
+        }
+        return new RailProperty(railModel == null ? "" : railModel, block, meta, height);
     }
 
     /**

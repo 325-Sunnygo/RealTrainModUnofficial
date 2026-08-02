@@ -2,6 +2,7 @@ package jp.ngt.rtm.rail.util;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks;
 import com.portofino.realtrainmodunofficial.block.BallastBlock;
+import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
 import com.portofino.realtrainmodunofficial.block.MarkerBlock;
 import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
@@ -463,16 +464,18 @@ public abstract class RailMap {
         this.createRailListLegacy(prop);
         Block collisionBlock = RealTrainModUnofficialBlocks.RAIL_COLLISION.get();
         BlockPos corePos = new BlockPos(x0, y0, z0);
+        int placed = 0;
+        int candidates = this.rails.size();
         for (int[] rail : this.rails) {
             BlockPos pos = new BlockPos(rail[0], rail[1], rail[2]);
             BlockState existingState = level.getBlockState(pos);
             Block existing = existingState.getBlock();
-            boolean replaceable = existing == Blocks.AIR
-                    || existing == Blocks.CAVE_AIR || existing == Blocks.VOID_AIR
-                    || existing instanceof RailCollisionBlock
-                    || existing instanceof BallastBlock
-                    || existing instanceof MarkerBlock
-                    || existingState.canBeReplaced();
+            // ★本家 setRail は「別のレールでなければ置き換える」。
+            // 空気系しか置き換えないと、草原など地面のある所では道床ブロックが 1 つも置かれず、
+            // 道床が出ない・当たり判定も付かない (実測)。
+            // レールのコアと、壊せないブロックだけは避ける。
+            boolean replaceable = !(existing instanceof LargeRailCoreBlock)
+                    && existingState.getDestroySpeed(level, pos) >= 0.0F;
             if (replaceable) {
                 level.setBlock(pos, collisionBlock.defaultBlockState(), Block.UPDATE_ALL);
                 BlockEntity be = level.getBlockEntity(pos);
@@ -481,9 +484,12 @@ public abstract class RailMap {
                     float surfaceY = rail.length >= 4 ? rail[3] / 16.0f : 0.0f;
                     rbe.setSurfaceY(surfaceY);
                     level.sendBlockUpdated(pos, rbe.getBlockState(), rbe.getBlockState(), Block.UPDATE_ALL);
+                    placed++;
                 }
             }
         }
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+            "[道床] 敷設: 候補 {} / 実際に置いた {} (幅 {})", candidates, placed, prop.ballastWidth);
         this.rails.clear();
     }
 

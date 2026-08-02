@@ -138,4 +138,34 @@ public class RailItem extends Item {
                 .withStyle(ChatFormatting.DARK_GRAY));
         }
     }
+
+    /**
+     * 本家 ItemRail.getItemStackDisplayName と同じ形。
+     * 「レール (1067mm_PC, 砂利)」のように、レールの種類と道床を出す。
+     */
+    @Override
+    public net.minecraft.network.chat.Component getName(net.minecraft.world.item.ItemStack stack) {
+        net.minecraft.network.chat.Component base = super.getName(stack);
+        String railId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
+        if (railId == null || railId.isBlank()) {
+            return base;
+        }
+        RailDefinition def = RailRegistry.getById(railId);
+        String railName = def != null && def.getDisplayName() != null && !def.getDisplayName().isBlank()
+            ? def.getDisplayName() : railId;
+
+        StringBuilder sb = new StringBuilder(base.getString()).append(" (").append(railName);
+        String ballast = stack.get(RealTrainModUnofficialComponents.SELECTED_BALLAST.get());
+        if (ballast != null && !ballast.isBlank()) {
+            net.minecraft.resources.ResourceLocation rl =
+                net.minecraft.resources.ResourceLocation.tryParse(ballast);
+            net.minecraft.world.level.block.Block block = rl == null ? null
+                : net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(rl);
+            if (block != null && block != net.minecraft.world.level.block.Blocks.AIR) {
+                sb.append(", ").append(block.getName().getString());
+            }
+        }
+        sb.append(')');
+        return net.minecraft.network.chat.Component.literal(sb.toString());
+    }
 }

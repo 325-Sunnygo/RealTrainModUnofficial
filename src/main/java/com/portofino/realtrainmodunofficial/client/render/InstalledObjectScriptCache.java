@@ -31,6 +31,12 @@ public final class InstalledObjectScriptCache {
          * 記録と再生が丸ごと無駄になっていた。焼き込みは ObjectMeshCache が持つ。
          */
         boolean noCache;
+    
+        /**
+         * この設置物のスクリプトが時刻を読む (= 見た目が毎フレーム変わる) か。
+         * 一度でも読んだら以後キャッシュしない。
+         */
+        boolean timeDependent;
     }
 
     private InstalledObjectScriptCache() {
@@ -50,11 +56,27 @@ public final class InstalledObjectScriptCache {
         // ★毎フレーム new しない。設置物 150 個 × 毎フレームだと記録の生成だけで効いてくる。
         GLRecorder rec = SCRATCH.get();
         rec.clear();
+        // ★スクリプトが時刻を読んだかを見張る。読んでいたら毎フレーム動く物 (ミラーボールの回転・
+        // 赤色灯の回転・点滅) なので、焼き込みに載せてはいけない。
+        // 本家も renderRailDynamic 相当は焼き込みの外で毎フレーム実行している。
+        jp.ngt.rtm.render.PartsRenderer.clearTimeAccessed();
         GLRecorder.activate(rec);
         try {
             MqoModelLoader.renderModelPreferScript(model, poseStack, buffer, packedLight, be);
         } finally {
             GLRecorder.deactivate();
+        }
+        boolean timeDependent = jp.ngt.rtm.render.PartsRenderer.wasTimeAccessed();
+        if (timeDependent) {
+            // 時間で見た目が変わる物は毎フレーム作り直して提出する。
+            // (焼くと内容キーが毎フレーム変わり、焼き込み枠を食いつぶしたうえで
+            //  古いメッシュが出続けて「回らない」状態になる)
+            c.timeDependent = true;
+        }
+        if (c.timeDependent) {
+            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(false);
+            VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model, null);
+            return;
         }
         if (rec.hasGeometry()) {
             // ★本家 RailPartsRenderer.renderRailStatic と同じ流れ:

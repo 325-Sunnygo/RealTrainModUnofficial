@@ -51,6 +51,18 @@ public final class RailMeshCache {
 
     private static final Map<BlockPos, RailMesh> CACHE = new LinkedHashMap<>(64, 0.75F, true);
 
+    /**
+     * 「焼き直せ」と言われたのに、そのフレームの焼き込み枠 ({@link #MAX_BAKES_PER_FRAME}) を
+     * 使い切っていて見送ったレール。
+     *
+     * <p>★これが無いと、敷いた直後のレールが古いメッシュのまま固定される。
+     * 呼び出し側 (RailScriptRenderers) は記録を作り直した時点で
+     * {@code shouldRerenderRail} を false に戻すので、ここで見送ると
+     * 「焼き直せ」がどこにも残らず、次フレーム以降は二度と焼き直されない。
+     * リログ (レベル切替でキャッシュ破棄) でしか直らなかったのはこれが原因。
+     */
+    private static final java.util.Set<BlockPos> PENDING_REBAKE = new java.util.HashSet<>();
+
     private static Level lastLevel;
 
     /** 毎フレーム先頭 (RailDrawQueue.flush 前) に呼ぶ。焼き込み枠をリセットし、フレーム番号を進める。 */
@@ -109,7 +121,9 @@ public final class RailMeshCache {
 
         RailMesh mesh = CACHE.get(pos);
         // 必ず焼く要因: 強制再焼き (パック再読込)・未焼き・モデル差替。
-        boolean mustBake = forceRebuild || mesh == null || mesh.model() != model;
+        // ★PENDING_REBAKE も見る。焼き込み枠切れで見送った「焼き直せ」を覚えておくため。
+        boolean mustBake = forceRebuild || PENDING_REBAKE.contains(pos)
+                || mesh == null || mesh.model() != model;
         // 任意で焼く要因: ライト or 見た目 (variant=トング位置) が変わった。
         boolean lightChanged = !mustBake && mesh.light() != packedLight;
         boolean variantChanged = !mustBake && mesh.variant() != variant;
@@ -123,6 +137,11 @@ public final class RailMeshCache {
         if (needsBake) {
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
                 // ★スパイク対策: このフレームの焼き込み枠を使い切った → 次フレームへ回す。
+                // 「必ず焼く」要求はここで覚えておく。呼び出し側のフラグは既に降ろされているので、
+                // 覚えておかないと要求が消えて古いメッシュのまま固定される。
+                if (mustBake) {
+                    PENDING_REBAKE.add(pos.immutable());
+                }
                 if (mesh != null) {
                     // 再焼き待ち: 古いメッシュをそのまま描く (光/形が最大数フレーム古いだけ・
                     // 不可視にはしない)。needsBake は次フレームも真なので枠が空き次第焼き直る。
@@ -146,6 +165,7 @@ public final class RailMeshCache {
                     return false;
                 }
                 CACHE.put(pos, mesh);
+                PENDING_REBAKE.remove(pos);
                 trim();
             }
         }
@@ -229,6 +249,7 @@ public final class RailMeshCache {
             mesh.close();
         }
         CACHE.clear();
+        PENDING_REBAKE.clear();
     }
 
     /** レールが壊された / 作り直された時に呼ぶ (VBO を解放する)。 */
@@ -237,5 +258,6 @@ public final class RailMeshCache {
         if (mesh != null) {
             mesh.close();
         }
+        PENDING_REBAKE.remove(pos);
     }
 }

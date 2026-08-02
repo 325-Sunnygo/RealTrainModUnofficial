@@ -169,7 +169,12 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             || blockEntity.getCategory() == InstalledObjectCategory.FLUORESCENT
                             || blockEntity.getCategory() == InstalledObjectCategory.OVERHEAD_LINE_POLE
                             || blockEntity.getCategory() == InstalledObjectCategory.PIPE
-                            || blockEntity.getCategory() == InstalledObjectCategory.POINT;
+                            || blockEntity.getCategory() == InstalledObjectCategory.POINT
+                            // ★照明もここに含める。本家の RenderMirrorBall.js / RenderRevolvingLight.js は
+                            // renderClass に MachinePartsRenderer を指定していて、この経路でしか走らない。
+                            // 以前は「ブロック検知スクリプトのときだけ」に絞っていたため、ミラーボールや
+                            // 赤色灯はスクリプトが一切実行されず、素モデルが描かれるだけで回らなかった。
+                            || blockEntity.getCategory() == InstalledObjectCategory.LIGHT;
                     boolean hasMachineScript = definition.getScriptPath() != null && !definition.getScriptPath().isBlank();
                     // これらのブロック検知信号パックは json の machineType が "Light" のため SIGNAL でなく
                     // LIGHT に分類され、本来スクリプト経路に載らず素モデルで全レンズが描かれていた(=複数点灯)。

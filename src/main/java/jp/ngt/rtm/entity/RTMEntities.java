@@ -22,14 +22,20 @@ public final class RTMEntities {
             REGISTER.register("rtm_train", () -> EntityType.Builder.<EntityTrain>of(EntityTrain::new, MobCategory.MISC)
                     .sized(EntityTrainBase.TRAIN_WIDTH, EntityTrainBase.TRAIN_HEIGHT)
                     .clientTrackingRange(10)
-                    .updateInterval(3)
+                    // ★毎tick送る。本家は VehicleTrackerEntry という専用トラッカーを
+                    // 持たせて位置を毎tick配っている。3 tick に 1 回だと、走行中だけ
+                    // 車ごとに更新の位相がずれて車間が開く (停車中は正常に見える)。
+                    .updateInterval(1)
                     .build("rtm_train"));
 
     public static final DeferredHolder<EntityType<?>, EntityType<EntityBogie>> BOGIE =
             REGISTER.register("rtm_bogie", () -> EntityType.Builder.<EntityBogie>of(EntityBogie::new, MobCategory.MISC)
                     .sized(EntityTrainBase.TRAIN_WIDTH, EntityTrainBase.TRAIN_HEIGHT)
                     .clientTrackingRange(10)
-                    .updateInterval(3)
+                    // ★毎tick送る。本家は VehicleTrackerEntry という専用トラッカーを
+                    // 持たせて位置を毎tick配っている。3 tick に 1 回だと、走行中だけ
+                    // 車ごとに更新の位相がずれて車間が開く (停車中は正常に見える)。
+                    .updateInterval(1)
                     .build("rtm_bogie"));
 
     public static final DeferredHolder<EntityType<?>, EntityType<jp.ngt.rtm.entity.train.parts.EntityFloor>> FLOOR =
@@ -38,7 +44,10 @@ public final class RTMEntities {
                     // 本家 setSize(1.25F, 0.0625F) — 高さは掴みやすいよう少し確保
                     .sized(1.25F, 0.35F)
                     .clientTrackingRange(8)
-                    .updateInterval(3)
+                    // ★毎tick送る。本家は VehicleTrackerEntry という専用トラッカーを
+                    // 持たせて位置を毎tick配っている。3 tick に 1 回だと、走行中だけ
+                    // 車ごとに更新の位相がずれて車間が開く (停車中は正常に見える)。
+                    .updateInterval(1)
                     .build("rtm_floor"));
 
     // 本家 EntityMotorman (運転士)。setSize(0.6F, 1.8F)

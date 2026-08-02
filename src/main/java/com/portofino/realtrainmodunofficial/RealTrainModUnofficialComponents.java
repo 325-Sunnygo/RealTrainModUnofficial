@@ -34,6 +34,18 @@ public class RealTrainModUnofficialComponents {
         builder -> builder.persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8)
     );
 
+    /**
+     * レールアイテムに焼き込まれた道床ブロック ("minecraft:gravel" など)。
+     *
+     * <p>本家と同じで、アイテムごとに道床が決まっている。
+     * 敷いたあとレールをいじっても道床は変わらない。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> SELECTED_BALLAST
+        = REGISTRAR.registerComponentType(
+        "selected_ballast",
+        builder -> builder.persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8)
+    );
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<CompoundTag>> RAIL_PREVIEW_START
         = REGISTRAR.registerComponentType(
         "rail_preview_start",

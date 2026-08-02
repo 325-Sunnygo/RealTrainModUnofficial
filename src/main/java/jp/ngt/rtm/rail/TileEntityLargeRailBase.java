@@ -68,6 +68,47 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         this.blockHeights = null;
         this.cachedShape = null;
         this.finishSetupBlockBounds = false;
+        this.refreshBallastModel();
+    }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        this.refreshBallastModel();
+    }
+
+    /**
+     * 道床の形を作り直させる。
+     *
+     * <p>NeoForge はチャンクを焼く直前に {@code getModelData()} を呼ぶが、
+     * 呼ぶ相手は「作り直しを申請した BlockEntity」だけ。申請しないと
+     * コアが後から届いても古い (空の) 形のまま焼かれ、道床が出ない。
+     */
+    public void refreshBallastModel() {
+        if (this.level != null && this.level.isClientSide()) {
+            this.requestModelDataUpdate();
+        }
+    }
+
+    /**
+     * 道床 (レール下の砂利) の形をチャンクビルダへ渡す。
+     *
+     * <p>本家 1.7.10 は {@code RenderBlockLargeRail} (ISimpleBlockRenderingHandler) で
+     * チャンクメッシュへ焼いていた。1.21 でも同じく焼く側に載せるので、毎フレームの負担は無い。
+     */
+    @Override
+    public net.neoforged.neoforge.client.model.data.ModelData getModelData() {
+        if (this.level == null) {
+            return net.neoforged.neoforge.client.model.data.ModelData.EMPTY;
+        }
+        var shape = com.portofino.realtrainmodunofficial.client.render.BallastGeometry
+                .shapeAt(this.level, this.worldPosition);
+        if (shape == null) {
+            return net.neoforged.neoforge.client.model.data.ModelData.EMPTY;
+        }
+        return net.neoforged.neoforge.client.model.data.ModelData.builder()
+                .with(com.portofino.realtrainmodunofficial.client.render.BallastGeometry.SHAPE, shape)
+                .build();
     }
 
     @Override
@@ -276,11 +317,18 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
 
     private float[] getBlockHeights(int x, int y, int z, float defaultHeight) {
         TileEntityLargeRailCore core = this.getRailCore();
-        if (core == null) {
-            return null;
-        }
+        return blockHeightsOf(core == null ? null : core.getAllRailMaps(), x, y, z, defaultHeight);
+    }
 
-        RailMap[] rms = core.getAllRailMaps();
+    /**
+     * レールコアの線形から、そのブロックの 4 隅の高さを出す。
+     *
+     * <p>道床 (BallastBlock) からも同じ計算が要るので static に切り出してある。
+     * レール本体と道床で別々の式にすると、隣り合うブロックの継ぎ目がずれる。
+     *
+     * @return {xNzP, xPzP, xPzN, xNzN}。出せなければ null
+     */
+    public static float[] blockHeightsOf(RailMap[] rms, int x, int y, int z, float defaultHeight) {
         if (rms == null) {
             return null;
         }
