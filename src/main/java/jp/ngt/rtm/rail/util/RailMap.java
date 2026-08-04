@@ -488,8 +488,6 @@ public abstract class RailMap {
                 }
             }
         }
-        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-            "[道床] 敷設: 候補 {} / 実際に置いた {} (幅 {})", candidates, placed, prop.ballastWidth);
         this.rails.clear();
     }
 

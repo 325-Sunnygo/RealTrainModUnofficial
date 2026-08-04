@@ -101,10 +101,22 @@ public class PartsRenderer {
             // ClassCastException で描画スクリプトが丸ごと落ちていても気付けなかった。
             Throwable cause = t.getCause() != null ? t.getCause() : t;
             String key = pass + "|" + cause;
+            // ★「render が無い」は異常ではない。
+            //   架線スクリプト (renderClass = WirePartsRenderer) は renderWireStatic /
+            //   renderWireDynamic しか持たず、柱そのものは素のモデルで描くのが正しい。
+            //   これを警告で出していたので、本当の失敗と見分けが付かなかった。
+            boolean noRenderFunction = cause instanceof NoSuchMethodException
+                    && String.valueOf(cause.getMessage()).contains("render");
             if (this.loggedScriptFailures.size() < 32 && this.loggedScriptFailures.add(key)) {
-                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
-                    "[RTMU] 描画スクリプトが落ちました (素モデル描画へフォールバック) pass={} script={}: {}",
-                    pass, this.scriptName == null ? "?" : this.scriptName, String.valueOf(cause));
+                if (noRenderFunction) {
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.debug(
+                        "[RTMU] render 関数を持たないスクリプト (素モデルで描画) script={}",
+                        this.scriptName == null ? "?" : this.scriptName);
+                } else {
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                        "[RTMU] 描画スクリプトが落ちました (素モデル描画へフォールバック) pass={} script={}: {}",
+                        pass, this.scriptName == null ? "?" : this.scriptName, String.valueOf(cause));
+                }
             }
         }
     }
@@ -139,7 +151,20 @@ public class PartsRenderer {
             this.modelObj = mo;
         }
         if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "init", modelSet, this.modelObj);
+            try {
+                ScriptUtil.doScriptFunction(this.script, "init", modelSet, this.modelObj);
+            } catch (Throwable t) {
+                Throwable cause = t.getCause() != null ? t.getCause() : t;
+                // init を持たないスクリプトは正常
+                if (!(cause instanceof NoSuchMethodException)) {
+                    // ★握りつぶさない。init が落ちるとパーツ登録も定数の代入も行われず、
+                    //   スクリプトは「例外なしで何も描かない」状態になる
+                    //   (架線が既定のケーブルに落ちる症状の原因がここだと追えなかった)。
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                        "[RTMU] スクリプトの init が落ちました script={}: {}",
+                        this.scriptName == null ? "?" : this.scriptName, String.valueOf(cause));
+                }
+            }
         }
         this.partsList.forEach(parts -> parts.init(this));
     }

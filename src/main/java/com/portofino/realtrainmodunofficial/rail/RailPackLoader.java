@@ -282,14 +282,13 @@ public class RailPackLoader {
                     ballast = readIntSafe(ballastEl, ballast);
                 }
             }
-            if (ballast <= 0 && ballastBlockId.isEmpty()) {
-                String idLower = id == null ? "" : id.toLowerCase(java.util.Locale.ROOT);
-                String fileLower = modelFile.toLowerCase(java.util.Locale.ROOT);
-                if (idLower.contains("1067mm") || idLower.contains("1435mm") || idLower.contains("1524mm")
-                    || fileLower.contains("1067mm") || fileLower.contains("1435mm") || fileLower.contains("1524mm")
-                    || idLower.contains("762mm") || fileLower.contains("762mm")) {
-                    ballast = 3;
-                }
+            //本家 RailConfig.init: ballastWidth は常に 1 以上の奇数 (未指定なら 3)。
+            //  ★幅と「道床を敷くか」は別物。敷くかどうかは defaultBallast の有無で決まる
+            //   (書いていなければ空気 = 何も置かない)。
+            if (ballast <= 0) {
+                ballast = 3;
+            } else if ((ballast & 1) == 0) {
+                ++ballast;
             }
             LOADED.add(new RailDefinition(id, displayName, packName, packName, modelFile, scriptPath,
                 buttonTexture, tex, offset, scale, ballast, ballastBlockId, ballastSets));

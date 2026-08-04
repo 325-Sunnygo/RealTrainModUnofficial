@@ -218,6 +218,14 @@ public class WorldCompat {
      */
     public int func_72805_g(double x, double y, double z) {
         BlockPos pos = new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z));
+        // RTM 設置物のメタは取付面 (1.7.10 の実メタと同じ)。
+        // NGTO Builder の BlockBuilder が「既に同じブロック+メタか」のスキップ判定に使う。
+        // 0 固定だと既設碍子が毎回「別物」に見えて NBT を再適用され、接続が消える。
+        if (this.level.getBlockEntity(pos)
+                instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be
+                && be.getMountFace() >= 0) {
+            return be.getMountFace();
+        }
         return jp.ngt.mccompat.init.Blocks.colorMeta(this.level.getBlockState(pos).getBlock());
     }
 

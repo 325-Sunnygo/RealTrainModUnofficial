@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "rtmuautodrive:block/train_dispatcher"
+    }
+  }
+}

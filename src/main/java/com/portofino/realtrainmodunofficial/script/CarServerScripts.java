@@ -59,6 +59,10 @@ public final class CarServerScripts {
             // 差し込んだ差し替えが呼ぶブリッジ。この経路では束縛されていなかったため、
             // 差し替えても __SRB__ が未定義で必ず失敗していた。
             engine.put("__SRB__", new SrbRailBridge());
+            //どのツールのサーバー側が動いているかログで追えるようにする
+            //(クライアントの "vehicle script init" と対になる)
+            RealTrainModUnofficial.LOGGER.info("[RTMU] サーバースクリプト読み込み: {} ({})",
+                def.getId(), path);
             return new Entry(engine);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init server script for {}", def.getId(), t);

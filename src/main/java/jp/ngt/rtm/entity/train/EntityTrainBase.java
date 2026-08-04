@@ -541,7 +541,8 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 try {
                     this.formation.onRemovedTrain(this);
                 } catch (IndexOutOfBoundsException e) {
-                    e.printStackTrace();
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                        "[RTMU] 編成からの車両除去に失敗", e);
                 }
             }
         }
@@ -1263,6 +1264,37 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return InteractionResult.SUCCESS;
     }
 
+    /**
+     * 運転台へ乗せる (本家の運転士アイテムと同じ処理)。
+     * 自動運転アドオン (RTMU-AutoDrive) が運転士を自動で乗務させるために使う。
+     *
+     * @param direction 進行方向 (getTrainDirection と同じ 0/1)
+     */
+    public void boardDriverSeat(Entity entity, int direction) {
+        this.mountEntityToTrain(entity, direction);
+    }
+
+    /**
+     * この編成が<b>終点に着いている</b>か。自動運転アドオンが立てる。
+     *
+     * <p>立っている間、乗客 NPC は<b>降りるだけで乗ってこない</b>
+     * (終点で乗せると、消える列車に乗せることになる)。
+     */
+    private boolean terminating;
+
+    public boolean isTerminating() {
+        return this.terminating;
+    }
+
+    public void setTerminating(boolean value) {
+        this.terminating = value;
+    }
+
+    /** 運転台が空いているか (本家 interactTrain の driverSeatFree と同じ判定)。 */
+    public boolean isDriverSeatFree() {
+        return this.getPassengers().stream().allMatch(this::hasSeat);
+    }
+
     private void mountEntityToTrain(Entity entity, int direction) {
         if (this.isControlCar()) {
             this.setTrainDirection(direction);
@@ -1615,12 +1647,21 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
         if (DATA_ROLL.equals(key) && this.level().isClientSide) {
             this.vehicleRoll = this.entityData.get(DATA_ROLL);
+            this.motionBuffer.setLatestRotation(this.vehicleYaw, this.vehiclePitch, this.vehicleRoll);
         }
         if (DATA_YAW.equals(key) && this.level().isClientSide) {
-            this.vehicleYaw = this.entityData.get(DATA_YAW);
+            float yaw = this.entityData.get(DATA_YAW);
+            this.vehicleYaw = yaw;
+            this.motionBuffer.setLatestRotation(this.vehicleYaw, this.vehiclePitch, this.vehicleRoll);
+            // ★実姿勢が届いた時点で即座に向ける。tick を待つと 1 フレームだけ
+            //   スポーンパケットの粗い yaw (だいたい 0 = 横向き) で描かれてしまう。
+            if (!this.isClientRotInit()) {
+                this.snapClientRotation(yaw, this.entityData.get(DATA_PITCH));
+            }
         }
         if (DATA_PITCH.equals(key) && this.level().isClientSide) {
             this.vehiclePitch = this.entityData.get(DATA_PITCH);
+            this.motionBuffer.setLatestRotation(this.vehicleYaw, this.vehiclePitch, this.vehicleRoll);
         }
         if (DATA_MODEL_NAME.equals(key)) {
             this.configCache = null;

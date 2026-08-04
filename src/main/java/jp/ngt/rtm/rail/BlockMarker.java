@@ -576,14 +576,27 @@ public class BlockMarker extends BaseEntityBlock {
      *
      * @param ballastId アイテムに焼き込まれた道床ブロック ID。null ならレール定義の既定
      */
-    private static RailProperty propertyFor(String railModel, @javax.annotation.Nullable String ballastId) {
+    public static RailProperty propertyFor(String railModel, @javax.annotation.Nullable String ballastId) {
         com.portofino.realtrainmodunofficial.rail.RailDefinition def =
                 (railModel == null || railModel.isEmpty()) ? null
                         : com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(railModel);
 
-        String blockId = (ballastId == null || ballastId.isBlank())
-                ? (def == null ? "" : def.getBallastBlockId())
-                : ballastId;
+        // 道床の決め方 (本家 ItemRail 準拠 + パック実態への対応):
+        //  ・そのレールの defaultBallast に<b>書いてある物からしか選べない</b>
+        //  ・defaultBallast を書いていないレール (Advanced Rails 等) は<b>道床なし</b>
+        //    ★ここでアイテムに焼かれた道床をそのまま使うと、砂利のレールアイテムから
+        //     モデルだけ切り替えたときに、道床を持たないレールへ砂利が付いてくる。
+        java.util.List<com.portofino.realtrainmodunofficial.rail.RailDefinition.Ballast> sets =
+                def == null ? java.util.List.of() : def.getBallastSets();
+        String blockId;
+        if (sets.isEmpty()) {
+            blockId = "";
+        } else if (ballastId != null && !ballastId.isBlank()
+                && sets.stream().anyMatch(set -> ballastId.equals(set.blockId()))) {
+            blockId = ballastId;                //そのレールが持っている道床を選んでいる
+        } else {
+            blockId = sets.get(0).blockId();    //別のレールの道床は引き継がない
+        }
 
         //その道床に対応する厚み/メタ (本家 RailConfig.defaultBallast の 1 行)
         int meta = 0;

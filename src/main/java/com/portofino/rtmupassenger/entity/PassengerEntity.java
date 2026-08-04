@@ -91,6 +91,16 @@ public class PassengerEntity extends PathfinderMob {
         this.setPersistenceRequired();
     }
 
+    /**
+     * どんな一撃でも死ぬ。運転士 ({@code EntityMotorman}) と同じ扱いで、
+     * <b>素手 1 ダメージでも 1 発</b>で片付けられるようにするため
+     * (大量に湧く NPC を殴り続けるのは現実的でない)。
+     */
+    @Override
+    public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
+        return super.hurt(source, 10000.0F);
+    }
+
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 20.0D)
@@ -241,6 +251,7 @@ public class PassengerEntity extends PathfinderMob {
         if (this.lastRiddenTrain != null) {
             if (this.lastRiddenTrain.isRemoved() && this.state == State.RIDING) {
                 // 降車を経ずに列車が消えた = 破壊。乗客も消滅 (要件)。
+                // 終点で消える列車も同じ: 10 秒の間に降り切れず乗ったままだった客は消す (ユーザー指定)。
                 this.discard();
                 return;
             }
@@ -272,11 +283,17 @@ public class PassengerEntity extends PathfinderMob {
      * 駅ブロックのチャンク状態に依存しないので、チャンク外の駅でも確実に降りられる。
      */
     private void tickRiding(EntityTrainBase train) {
+        boolean stopped = Math.abs(train.getSpeed()) < 0.05F;
+        boolean doorOpen = train.getTrainStateData(4) != 0; //State_Door (0=閉)
+        // ★終点では目的駅かどうかに関係なく全員降ろす。
+        //   終点の列車はこのあと消えるので、乗せたままだと客ごと消えてしまう。
+        if (train.isTerminating() && stopped && doorOpen) {
+            this.beginAlightingWalk(train);
+            return;
+        }
         if (this.destinationPos == null) {
             return;
         }
-        boolean stopped = Math.abs(train.getSpeed()) < 0.05F;
-        boolean doorOpen = train.getTrainStateData(4) != 0; //State_Door (0=閉)
         if (this.alightAtTick == 0) {
             boolean atDest = distToTrainBodySq(train,
                     this.destinationPos.getX() + 0.5D, this.destinationPos.getZ() + 0.5D) <= ALIGHT_DIST_SQ;

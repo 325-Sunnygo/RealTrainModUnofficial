@@ -60,5 +60,8 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(MotormanSkinPayload.TYPE, MotormanSkinPayload.STREAM_CODEC, MotormanSkinPayload::handleOnServer);
         // 本家系列車 (EntityVehicleBase) の DataMap 同期 (ATSA HUD 等が使用)
         registrar.playToClient(DataMapSyncPayload.TYPE, DataMapSyncPayload.STREAM_CODEC, DataMapSyncPayload::handleOnClient);
+        // 背景パネルの設定 (画像・大きさ・高さ)
+        registrar.playToServer(BackgroundPanelPayload.TYPE, BackgroundPanelPayload.STREAM_CODEC,
+            BackgroundPanelPayload::handleOnServer);
     }
 }

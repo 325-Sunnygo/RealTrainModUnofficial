@@ -149,8 +149,13 @@ public class ItemRail extends Item {
                         com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
                 model = def != null ? def.getId() : "";
             }
-            RailProperty prop = new RailProperty(model == null ? "" : model,
-                    net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
+            //★ここで砂利を決め打ちしてはいけない。
+            //  defaultBallast を持たないレール (Advanced Rails 等) にまで砂利が敷かれる。
+            //  道床はレール定義に書いてある物からだけ選ぶ (BlockMarker.propertyFor と同じ規則)。
+            String ballastId = stack.get(
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents.SELECTED_BALLAST.get());
+            RailProperty prop = jp.ngt.rtm.rail.BlockMarker.propertyFor(
+                    model == null ? "" : model, ballastId);
             jp.ngt.rtm.rail.BlockMarker.setLastUsedProperty(prop);
             return prop;
         }

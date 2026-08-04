@@ -91,6 +91,11 @@ public final class RealTrainModUnofficialClientModEvents {
             RealTrainModUnofficialBlockEntities.INSTALLED_OBJECT.get(),
             InstalledObjectBlockEntityRenderer::new
         );
+        // 背景パネル (模型の背景に写真を立てる)
+        event.registerBlockEntityRenderer(
+            RealTrainModUnofficialBlockEntities.BACKGROUND_PANEL.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.BackgroundPanelBlockEntityRenderer::new
+        );
         // jp.ngt.rtm.entity: 本家忠実移植の列車/台車 (Phase 2 フリップ)
         event.registerEntityRenderer(
             jp.ngt.rtm.entity.RTMEntities.TRAIN.get(),

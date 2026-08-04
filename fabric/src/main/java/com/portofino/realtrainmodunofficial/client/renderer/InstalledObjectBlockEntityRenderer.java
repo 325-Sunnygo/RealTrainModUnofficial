@@ -129,7 +129,12 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         poseStack.translate(0.0D, -0.5D, 0.0D);
                         // 本家 getRotation = round(180 - playerYaw)。RTMU の yaw は playerYaw なので
                         // YP(180 - yaw) が本家 rotate(getRotation) と一致する。meta==0 は本家同様に反転。
-                        float lightYaw = 180.0F - blockEntity.getYaw();
+                        // 本家 RenderMachine: 保存してある rotationYaw をそのまま回す。
+                        // ★ここで 180 - yaw としてはいけない。設置時の honkeRotation が
+                        // 既に本家の式 (-playerYaw + 180 の量子化) で保存しているので、
+                        // 二重に補正することになり、しかも 180-yaw は回転ではなく鏡映なので
+                        // 向きによって反対を向く。
+                        float lightYaw = blockEntity.getYaw();
                         if (mountFace == 0) {
                             lightYaw = -lightYaw;
                         }
@@ -151,7 +156,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         Vec3 renderOffset = blockEntity.getRenderOffset();
                         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
                         applyAdjustments(poseStack, blockEntity);
-                        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
+                        // 保存値がそのまま本家の rotationYaw (上の照明分岐と同じ理由)
+                        poseStack.mulPose(Axis.YP.rotationDegrees(blockEntity.getYaw()));
                         // 壁挿し碍子は横倒し(mountPitch)にする。0なら通常の縦置き。
                         // 列車検知器ではレールの勾配(mountPitch)とカント(mountRoll)になる。
                         if (blockEntity.getMountPitch() != 0.0F) {
@@ -921,7 +927,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         // ---- 板 ----
         poseStack.pushPose();
         poseStack.translate(0.0F, plateY, 0.0F);
-        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
+        poseStack.mulPose(Axis.YP.rotationDegrees(blockEntity.getYaw()));
         PoseStack.Pose pose = poseStack.last();
         // ★ VertexConsumer は「使う直前に」取る。MultiBufferSource は別の RenderType を
         // 要求された時点で前のバッファを閉じるので、先に取っておくと後で書き込んだ瞬間に

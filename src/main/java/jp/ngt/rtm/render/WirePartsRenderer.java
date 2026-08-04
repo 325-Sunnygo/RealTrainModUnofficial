@@ -35,14 +35,56 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
     }
 
     public void renderWireStatic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
+        callWireScript("renderWireStatic", tile, connection, vec, partialTicks, pass);
+    }
+
+    /**
+     * 本家 renderWireDynamic。
+     * スクリプトを持たないモデルは、ここで直接敷き詰めるのが本家
+     * (レンダラ側に別経路を持たせない)。pass0 でのみ描くのは発光防止。
+     */
+    public void renderWireDynamic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
         if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "renderWireStatic", tile, connection, vec, partialTicks, pass);
+            callWireScript("renderWireDynamic", tile, connection, vec, partialTicks, pass);
+        } else if (pass == RenderPass.NORMAL.id) {
+            if (this.deflectionCoefficient > 0.0F) {
+                this.renderWireDeflection(tile, connection, vec, partialTicks, pass, null);
+            } else {
+                this.renderWireStraight(tile, connection, vec, partialTicks, pass, null);
+            }
         }
     }
 
-    public void renderWireDynamic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
-        if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "renderWireDynamic", tile, connection, vec, partialTicks, pass);
+    /** 既にログした失敗 (関数名, 例外) の組。 */
+    private final java.util.Set<String> loggedFailures = new java.util.HashSet<>();
+
+    /**
+     * 架線スクリプトを呼ぶ。
+     *
+     * <p>★例外を握りつぶさない。以前は {@code doScriptIgnoreError} で捨てていたので、
+     * スクリプトが未対応 API で落ちても「何も描かない」だけになり、
+     * RTMU 内蔵の素ケーブルへフォールバックして<b>既定のワイヤーに見えていた</b>。
+     * 原因が一切ログに出ないので追えなかった。
+     */
+    private void callWireScript(String function, Object tile, Object connection, Object vec,
+                                float partialTicks, int pass) {
+        if (this.script == null) {
+            return;
+        }
+        try {
+            ScriptUtil.doScriptFunction(this.script, function, tile, connection, vec, partialTicks, pass);
+        } catch (Throwable t) {
+            Throwable cause = t.getCause() != null ? t.getCause() : t;
+            // 関数を持たないのは異常ではない (renderWireStatic が空のパックがある)
+            if (cause instanceof NoSuchMethodException) {
+                return;
+            }
+            String key = function + "|" + cause;
+            if (this.loggedFailures.size() < 16 && this.loggedFailures.add(key)) {
+                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                    "[架線] スクリプトが落ちました {} script={}: {}",
+                    function, this.scriptName == null ? "?" : this.scriptName, String.valueOf(cause));
+            }
         }
     }
 

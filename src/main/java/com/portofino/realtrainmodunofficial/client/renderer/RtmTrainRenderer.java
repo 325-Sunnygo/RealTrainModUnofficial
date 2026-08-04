@@ -114,11 +114,16 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             tSec = ClientRenderProfiler.sec();
             com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.Scripted scripted =
                     com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
-            boolean scriptRendered = scripted != null && scripted.render(entity, partialTicks, poseStack, buffer,
+            if (scripted != null) {
+                scripted.render(entity, partialTicks, poseStack, buffer,
                     bodyLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, model);
+            }
             ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_SCRIPTED, tSec);
 
-            if (!scriptRendered) {
+            // ★スクリプトを持つ車両は、それが何も描かなくても素モデルへ逃がさない。
+            //   本家 PartsRenderer.execScriptFunc は例外を投げ直すだけで代替描画を持たない。
+            //   スクリプトを持たない車両だけがこの経路 (本家の useScript=false 相当)。
+            if (scripted == null) {
                 MqoModelLoader.GroupPredicate filter =
                         groupName -> shouldRenderGroup(groupName);
 
@@ -142,7 +147,8 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                     @Override public boolean mayModify(String groupName) {
                         if (groupName == null || groupName.isEmpty()) return false;
                         if (leftChains.isEmpty() && rightChains.isEmpty()) {
-                            return groupName.length() >= 4 && TrainEntityRenderer.containsDoorWord(groupName);
+                            // ドア定義が無いなら動かす対象も無い (名前推定はしない)。
+                            return false;
                         }
                         return TrainEntityRenderer.hasPartsTransform(leftChains, groupName)
                                 || TrainEntityRenderer.hasPartsTransform(rightChains, groupName);

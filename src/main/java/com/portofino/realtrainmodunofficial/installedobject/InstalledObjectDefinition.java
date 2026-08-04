@@ -37,6 +37,8 @@ public class InstalledObjectDefinition {
     // ワイヤー用パラメータ(WireConfig 相当)。コンストラクタ後に setWireParams で設定。
     private float sectionLength = 0.5F;
     private float deflectionCoefficient = 0.0F;
+    /** 本家 WireConfig.lengthCoefficient。既定 0 = 長さによる補正なし。 */
+    private float lengthCoefficient = 0.0F;
     // 看板用パラメータ(本家 SignboardConfig 相当)。コンストラクタ後に setSignboardParams で設定。
     // animationCycle: frame を1コマ進めるのに要する tick 数。
     private int animationCycle = 1;
@@ -111,11 +113,25 @@ public class InstalledObjectDefinition {
         return deflectionCoefficient;
     }
 
+    /**
+     * 本家 WireConfig.lengthCoefficient。長いほどたるみを小さくする係数で、
+     * 本家は alpha = deflectionCoefficient * cos(pitch) / (1+lengthCoefficient)^水平長 に使う。
+     * 既定の架線 (ModelWire_BasicWireBlack.json) は 0.0625 を指定している。
+     */
+    public float getLengthCoefficient() {
+        return lengthCoefficient;
+    }
+
     public void setWireParams(float sectionLength, float deflectionCoefficient) {
+        setWireParams(sectionLength, deflectionCoefficient, this.lengthCoefficient);
+    }
+
+    public void setWireParams(float sectionLength, float deflectionCoefficient, float lengthCoefficient) {
         if (sectionLength > 0.0F) {
             this.sectionLength = sectionLength;
         }
         this.deflectionCoefficient = Math.max(0.0F, deflectionCoefficient);
+        this.lengthCoefficient = Math.max(0.0F, lengthCoefficient);
     }
 
     public Vec3 getWireAttachPos() {

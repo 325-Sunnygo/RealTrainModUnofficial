@@ -137,9 +137,29 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             if (blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
                 return EMPTY_SHAPE;
             }
-            return outlineShape(blockEntity.getCategory(), level, pos);
+            return shiftToModel(outlineShape(blockEntity.getCategory(), level, pos), blockEntity);
         }
         return RTM_SELECTION_SHAPE;
+    }
+
+    /**
+     * 信号の当たり判定をモデルと同じ場所へ動かす。
+     *
+     * <p>本家 {@code ItemSignal} は<b>クリックした柱ブロックそのものを信号に置き換える</b>ので、
+     * 当たり判定は必ず見えている信号と同じ位置にある。RTMU は 1 つ手前のブロックに置いて
+     * モデルだけ柱の中へ押し込んでいるため、そのままだと当たり判定だけが 1 ブロック
+     * ずれた場所に残る (柱に挿したときだけズレる = 置き方で当たり判定が変わる)。
+     * 描画オフセットぶん当たり判定も動かすことで、<b>どう置いても信号の当たり判定は常に同じ</b>になる。
+     */
+    private static VoxelShape shiftToModel(VoxelShape shape, InstalledObjectBlockEntity be) {
+        if (be.getCategory() != InstalledObjectCategory.SIGNAL) {
+            return shape;
+        }
+        net.minecraft.world.phys.Vec3 off = be.getRenderOffset();
+        if (off == null || (off.x == 0.0D && off.y == 0.0D && off.z == 0.0D)) {
+            return shape;
+        }
+        return shape.move(off.x, off.y, off.z);
     }
 
     /** 種類ごとの見た目どおりの形 (選択枠)。本家の setBlockBounds と同じ。 */
@@ -175,7 +195,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             if (category == InstalledObjectCategory.FLUORESCENT) {
                 return EMPTY_SHAPE;   //本家 BlockFluorescent: 当たり判定なし (壊せはする)
             }
-            return outlineShape(category, level, pos);
+            return shiftToModel(outlineShape(category, level, pos), blockEntity);
         }
         return RTM_SELECTION_SHAPE;
     }

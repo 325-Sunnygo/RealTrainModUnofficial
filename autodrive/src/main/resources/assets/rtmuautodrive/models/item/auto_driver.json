@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "rtmuautodrive:item/auto_driver"
+  }
+}

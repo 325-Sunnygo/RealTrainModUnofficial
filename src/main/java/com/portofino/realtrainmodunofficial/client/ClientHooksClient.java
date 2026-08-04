@@ -176,6 +176,30 @@ public final class ClientHooksClient {
         }
     }
 
+    /**
+     * 背景パネルの設定画面。今の設定を持って開く
+     * (開いた瞬間に現在値が入っていないと、保存で既定値に戻ってしまう)。
+     */
+    public static void openBackgroundPanelScreen(BlockPos pos) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) {
+            return;
+        }
+        byte[] image = new byte[0];
+        String name = "";
+        float scale = com.portofino.realtrainmodunofficial.blockentity.BackgroundPanelBlockEntity.DEFAULT_SCALE;
+        float offsetY = 0.0F;
+        if (mc.level.getBlockEntity(pos)
+                instanceof com.portofino.realtrainmodunofficial.blockentity.BackgroundPanelBlockEntity be) {
+            image = be.getImage();
+            name = be.getImageName();
+            scale = be.getScale();
+            offsetY = be.getOffsetY();
+        }
+        mc.setScreen(new com.portofino.realtrainmodunofficial.client.screen.BackgroundPanelScreen(
+            pos, image, name, scale, offsetY));
+    }
+
     public static void openScriptBlockScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(new ScriptBlockScreen(pos));
     }
@@ -207,6 +231,15 @@ public final class ClientHooksClient {
      * </ol>
      * 片方だけだと、焼き直しても中身が古いまま / 中身は新しいのに焼かれないまま になる。
      */
+    /** レール 1 本ぶんの焼き込みメッシュを捨てる (線形が変わった時)。 */
+    public static void invalidateRailMesh(Level level, int x, int y, int z) {
+        if (level == null || !level.isClientSide()) {
+            return;
+        }
+        com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.invalidate(
+            new net.minecraft.core.BlockPos(x, y, z));
+    }
+
     public static void refreshRailBallast(Level level, int x0, int y0, int z0, int x1, int y1, int z1) {
         if (level == null || !level.isClientSide()) {
             return;

@@ -438,9 +438,12 @@ public final class InstalledObjectPackLoader {
             );
             if (category == InstalledObjectCategory.WIRE) {
                 // ワイヤーは sectionLength(モデル1個分の長さ)と deflectionCoefficient(たるみ)を持つ。
+                // lengthCoefficient は本家 WireConfig の「長いほどたるみを小さくする」係数
+                // (ModelWire_BasicWireBlack.json が 0.0625 を指定)。
                 float sectionLength = parseFloat(obj, "sectionLength", 0.5F);
                 float deflection = parseFloat(obj, "deflectionCoefficient", 0.0F);
-                def.setWireParams(sectionLength, deflection);
+                float lengthCoef = parseFloat(obj, "lengthCoefficient", 0.0F);
+                def.setWireParams(sectionLength, deflection, lengthCoef);
             }
             // 本家 KaizPatchX の customIconTexture。持ち物欄でのアイテムの絵を差し替える。
             // 架線柱のように「1 つのアイテムで中身を選ぶ」物を見分けるための機能で、
@@ -456,10 +459,6 @@ public final class InstalledObjectPackLoader {
             boolean rotByMeta = getBoolean(obj, "rotateByMetadata", false)
                 || (model != null && getBoolean(model, "rotateByMetadata", false));
             def.setRotateByMetadata(rotByMeta);
-            if (rotByMeta) {
-                // 効いているかを起動時に確認できるようにする (該当は数件だけ)
-                RealTrainModUnofficial.LOGGER.info("[設置物] rotateByMetadata=true: {}", def.getId());
-            }
             // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate が回るスクリプト
             // (列車検知器は全ての処理をここに書く)。
             def.setServerScriptPath(getString(obj, "serverScriptPath"));

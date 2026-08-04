@@ -45,6 +45,18 @@ public final class RtmuSettings {
      * <p><b>読み込みは止めない。</b> 既に設置されている物や、パックがこれらを参照している場合に
      * 壊れてしまうため、隠すのは<b>選択画面の一覧だけ</b>にする。
      */
+    /**
+     * 列車の滑らかさ (遅延バッファ・ミリ秒)。
+     * 届いた位置を「今 − これ」で再生する。大きいほど通信のゆらぎに強く滑らかだが、
+     * その分だけ表示が遅れる。0 で無効 (従来の漸近方式)。既定 100ms = 2 tick。
+     * ★従来方式は実質 3 tick 遅れているので、100ms なら遅れはむしろ減る。
+     */
+    public static int trainSmoothingMs = 100;
+
+    public static int clampTrainSmoothingMs(int v) {
+        return Math.max(0, Math.min(300, v));
+    }
+
     public static boolean hideBundledModels = false;
 
     /** その pack 名が MOD 同梱の物か (選択画面で隠す判定)。 */
@@ -148,6 +160,8 @@ public final class RtmuSettings {
             vehicleRenderDistance = clampVehicleRenderDistance(parseInt(p.getProperty("vehicleRenderDistance", "0"), 0));
             maxPassengers = clampMaxPassengers(parseInt(p.getProperty("maxPassengers", "30"), 30));
             hideBundledModels = Boolean.parseBoolean(p.getProperty("hideBundledModels", "false"));
+            trainSmoothingMs = clampTrainSmoothingMs(parseInt(p.getProperty("trainSmoothingMs", "100"), 100));
+            jp.ngt.rtm.entity.ClientMotionBuffer.setDelayMillis(trainSmoothingMs);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("RTMU: failed to load settings", e);
         }
@@ -163,6 +177,8 @@ public final class RtmuSettings {
             p.setProperty("vehicleRenderDistance", Integer.toString(vehicleRenderDistance));
             p.setProperty("maxPassengers", Integer.toString(maxPassengers));
             p.setProperty("hideBundledModels", Boolean.toString(hideBundledModels));
+            p.setProperty("trainSmoothingMs", Integer.toString(trainSmoothingMs));
+            jp.ngt.rtm.entity.ClientMotionBuffer.setDelayMillis(trainSmoothingMs);
             try (OutputStream out = Files.newOutputStream(FILE)) {
                 p.store(out, "RTMU client settings");
             }

@@ -15,6 +15,11 @@ public final class ClientHooks {
     private ClientHooks() {
     }
 
+    /** 背景パネルの設定画面。 */
+    public static void openBackgroundPanelScreen(BlockPos pos) {
+        invokeClient("openBackgroundPanelScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
     /** エディタ画面 (neo mcte)。 */
     public static void openEditorScreen() {
         invokeClient("openEditorScreen", new Class<?>[]{});
@@ -165,6 +170,12 @@ public final class ClientHooks {
      * <p>道床はレールベースのブロックがチャンクメッシュへ焼くが、形はレールコアの線形から
      * 引くので、コアが後から届くとベース側は「コア無し」で焼かれたままになる。
      */
+    public static void invalidateRailMesh(Level level, int x, int y, int z) {
+        invokeClient("invalidateRailMesh",
+            new Class<?>[]{Level.class, int.class, int.class, int.class},
+            level, x, y, z);
+    }
+
     public static void refreshRailBallast(Level level, int x0, int y0, int z0, int x1, int y1, int z1) {
         invokeClient("refreshRailBallast",
             new Class<?>[]{Level.class, int.class, int.class, int.class, int.class, int.class, int.class},

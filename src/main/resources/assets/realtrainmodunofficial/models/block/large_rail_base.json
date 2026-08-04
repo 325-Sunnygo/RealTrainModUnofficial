@@ -1,8 +1,6 @@
 {
- "parent": "minecraft:block/block",
- "textures": {"all": "minecraft:block/gravel", "particle": "minecraft:block/gravel"},
- "elements": [{
-  "from": [0,0,0], "to": [16,1,16],
-  "faces": {"down":{"texture":"#all"},"up":{"texture":"#all"},"north":{"texture":"#all"},"south":{"texture":"#all"},"west":{"texture":"#all"},"east":{"texture":"#all"}}
- }]
+  "_comment": "道床は BallastModel/BallastFabricModel が線形に沿って動的に描く。ここに面を置くと、動的描画が効かない環境で全レールに砂利の板が敷かれる (レール種類を問わず)。",
+  "parent": "minecraft:block/block",
+  "textures": {"particle": "minecraft:block/gravel"},
+  "elements": []
 }

@@ -81,6 +81,8 @@ public final class MachineScriptRenderers {
                 return INVALID;
             }
             renderer.setScript(se);
+            //どのパックのスクリプトが落ちたか追えるように名前を持たせる
+            renderer.scriptName = def.getId() + " (" + def.getScriptPath() + ")";
             se.put("renderer", renderer);
 
             // ModelObject: テクスチャ + モデルグラフ

@@ -192,6 +192,37 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
     }
 
     /**
+     * 信号の向き。<b>本家 ItemSignal はプレイヤーの向きではなくクリックした面で決める。</b>
+     *
+     * <pre>int dir = par7 == 2 ? 2 : (par7 == 4 ? 3 : (par7 == 3 ? 0 : 1));  // 1.7.10 の面番号
+     * // 描画は RenderSignal が getBlockDirection() = dir * 90 度で回す</pre>
+     *
+     * つまり北面をクリック→180 度・南面→0 度・西面→270 度・東面→90 度。
+     * RTM の yaw は MC の {@code Direction.toYRot()} と X 軸が逆なので、
+     * {@code toYRot()} をそのまま使うと東西が入れ替わる。
+     *
+     * <p>本家は上面/下面クリックでは信号を置かせない (即 return)。RTMU は置けるままにしてあるので、
+     * その場合だけプレイヤーの向きを 90 度刻みにして代用する。
+     *
+     * <p>★以前はプレイヤーの生の yaw をそのまま入れていた。本家の量子化 (-yaw + 180) を
+     * 通していないので、正面から置くと 180 度反対を向いていた。
+     */
+    private static float signalYaw(net.minecraft.core.Direction clickedFace,
+                                   net.minecraft.world.entity.player.Player player) {
+        return switch (clickedFace) {
+            case NORTH -> 180.0F;
+            case SOUTH -> 0.0F;
+            case WEST -> 270.0F;
+            case EAST -> 90.0F;
+            // 上下面: 本家に対応が無いので、本家の量子化式を 90 度刻みで使う
+            default -> {
+                double a = jp.ngt.ngtlib.math.NGTMath.normalizeAngle(-player.getYRot() + 180.0D + 45.0D);
+                yield (float) (net.minecraft.util.Mth.floor(a / 90.0D) * 90);
+            }
+        };
+    }
+
+    /**
      * 本家 ItemInstalledObject の看板向き:
      * floor(normalizeAngle(yaw + 180) / 90 + 0.5) & 3
      */
@@ -293,7 +324,16 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         } else if (fluorescent || gridAligned) {
             placeYaw = 0.0F;
         } else if (!honkeFaceMount && !railMounted
-                && category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL) {
+                && category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL
+                // ★照明とスピーカーは壁貼り付けの対象外。
+                // 本家 ItemInstalledObject は LIGHT/SPEAKER に対して
+                //   setBlock(..., クリック面, 3) + setRotation(player, 15)
+                // しかせず、向きは常にプレイヤーの向きで決まる。
+                // RTMU 独自の壁貼り付けは placeYaw を「クリック面の反対向き」で上書きし、
+                // さらに wallMounted が立つことで下の「プレイヤーの向きを入れる」処理まで
+                // 飛ばしていたため、横面に置くと置いた方向を向かなくなっていた。
+                && category != InstalledObjectCategory.LIGHT
+                && category != InstalledObjectCategory.SPEAKER) {
             if (clickedFace == net.minecraft.core.Direction.DOWN) {
                 upsideDown = true;
                 placeMountPitch = 180.0F;
@@ -309,6 +349,9 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
                 && category != InstalledObjectCategory.SIGNAL
                 && category != InstalledObjectCategory.WIRE) {
             placeYaw = honkeRotation(player);
+        }
+        if (category == InstalledObjectCategory.SIGNAL) {
+            placeYaw = signalYaw(clickedFace, player);
         }
         if (!level.isClientSide) {
             level.setBlock(placePos, RealTrainModUnofficialBlocks.INSTALLED_OBJECT.get().defaultBlockState(), 3);

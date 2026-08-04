@@ -83,6 +83,11 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<MiniatureItem> MINIATURE_ITEM = ITEMS.register(
         "miniature", MiniatureItem::new
     );
+    /** 背景パネル。設定 (画像・大きさ) はブロックエンティティが持つ。 */
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> BACKGROUND_PANEL_ITEM = ITEMS.register(
+        "background_panel", () -> new net.minecraft.world.item.BlockItem(
+            RealTrainModUnofficialBlocks.BACKGROUND_PANEL.get(), new net.minecraft.world.item.Item.Properties())
+    );
     public static final DeferredItem<CrowbarItem> CROWBAR_ITEM = ITEMS.register(
         "crowbar", CrowbarItem::new
     );

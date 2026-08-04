@@ -329,5 +329,8 @@
   "tooltip.realtrainmodunofficial.formation_crowbar": "Removes the whole coupled formation you hit",
   "message.realtrainmodunofficial.formation_crowbar.removed": "Removed %s cars",
   "itemGroup.realtrainmodunofficial.rtmu": "RTMU",
-  "message.realtrainmodunofficial.train.no_model_selected": "Select a model first (right-click to open the list)"
+  "itemGroup.realtrainmodunofficial.signal_controller": "Signal Controller",
+  "message.realtrainmodunofficial.train.no_model_selected": "Select a model first (right-click to open the list)",
+  "item.realtrainmodunofficial.background_panel": "Background Panel",
+  "block.realtrainmodunofficial.background_panel": "Background Panel"
 }

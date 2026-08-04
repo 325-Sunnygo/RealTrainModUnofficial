@@ -104,6 +104,14 @@ public final class StationRegistry extends SavedData {
         return this.stations.size();
     }
 
+    /**
+     * 登録されている駅ブロックの座標一覧 (読み取り専用)。
+     * 自動運転アドオン (RTMU-AutoDrive) が「進行方向の先にある駅」を探すのに使う。
+     */
+    public java.util.Set<BlockPos> positions() {
+        return java.util.Collections.unmodifiableSet(this.stations.keySet());
+    }
+
     private Station station(BlockPos pos) {
         Station s = this.stations.get(pos);
         return s == null ? new Station(0, DEFAULT_CAPACITY) : s;

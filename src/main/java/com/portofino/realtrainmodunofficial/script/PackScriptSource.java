@@ -350,11 +350,56 @@ public final class PackScriptSource {
             source = TypeScriptTranspiler.toJavaScript(source);
         }
         String out = resolveIncludes(source, new HashSet<>());
+        out = widenLegacyWorldHeight(out);
         out = remapLegacyClasses(out);
         out = SELF_ASSIGN_DECL.matcher(out).replaceAll("");
         out = remapVanillaOnlyMethods(out);
+        out = remapNbtCalls(out);
         return remapFieldAccess(out);
     }
+
+    /**
+     * NBT の SRG メソッドを、レシーバを引数に取る静的版へ回す。
+     *
+     * <p>スクリプトが受け取る NBT はシムとは限らない。
+     * {@code jp.ngt.ngtlib.block.BlockSet.nbt} は Java 側の都合で実バニラの CompoundTag で、
+     * 実バニラ型には 1.7.10 の SRG 名を生やせない。
+     * NGTO Builder2 はこれに対して {@code nbt.func_74737_b()} (copy) を呼ぶので
+     * 「is not a function」で落ち、しかもパックが例外を捨てるため無音で失敗していた。
+     *
+     * <p>レシーバがシムの場合も {@code NBTCompat} が素通しするので、既存の動作は変わらない。
+     */
+    private static String remapNbtCalls(String src) {
+        Matcher m = NBT_CALL.matcher(src);
+        StringBuilder out = new StringBuilder(src.length() + 64);
+        while (m.find()) {
+            String receiver = m.group(1);
+            String method = m.group(2);
+            String args = m.group(3).trim();
+            String replacement;
+            if (receiver.endsWith("NBTCompat")) {
+                replacement = m.group();
+            } else {
+                replacement = "Packages.jp.ngt.mccompat.nbt.NBTCompat." + method
+                    + "(" + receiver + (args.isEmpty() ? "" : ", " + args) + ")";
+            }
+            m.appendReplacement(out, Matcher.quoteReplacement(replacement));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    /**
+     * {@code <式>.func_XXXX(引数)} の NBT 版。引数の入れ子は 1 段まで見る
+     * ({@code a.func_74776_a("k", f(x))} が拾えるように)。
+     */
+    private static final Pattern NBT_CALL = Pattern.compile(
+        "([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\."
+        + "(func_74737_b|func_74760_g|func_74776_a|func_74764_b|func_74775_l|func_74782_a"
+        + "|func_74778_a|func_74779_i|func_74768_a|func_74762_e|func_74757_a|func_74767_n"
+        + "|func_74780_a|func_74769_h|func_150295_c)"
+        + "\\(((?:[^()]|\\([^()]*\\))*)\\)");
+
 
     /**
      * レシーバがバニラのインスタンスで、シムで包むことも継承することもできない
@@ -495,5 +540,23 @@ public final class PackScriptSource {
             return new String(bytes, java.nio.charset.Charset.forName("Shift_JIS"));
         }
         return utf8;
+    }
+
+    /**
+     * 1.7.10 時代のパックが持つ「Y は 0〜255」という前提を 1.21 の範囲へ広げる。
+     *
+     * <p>1.21 のワールドは Y=-64 から始まるので、地下 (Y<0) に建てると
+     * {@code if (y < 0 || y >= 256) return;} のような番兵に引っかかって
+     * <b>何も置かれずに黙って終わる</b>。
+     * 実測: NGTO Builder2 で Y=-47 に架線を張ると
+     * "Skip TileEntity NBT: invalid y=-47" だけが出てビームが出なかった。
+     *
+     * <p>置き換えるのは<b>この形の範囲チェックだけ</b>。他の比較には触らない。
+     */
+    private static String widenLegacyWorldHeight(String src) {
+        return src
+            .replace("y < 0 || y >= 256", "y < -64 || y >= 320")
+            .replace("y < 0 || y > 255", "y < -64 || y > 319")
+            .replace("posY < 0 || posY >= 256", "posY < -64 || posY >= 320");
     }
 }

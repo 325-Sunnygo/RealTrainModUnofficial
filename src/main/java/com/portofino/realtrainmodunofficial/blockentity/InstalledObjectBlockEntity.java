@@ -33,6 +33,13 @@ public class InstalledObjectBlockEntity extends BlockEntity
     private static final int TICKET_GATE_OPEN_TICKS = 60;
     private static final int TICKET_GATE_MOVE_TICKS = 12;
     private String definitionId = "";
+    /**
+     * 張ってある架線のモデル。<b>碍子の定義とは別に持つ</b>
+     * (本家は Connection がモデルを持ち、碍子の定義は触らない)。
+     * ★以前は definitionId をワイヤーのモデルで上書きしていたので、
+     *   「碍子として描くモデル」と「架線として描くモデル」が同じ物になり重なっていた。
+     */
+    private String wireModel = "";
     private String category = InstalledObjectCategory.LIGHT.name();
     // ATS 地上子ビーコン (server_ATS_Beacon.js) が、連動信号機の現示を
     // NGTUtil.getField(TileEntitySignal.class, tile, ["signalLevel"])
@@ -66,6 +73,15 @@ public class InstalledObjectBlockEntity extends BlockEntity
     private float adjustPitch;
     private float adjustYaw;
     private float adjustScale = 1.0F;
+    /**
+     * 本家 TileEntityElectricalWiring.connections の移植。
+     * <b>1 つの碍子が複数本の架線を持てる</b>。張った側が {@code isRoot=true} で、
+     * 相手側には {@code isRoot=false} が入る。<b>描くのは root 側だけ</b>
+     * (本家 RenderElectricalWiring.renderAllWire の filter と同じ)。
+     */
+    private final java.util.List<jp.ngt.rtm.electric.Connection> connections =
+        new java.util.ArrayList<>();
+
     private BlockPos wireStart;
     private BlockPos wireEnd;
     private boolean powered;
@@ -254,9 +270,31 @@ public class InstalledObjectBlockEntity extends BlockEntity
      * (NGTUtil.setValueToField(TileEntityConnectorBase.class, tile, name, "modelName")) を
      * jp.ngt.ngtlib.util.NGTUtil がここへブリッジする。bare name から碍子定義を解決して適用する。
      */
+    /** 見つからなかったモデル名を 1 回だけ知らせる。 */
+    private static final java.util.Set<String> WARNED_MODEL_NAME =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     public void applyScriptModelName(String bareName) {
         InstalledObjectDefinition def = InstalledObjectRegistry.getByBareName(bareName, InstalledObjectCategory.INSULATOR);
+        if (def == null && bareName != null) {
+            // 完全一致で見つからないときは末尾一致でも拾う
+            // ("pack:Name" 形式や接頭辞違いで来ることがある)。
+            String needle = bareName.substring(bareName.lastIndexOf(':') + 1);
+            for (InstalledObjectDefinition d : InstalledObjectRegistry.getAll()) {
+                if (d.getBareName().equalsIgnoreCase(needle)) {
+                    def = d;
+                    break;
+                }
+            }
+        }
         if (def == null) {
+            // ★黙って諦めない。ここで返すと「ブロックは置かれたのにモデルが付かない
+            //   (＝何も見えない)」になり、原因が一切分からなくなる。
+            if (WARNED_MODEL_NAME.size() < 32 && WARNED_MODEL_NAME.add(String.valueOf(bareName))) {
+                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                    "[RTMU] スクリプトが指定したモデルが見つかりません: \"{}\" (碍子/設置物として解決できず)",
+                    bareName);
+            }
             return;
         }
         this.definitionId = def.getId();
@@ -267,10 +305,121 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
+    // ---- 1.7.10 srg 名のシム (NGTO Builder 等のパックスクリプトが直接呼ぶ) ----
+    //
+    // ★NGTO Builder2 のビーム/ワイヤーツールは、ブロックを置いたあと
+    //   tile.func_145839_a(nbt) で NBT を丸ごと流し込んで碍子の種類とオフセットを決める。
+    //   この 2 つが無いとスクリプトがそこで落ち、<b>ブロックだけ置かれてモデルが付かない</b>
+    //   (置いても何も起きないように見える)。
+
+    /** 本家 TileEntity.readFromNBT。 */
+    public void func_145839_a(Object nbt) {
+        net.minecraft.nbt.CompoundTag tag = jp.ngt.mccompat.nbt.NBTTagCompound.unwrap(nbt);
+        if (tag == null || this.level == null) {
+            return;
+        }
+        // ★パックの NBT は部分的 (ModelName/offset だけ等)。本家の readFromNBT は
+        //   自分のキーしか読まないため、書かれていないフィールドは変化しないのが正しい。
+        //   RTMU の loadAdditional は全キーを読む (無いキー = 既定値で上書き) ので、
+        //   タグに無いキーの分は退避して戻す。これを怠ると、NGTO Builder が続きのビームを
+        //   置いたとき既設碍子へ NBT を再適用して接続・定義・取付面が全部消える
+        //   (= 前のビームのワイヤーが消える)。
+        String prevDefinition = this.definitionId;
+        String prevCategory = this.category;
+        String prevWireModel = this.wireModel;
+        int prevMountFace = this.mountFace;
+        float prevYaw = this.yaw;
+        net.minecraft.core.BlockPos prevWireStart = this.wireStart;
+        net.minecraft.core.BlockPos prevWireEnd = this.wireEnd;
+        java.util.List<jp.ngt.rtm.electric.Connection> prevConnections =
+            new java.util.ArrayList<>(this.connections);
+        this.loadAdditional(tag, this.level.registryAccess());
+        if (!tag.contains("DefinitionId")) {
+            this.definitionId = prevDefinition;
+        }
+        if (!tag.contains("Category")) {
+            this.category = prevCategory;
+        }
+        if (!tag.contains("WireModelId")) {
+            this.wireModel = prevWireModel;
+        }
+        if (!tag.contains("Yaw")) {
+            this.yaw = prevYaw;
+        }
+        if (!tag.contains("MountFace")) {
+            // 本家は取付面をブロックメタが持つので NBT 適用では変わらない。
+            // 一度も設定されていないタイルだけ本家の既定 = 1 (上面)。
+            this.mountFace = prevMountFace >= 0 ? prevMountFace : 1;
+        }
+        if (!tag.contains("WireStartX")) {
+            this.wireStart = prevWireStart;
+        }
+        if (!tag.contains("WireEndX")) {
+            this.wireEnd = prevWireEnd;
+        }
+        if (!tag.contains("Connections")) {
+            this.connections.clear();
+            this.connections.addAll(prevConnections);
+        }
+        // 1.7.10 のパックが手で入れるキーも受ける (RTMU の保存形式には無い)
+        if (tag.contains("ModelName")) {
+            this.applyScriptModelName(tag.getString("ModelName"));
+        }
+        if (tag.contains("offsetX") || tag.contains("offsetY") || tag.contains("offsetZ")) {
+            this.setRenderOffset(tag.getFloat("offsetX"), tag.getFloat("offsetY"), tag.getFloat("offsetZ"));
+        }
+        this.setChanged();
+        if (!this.level.isClientSide) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+        }
+    }
+
+    /** 本家 TileEntity.writeToNBT。 */
+    public void func_145841_b(Object nbt) {
+        net.minecraft.nbt.CompoundTag tag = jp.ngt.mccompat.nbt.NBTTagCompound.unwrap(nbt);
+        if (tag == null || this.level == null) {
+            return;
+        }
+        this.saveAdditional(tag, this.level.registryAccess());
+        tag.putInt("x", this.worldPosition.getX());
+        tag.putInt("y", this.worldPosition.getY());
+        tag.putInt("z", this.worldPosition.getZ());
+        // パックが読み書きする 1.7.10 のキーも一緒に出す
+        tag.putString("ModelName", bareModelName(this.definitionId));
+        net.minecraft.world.phys.Vec3 off = this.getRenderOffset();
+        tag.putFloat("offsetX", (float) off.x);
+        tag.putFloat("offsetY", (float) off.y);
+        tag.putFloat("offsetZ", (float) off.z);
+    }
+
+    /** "insulator:pack:Name" → "Name" (パックが期待する素の名前)。 */
+    private static String bareModelName(String id) {
+        if (id == null || id.isEmpty()) {
+            return "";
+        }
+        int i = id.lastIndexOf(':');
+        return i >= 0 ? id.substring(i + 1) : id;
+    }
+
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.putString("DefinitionId", definitionId);
+        tag.putString("WireModelId", wireModel);
+        if (!this.connections.isEmpty()) {
+            net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+            for (jp.ngt.rtm.electric.Connection c : this.connections) {
+                CompoundTag e = new CompoundTag();
+                e.putBoolean("Root", c.isRoot);
+                e.putInt("X", c.x);
+                e.putInt("Y", c.y);
+                e.putInt("Z", c.z);
+                e.putByte("Type", c.type.id);
+                e.putString("Wire", c.wireName);
+                list.add(e);
+            }
+            tag.put("Connections", list);
+        }
         tag.putString("Category", category);
         tag.putFloat("Yaw", yaw);
         tag.putFloat("MountPitch", mountPitch);
@@ -338,6 +487,17 @@ public class InstalledObjectBlockEntity extends BlockEntity
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         definitionId = tag.getString("DefinitionId");
+        wireModel = tag.getString("WireModelId");
+        this.connections.clear();
+        net.minecraft.nbt.ListTag connList =
+            tag.getList("Connections", net.minecraft.nbt.Tag.TAG_COMPOUND);
+        for (int i = 0; i < connList.size(); i++) {
+            CompoundTag e = connList.getCompound(i);
+            this.connections.add(new jp.ngt.rtm.electric.Connection(
+                e.getBoolean("Root"), e.getInt("X"), e.getInt("Y"), e.getInt("Z"),
+                jp.ngt.rtm.electric.Connection.ConnectionType.byId(e.getByte("Type")),
+                e.getString("Wire")));
+        }
         category = tag.contains("Category") ? tag.getString("Category") : InstalledObjectCategory.LIGHT.name();
         yaw = tag.getFloat("Yaw");
         mountPitch = tag.getFloat("MountPitch");
@@ -416,6 +576,16 @@ public class InstalledObjectBlockEntity extends BlockEntity
             this.signalAspect = SignalAspect.STOP.getId();
         }
         setChanged();
+    }
+
+    /** 張ってある架線のモデル ID。空なら未指定。 */
+    public String getWireModelId() {
+        // 旧ワールド互換: definitionId を書き換える方式で保存されたものはそれを使う
+        if ((this.wireModel == null || this.wireModel.isEmpty())
+                && getCategory() == InstalledObjectCategory.WIRE) {
+            return this.definitionId;
+        }
+        return this.wireModel == null ? "" : this.wireModel;
     }
 
     public String getDefinitionId() {
@@ -1092,28 +1262,73 @@ public class InstalledObjectBlockEntity extends BlockEntity
      * Wire ツールが「この碍子から (x,y,z) の碍子へワイヤーを張る」ときに呼ぶ (本家 setConnectionTo)。
      * RTMU の配線描画は wireStart/wireEnd を持つ設置物に対して行われるので、両端を設定して描画対象にする。
      */
+    /** 本家 getConnectionList。描画側が root だけを拾う。 */
+    public java.util.List<jp.ngt.rtm.electric.Connection> getConnectionList() {
+        return this.connections;
+    }
+
+    /** 本家 setConnectionFrom: 張られた側 (root でない) の接続を足す。 */
+    public void setConnectionFrom(int x, int y, int z, jp.ngt.rtm.electric.Connection.ConnectionType type,
+                                  String wireName) {
+        this.connections.removeIf(c -> c.x == x && c.y == y && c.z == z);
+        this.connections.add(new jp.ngt.rtm.electric.Connection(false, x, y, z, type, wireName));
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public void setConnectionTo(int x, int y, int z, Object connectionType, Object modelState) {
-        this.wireStart = this.worldPosition;
-        this.wireEnd = new net.minecraft.core.BlockPos(x, y, z);
-        // RTMU の配線描画は「WIRE カテゴリの設置物が、その定義(モデル)のケーブルを wireStart→wireEnd に描く」。
-        // なので接続された碍子を WIRE オブジェクト化する: 定義=選択ワイヤーモデル、category=WIRE。
+        // 本家 TileEntityElectricalWiring.setConnectionTo の移植。
+        // ★碍子の定義は触らない (ワイヤーモデルは接続が持つ)。
+        //   以前は definitionId をワイヤーモデルで上書きして category=WIRE にしていたが、
+        //   NGTO Builder2 が続きのビームを置くとき既設碍子が「同じブロック」に見えなくなり、
+        //   NBT ごと置き直されて接続 (= 前のビームのワイヤー) が消えていた。
+        //   本家は碍子が碍子のままなので BlockBuilder のスキップ判定に通る。
+        jp.ngt.rtm.electric.Connection.ConnectionType type =
+            connectionType instanceof jp.ngt.rtm.electric.Connection.ConnectionType ct
+                ? ct : jp.ngt.rtm.electric.Connection.ConnectionType.WIRE;
+        net.minecraft.core.BlockPos targetPos = new net.minecraft.core.BlockPos(x, y, z);
+        if (type == jp.ngt.rtm.electric.Connection.ConnectionType.NONE) {
+            // 切断 (本家と同じ): 自分と相手の両方から外す
+            this.connections.removeIf(c -> c.x == x && c.y == y && c.z == z);
+            if (level != null && level.getBlockEntity(targetPos)
+                    instanceof InstalledObjectBlockEntity target) {
+                target.connections.removeIf(c -> c.x == this.worldPosition.getX()
+                    && c.y == this.worldPosition.getY() && c.z == this.worldPosition.getZ());
+                target.setChanged();
+                if (!level.isClientSide) {
+                    level.sendBlockUpdated(target.worldPosition, target.getBlockState(),
+                        target.getBlockState(), 3);
+                }
+            }
+            setChanged();
+            if (level != null && !level.isClientSide) {
+                level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+                jp.ngt.rtm.electric.WireManager.unregister(level, this.worldPosition, targetPos);
+            }
+            return;
+        }
         String wireModelId = null;
         if (modelState instanceof com.portofino.realtrainmodunofficial.item.WireItem.WireModelState wms) {
             wireModelId = wms.modelId;
         } else if (modelState instanceof String s) {
             wireModelId = s;
         }
-        if (wireModelId != null && !wireModelId.isEmpty()) {
-            this.definitionId = wireModelId;
-            this.category = InstalledObjectCategory.WIRE.name();
+        // 本家: 自分に root の接続を足し、相手には root でない接続を足す (setConnectionFrom)。
+        this.connections.removeIf(c -> c.x == x && c.y == y && c.z == z);
+        this.connections.add(new jp.ngt.rtm.electric.Connection(
+            true, x, y, z, type, wireModelId == null ? "" : wireModelId));
+        if (level != null && level.getBlockEntity(targetPos)
+                instanceof InstalledObjectBlockEntity target) {
+            target.setConnectionFrom(this.worldPosition.getX(), this.worldPosition.getY(),
+                this.worldPosition.getZ(), type, wireModelId == null ? "" : wireModelId);
         }
         setChanged();
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
-            // WIRE の電気グラフにも登録 (再読込時は onLoad が category==WIRE で再登録する)。
-            if (getCategory() == InstalledObjectCategory.WIRE) {
-                jp.ngt.rtm.electric.WireManager.register(level, this.wireStart, this.wireEnd);
-            }
+            // 電気グラフ (WebCTC 連動等)。再読込時は onLoad が接続から再登録する。
+            jp.ngt.rtm.electric.WireManager.register(level, this.worldPosition, targetPos);
         }
     }
 
@@ -1130,9 +1345,9 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    @Override
+    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void onLoad() {
-        super.onLoad();
+        // super.onLoad; — バニラの BlockEntity には onLoad が無い
         LOADED_OBJECTS.add(this);
         if (level instanceof ServerLevel serverLevel && isSignal()) {
             SignalNetworkSavedData.get(serverLevel).syncLoadedSignal(serverLevel, this);
@@ -1145,6 +1360,19 @@ public class InstalledObjectBlockEntity extends BlockEntity
             }
             jp.ngt.rtm.electric.WireManager.INSTANCE.addWire(level, wireStart, wireEnd);
         }
+        // 接続式 (本家構造) の配線も同様に登録
+        if (level != null) {
+            for (jp.ngt.rtm.electric.Connection c : this.connections) {
+                if (!c.isRoot || c.type != jp.ngt.rtm.electric.Connection.ConnectionType.WIRE) {
+                    continue;
+                }
+                net.minecraft.core.BlockPos target = new net.minecraft.core.BlockPos(c.x, c.y, c.z);
+                if (!level.isClientSide) {
+                    jp.ngt.rtm.electric.WireManager.register(level, worldPosition, target);
+                }
+                jp.ngt.rtm.electric.WireManager.INSTANCE.addWire(level, worldPosition, target);
+            }
+        }
     }
 
     @Override
@@ -1155,6 +1383,19 @@ public class InstalledObjectBlockEntity extends BlockEntity
                 jp.ngt.rtm.electric.WireManager.unregister(level, wireStart, wireEnd);
             }
             jp.ngt.rtm.electric.WireManager.INSTANCE.removeWire(level, wireStart, wireEnd);
+        }
+        // 接続式 (本家構造) の配線も解除
+        if (level != null) {
+            for (jp.ngt.rtm.electric.Connection c : this.connections) {
+                if (!c.isRoot || c.type != jp.ngt.rtm.electric.Connection.ConnectionType.WIRE) {
+                    continue;
+                }
+                net.minecraft.core.BlockPos target = new net.minecraft.core.BlockPos(c.x, c.y, c.z);
+                if (!level.isClientSide) {
+                    jp.ngt.rtm.electric.WireManager.unregister(level, worldPosition, target);
+                }
+                jp.ngt.rtm.electric.WireManager.INSTANCE.removeWire(level, worldPosition, target);
+            }
         }
         super.setRemoved();
     }

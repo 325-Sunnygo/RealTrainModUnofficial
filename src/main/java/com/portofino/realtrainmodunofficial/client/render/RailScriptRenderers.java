@@ -108,6 +108,19 @@ public final class RailScriptRenderers {
     /** 明るさを調べ直す間隔 (フレーム)。 */
     private static final int LIGHT_PROBE_INTERVAL = 10;
 
+    /**
+     * そのレール 1 本ぶんの記録と指紋を捨てる。
+     *
+     * <p>線形が届いた/変わった時に呼ぶ。これをしないと、線形がまだ揃っていない時点で
+     * 焼いた古いメッシュが VBO に残り続け、<b>道床 (ブロック側) だけ新しい線形になって
+     * レールの線だけ元の位置に取り残される</b> (入り直すと直るのはこれ)。
+     */
+    public static void invalidate(BlockPos pos) {
+        PLAIN_CACHE.remove(pos);
+        LIGHT_SIGNATURES.remove(pos);
+        RailMeshCache.invalidate(pos);
+    }
+
     /** フレーム頭で 1 回。 */
     public static void beginFrame() {
         frameCounter++;

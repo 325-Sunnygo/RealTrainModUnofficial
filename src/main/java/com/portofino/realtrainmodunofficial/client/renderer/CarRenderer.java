@@ -52,25 +52,22 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
         // 本家式: rendererPath スクリプトを Nashorn (VehicleScriptRenderers) で実行。
         // SRB3/NGTO Builder の GUI・マーカー・入力処理はこの render 内で動く。
         var scripted = com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
-        boolean scriptRendered = false;
         if (scripted != null) {
             poseStack.pushPose();
             try {
                 poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
                 // ボディモデルはスクリプト無しロード (レガシースクリプトを起動させない)
                 MqoModelLoader.MqoModel bodyModel = MqoModelLoader.loadModelForVehicleNoScript(def);
-                // 戻り値 = スクリプトが実際にジオメトリを描いたか。false のとき (render が
-                // 何も描かず終わる / 例外で落ちる) は下の素モデル描画にフォールバックする。
-                scriptRendered = scripted.render(entity, partialTick, poseStack, bufferSource,
+                scripted.render(entity, partialTick, poseStack, bufferSource,
                         packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, bodyModel);
             } catch (Throwable ignored) {
             } finally {
                 poseStack.popPose();
             }
         }
-        // スクリプトが無い or スクリプト描画に失敗した車両: 旧 MQO パイプライン (ベイクドモデル)。
-        // 本家系の列車レンダラ (RtmTrainRenderer) と同じフォールバック。
-        if (!scriptRendered) {
+        // ★スクリプトを持つ車両は、それが何も描かなくても素モデルへ逃がさない (本家に代替描画は無い)。
+        //   スクリプトを持たない車両だけがこの経路。
+        if (scripted == null) {
             MqoModelLoader.MqoModel model = MqoModelLoader.loadModelForVehicle(def);
             if (model != null) {
                 poseStack.pushPose();

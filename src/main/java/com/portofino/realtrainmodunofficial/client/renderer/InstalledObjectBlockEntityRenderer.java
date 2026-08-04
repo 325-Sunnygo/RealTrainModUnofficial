@@ -19,7 +19,6 @@ import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -29,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.joml.Matrix4f;
 
 public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<InstalledObjectBlockEntity> {
     /** 本家 SignalLevel.HIGH_SPEED_PROCEED.level — 現示の上限。 */
@@ -57,6 +55,9 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                        MultiBufferSource buffer, int packedLight, int packedOverlay) {
         long profilerStart = ClientRenderProfiler.begin();
         InstalledObjectDefinition definition = InstalledObjectRegistry.getById(blockEntity.getDefinitionId());
+        // 本家 RenderElectricalWiring.renderAllWire:
+        // root の接続の架線は、碍子の定義が解決できるかに関係なくこのタイルが描く。
+        boolean drewConnectionWire = renderConnectionWires(blockEntity, poseStack, buffer, packedLight, packedOverlay);
         if (definition == null) {
             ClientRenderProfiler.endInstalledObject(profilerStart);
             return;
@@ -72,14 +73,17 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         Vec3 center = blockEntity.getRenderCenter();
         double cameraDistanceSq = cameraPos.distanceToSqr(center);
-        // ワイヤー: wireStart/wireEnd があればケーブル(ジオメトリ)を描く。
-        // ケーブルのみ(中間の設置物モデルは出さない)。
-        if (blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
+        // 旧形式ワイヤー (中間ブロック式 / 旧ワールドの書き換え済みタイル)。
+        // 接続リストを持つタイルは renderConnectionWires が既に描いているので二重に描かない。
+        if (!drewConnectionWire
+                && blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null
+                && blockEntity.getWireStart().equals(blockEntity.getBlockPos())) {
             renderWire(blockEntity, definition, poseStack, buffer, cameraDistanceSq, cameraPos, packedLight, packedOverlay);
-            if (blockEntity.getCategory() == InstalledObjectCategory.WIRE) {
-                ClientRenderProfiler.endInstalledObject(profilerStart);
-                return;
-            }
+        }
+        // ワイヤー定義のモデルは架線のジオメトリそのもの (本家 ModelSetWire)。設置物としては描かない。
+        if (blockEntity.getCategory() == InstalledObjectCategory.WIRE) {
+            ClientRenderProfiler.endInstalledObject(profilerStart);
+            return;
         }
         if (definition.getModelFile() != null && !definition.getModelFile().isBlank()) {
             MqoModelLoader.MqoModel model = MqoModelLoader.loadModelFromPack(
@@ -129,21 +133,30 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         poseStack.translate(0.0D, -0.5D, 0.0D);
                         // 本家 getRotation = round(180 - playerYaw)。RTMU の yaw は playerYaw なので
                         // YP(180 - yaw) が本家 rotate(getRotation) と一致する。meta==0 は本家同様に反転。
-                        float lightYaw = 180.0F - blockEntity.getYaw();
+                        // 本家 RenderMachine: 保存してある rotationYaw をそのまま回す。
+                        // ★ここで 180 - yaw としてはいけない。設置時の honkeRotation が
+                        // 既に本家の式 (-playerYaw + 180 の量子化) で保存しているので、
+                        // 二重に補正することになり、しかも 180-yaw は回転ではなく鏡映なので
+                        // 向きによって反対を向く。
+                        float lightYaw = blockEntity.getYaw();
                         if (mountFace == 0) {
                             lightYaw = -lightYaw;
                         }
                         poseStack.mulPose(Axis.YP.rotationDegrees(lightYaw));
                         poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
                         poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
-                    } else if (blockEntity.getMountFace() >= 0) {
-                        // 本家 RenderElectricalWiring (碍子/コネクタ) 準拠:
+                    } else if (blockEntity.getMountFace() >= 0 || isConnectorCategory(blockEntity.getCategory())) {
+                        // 本家 RenderElectricalWiring.renderConnector 準拠:
                         // ブロック中心 (+0.5,+0.5,+0.5) を基準に、クリック面 (meta 0-5) で回転。
+                        // ★碍子/コネクタは取付面が無くてもここを通す。本家 renderConnector は
+                        //   常にブロック中心を原点にし、meta は %6 なので既定は 1 (面回転なし)。
+                        //   底面原点の分岐へ落とすとモデルだけ 0.5 沈み、架線の取付点とも食い違う。
                         poseStack.translate(0.5D, 0.5D, 0.5D);
                         Vec3 renderOffset = blockEntity.getRenderOffset();
                         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
                         applyAdjustments(poseStack, blockEntity);
-                        applyHonkeMountFaceRotation(poseStack, blockEntity.getMountFace());
+                        applyHonkeMountFaceRotation(poseStack,
+                            blockEntity.getMountFace() >= 0 ? blockEntity.getMountFace() : 1);
                         poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
                         poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
                     } else {
@@ -151,7 +164,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                         Vec3 renderOffset = blockEntity.getRenderOffset();
                         poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
                         applyAdjustments(poseStack, blockEntity);
-                        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
+                        // 保存値がそのまま本家の rotationYaw (上の照明分岐と同じ理由)
+                        poseStack.mulPose(Axis.YP.rotationDegrees(blockEntity.getYaw()));
                         // 壁挿し碍子は横倒し(mountPitch)にする。0なら通常の縦置き。
                         // 列車検知器ではレールの勾配(mountPitch)とカント(mountRoll)になる。
                         if (blockEntity.getMountPitch() != 0.0F) {
@@ -176,7 +190,13 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             // renderClass に MachinePartsRenderer を指定していて、この経路でしか走らない。
                             // 以前は「ブロック検知スクリプトのときだけ」に絞っていたため、ミラーボールや
                             // 赤色灯はスクリプトが一切実行されず、素モデルが描かれるだけで回らなかった。
-                            || blockEntity.getCategory() == InstalledObjectCategory.LIGHT;
+                            || blockEntity.getCategory() == InstalledObjectCategory.LIGHT
+                            // ★碍子/コネクタ (架線柱含む) もここ。
+                            //   本家 RenderElectricalWiring.renderConnector は
+                            //   modelSet.modelObj.render(...) = <b>スクリプトだけ</b>を描く。
+                            //   RTMU の renderPreferScript 経路は「スクリプト + 焼き込みモデル」の
+                            //   2 段構成なので、同じパーツが二重に出てちらついていた。
+                            || isConnectorCategory(blockEntity.getCategory());
                     boolean hasMachineScript = definition.getScriptPath() != null && !definition.getScriptPath().isBlank();
                     // これらのブロック検知信号パックは json の machineType が "Light" のため SIGNAL でなく
                     // LIGHT に分類され、本来スクリプト経路に載らず素モデルで全レンズが描かれていた(=複数点灯)。
@@ -261,11 +281,21 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         ClientRenderProfiler.endInstalledObject(profilerStart);
     }
 
+
+
+
     private void renderWire(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
                             PoseStack poseStack, MultiBufferSource buffer,
                             double cameraDistanceSq, Vec3 cameraPos, int packedLight, int packedOverlay) {
-        BlockPos start = blockEntity.getWireStart();
-        BlockPos end = blockEntity.getWireEnd();
+        renderWireBetween(blockEntity, definition, blockEntity.getWireStart(), blockEntity.getWireEnd(),
+            poseStack, buffer, cameraDistanceSq, cameraPos, packedLight, packedOverlay);
+    }
+
+    private void renderWireBetween(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
+                            BlockPos startPos, BlockPos endPos, PoseStack poseStack, MultiBufferSource buffer,
+                            double cameraDistanceSq, Vec3 cameraPos, int packedLight, int packedOverlay) {
+        BlockPos start = startPos;
+        BlockPos end = endPos;
         if (start == null || end == null) {
             return;
         }
@@ -274,110 +304,87 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         Vec3 origin = Vec3.atLowerCornerOf(blockEntity.getBlockPos());
         Vec3 fromWorld = resolveWireAttachPoint(blockEntity.getLevel(), start);
         Vec3 toWorld = resolveWireAttachPoint(blockEntity.getLevel(), end);
+        if (fromWorld == null || toWorld == null) {
+            return;
+        }
         Vec3 from = fromWorld.subtract(origin);
         Vec3 to = toWorld.subtract(origin);
 
-        String wireScript = definition.getScriptPath();
-        boolean hasScript = wireScript != null && !wireScript.isBlank();
-        String normalizedScript = hasScript ? wireScript.toLowerCase(java.util.Locale.ROOT).replace('\\', '/') : "";
-        boolean hasRenderableModel = hasRenderableWireModel(definition);
-        MqoModelLoader.MqoModel model = hasRenderableModel
+        MqoModelLoader.MqoModel model = hasRenderableWireModel(definition)
             ? MqoModelLoader.loadModelFromPack(definition.getPackName(), definition.getModelFile(),
                 definition.getTextureOverrides(), definition.getScriptPath(), definition.isSmoothing())
             : null;
 
-        // どの経路で描いているかを定義ごとに 1 回だけ出す (架線柱が本家と違う見た目になる問題の切り分け用)
-        logWireRouteOnce(definition, hasScript, wireScript, model);
-
-        if (model != null && renderKnownScriptWireModel(blockEntity, definition, model, from, to,
-            normalizedScript, poseStack, buffer, packedLight, packedOverlay)) {
-            return;
-        }
-
-        // ★ 本家式: パックの rendererPath (WirePartsRenderer) をそのまま実行する。
-        // 架線柱パックは描画を renderWireStatic/renderWireDynamic に書いており、それを
-        // 呼ばずに自前の近似 (モデルを線に沿って等間隔で並べる) で描いていたため、
-        // Baru's Pole のような作り込んだパックが本家と違う見た目になっていた。
-        // ★model == null でもスクリプトを走らせること。
-        if (hasScript) {
-            com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.Scripted scripted =
-                com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.get(definition);
-            boolean drawn = scripted != null && scripted.render(blockEntity, from, to, 1.0F, poseStack, buffer,
-                packedLight, packedOverlay, model);
-            logWireScriptResultOnce(definition, scripted != null, drawn);
-            if (drawn) {
-                return;
-            }
-        }
-
-
-        // BasicWire / SimpleCatenary / モデル無しは本家の単線系スクリプトとして描く。
-        if (hasScript || model == null) {
-            renderBasicWireCable(from, to, packedLight, poseStack, buffer);
-            return;
-        }
-
-        Vec3 d = to.subtract(from);
-        double length = d.length();
-        if (length < 1.0e-4) {
-            return;
-        }
-        // NGT Vec3.getYaw/getPitch と同じ式。
-        float yaw = (float) Math.toDegrees(Math.atan2(d.x, d.z));
-        double xz = Math.sqrt(d.x * d.x + d.z * d.z);
-        float pitch = (float) Math.toDegrees(Math.atan2(d.y, xz));
-        float sectionLength = definition.getSectionLength(); // 定義(JSON)の sectionLength を使う(隙間防止)
-        int split = Math.max(1, (int) Math.floor(length / sectionLength));
-        // 描画負荷の上限(長すぎる電線でセクション数が爆発しないように)。
-        split = Math.min(split, 256);
-        float scaleY = (float) ((length / (double) split) / sectionLength);
-
-        poseStack.pushPose();
-        try {
-            poseStack.translate(from.x, from.y, from.z);
-            // モデルの +Y 軸を線方向へ向ける(本家と同じ yaw+180 / pitch-90)。
-            poseStack.mulPose(Axis.YP.rotationDegrees(yaw + 180.0F));
-            poseStack.mulPose(Axis.XP.rotationDegrees(pitch - 90.0F));
-            poseStack.scale(1.0F, scaleY, 1.0F);
-            boolean hasTranslucent = model.hasTranslucentBatches();
-            for (int i = 0; i < split; i++) {
-                MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight, packedOverlay,
-                    false, null, null, blockEntity);
-                if (hasTranslucent) {
-                    MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight, packedOverlay,
-                        true, null, null, blockEntity);
-                }
-                poseStack.translate(0.0F, sectionLength, 0.0F);
-            }
-        } finally {
-            poseStack.popPose();
+        // ★本家 RenderElectricalWiring.renderWire と同じ形。経路はこれ 1 本だけ。
+        //   ・スクリプトの有無にかかわらず WirePartsRenderer.renderWire を通す
+        //     (本家はスクリプトが無いモデルを renderWireDynamic の中で直線/たるみで描く)
+        //   ・スクリプトが「描かない」と決めたなら何も描かない。代替は描かない
+        com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.Scripted wire =
+            com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.get(definition);
+        if (wire != null) {
+            wire.render(blockEntity, from, to, 1.0F, poseStack, buffer, packedLight, packedOverlay, model);
         }
     }
 
-    /** 架線 1 本ごとに「どの描画経路に入ったか」を定義単位で 1 回だけ記録する。 */
-    private static final java.util.Set<String> WIRE_ROUTE_LOGGED =
-        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+
+
+
+
+
+
 
     /**
-     * 架線柱パックが本家と違う見た目になる問題の切り分け用。
-     * 本家式スクリプト描画 (com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers)
-     * が動いていれば "Wire script renderer initialized" が出るはずだが、ログに一度も現れない。
+     * 本家 RenderElectricalWiring.renderAllWire の移植。
+     * root かつ可視の接続を、接続が持つワイヤーモデル (ModelWire) で描く。
+     * NGTO Builder2 のビームはこの形 (碍子は碍子のまま・接続がモデルを持つ)。
+     *
+     * @return 1 本でも描いたら true
      */
-    private static void logWireRouteOnce(InstalledObjectDefinition definition, boolean hasScript,
-                                         String wireScript, MqoModelLoader.MqoModel model) {
-        if (definition == null || !WIRE_ROUTE_LOGGED.add(definition.getId())) {
-            return;
+    private boolean renderConnectionWires(InstalledObjectBlockEntity blockEntity, PoseStack poseStack,
+                                          MultiBufferSource buffer, int packedLight, int packedOverlay) {
+        java.util.List<jp.ngt.rtm.electric.Connection> connections = blockEntity.getConnectionList();
+        if (connections.isEmpty()) {
+            return false;
         }
+        Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        double cameraDistanceSq = cameraPos.distanceToSqr(blockEntity.getRenderCenter());
+        boolean drew = false;
+        for (int i = 0; i < connections.size(); i++) {
+            jp.ngt.rtm.electric.Connection connection = connections.get(i);
+            if (!connection.isRoot || !connection.type.isVisible) {
+                continue;
+            }
+            InstalledObjectDefinition wireDef = resolveWireDefinition(connection.wireName);
+            if (wireDef == null) {
+                continue;
+            }
+            renderWireBetween(blockEntity, wireDef, blockEntity.getBlockPos(),
+                new BlockPos(connection.x, connection.y, connection.z),
+                poseStack, buffer, cameraDistanceSq, cameraPos, packedLight, packedOverlay);
+            drew = true;
+        }
+        return drew;
     }
 
-    private static final java.util.Set<String> WIRE_SCRIPT_LOGGED =
-        java.util.concurrent.ConcurrentHashMap.newKeySet();
-
-    /** 本家式スクリプト描画を「呼べたか」「実際に描けたか」を定義単位で 1 回だけ記録する。 */
-    private static void logWireScriptResultOnce(InstalledObjectDefinition definition, boolean hasRenderer, boolean drawn) {
-        if (definition == null || !WIRE_SCRIPT_LOGGED.add(definition.getId())) {
-            return;
+    /** 接続が持つワイヤーモデル名 → 定義。完全 ID → 末尾名の順で解決する。 */
+    private static InstalledObjectDefinition resolveWireDefinition(String wireName) {
+        if (wireName == null || wireName.isEmpty()) {
+            return null;
         }
+        InstalledObjectDefinition def = InstalledObjectRegistry.getById(wireName);
+        if (def == null) {
+            def = InstalledObjectRegistry.getByBareName(
+                wireName.substring(wireName.lastIndexOf(':') + 1), InstalledObjectCategory.WIRE);
+        }
+        return def;
+    }
+
+    /** 本家 TileEntityConnectorBase 系 (碍子・入出力コネクタ・架線柱)。 */
+    private static boolean isConnectorCategory(InstalledObjectCategory category) {
+        return category == InstalledObjectCategory.INSULATOR
+            || category == InstalledObjectCategory.CONNECTOR_INPUT
+            || category == InstalledObjectCategory.CONNECTOR_OUTPUT;
     }
 
     private static boolean hasRenderableWireModel(InstalledObjectDefinition definition) {
@@ -392,24 +399,47 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         return !normalized.endsWith("model_none.mqo");
     }
 
+    /**
+     * 接続点の座標。解決できなければ null。
+     *
+     * <p>本家 RenderElectricalWiring.getConnectedTarget は、相手の wirePos が取れないとき
+     * 差分を 0 のままにする = 架線を描かない。代わりの座標をでっち上げない。
+     */
     private static Vec3 resolveWireAttachPoint(Level level, BlockPos pos) {
         if (level != null && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity endpoint) {
             InstalledObjectDefinition endpointDef = InstalledObjectRegistry.getById(endpoint.getDefinitionId());
             if (endpointDef != null) {
-                Vec3 wp = endpointDef.getWireAttachPos();
+                // ★取付点はタイルに聞く (本家 TileEntityConnectorBase.wirePos)。
+                // 定義から直に引くと、架線を張られて WIRE へ書き換えられた側だけ
+                // 「ワイヤー定義の wirePos = 未指定 = 0」になり、
+                // もう一方 (碍子のまま) との差が Δy となって架線が傾く。
+                jp.ngt.ngtlib.math.Vec3 tileWirePos = endpoint.getWirePos();
+                Vec3 wp = tileWirePos != null
+                    ? new Vec3(tileWirePos.getX(), tileWirePos.getY(), tileWirePos.getZ())
+                    : endpointDef.getWireAttachPos();
 
                 // ★ 面に取り付けた碍子 (通常の架線柱はこれ)。
                 // 本家 TileEntityConnectorBase.updateWirePos + RenderElectricalWiring.renderAllWire:
-                if (endpoint.getMountFace() >= 0) {
+                //
+                // ★取付面が無い (-1) ときも本家の既定 = 1 (上向き・面回転なし) として
+                //   <b>ブロック中心</b>を基準にする。本家 getConnectedTarget は両端とも
+                //   「座標 + 0.5 + wirePos」で Y も必ず +0.5 (例外は TileEntityDummyEW だけ)。
+                //   RTMU は取付面なしだけ Y に +0.0 を使っていたため、
+                //   相手側のフォールバック (atCenterOf = +0.5) との間に
+                //   <b>Δy = 0.5 が固定で出て架線が傾いていた</b> (実測ログで全区間 0.5000)。
+                //   NGTO Builder は MountFace を書かないので、ビーム架線は必ずここに落ちる。
+                if (endpoint.getMountFace() >= 0 || endpoint.getMountPitch() == 0.0F) {
+                    int face = endpoint.getMountFace() >= 0 ? endpoint.getMountFace() : 1;
                     jp.ngt.ngtlib.math.Vec3 rotated = rotateWirePosByMountFace(
-                        new jp.ngt.ngtlib.math.Vec3(wp.x, wp.y, wp.z), endpoint.getMountFace());
+                        new jp.ngt.ngtlib.math.Vec3(wp.x, wp.y, wp.z), face);
                     return Vec3.atLowerCornerOf(pos)
                         .add(0.5D, 0.5D, 0.5D)
                         .add(endpoint.getRenderOffset())
                         .add(rotated.getX(), rotated.getY(), rotated.getZ());
                 }
 
-                // 地面置き (取付面なし)。モデルは底面中央 + (180-yaw) で描かれるので接続点も同じに。
+                // 傾けて置いてある物 (列車検知器など) だけは、モデルが底面中央 + (180-yaw) で
+                // 描かれるので接続点も同じ基準にする。
                 Vec3 tilted = rotateX(new Vec3(wp.x, wp.y, wp.z), endpoint.getMountPitch());
                 Vec3 rotated = rotateY(tilted, 180.0D - endpoint.getYaw());
                 return Vec3.atLowerCornerOf(pos)
@@ -418,7 +448,12 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     .add(rotated);
             }
         }
-        return Vec3.atCenterOf(pos);
+        // 変換器などタイルはあるが設置物ではない相手はブロック中心 (従来動作)。
+        if (level != null && level.getBlockEntity(pos) != null) {
+            return Vec3.atCenterOf(pos);
+        }
+        // タイルが無い (相手が壊された・未ロード) — 本家 getConnectedTarget は描かない。
+        return null;
     }
 
     /**
@@ -464,184 +499,11 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         return new Vec3(vec.x, vec.y * cos - vec.z * sin, vec.y * sin + vec.z * cos);
     }
 
-    private boolean renderKnownScriptWireModel(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
-                                               MqoModelLoader.MqoModel model, Vec3 from, Vec3 to, String script,
-                                               PoseStack poseStack, MultiBufferSource buffer,
-                                               int packedLight, int packedOverlay) {
-        if (script == null || script.isBlank()) {
-            return false;
-        }
-        if (script.endsWith("wire51/renderbeam1.js")) {
-            renderWire51Beam(blockEntity, definition, model, from, to, poseStack, buffer, packedLight, packedOverlay);
-            return true;
-        }
-        if (script.endsWith("wire51/renderwire.js")) {
-            renderScaledZWireModel(blockEntity, definition, model, from, to, 10.0D, "obj1",
-                poseStack, buffer, packedLight, packedOverlay);
-            return true;
-        }
-        if (script.endsWith("wire51/renderbracket.js")) {
-            renderScaledZWireModel(blockEntity, definition, model, from, to, 3.0D, "obj1",
-                poseStack, buffer, packedLight, packedOverlay);
-            return true;
-        }
-        if (script.endsWith("wire51/renderbracketd.js")) {
-            renderScaledZWireModel(blockEntity, definition, model, from, to, 4.0D, "obj1",
-                poseStack, buffer, packedLight, packedOverlay);
-            return true;
-        }
-        return false;
-    }
 
-    private void renderWire51Beam(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
-                                  MqoModelLoader.MqoModel model, Vec3 from, Vec3 to, PoseStack poseStack,
-                                  MultiBufferSource buffer, int packedLight, int packedOverlay) {
-        Vec3 d = to.subtract(from);
-        double length = d.length();
-        if (length < 1.0e-4D) {
-            return;
-        }
 
-        int maxPos = Math.max(1, (int) Math.floor(length / 2.0D) * 2);
-        maxPos = Math.min(maxPos, 256);
-        double move = length / (double) maxPos;
-        float scale = (float) move;
-        int halfMaxPos = maxPos / 2;
 
-        poseStack.pushPose();
-        try {
-            applyZWireOrientation(poseStack, from, d);
-            poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
-            for (int i = 0; i < maxPos; i++) {
-                String group;
-                double offsetZ = 0.0D;
-                if (i == 0) {
-                    group = "BeamR1";
-                    offsetZ = 2.0D;
-                } else if (i < halfMaxPos) {
-                    group = "BeamR2";
-                    offsetZ = 1.0D;
-                } else if (i < maxPos - 1) {
-                    group = "BeamL2";
-                } else {
-                    group = "BeamL1";
-                    offsetZ = -1.0D;
-                }
 
-                poseStack.pushPose();
-                poseStack.translate(0.0D, 0.0D, move * i + offsetZ);
-                poseStack.scale(1.0F, 1.0F, scale);
-                renderWireModelGroup(model, poseStack, buffer, packedLight, packedOverlay, blockEntity, group);
-                poseStack.popPose();
-            }
-        } finally {
-            poseStack.popPose();
-        }
-    }
 
-    private void renderScaledZWireModel(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
-                                        MqoModelLoader.MqoModel model, Vec3 from, Vec3 to, double baseLength,
-                                        String groupName, PoseStack poseStack, MultiBufferSource buffer,
-                                        int packedLight, int packedOverlay) {
-        Vec3 d = to.subtract(from);
-        double length = d.length();
-        if (length < 1.0e-4D || baseLength <= 0.0D) {
-            return;
-        }
-
-        // 本家Wire51の描画スクリプト(renderWire.js 等)を忠実移植:
-        // rate = length / baseLength;            // wire=10, bracket=3, bracketD=4
-        // rotate(yaw,'Y'); rotate(-pitch,'X');   // applyZWireOrientation
-        // glScalef(1, 1, rate);                  // +Z(線方向)のみを電線長へ伸ばす
-        // wire.render;                         // 1回だけ(タイルしない)
-        // Catenary1 は +Z 軸長 1000(×0.01=10ブロック)で作られているため、Z を rate 倍すれば
-        // 碍子から碍子へ正しい太さ・たるみ(Y方向 -0.81)で張られる。
-        float rate = (float) (length / baseLength);
-
-        poseStack.pushPose();
-        try {
-            applyZWireOrientation(poseStack, from, d);
-            float modelScale = definition.getModelScale();
-            poseStack.scale(modelScale, modelScale, modelScale);
-            poseStack.scale(1.0F, 1.0F, rate);
-            renderWireModelGroup(model, poseStack, buffer, packedLight, packedOverlay, blockEntity, groupName);
-        } finally {
-            poseStack.popPose();
-        }
-    }
-
-    private static void applyZWireOrientation(PoseStack poseStack, Vec3 from, Vec3 d) {
-        double xz = Math.sqrt(d.x * d.x + d.z * d.z);
-        // 本家Wire51スクリプト(renderWire/renderBeam/renderBracket)準拠:
-        // yaw = vec.getYaw; pit = -vec.getPitch;
-        // rotate(yaw,'Y'); rotate(pit,'X');
-        // モデルは +Z 軸が線方向に作られている(Catenary1 dZ=1000≒10ブロック)。
-        float yaw = (float) Math.toDegrees(Math.atan2(d.x, d.z));
-        float pitch = (float) Math.toDegrees(Math.atan2(d.y, xz));
-        poseStack.translate(from.x, from.y, from.z);
-        poseStack.mulPose(Axis.YP.rotationDegrees(yaw));
-        poseStack.mulPose(Axis.XP.rotationDegrees(-pitch));
-    }
-
-    private static void renderWireModelGroup(MqoModelLoader.MqoModel model, PoseStack poseStack,
-                                             MultiBufferSource buffer, int packedLight, int packedOverlay,
-                                             InstalledObjectBlockEntity blockEntity, String groupName) {
-        MqoModelLoader.GroupPredicate filter = groupName == null || groupName.isBlank()
-            ? null
-            : candidate -> groupMatches(candidate, groupName);
-        MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight, packedOverlay,
-            false, filter, null, blockEntity);
-        if (model.hasTranslucentBatches()) {
-            MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight, packedOverlay,
-                true, filter, null, blockEntity);
-        }
-    }
-
-    /**
-     * 本家RTM の基本ワイヤー(RenderBasicWire.js renderWireDynamic)を忠実再現したケーブル描画。
-     * XZ面リボン(ワイヤー色)と Y面リボン(黒)の十字を、たるみ式 fh=((j-8)/16)^2-0.25)*1.5 で描く。
-     */
-    private void renderBasicWireCable(Vec3 from, Vec3 to, int packedLight, PoseStack poseStack, MultiBufferSource buffer) {
-        double x = to.x - from.x;
-        double y = to.y - from.y;
-        double z = to.z - from.z;
-        double hor = Math.sqrt(x * x + z * z);
-        if (hor < 1.0e-6) hor = 1.0e-6;
-        double x1 = x / hor, z1 = z / hor;
-        final int split = 16;
-        final double w = 0.025D;
-        VertexConsumer c = buffer.getBuffer(RenderType.leash());
-        Matrix4f mat = poseStack.last().pose();
-        // XZ リボン色(暗灰)/ Y リボン色(黒)。RTM は XZ=ワイヤー色, Y=0(黒)。
-        final int xr = 26, xg = 26, xb = 26;
-        final int yr = 6, yg = 6, yb = 6;
-        // --- XZ 面リボン ---
-        float lastX = 0, lastY = 0, lastZ = 0;
-        for (int j = 0; j <= split; j++) {
-            double ft = j / (double) split;
-            double f2 = (j - 8.0) / split;
-            double fh = (f2 * f2 - 0.25) * 1.5;
-            double px = from.x + x * ft, py = from.y + y * ft + fh, pz = from.z + z * ft;
-            c.addVertex(mat, (float) (px - w * z1), (float) py, (float) (pz + w * x1))
-                .setColor(xr, xg, xb, 255).setLight(packedLight);
-            lastX = (float) (px + w * z1); lastY = (float) py; lastZ = (float) (pz - w * x1);
-            c.addVertex(mat, lastX, lastY, lastZ).setColor(xr, xg, xb, 255).setLight(packedLight);
-        }
-        // --- 縮退ブリッジ(XZ最後の頂点 → Y最初の頂点)で strip を分離 ---
-        double fh0 = (((0 - 8.0) / split) * ((0 - 8.0) / split) - 0.25) * 1.5;
-        float firstYx = (float) from.x, firstYy = (float) (from.y + fh0 + w), firstYz = (float) from.z;
-        c.addVertex(mat, lastX, lastY, lastZ).setColor(yr, yg, yb, 255).setLight(packedLight);
-        c.addVertex(mat, firstYx, firstYy, firstYz).setColor(yr, yg, yb, 255).setLight(packedLight);
-        // --- Y 面リボン ---
-        for (int j = 0; j <= split; j++) {
-            double ft = j / (double) split;
-            double f2 = (j - 8.0) / split;
-            double fh = (f2 * f2 - 0.25) * 1.5;
-            double px = from.x + x * ft, py = from.y + y * ft + fh, pz = from.z + z * ft;
-            c.addVertex(mat, (float) px, (float) (py + w), (float) pz).setColor(yr, yg, yb, 255).setLight(packedLight);
-            c.addVertex(mat, (float) px, (float) (py - w), (float) pz).setColor(yr, yg, yb, 255).setLight(packedLight);
-        }
-    }
 
     private static boolean shouldRenderInstalledObjectGroup(String groupName, InstalledObjectBlockEntity blockEntity,
                                                             InstalledObjectDefinition definition, double cameraDistanceSq,
@@ -723,46 +585,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
      * 本家RTM: モデル静止位置=開、閉(canThrough=false)で扉を回転。
      */
 
-    /** group(s) のモデル座標 AABB {minX,minY,minZ,maxX,maxY,maxZ}。取得できなければ null。 */
-    // 碍子モデルの実描画上端Y(ベイク座標=×0.01適用済み)。電線をモデル先端から出すために使う。
-    private static double modelTopY(MqoModelLoader.MqoModel model) {
-        if (model == null) {
-            return Double.NaN;
-        }
-        java.util.Set<String> groups = model.getAllNormalizedGroupNames();
-        if (groups == null || groups.isEmpty()) {
-            return Double.NaN;
-        }
-        java.util.List<float[]> quads = model.getGroupQuadCorners(groups);
-        if (quads == null || quads.isEmpty()) {
-            return Double.NaN;
-        }
-        double maxY = -Double.MAX_VALUE;
-        for (float[] q : quads) {
-            for (int c = 0; c < 4; c++) {
-                maxY = Math.max(maxY, q[c * 3 + 1]);
-            }
-        }
-        return maxY == -Double.MAX_VALUE ? Double.NaN : maxY;
-    }
 
-    private static float[] groupBounds(MqoModelLoader.MqoModel model, String groupName) {
-        java.util.List<float[]> quads = model.getGroupQuadCorners(java.util.Set.of(groupName));
-        if (quads == null || quads.isEmpty()) {
-            return null;
-        }
-        float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
-        float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
-        for (float[] q : quads) {
-            for (int c = 0; c < 4; c++) {
-                float x = q[c * 3], y = q[c * 3 + 1], z = q[c * 3 + 2];
-                minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-                minY = Math.min(minY, y); maxY = Math.max(maxY, y);
-                minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z);
-            }
-        }
-        return new float[]{minX, minY, minZ, maxX, maxY, maxZ};
-    }
 
     private static CrossingTransform resolveCrossingTransform(InstalledObjectBlockEntity blockEntity, String groupName) {
         String scriptPath = getCrossingScriptPath(InstalledObjectRegistry.getById(blockEntity.getDefinitionId()));
@@ -921,7 +744,7 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         // ---- 板 ----
         poseStack.pushPose();
         poseStack.translate(0.0F, plateY, 0.0F);
-        poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - blockEntity.getYaw()));
+        poseStack.mulPose(Axis.YP.rotationDegrees(blockEntity.getYaw()));
         PoseStack.Pose pose = poseStack.last();
         // ★ VertexConsumer は「使う直前に」取る。MultiBufferSource は別の RenderType を
         // 要求された時点で前のバッファを閉じるので、先に取っておくと後で書き込んだ瞬間に
@@ -1246,10 +1069,9 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         }
         if (blockEntity.isSignal()) {
             int signal = blockEntity.getLegacySignalState();
+            // ★定義に光グループが無いなら光らせない。本家はグループ名を決め打ちしない
+            //   (信号の点灯は SignalPartsRenderer のスクリプトが決める)。
             List<String> groups = selectSignalLightGroups(definition.getSignalLightGroups(), signal);
-            if (groups.isEmpty()) {
-                groups = fallbackSignalGroups(signal);
-            }
             return groups == null ? List.of() : groups;
         }
         if (blockEntity.getCategory() == InstalledObjectCategory.CROSSING && blockEntity.isPowered()) {
@@ -1331,18 +1153,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         return groups == null ? List.of() : groups;
     }
 
-    private static List<String> fallbackSignalGroups(int legacyState) {
-        return switch (legacyState) {
-            case 1 -> List.of("light4");
-            case 2 -> List.of("light4", "light3");
-            case 3 -> List.of("light3");
-            case 4 -> List.of("light3", "light5");
-            case 5 -> List.of("light2");
-            case 6 -> List.of("light1", "light5");
-            case 7 -> List.of("light1", "light2");
-            default -> List.of();
-        };
-    }
 
     private static int[] signalColorForGroup(String group) {
         String lower = group == null ? "" : group.toLowerCase();
@@ -1372,12 +1182,31 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             Vec3 b = Vec3.atCenterOf(blockEntity.getWireEnd());
             return new AABB(a, b).inflate(2.0D);
         }
-        return new AABB(blockEntity.getBlockPos()).inflate(4.0D);
+        AABB box = new AABB(blockEntity.getBlockPos()).inflate(4.0D);
+        // 接続式 (本家構造) の架線: root 接続の相手まで覆う。
+        // これが無いと碍子が画面外に出た瞬間にビームごと消える。
+        java.util.List<jp.ngt.rtm.electric.Connection> connections = blockEntity.getConnectionList();
+        for (int i = 0; i < connections.size(); i++) {
+            jp.ngt.rtm.electric.Connection c = connections.get(i);
+            if (c.isRoot && c.type.isVisible) {
+                box = box.minmax(new AABB(new BlockPos(c.x, c.y, c.z)).inflate(2.0D));
+            }
+        }
+        return box;
     }
 
+    /**
+     * ★架線でも false のままにする。
+     *
+     * <p>true にすると「グローバル BlockEntity」としてチャンクの描画リストとは<b>別枠でも</b>
+     * 描かれる。Sodium 環境では両方が走るので、<b>同じ架線が 1 tick に 2 回描かれて重なる</b>
+     * (実測: 1 区間につき 2 回)。
+     * 長い架線が画面外で消えないようにするのは {@link #getRenderBoundingBox} の役目で、
+     * そちらが始点→終点を覆う箱を返しているのでこれは要らない。
+     */
     @Override
     public boolean shouldRenderOffScreen(InstalledObjectBlockEntity blockEntity) {
-        return blockEntity.getCategory() == InstalledObjectCategory.WIRE;
+        return false;
     }
 
     @Override

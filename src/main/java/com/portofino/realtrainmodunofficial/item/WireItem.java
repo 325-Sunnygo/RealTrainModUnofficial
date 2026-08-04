@@ -116,6 +116,23 @@ public class WireItem extends Item implements ModelSelectableItem {
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
 
+        // 本家 ItemWire: 2 回目にクリックした碍子へ接続を張る (そちらが root)。
+        // 中間ブロックは置かない。ワイヤーモデルは接続 (Connection) が持ち、
+        // 碍子はそのまま残る (NGTO Builder2 のビーム設置と同じ形)。
+        if (level.getBlockEntity(clickedPos) instanceof InstalledObjectBlockEntity targetBe) {
+            if (!level.isClientSide) {
+                targetBe.setConnectionTo(startPos.getX(), startPos.getY(), startPos.getZ(),
+                    jp.ngt.rtm.electric.Connection.ConnectionType.WIRE, definition.getId());
+                stack.remove(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get());
+                if (!player.getAbilities().instabuild) {
+                    stack.shrink(1);
+                }
+                player.displayClientMessage(Component.literal("ワイヤーを設置しました"), true);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        // 設置物以外 (信号変換器など) は従来の中間ブロック式のまま
         BlockPos mid = new BlockPos((startPos.getX() + clickedPos.getX()) >> 1, (startPos.getY() + clickedPos.getY()) >> 1, (startPos.getZ() + clickedPos.getZ()) >> 1);
         BlockState state = level.getBlockState(mid);
         if (!state.canBeReplaced()) {

@@ -331,5 +331,8 @@
   "tooltip.realtrainmodunofficial.formation_crowbar": "殴った車両の編成をまるごと消す",
   "message.realtrainmodunofficial.formation_crowbar.removed": "編成を %s 両ぶん撤去しました",
   "itemGroup.realtrainmodunofficial.rtmu": "RTMU",
-  "message.realtrainmodunofficial.train.no_model_selected": "モデルを選んでください (右クリックで選択画面)"
+  "itemGroup.realtrainmodunofficial.signal_controller": "シグナルコントローラー",
+  "message.realtrainmodunofficial.train.no_model_selected": "モデルを選んでください (右クリックで選択画面)",
+  "item.realtrainmodunofficial.background_panel": "背景パネル",
+  "block.realtrainmodunofficial.background_panel": "背景パネル"
 }

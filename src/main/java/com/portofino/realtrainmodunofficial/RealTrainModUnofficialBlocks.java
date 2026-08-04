@@ -22,6 +22,10 @@ public class RealTrainModUnofficialBlocks {
     /** 設置済みミニチュア (neo mcte)。中身は MiniatureBlockEntity が丸ごと持つ。 */
     public static final net.neoforged.neoforge.registries.DeferredBlock<com.portofino.realtrainmodunofficial.block.MiniatureBlock> MINIATURE
         = BLOCKS.register("miniature", () -> new com.portofino.realtrainmodunofficial.block.MiniatureBlock());
+    /** 背景パネル: 模型やジオラマの背景に写真を立てる。 */
+    public static final DeferredBlock<com.portofino.realtrainmodunofficial.block.BackgroundPanelBlock> BACKGROUND_PANEL
+        = BLOCKS.register("background_panel",
+            () -> new com.portofino.realtrainmodunofficial.block.BackgroundPanelBlock());
     public static final DeferredBlock<MarkerBlock> MARKER
         = BLOCKS.register("legacy_marker", () -> new MarkerBlock(false));
     public static final DeferredBlock<MarkerBlock> MARKER_SWITCH

@@ -12,5 +12,7 @@ plugins {
 //別配布の移植 mod (別 jar): RTMU-WebCTC / RTMU-ATSAssistMod
 include 'webctc'
 include 'atsa'
+//RTMU 純正の自動運転アドオン (別 jar)
+include 'autodrive'
 //乗客シミュレーションは RTMU 本体へ統合済み (旧 passenger サブプロジェクトは廃止)。
 //ソースは src/main/java/com/portofino/rtmupassenger/ にある。

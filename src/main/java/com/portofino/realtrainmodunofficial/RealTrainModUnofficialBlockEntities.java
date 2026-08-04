@@ -28,6 +28,13 @@ public class RealTrainModUnofficialBlockEntities {
             com.portofino.realtrainmodunofficial.blockentity.MiniatureBlockEntity::new,
             RealTrainModUnofficialBlocks.MINIATURE.get()).build(null));
 
+    /** 背景パネル。 */
+    public static final DeferredHolder<BlockEntityType<?>,
+        BlockEntityType<com.portofino.realtrainmodunofficial.blockentity.BackgroundPanelBlockEntity>> BACKGROUND_PANEL =
+        BLOCK_ENTITY_TYPES.register("background_panel", () -> BlockEntityType.Builder.of(
+            com.portofino.realtrainmodunofficial.blockentity.BackgroundPanelBlockEntity::new,
+            RealTrainModUnofficialBlocks.BACKGROUND_PANEL.get()).build(null));
+
     /** レールコア: 起点ブロック1個。道床とは無関係。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LargeRailCoreBlockEntity>> LARGE_RAIL_CORE =
         BLOCK_ENTITY_TYPES.register("legacy_large_rail_core", () -> BlockEntityType.Builder.of(LargeRailCoreBlockEntity::new,

@@ -1,0 +1,35 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="LGPL-3.0-or-later"
+issueTrackerURL="https://github.com/325-Sunnygo/RealTrainModUnofficial/issues"
+
+[[mods]]
+modId="rtmuautodrive"
+version="1.0.0"
+displayName="RTMU-AutoDrive_1.21.1"
+authors="325-Sunnygo"
+description='''自動運転 — 自動運転装置で列車を右クリックすると、運転士が自動で乗務して走り出します。
+駅ブロックの前で自動的に減速して停車し、ドアを開けて発車します。信号があれば現示に従います。
+自動運転中の編成はチャンクが読み込まれていなくても走り続けるので、遠くの駅から列車が来ます。
+(RTMU 純正のアドオン。RTMU 本体が必要です)'''
+
+[[dependencies.rtmuautodrive]]
+    modId="neoforge"
+    type="required"
+    versionRange="[21.1.0,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.rtmuautodrive]]
+    modId="minecraft"
+    type="required"
+    versionRange="[1.21.1]"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.rtmuautodrive]]
+    modId="realtrainmodunofficial"
+    type="required"
+    versionRange="[1.0,)"
+    ordering="AFTER"
+    side="BOTH"

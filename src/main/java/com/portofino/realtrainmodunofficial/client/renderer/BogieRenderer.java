@@ -180,17 +180,9 @@ public class BogieRenderer {
             }
         }
 
-        MqoModel bogieModel = MqoModelLoader.loadModelForVehiclePart(parentDef, modelFile, textureOverrides, bogieDef.scriptPath());
-        if (bogieModel == null) {
-            // 台車モデルが見つからない/ロード失敗時は組み込みデフォルト台車にフォールバック。
-            // 透明になるよりは何か見えていたほうが利用者の混乱が少ない。
-            Map<String, String> fallbackOverrides = textureOverrides;
-            if (fallbackOverrides == null || fallbackOverrides.isEmpty()) {
-                fallbackOverrides = Map.of("default", "textures/train/bogie.png");
-            }
-            bogieModel = MqoModelLoader.loadModelForVehiclePart(parentDef, DEFAULT_CLASS_BOGIE_MODEL, fallbackOverrides);
-        }
-        return bogieModel;
+        // ★読み込めなかったら描かない。本家 RenderBogie も isDummy なら欠落表示に落とすだけで、
+        //   それらしい台車を代わりに出したりはしない。
+        return MqoModelLoader.loadModelForVehiclePart(parentDef, modelFile, textureOverrides, bogieDef.scriptPath());
     }
 
     public static boolean isDummyBogieModel(String modelFile) {

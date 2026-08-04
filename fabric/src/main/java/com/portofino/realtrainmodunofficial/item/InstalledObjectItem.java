@@ -293,7 +293,16 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         } else if (fluorescent || gridAligned) {
             placeYaw = 0.0F;
         } else if (!honkeFaceMount && !railMounted
-                && category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL) {
+                && category != InstalledObjectCategory.WIRE && category != InstalledObjectCategory.SIGNAL
+                // ★照明とスピーカーは壁貼り付けの対象外。
+                // 本家 ItemInstalledObject は LIGHT/SPEAKER に対して
+                //   setBlock(..., クリック面, 3) + setRotation(player, 15)
+                // しかせず、向きは常にプレイヤーの向きで決まる。
+                // RTMU 独自の壁貼り付けは placeYaw を「クリック面の反対向き」で上書きし、
+                // さらに wallMounted が立つことで下の「プレイヤーの向きを入れる」処理まで
+                // 飛ばしていたため、横面に置くと置いた方向を向かなくなっていた。
+                && category != InstalledObjectCategory.LIGHT
+                && category != InstalledObjectCategory.SPEAKER) {
             if (clickedFace == net.minecraft.core.Direction.DOWN) {
                 upsideDown = true;
                 placeMountPitch = 180.0F;
@@ -311,6 +320,12 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
             placeYaw = honkeRotation(player);
         }
         if (!level.isClientSide) {
+            if (category == InstalledObjectCategory.LIGHT || category == InstalledObjectCategory.SPEAKER) {
+                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+                    "[向き診断] 設置 {} playerYaw={} → 保存yaw={} クリック面={}({}) rotateByMeta={}",
+                    definition.getId(), player.getYRot(), placeYaw,
+                    clickedFace, clickedFace.ordinal(), rotateByMeta);
+            }
             level.setBlock(placePos, RealTrainModUnofficialBlocks.INSTALLED_OBJECT.get().defaultBlockState(), 3);
             if (level.getBlockEntity(placePos) instanceof InstalledObjectBlockEntity blockEntity) {
                 blockEntity.setDefinition(definition.getId(), category, placeYaw);

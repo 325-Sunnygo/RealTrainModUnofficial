@@ -81,11 +81,28 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         this.refreshBallastArea();
     }
 
+    /** レール線形がまだ届いていなくて焼き直せなかった。次の tick で試し直す。 */
+    private boolean pendingBallastRefresh;
+
     /** レール一帯 (道床の敷かれている範囲) の道床を焼き直させる。クライアントのみ。 */
     public void refreshBallastArea() {
-        if (this.level == null || !this.level.isClientSide() || !this.isLoaded()) {
+        if (this.level == null || !this.level.isClientSide()) {
             return;
         }
+        // ★線形がまだ入っていない時点で諦めてはいけない。
+        //   新規に敷いたレールは「BE が置かれる → 少し後に線形が届く」順なので、
+        //   ここで return すると<b>焼き直しの機会が二度と来ない</b>
+        //   (入り直すと直るのはこれ。長い＝浅い分岐ほど派手に崩れて見える)。
+        if (!this.isLoaded()) {
+            this.pendingBallastRefresh = true;
+            return;
+        }
+        this.pendingBallastRefresh = false;
+        // ★レールの線 (焼き込みメッシュ) も一緒に捨てる。道床だけ作り直すと、
+        //   ブロック側は新しい線形・レールの線は古い線形になって<b>ずれて見える</b>。
+        com.portofino.realtrainmodunofficial.ClientHooks.invalidateRailMesh(this.level,
+                this.worldPosition.getX(), this.worldPosition.getY(), this.worldPosition.getZ());
+        this.shouldRerenderRail = true;
         int[] size = this.getRailSize();
         int pad = (this.getProperty().getBallastWidth() >> 1) + 2;
         com.portofino.realtrainmodunofficial.ClientHooks.refreshRailBallast(this.level,
@@ -372,8 +389,13 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         }
     }
 
+
     /** 本家 updateEntity 相当。Block 側の BlockEntityTicker から毎 tick 呼ばれる。 */
     public void tick() {
+        // 焼き直しを取りこぼしていたら、線形が届いた時点でやり直す
+        if (this.pendingBallastRefresh && this.level != null && this.level.isClientSide()) {
+            this.refreshBallastArea();
+        }
         if (this.level != null && !this.level.isClientSide) {
             this.isCollidedTrain = this.colliding;
             this.colliding = false;

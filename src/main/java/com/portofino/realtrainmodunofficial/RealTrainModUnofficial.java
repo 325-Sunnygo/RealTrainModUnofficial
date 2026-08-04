@@ -27,7 +27,7 @@ public class RealTrainModUnofficial {
      * ビルド刻印。
      * サーバー/クライアントにどのビルドが入っているかはこれでしか判別できない。
      */
-    public static final String BUILD_TAG = "1.0.16 (Fabric 移植: キー衝突・描画段階・intermediary 名・設置物の当たり判定・可変光源; MOD 自身の規約は非表示)";
+    public static final String BUILD_TAG = "1.0.17 (Fabric 移植: キー衝突・描画段階・intermediary 名・設置物の当たり判定・可変光源; MOD 自身の規約は非表示)";
 
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
         DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
@@ -47,6 +47,21 @@ public class RealTrainModUnofficial {
             .withTabsAfter(MAIN_TAB.getKey())
             .icon(() -> RealTrainModUnofficialItems.FORMATION_ITEM.get().getDefaultInstance())
             .displayItems((parameters, output) -> acceptRtmuTab(output)).build());
+
+    /** 信号制御器と位置設定ツール専用のタブ (ユーザー指定で独立させたもの)。 */
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> SIGNAL_CONTROLLER_TAB =
+        CREATIVE_MODE_TABS.register("signal_controller_tab", () -> CreativeModeTab.builder()
+            .title(Component.translatable("itemGroup.realtrainmodunofficial.signal_controller"))
+            .withTabsAfter(RTMU_TAB.getKey())
+            .icon(() -> RealTrainModUnofficialItems.SIGNAL_CONTROLLER_ITEM.get().getDefaultInstance())
+            .displayItems((parameters, output) -> acceptSignalControllerTab(output)).build());
+
+    /** シグナルコントローラー (SignalControllerMod 移植) 一式。 */
+    private static void acceptSignalControllerTab(net.minecraft.world.item.CreativeModeTab.Output output) {
+        output.accept(RealTrainModUnofficialItems.SIGNAL_CONTROLLER_ITEM.get());
+        output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_0.get());
+        output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_1.get());
+    }
 
     /**
      * クリエイティブタブの並び順。<b>本家 RTM (1.7.10) と同じ順番</b>にしてある。
@@ -125,11 +140,8 @@ public class RealTrainModUnofficial {
         // 銃器・金鋸・櫂・ふいご は RTMU に無い
         output.accept(RealTrainModUnofficialItems.CAMERA_ITEM.get());         //camera
 
-        // ★SignalControllerMod (masa300) 移植は RTM 側に置く (ユーザー指定)。
-        // 本家 RTM そのものには無いが、信号まわりの道具なのでこちらが探しやすい。
-        output.accept(RealTrainModUnofficialItems.SIGNAL_CONTROLLER_ITEM.get());
-        output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_0.get());
-        output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_1.get());
+        // ★SignalControllerMod (masa300) 移植は専用タブ (SIGNAL_CONTROLLER_TAB) へ移した。
+        // 位置設定ツール 2 つと必ずセットで使うので、まとめて 1 タブにしてある (ユーザー指定)。
     }
 
     /**
@@ -150,6 +162,8 @@ public class RealTrainModUnofficial {
         // 乗客シミュレーション (統合): 駅ブロック / 停止位置目標
         output.accept(com.portofino.rtmupassenger.PassengerMod.STATION_ITEM.get());
         output.accept(com.portofino.rtmupassenger.PassengerMod.STOP_TARGET_ITEM.get());
+        // 背景パネル: 模型やジオラマの背景に写真を立てる
+        output.accept(RealTrainModUnofficialItems.BACKGROUND_PANEL_ITEM.get());
     }
 
     /**
@@ -160,7 +174,7 @@ public class RealTrainModUnofficial {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> EXTERNAL_BUILDING_TAB =
         CREATIVE_MODE_TABS.register("external_building_tab", () -> CreativeModeTab.builder()
             .title(Component.literal("外部建材 (1.7.10)"))
-            .withTabsAfter(RTMU_TAB.getKey())
+            .withTabsAfter(SIGNAL_CONTROLLER_TAB.getKey())
             .icon(() -> com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks.TAB_ITEMS.isEmpty()
                 ? new net.minecraft.world.item.ItemStack(net.minecraft.world.item.Items.BRICKS)
                 : com.portofino.realtrainmodunofficial.building.ExternalBuildingBlocks.TAB_ITEMS.get(0).get().getDefaultInstance())
@@ -263,13 +277,16 @@ public class RealTrainModUnofficial {
                 if (def.getId() == null || def.getId().isBlank()) {
                     continue;
                 }
+                //本家 ItemRail.getSubItems と同じ: defaultBallast に書いてある数だけ出す。
+                //  1067mm_Wood なら [gravel, snow] の 2 つ、桁レールなら [air] の 1 つ。
+                //  ★defaultBallast を持たないレール (Advanced Rails 等) は本家ではタブに出ない。
+                //   RTMU は出すが、道床は付けない (null = レール定義に無い = 空気)。
                 java.util.List<com.portofino.realtrainmodunofficial.rail.RailDefinition.Ballast> sets =
                     def.getBallastSets();
                 if (sets.isEmpty()) {
-                    output.accept(railStack(def.getId(), def.getBallastBlockId()));
+                    output.accept(railStack(def.getId(), null));
                     continue;
                 }
-                //本家と同じく、道床の数だけアイテムが出る (「00_砂利」のような並び)
                 for (com.portofino.realtrainmodunofficial.rail.RailDefinition.Ballast set : sets) {
                     output.accept(railStack(def.getId(), set.blockId()));
                 }

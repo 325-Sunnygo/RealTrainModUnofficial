@@ -104,8 +104,13 @@ public final class FormationSpawner {
         List<EntityTrainBase> spawned = new ArrayList<>(ids.size());
         for (int i = 0; i < ids.size(); i++) {
             Placement p = placements.get(i);
+            // 最後尾 (後ろに何も繋がらない車両) だけ前後逆向きに置く。
+            // 実車と同じで、後追いの運転台が編成の外側を向く。
+            // 1 両だけのときは「最後尾」ではなく単なる 1 両目なので反転しない。
+            boolean tail = ids.size() >= 2 && i == ids.size() - 1;
+            float carYaw = tail ? Mth.wrapDegrees(p.yaw() + 180.0F) : p.yaw();
             EntityTrain train = new EntityTrain(jp.ngt.rtm.entity.RTMEntities.TRAIN.get(), level);
-            train.moveTo(p.x(), p.y(), p.z(), p.yaw(), p.pitch());
+            train.moveTo(p.x(), p.y(), p.z(), carYaw, p.pitch());
             train.setModelName(ids.get(i));
             train.spawnTrain(level);
             train.onModelChanged();

@@ -1,0 +1,36 @@
+//RTMU-AutoDrive_1.21.1 — RTMU 純正の自動運転 mod (RTMU に依存)。
+//RTMU 本体とは別 jar として配布する。ライセンスは RTMU と同じ LGPLv3。
+plugins {
+    id 'java-library'
+    id 'net.neoforged.gradle.userdev'
+}
+
+version = autodrive_version
+group = 'com.portofino.rtmuautodrive'
+
+base {
+    archivesName = 'RTMU-AutoDrive_1.21.1'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+dependencies {
+    implementation "net.neoforged:neoforge:${neo_version}"
+    //RTMU 本体のクラス (EntityTrainBase / EntityMotorman / StationRegistry) をコンパイル参照。
+    //実行時は mods フォルダの RTMU jar が提供する。
+    compileOnly rootProject
+}
+
+//RTMU 本体と同じ: ビルドしたら Modrinth の Server test プロファイルへ自動配置
+def modrinthModsDir = file("${System.properties['user.home']}/Library/Application Support/ModrinthApp/profiles/Server test/mods")
+
+tasks.register('copyJarToModrinthMods', Copy) {
+    dependsOn tasks.named('jar')
+    onlyIf { modrinthModsDir.isDirectory() }
+    from(tasks.named('jar').flatMap { it.archiveFile })
+    into(modrinthModsDir)
+}
+
+tasks.named('build').configure {
+    finalizedBy(tasks.named('copyJarToModrinthMods'))
+}

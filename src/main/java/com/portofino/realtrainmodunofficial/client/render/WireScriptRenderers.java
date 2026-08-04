@@ -38,8 +38,16 @@ public final class WireScriptRenderers {
     private WireScriptRenderers() {
     }
 
+    /**
+     * 架線の描画器を返す。
+     *
+     * <p>★スクリプトを持たない架線でも返す。本家はスクリプトの有無にかかわらず
+     * {@link WirePartsRenderer#renderWire} を通し、スクリプトが無いときは
+     * {@code renderWireDynamic} の中で直線/たるみを描く。
+     * レンダラ側に別経路を持たせない。
+     */
     public static Scripted get(InstalledObjectDefinition def) {
-        if (def == null || def.getScriptPath() == null || def.getScriptPath().isBlank()) {
+        if (def == null) {
             return null;
         }
         Scripted s = CACHE.computeIfAbsent(def.getId(), id -> create(def));
@@ -48,44 +56,56 @@ public final class WireScriptRenderers {
 
     private static Scripted create(InstalledObjectDefinition def) {
         try {
-            byte[] bytes = NGTFileLoader.findAsset(def.getScriptPath());
-            if (bytes == null) {
-                RealTrainModUnofficial.LOGGER.warn("[wire] スクリプトが見つかりません: {} ({})",
-                        def.getId(), def.getScriptPath());
-                return INVALID;
+            String scriptPath = def.getScriptPath();
+            boolean hasScript = scriptPath != null && !scriptPath.isBlank();
+            WirePartsRenderer renderer;
+            if (hasScript) {
+                byte[] bytes = NGTFileLoader.findAsset(scriptPath);
+                if (bytes == null) {
+                    RealTrainModUnofficial.LOGGER.warn("[wire] スクリプトが見つかりません: {} ({})",
+                            def.getId(), scriptPath);
+                    return INVALID;
+                }
+                // Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-8 だと構文ごと壊れる)
+                String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
+                ScriptEngine se = ScriptUtil.doScript(
+                        "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n"
+                        + "var GL12 = GL11;\n"
+                        + "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n"
+                        // スクリプトは 1.12 の net.minecraft.util.math.BlockPos を import する。
+                        // 1.21 では core.BlockPos なので、あらかじめグローバルに束縛しておく。
+                        + "var BlockPos = Java.type('" + net.minecraft.core.BlockPos.class.getName() + "');\n"
+                        + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, scriptPath));
+                Object rcName = se.get("renderClass");
+                if (rcName == null) {
+                    RealTrainModUnofficial.LOGGER.warn("[wire] renderClass がありません: {}", def.getId());
+                    return INVALID;
+                }
+                Class<?> rc = Class.forName(rcName.toString(), true, ScriptUtil.class.getClassLoader());
+                Object instance;
+                try {
+                    instance = rc.getConstructor(String[].class).newInstance(new Object[]{new String[0]});
+                } catch (NoSuchMethodException e) {
+                    instance = rc.getDeclaredConstructor().newInstance();
+                }
+                if (!(instance instanceof WirePartsRenderer wpr)) {
+                    // 架線以外の renderClass (BasicWire 等が別クラスを指す場合) は描かない
+                    return INVALID;
+                }
+                renderer = wpr;
+                renderer.setScript(se);
+                //どのパックのスクリプトが落ちたか追えるように名前を持たせる
+                renderer.scriptName = def.getId() + " (" + scriptPath + ")";
+                se.put("renderer", renderer);
+            } else {
+                renderer = new WirePartsRenderer(new String[0]);
+                renderer.scriptName = def.getId() + " (スクリプト無し)";
             }
-            // Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-8 だと構文ごと壊れる)
-            String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
-            ScriptEngine se = ScriptUtil.doScript(
-                    "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n"
-                    + "var GL12 = GL11;\n"
-                    + "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n"
-                    // スクリプトは 1.12 の net.minecraft.util.math.BlockPos を import する。
-                    // 1.21 では core.BlockPos なので、あらかじめグローバルに束縛しておく。
-                    + "var BlockPos = Java.type('" + net.minecraft.core.BlockPos.class.getName() + "');\n"
-                    + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, def.getScriptPath()));
-            Object rcName = se.get("renderClass");
-            if (rcName == null) {
-                RealTrainModUnofficial.LOGGER.warn("[wire] renderClass がありません: {}", def.getId());
-                return INVALID;
-            }
-            Class<?> rc = Class.forName(rcName.toString(), true, ScriptUtil.class.getClassLoader());
-            Object instance;
-            try {
-                instance = rc.getConstructor(String[].class).newInstance(new Object[]{new String[0]});
-            } catch (NoSuchMethodException e) {
-                instance = rc.getDeclaredConstructor().newInstance();
-            }
-            if (!(instance instanceof WirePartsRenderer renderer)) {
-                // 架線以外の renderClass (BasicWire 等が別クラスを指す場合) は従来描画に任せる
-                return INVALID;
-            }
-            renderer.setScript(se);
-            se.put("renderer", renderer);
 
             // 定義 (JSON) の値を本家 WireConfig 相当としてレンダラへ
             renderer.sectionLength = def.getSectionLength();
             renderer.deflectionCoefficient = def.getDeflectionCoefficient();
+            renderer.lengthCoefficient = def.getLengthCoefficient();
             renderer.smoothing = def.isSmoothing();
 
             List<TextureSet> sets = new ArrayList<>();
@@ -134,8 +154,6 @@ public final class WireScriptRenderers {
         return NGTFileLoader.resolvePackTexture(path);
     }
 
-    private static final java.util.Set<String> WARNED_EMPTY = java.util.concurrent.ConcurrentHashMap.newKeySet();
-
     public static final class Scripted {
         private final WirePartsRenderer renderer;
         private final ModelObject modelObject;
@@ -155,7 +173,7 @@ public final class WireScriptRenderers {
         /**
          * @param from 接続元の取付点 (ブロック隅からの相対座標)
          * @param to   接続先の取付点 (同上)
-         * @return true = スクリプトが描いた (呼び出し元は従来描画をスキップする)
+         * @return true = 何か描いた (代替描画は無いので呼び出し元は使わない)
          */
         public boolean render(InstalledObjectBlockEntity be, net.minecraft.world.phys.Vec3 from,
                               net.minecraft.world.phys.Vec3 to, float partialTick, PoseStack poseStack,
@@ -167,15 +185,39 @@ public final class WireScriptRenderers {
             if (this.renderer == null) {
                 return false;
             }
+            this.renderer.modelGroupNames = model != null ? model.getOriginalGroupNames() : java.util.Set.of();
+            // 本家 RenderElectricalWiring: 原点は接続元の取付点、vec は相手までの相対ベクトル
+            Vec3 vec = new Vec3(to.x - from.x, to.y - from.y, to.z - from.z);
+
+            // 本家 RenderElectricalWiring.renderWire のパス構成をそのまま再現する。
+            //   pass0 → NORMAL
+            //   pass1 → light を持つなら LIGHT (満照度)、alphaBlend を持つなら TRANSPARENT
+            // 1.21 の BlockEntityRenderer は 1 回しか呼ばれないので、ここで順に流す。
+            boolean drawn = renderPass(jp.ngt.rtm.render.RenderPass.NORMAL, be, from, vec, partialTick,
+                poseStack, buffer, packedLight, packedOverlay, model);
+            if (this.modelObject != null && this.modelObject.light) {
+                drawn |= renderPass(jp.ngt.rtm.render.RenderPass.LIGHT, be, from, vec, partialTick,
+                    poseStack, buffer, packedLight, packedOverlay, model);
+            }
+            if (this.modelObject != null && this.modelObject.alphaBlend) {
+                drawn |= renderPass(jp.ngt.rtm.render.RenderPass.TRANSPARENT, be, from, vec, partialTick,
+                    poseStack, buffer, packedLight, packedOverlay, model);
+            }
+
+            return drawn;
+        }
+
+        /** 1 パス分を記録して再生する。本家の pass ごとの renderWire 呼び出しに対応。 */
+        private boolean renderPass(jp.ngt.rtm.render.RenderPass pass, InstalledObjectBlockEntity be,
+                                   net.minecraft.world.phys.Vec3 from, Vec3 vec, float partialTick,
+                                   PoseStack poseStack, MultiBufferSource buffer,
+                                   int packedLight, int packedOverlay, MqoModelLoader.MqoModel model) {
             GLRecorder rec = new GLRecorder();
             GLRecorder.activate(rec);
             try {
-                this.renderer.modelGroupNames = model != null ? model.getOriginalGroupNames() : java.util.Set.of();
-                // 本家 RenderElectricalWiring: 原点は接続元の取付点、vec は相手までの相対ベクトル
-                Vec3 vec = new Vec3(to.x - from.x, to.y - from.y, to.z - from.z);
                 rec.push();
                 rec.translate((float) from.x, (float) from.y, (float) from.z);
-                this.renderer.renderWire(be, null, vec, partialTick, 0);
+                this.renderer.renderWire(be, null, vec, partialTick, pass.id);
                 rec.pop();
             } catch (Throwable t) {
                 RealTrainModUnofficial.LOGGER.warn("Wire script render failed", t);
@@ -183,17 +225,15 @@ public final class WireScriptRenderers {
                 GLRecorder.deactivate();
                 this.renderer.consumeScriptFailure();
             }
-            // スクリプトが未対応 API で落ちて何も描けなかった場合は従来描画に戻す
             if (!rec.hasGeometry()) {
-                if (!WARNED_EMPTY.contains(this.renderer.getClass().getName())) {
-                    WARNED_EMPTY.add(this.renderer.getClass().getName());
-                    RealTrainModUnofficial.LOGGER.warn("[wire] スクリプトが何も描きませんでした → 従来描画にフォールバック");
-                }
                 return false;
             }
-            VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model,
+            // 本家は LIGHT パスでライティングを切って満照度にする
+            int light = pass == jp.ngt.rtm.render.RenderPass.LIGHT
+                ? net.minecraft.client.renderer.LightTexture.FULL_BRIGHT : packedLight;
+            VehicleScriptRenderers.replay(rec, poseStack, buffer, light, packedOverlay, model,
                     this.modelObject != null ? this.modelObject.model : null,
-                    jp.ngt.rtm.render.RenderPass.NORMAL.id, null, this.defaultTexture);
+                    pass.id, null, this.defaultTexture);
             return true;
         }
     }

@@ -101,7 +101,9 @@ public class StationBlockEntity extends BlockEntity {
             boolean doorOpen = train.getTrainStateData(4) != 0; //State_Door (0=閉)
             // この駅の停止位置目標にドアが付いている列車だけを扱う。
             // 隣の駅に停車中の列車を自分の駅と誤認して乗せないため。
-            if (stopped && doorOpen && this.trainServesThisStation(train)) {
+            // ★終点の列車には乗せない (降車は PassengerEntity 側でそのまま行われる)。
+            //   乗せると、このあと消える列車に乗り込むことになる。
+            if (stopped && doorOpen && !train.isTerminating() && this.trainServesThisStation(train)) {
                 if (boardable == null) {
                     boardable = train;
                 }

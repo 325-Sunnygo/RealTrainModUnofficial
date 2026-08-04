@@ -387,12 +387,8 @@ public class EntityBogie extends Entity {
         // 新しいレールの反響音指定を引き継ぎ、継ぎ目カウントを最初から数え直す
         this.reverbSound = newRail != null && newRail.isReberbSound();
         this.jointIndex = 0;
+        // 継ぎ目は<b>音だけ</b>。車体を揺らす入力は持たない (上を参照)
         this.playJointSound();
-        // レール継ぎ目のガタン — 車体サスペンションへ入力 (RTMU オリジナル)
-        EntityTrainBase train = this.getTrain();
-        if (train != null && train.bogieController != null) {
-            train.bogieController.onRailJoint(this, train.getSpeed());
-        }
     }
 
     /** 既定のジョイント音 (パックが sound_Joint を指定しない場合)。 */
@@ -525,6 +521,12 @@ public class EntityBogie extends Entity {
     }
 
     protected void updatePosAndRotationClient() {
+        // ★ここに遅延バッファを入れてはいけない。
+        // バニラは移動パケットに回転が無いとき lerpTo へ entity.lerpTargetYRot()
+        // (= クライアント自身の現在値) を渡す (ClientPacketListener:630)。
+        // それを標本として貯めると<b>自分の出力を遅れて再生し続ける閉ループ</b>になり、
+        // 回転パケットが止まった瞬間 (カーブを抜けた直後) に小刻みに揺れる。
+        // 台車の姿勢はレールから直に求める (snapToRailArc / RtmBogieRenderer)。
         if (this.carPosRotationInc > 0) {
             float d0 = 1.0F / (float) this.carPosRotationInc;
             this.setYRot(this.getYRot() + Mth.wrapDegrees(this.carYaw - this.getYRot()) * d0);
@@ -553,7 +555,7 @@ public class EntityBogie extends Entity {
      * サーバ #updateBogiePos と同じレール取得・サンプリングを行うが、
      * 台車の物理状態フィールド (currentRailObj/currentRailMap/split/prevPosIndex) は
      * 一切変更しない。
-     * @return レール弧上の {x, y, z}。レール未検出時は null (呼び出し側で弦へフォールバック)。
+     * @return {x, y, z, ヨー, ピッチ, カント}。レール未検出時は null (呼び出し側で弦へフォールバック)。
      */
     public double[] snapToRailArc(double cx, double cy, double cz) {
         TileEntityLargeRailCore coreObj = this.getRail(cx, cy, cz);
@@ -577,7 +579,19 @@ public class EntityBogie extends Entity {
         int pIndex = railMap.getNearlestPoint(railSplit, cx, cz);
         double[] posZX = railMap.getRailPos(railSplit, pIndex);//{z, x}
         double py = railMap.getRailHeight(railSplit, pIndex) + EntityTrainBase.TRAIN_HEIGHT;
-        return new double[]{posZX[1], py, posZX[0]};
+        // ★姿勢もレールから求める。
+        // パケット由来の姿勢は 1.4 度に量子化されていて、しかも回転が止まると
+        // 自分の値が返ってくる (lerpTargetYRot) ので滑らかにできない。
+        // レールは連続な曲線なので、そこから取れば刻みも遅れも無い。
+        // 式はサーバー側 updateBogiePos と同じ (向きの 180 度反転もそこで解決する)。
+        float railYaw = Mth.wrapDegrees(railMap.getRailRotation(railSplit, pIndex));
+        float bogieYaw = fixBogieYaw(this.getYRot(), railYaw);
+        float bogiePitch = fixBogiePitch(railMap.getRailPitch(railSplit, pIndex), railYaw, bogieYaw);
+        float cant = railMap.getCant(railSplit, pIndex);
+        if (Math.abs(Mth.wrapDegrees(railYaw - bogieYaw)) > 90.0F) {
+            cant *= -1.0F;
+        }
+        return new double[]{posZX[1], py, posZX[0], bogieYaw, bogiePitch, cant};
     }
 
     @Override

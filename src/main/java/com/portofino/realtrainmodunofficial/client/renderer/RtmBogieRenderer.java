@@ -87,13 +87,19 @@ public class RtmBogieRenderer extends EntityRenderer<EntityBogie> {
         try {
             poseStack.translate(targetX - bogieFX, targetY - bogieFY, targetZ - bogieFZ);
 
-            float roll = Mth.lerp(partialTicks, bogie.prevRotationRoll, bogie.rotationRoll);
+            // ★姿勢もレールから取れたならそれを使う。
+            // パケット由来の姿勢は 1.4 度刻みに量子化されているうえ、回転が止まると
+            // 自分の値が返ってくるので滑らかにならない。レールは連続なので刻みが無い。
+            float roll = arc != null ? (float) arc[5]
+                : Mth.lerp(partialTicks, bogie.prevRotationRoll, bogie.rotationRoll);
             if (Math.abs(roll) > 0.001F) {
                 poseStack.mulPose(Axis.ZP.rotationDegrees(roll));
             }
 
-            float yaw = Mth.rotLerp(partialTicks, bogie.yRotO, bogie.getYRot());
-            float pitch = Mth.lerp(partialTicks, bogie.xRotO, bogie.getXRot());
+            float yaw = arc != null ? (float) arc[3]
+                : Mth.rotLerp(partialTicks, bogie.yRotO, bogie.getYRot());
+            float pitch = arc != null ? (float) arc[4]
+                : Mth.lerp(partialTicks, bogie.xRotO, bogie.getXRot());
             // renderWorldBogie が yaw(Y)/-pitch(X)/scale を適用する
             BogieRenderer.renderWorldBogie(poseStack, bogieDef, def, buffer, packedLight, yaw, pitch, partialTicks);
         } finally {

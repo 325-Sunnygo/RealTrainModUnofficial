@@ -29,6 +29,17 @@ public class FormationCrowbarItem extends Item {
     }
 
     /**
+     * ブロックは掘れない (通常のバール {@link CrowbarItem} と同じ)。
+     * これが無いとクリエイティブでレールや地形を即破壊してしまう。
+     */
+    @Override
+    public boolean canAttackBlock(net.minecraft.world.level.block.state.BlockState state,
+                                  net.minecraft.world.level.Level level,
+                                  net.minecraft.core.BlockPos pos, Player player) {
+        return false;
+    }
+
+    /**
      * 殴ったとき。
      *
      * <p>台車を殴っても車体を殴っても効くようにする (見た目で当たるのはほぼ台車)。

@@ -120,6 +120,13 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public float prevRotationPitchVehicle;
 
     // 本家 setPositionAndRotation2/updatePosAndRotationClient のクライアント補間
+    /**
+     * ★滑らかさのための遅延バッファ。
+     * 漸近方式 (1/inc ずつ寄せる) は速度が一定にならず、常に約 3 tick 遅れる。
+     * 届いた位置を時刻つきで貯めて「今 − 遅延」を再生すると、速度が一定になり遅れも減る。
+     */
+    protected final jp.ngt.rtm.entity.ClientMotionBuffer motionBuffer =
+        new jp.ngt.rtm.entity.ClientMotionBuffer();
     protected int vehiclePosRotationInc;
     protected double vehicleX, vehicleY, vehicleZ;
     protected float vehicleYaw, vehiclePitch, vehicleRoll;
@@ -602,12 +609,38 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
             this.vehicleYaw = yaw;
             this.vehiclePitch = pitch;
         }
+        // 遅延バッファへ到着時刻つきで積む。姿勢は float 同期側の値を使う
+        this.motionBuffer.push(x, y, z, this.vehicleYaw, this.vehiclePitch, this.vehicleRoll);
     }
 
     /**
      * 本家 updatePosAndRotationClient の忠実移植 (クライアント補間)。
      * 位置・回転 (ヨー/ピッチ/ロール) をどちらも同じ 1/inc で漸近補間する。
      */
+    /** クライアント側で初期姿勢を入れ終えたか。 */
+    protected boolean isClientRotInit() {
+        return this.clientRotInit;
+    }
+
+    /**
+     * クライアントで姿勢を<b>補間せず即座に</b>合わせる。
+     *
+     * <p>スポーンパケットの yaw は byte 1 個ぶんの粗い値 (車両は 0 のことが多い) なので、
+     * 最初の tick で {@link #updatePosAndRotationClient} が直すまでの<b>1 フレームだけ
+     * 横を向いた車両が描かれる</b> (チャンク外から近付いたときに一瞬横向きに出るのがこれ)。
+     * 実姿勢が同期された時点でここを呼び、tick を待たずに向きを確定させる。
+     */
+    protected void snapClientRotation(float yaw, float pitch) {
+        this.vehicleYaw = yaw;
+        this.vehiclePitch = pitch;
+        this.setRot(yaw, pitch);
+        this.yRotO = yaw;
+        this.xRotO = pitch;
+        this.prevRotationYawVehicle = yaw;
+        this.prevRotationPitchVehicle = pitch;
+        this.clientRotInit = true;
+    }
+
     protected void updatePosAndRotationClient() {
         if (!this.clientRotInit) {
             this.clientRotInit = true;
@@ -616,6 +649,15 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
             this.xRotO = this.vehiclePitch;
             this.rotationRoll = this.vehicleRoll;
             this.prevRotationRoll = this.vehicleRoll;
+        }
+        // ★まず遅延バッファ。届いた位置を時刻で再生するので速度が一定になる。
+        // 標本が足りない間 (湧いた直後・テレポート直後) だけ従来の漸近方式へ落とす。
+        if (this.motionBuffer.sample()) {
+            this.setPos(this.motionBuffer.outX, this.motionBuffer.outY, this.motionBuffer.outZ);
+            this.setRot(this.motionBuffer.outYaw, this.motionBuffer.outPitch);
+            this.rotationRoll = this.motionBuffer.outRoll;
+            this.vehiclePosRotationInc = 0;
+            return;
         }
         if (this.vehiclePosRotationInc > 0) {
             float d0 = 1.0F / (float) this.vehiclePosRotationInc;

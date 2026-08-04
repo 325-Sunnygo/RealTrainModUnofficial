@@ -246,6 +246,10 @@ public final class CarEntity extends Entity {
         public DataMapCompat getDataMap() { return new DataMapCompat(car); }
     }
 
+    /** 送信失敗を 1 キーにつき 1 回だけ知らせる。 */
+    private static final java.util.Set<String> WARNED_SEND_FAILURE =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     /** RTM 互換: scriptData への読み書きを media する。 */
     public static final class DataMapCompat {
         private final CarEntity car;
@@ -288,8 +292,14 @@ public final class CarEntity extends Entity {
                 try {
                     net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new com.portofino.realtrainmodunofficial.network.CarScriptDataPayload(car.getId(), key, value));
-                } catch (Throwable ignored) {
-                    // サーバ未接続/送信失敗時は無視(ローカルには書けている)。
+                } catch (Throwable e) {
+                    // ★握りつぶさない。ここが失敗すると「クライアントでは組めているのに
+                    //   サーバーでは何も起きない」になり、原因が一切分からなくなる。
+                    if (WARNED_SEND_FAILURE.add(key)) {
+                        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                            "[RTMU] スクリプトデータをサーバーへ送れませんでした key={} 長さ={}: {}",
+                            key, value == null ? 0 : value.length(), e.toString());
+                    }
                 }
             }
         }

@@ -253,7 +253,8 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                     if (isRunningGearGroup(groupName)) return true;
                     if (leftChains.isEmpty() && rightChains.isEmpty()) {
                         // ドア定義の無いパックは名前推定フォールバックに掛かる可能性がある
-                        return groupName.length() >= 4 && containsDoorWord(groupName);
+                        // ドア定義が無いなら動かす対象も無い (名前推定はしない)。
+                        return false;
                     }
                     return hasPartsTransform(leftChains, groupName) || hasPartsTransform(rightChains, groupName);
                 }
@@ -476,32 +477,13 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             return;
         }
         if (doors == null || doors.isEmpty()) {
-            // JSON にドア定義が無いパック向けの名前推定フォールバック (本家には無い RTMU の補助)
-            applyLegacyDoorFallback(poseStack, groupName,
-                    smoothstep(Mth.clamp(progressTicks / MAX_DOOR_MOVE, 0.0F, 1.0F)), leftSide);
+            // ★定義が無いなら動かさない。本家にドア名を推測する仕組みは無い
+            //   (本家パックはドアの動きをスクリプトで書く)。
             return;
         }
         applyPartsTransform(poseStack, partsChains(doors), groupName, progressTicks);
     }
 
-    private static void applyLegacyDoorFallback(PoseStack poseStack, String groupName, float progress, boolean leftSide) {
-        String normalized = groupName == null ? "" : groupName.toLowerCase(java.util.Locale.ROOT);
-        if (!normalized.contains("door")) {
-            return;
-        }
-        boolean isDoorLeaf = normalized.matches(".*(?:^|_)[0-9]+[lr](?:_|$).*")
-            || normalized.matches(".*(?:^|_)[lr](?:_|$).*");
-        if (!isDoorLeaf) {
-            return;
-        }
-        double slide = 0.72D * progress;
-        boolean opensTowardPositiveZ = normalized.matches(".*[0-9]+l(?:_|$).*")
-            || normalized.contains("_l_")
-            || normalized.endsWith("_l");
-        // Barus Keikyu 系はドア名に train-side 情報を持たないため、まずは対象側の開閉で
-        // 全ドア葉を確実に動かし、葉ごとの L/R だけでスライド方向を決める。
-        poseStack.translate(0.0D, 0.0D, opensTowardPositiveZ ? slide : -slide);
-    }
 
 
     private static float smoothstep(float x) {

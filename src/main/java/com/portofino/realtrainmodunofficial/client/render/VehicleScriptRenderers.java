@@ -92,7 +92,7 @@ public final class VehicleScriptRenderers {
             // 無音終了 (ネイティブ/メモリ由来) の切り分け用。1 車両につき 1 回だけ出る。
             RealTrainModUnofficial.LOGGER.info("[RTMU] vehicle script init: {} ({})", def.getId(), def.getScriptPath());
             ModelObject modelObject = buildModelObject(def);
-            RealTrainModUnofficial.LOGGER.info("[RTMU] vehicle model graph built: {} groups={}", def.getId(),
+            RealTrainModUnofficial.LOGGER.debug("[RTMU] vehicle model graph built: {} groups={}", def.getId(),
                     modelObject != null && modelObject.model != null ? modelObject.model.groupObjects.size() : -1);
             jp.ngt.rtm.modelpack.modelset.ModelSetCompat modelSet =
                     new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(

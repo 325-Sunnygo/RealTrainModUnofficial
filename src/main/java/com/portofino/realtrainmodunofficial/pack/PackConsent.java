@@ -123,8 +123,15 @@ public final class PackConsent {
         if (isOwnModJar(zip)) {
             return true;
         }
-        ensureLoaded();
         String name = zip.getFileName().toString();
+        // ★同意を求めるのは<b>zip のモデルパックだけ</b>。
+        //   RTMU は mods フォルダも探すので、他 MOD の jar に入っている LICENSE まで
+        //   README 判定に引っかかって「規約に同意」画面に出ていた。
+        //   モデルパックは zip、MOD は jar なので拡張子で切り分ける。
+        if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
+            return true;
+        }
+        ensureLoaded();
         State decided = DECISIONS.get(name);
         if (decided == State.AGREED) {
             return true;

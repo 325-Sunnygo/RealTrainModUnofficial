@@ -3970,7 +3970,17 @@ public class TrainScriptSystem {
 
         public int getLodState(Object entity) { return 0; }
 
-        public int getMetadata(Object entity) { return 0; }
+        /**
+         * 本家の設置物 meta = クリックした面 (0-5)。RenderSearchLight.js 等が
+         * 壁付け時に樽の傾きを打ち消すのに使う (0 固定だと二重に傾く)。
+         */
+        public int getMetadata(Object entity) {
+            if (entity instanceof InstalledObjectBlockEntity be) {
+                int face = be.getMountFace();
+                return face >= 0 ? face : 1;
+            }
+            return 0;
+        }
 
         public boolean isSwitchRail(Object entity) {
             if (entity instanceof net.minecraft.world.level.block.entity.BlockEntity be) {

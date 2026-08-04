@@ -122,12 +122,6 @@ public final class MqoModelLoader {
         Path packPath = RailPackLoader.resolvePackPath(def.getPackName());
         MqoModel model = packPath == null ? null
             : loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), false);
-        if (model == null) {
-            // レールモデルが解決できないと描画されず道床(砂利)だけ生成され「レールが無い」
-            // 状態になる (ユーザー報告)。標準レール ModelRail_1067mm.mqo を mod jar から
-            // フォールバック読み込みし、必ず鉄レールが出るようにする。
-            model = loadFallbackRailModel();
-        }
         if (model != null) {
             // ★OpList 経路 (系統B) へはスクリプトを積まない。
             // 描画スクリプトは VehicleScriptRenderers / RailScriptRenderers (系統A) が
@@ -140,24 +134,6 @@ public final class MqoModelLoader {
         return model;
     }
 
-    private static MqoModel fallbackRailModel;
-    private static boolean fallbackRailAttempted;
-
-    /** 標準 1067mm レールを mod jar から読み込むフォールバック。失敗しても null を返すだけ。 */
-    private static MqoModel loadFallbackRailModel() {
-        if (fallbackRailAttempted) return fallbackRailModel;
-        fallbackRailAttempted = true;
-        try {
-            Path modJar = com.portofino.realtrainmodunofficial.BundledPackStore.getModJarPath();
-            if (modJar != null) {
-                fallbackRailModel = loadInternal(modJar, "ModelRail_1067mm.mqo",
-                    java.util.Map.of("default", "textures/rail/largeRail.png"), false);
-            }
-        } catch (Throwable t) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load fallback rail model", t);
-        }
-        return fallbackRailModel;
-    }
 
     public static MqoModel loadModelForVehicle(VehicleDefinition def) {
         if (def == null) {
@@ -1166,7 +1142,7 @@ public final class MqoModelLoader {
                    .append(materialOrder.get(i)).append("->").append(resolveTexturePath(
                        (byte) i, materialOrder, materialTexPaths, textureOverrides));
         }
-        RealTrainModUnofficial.LOGGER.info("[RTMU] 材質→テクスチャ [{}]: {}", opener.getPackKey(), mapping);
+        RealTrainModUnofficial.LOGGER.debug("[RTMU] 材質→テクスチャ [{}]: {}", opener.getPackKey(), mapping);
         return new MqoModel(out, materialTextures);
     }
 
@@ -4607,6 +4583,17 @@ public final class MqoModelLoader {
                         // 矢印を描く)。
                         // ★発光パスを RTMU の推測でスキップしない (スクリプト任せ)。
                         if (pass >= 2 && !shouldRenderEmissivePass(entity, pass)) continue;
+                        // ★pass1 は AlphaBlend を持つときだけ (本家 ModelObject.render)。
+                        // 本家は pass0 → 常に描く / pass1 → alphaBlend のときだけ描く、で、
+                        // alphaBlend はテクスチャ指定の第 3 欄が "AlphaBlend" かどうかで決まる。
+                        // RTMU は pass0/1 を無条件に回していたため、pass を見ないスクリプト
+                        // (架線柱の render_baru_pole_xx_s.js など) が<b>同じ物を 2 回描いて重なっていた</b>。
+                        // 宣言 AlphaBlend は registerTextureFromZip で isTranslucent に入るので
+                        // hasTranslucentBatches() で拾える (半端αを持つテクスチャも含む = 本家より緩い側)。
+                        if (pass == 1 && !hasTranslucentBatches()
+                                && !(scriptRenderer != null && scriptRenderer.hasAlphaPassContent())) {
+                            continue;
+                        }
                         poseStack.pushPose();
                         try {
                             executeScript(poseStack, buffer, packedLight, overlay, pass, entity);
