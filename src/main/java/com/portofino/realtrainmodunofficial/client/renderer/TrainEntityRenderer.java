@@ -102,7 +102,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     }
 
     /** 本家 getLightValue: 空 (時刻で減衰) とブロックの明るいほう。 */
-    private static int ambientLightValue(net.minecraft.world.level.Level level, double x, double y, double z) {
+    static int ambientLightValue(net.minecraft.world.level.Level level, double x, double y, double z) {
         BlockPos pos = BlockPos.containing(x, y + 0.5D, z);
         int skyBrightness = Mth.clamp(15 - level.getSkyDarken(), 0, 15);
         int sky = level.getBrightness(net.minecraft.world.level.LightLayer.SKY, pos) * skyBrightness / 15;
@@ -775,61 +775,25 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             || (hasManyOverlayFeatures && totalVertices >= 12_000 && batchCount >= 96);
     }
 
+    /**
+     * 前照灯・尾灯の光。本家 {@code RenderVehicleBase.renderLightEffect} へ丸投げする。
+     * ★ここは旧実装 (TrainEntity) の経路。設置される列車は EntityTrain なので
+     *   本命は {@link RtmTrainRenderer} 側。
+     */
     private static void renderConfiguredLights(TrainEntity entity, VehicleDefinition def,
                                                com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model,
                                                PoseStack poseStack, MultiBufferSource buffer, float renderYaw,
                                                boolean ridingThisTrain) {
-        // 「臨場感ライト」(放射状グローのビルボード)はユーザー要望で無効化。
-        // 実際のランプ部品(モデルの発光テクスチャ)はスクリプト/モデル側で描画されるので残る。
-        if (true) return;
         if (def == null) return;
         int mode = entity.getLightMode();
-        boolean interiorOn = entity.isInteriorLightOn();
-        if (mode <= 0 && !interiorOn) return;
-
-        boolean singleTrainActive = def.isSingleTrain() && !entity.isConnected();
-        boolean renderHeadLights = mode == 1 || mode == 3;
-        boolean renderTailLights = mode == 2 || mode == 3;
-        if (singleTrainActive && mode == 1) renderTailLights = true;
-
-        // カメラの right/up ベクトルを列車ローカル座標系に変換してビルボードを実現。
-        // 列車トランスフォームは Y軸回転 + オフセット + スケール。
-        Vector3f billRight = new Vector3f(1, 0, 0);
-        Vector3f billUp    = new Vector3f(0, 1, 0);
-        Quaternionf invYaw = Axis.YP.rotationDegrees(renderYaw).conjugate();
-        Minecraft.getInstance().gameRenderer.getMainCamera().rotation().transform(billRight);
-        Minecraft.getInstance().gameRenderer.getMainCamera().rotation().transform(billUp);
-        invYaw.transform(billRight);
-        invYaw.transform(billUp);
-        billRight.normalize();
-        billUp.normalize();
-
-        VertexConsumer consumer = buffer.getBuffer(RenderType.entityTranslucentEmissive(getGlowTexture()));
-        PoseStack.Pose pose = poseStack.last();
-        Matrix4f mat = pose.pose();
-        Matrix3f normalMatrix = pose.normal();
-
-        if (renderHeadLights) {
-            for (VehicleDefinition.LightDefinition light : def.getHeadLights()) {
-                renderLightGlow(consumer, mat, normalMatrix, light, true, billRight, billUp);
-            }
-        }
-        if (renderTailLights) {
-            for (VehicleDefinition.LightDefinition light : def.getTailLights()) {
-                renderLightGlow(consumer, mat, normalMatrix, light, false, billRight, billUp);
-            }
-        }
-        // 室内灯のビルボードグローは乗車中（=室内視点）のみ描画する。
-        // 外から見るとビルボードが半透明窓や車体越しに滲んで外装まで光って見えるため。
-        if (interiorOn && ridingThisTrain) {
-            for (VehicleDefinition.LightDefinition light : def.getInteriorLights()) {
-                renderLightGlow(consumer, mat, normalMatrix, light, true, billRight, billUp);
-            }
-        }
-        if (def.getHeadLights().isEmpty() && def.getTailLights().isEmpty()
-                && (model == null || !model.hasRenderScript())) {
-            renderLegacyFallbackLights(entity, consumer, mat, normalMatrix, mode, billRight, billUp);
-        }
+        if (mode <= 0) return;
+        boolean free = !entity.isConnected();
+        com.portofino.realtrainmodunofficial.client.render.VehicleLightEffect.render(
+            def, mode, 0, free, free,
+            entity.getX(), entity.getY(), entity.getZ(),
+            entity.getYRot(), entity.getXRot(),
+            ambientLightValue(entity.level(), entity.getX(), entity.getY(), entity.getZ()),
+            poseStack, buffer);
     }
 
     private static void renderLegacyFallbackLights(TrainEntity entity, VertexConsumer consumer, Matrix4f mat,

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab_top",
+  "textures": {
+    "bottom": "realtrainmodunofficial:block/fire_brick",
+    "top": "realtrainmodunofficial:block/fire_brick",
+    "side": "realtrainmodunofficial:block/fire_brick"
+  }
+}

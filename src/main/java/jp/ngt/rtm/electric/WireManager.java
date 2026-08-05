@@ -252,16 +252,22 @@ public final class WireManager {
             if (!isOrigin) {
                 converter.setElectricity(pos.getX(), pos.getY(), pos.getZ(), lvl);
             }
+            //★本家 TileEntitySC_Increment/Decrement と同じ式。上限で丸めない
+            //  (本家の信号レベルは 0〜127。15 で切ると本家と違う値が流れる)。
+            //  Decrement は 1 以下をそのまま通す (1 → 0 にはならない)。
             return switch (converter.getConverterType()) {
-                case Increment -> Mth.clamp(lvl + 1, 0, 15);
-                case Decrement -> Mth.clamp(lvl - 1, 0, 15);
+                case Increment -> lvl > 0 ? lvl + 1 : 0;
+                case Decrement -> lvl > 1 ? lvl - 1 : lvl;
                 default -> lvl;
             };
         }
         if (be instanceof InstalledObjectBlockEntity io && !isOrigin) {
-            if (io.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT
-                    || io.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
+            //★本家 TileEntityConnector.onGetElectricity は<b>入力コネクタだけ</b>が受ける。
+            //  出力コネクタは配線から受け取らない (取り付け先を読んで流す側)。
+            if (io.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT) {
                 io.setElectricity(lvl);
+                //本家 sendElectricity(DIRECT): 取り付け先ブロックへ書き込む
+                io.deliverToAttached(lvl);
             }
         }
         return lvl;

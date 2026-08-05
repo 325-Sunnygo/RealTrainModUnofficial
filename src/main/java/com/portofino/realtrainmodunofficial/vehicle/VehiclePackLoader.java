@@ -451,7 +451,11 @@ public class VehiclePackLoader {
             List<VehicleDefinition.DoorAnimationDefinition> rightDoors = parseDoorAnimations(obj, trainModel, "door_right");
             // ★速度性能は JSON から読まない。運転席GUI (ドアタブ) で車両ごとに設定する。
             // 空リスト = 既定値 (EntityTrainBase / TrainConfig.init の 0.36〜1.80) を使う。
-            List<Float> notchMaxSpeeds = List.of();
+            //★KaizPatchX TrainConfig の項目そのまま。ここを読まないと全車両が既定速度になる
+            //  (以前は運転席 GUI で 1 両ずつ決める作りだった)。
+            List<Float> notchMaxSpeeds = parseFloatList(obj, trainModel, "maxSpeed");
+            List<Float> notchAccelerations = parseFloatList(obj, trainModel, "accelerateions");
+            List<Float> decelerations = parseFloatList(obj, trainModel, "deccelerations");
             List<String> rollsignNames = parseStringList(obj, trainModel, "rollsignNames");
             List<String> customButtonNames = parseCustomButtonNames(obj, trainModel);
             List<List<String>> customButtonOptions = parseCustomButtonOptions(obj, trainModel);
@@ -476,8 +480,13 @@ public class VehiclePackLoader {
             String soundDoorOpen = firstNonBlank(getString(trainModel, "sound_DoorOpen"), getString(obj, "sound_DoorOpen"));
             String soundDoorClose = firstNonBlank(getString(trainModel, "sound_DoorClose"), getString(obj, "sound_DoorClose"));
             List<String> announcementSounds = parseAnnouncementSounds(obj, trainModel);
-            // ★加速度も JSON から読まない (上に同じ)。0 = 既定値を使う。
-            float acceleration = 0.0F;
+            //★本家のキーは綴りミスのまま accelerateion。0 = 既定 (0.001736)。
+            float acceleration = parseFloat(trainModel, "accelerateion",
+                    parseFloat(obj, "accelerateion", 0.0F));
+            boolean useVariableAcceleration = parseBoolean(trainModel, "useVariableAcceleration",
+                    parseBoolean(obj, "useVariableAcceleration", false));
+            boolean useVariableDeceleration = parseBoolean(trainModel, "useVariableDeceleration",
+                    parseBoolean(obj, "useVariableDeceleration", false));
             boolean smoothing = parseBoolean(trainModel, "smoothing", parseBoolean(obj, "smoothing", false));
             boolean doCulling = parseBoolean(trainModel, "doCulling", parseBoolean(obj, "doCulling", false));
             boolean hasConfiguredLights = !headLights.isEmpty() || !tailLights.isEmpty() || !interiorLights.isEmpty();
@@ -549,6 +558,8 @@ public class VehiclePackLoader {
             definition.setBrakeReleaseSounds(soundBrakeRelease, soundBrakeRelease2);
             definition.setDoorSounds(soundDoorOpen, soundDoorClose);
             definition.setTypeSign(typeSignNames, typeSignTexture, typeSigns);
+            definition.setSpeedProfile(notchAccelerations, decelerations,
+                    useVariableAcceleration, useVariableDeceleration);
             LOADED.add(definition);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse train json {} in {}: {}", sourcePath, packName, e.getMessage());

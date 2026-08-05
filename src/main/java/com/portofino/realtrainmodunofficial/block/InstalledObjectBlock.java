@@ -14,6 +14,7 @@ import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
@@ -128,8 +129,32 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     private static final VoxelShape CROSSING_SHAPE =
         Shapes.box(0.125D, 0.0D, 0.125D, 0.875D, 3.0D, 0.875D);
     /** 碍子・コネクタ (BlockConnector): 中心の 0.25〜0.75 の小箱。 */
+    /**
+     * 足場の当たり判定。本家 {@code BlockScaffold.addCollisionBoxToList} と同じで、
+     * <b>床 1/16 + 隣が足場でない側の手すり (高さ 1.5)</b> を組む。
+     * これが無いと足場の上に立てず、すり抜けてしまう。
+     */
+    private static final VoxelShape SCAFFOLD_FLOOR = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 0.0625D, 1.0D);
+    private static final VoxelShape SCAFFOLD_RAIL_XP = Shapes.box(0.9375D, 0.0D, 0.0D, 1.0D, 1.5D, 1.0D);
+    private static final VoxelShape SCAFFOLD_RAIL_XN = Shapes.box(0.0D, 0.0D, 0.0D, 0.0625D, 1.5D, 1.0D);
+    private static final VoxelShape SCAFFOLD_RAIL_ZP = Shapes.box(0.0D, 0.0D, 0.9375D, 1.0D, 1.5D, 1.0D);
+    private static final VoxelShape SCAFFOLD_RAIL_ZN = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 1.5D, 0.0625D);
+    /** 階段の壁 (高さ 2.0)。本家 BlockScaffoldStairs.addCollisionBoxToList。 */
+    private static final VoxelShape STAIR_WALL_XN = Shapes.box(0.0D, 0.0D, 0.0D, 0.0625D, 2.0D, 1.0D);
+    private static final VoxelShape STAIR_WALL_XP = Shapes.box(0.9375D, 0.0D, 0.0D, 1.0D, 2.0D, 1.0D);
+    private static final VoxelShape STAIR_WALL_ZN = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 2.0D, 0.0625D);
+    private static final VoxelShape STAIR_WALL_ZP = Shapes.box(0.0D, 0.0D, 0.9375D, 1.0D, 2.0D, 1.0D);
+
     private static final VoxelShape CONNECTOR_SHAPE =
         Shapes.box(0.25D, 0.25D, 0.25D, 0.75D, 0.75D, 0.75D);
+    /** 旗 (BlockFlag): 7/16〜9/16 の細い柱、高さ 1。 */
+    private static final VoxelShape FLAG_SHAPE =
+        Shapes.box(0.4375D, 0.0D, 0.4375D, 0.5625D, 1.0D, 0.5625D);
+    /** 改札 (BlockTurnstile): 0.375〜0.625 の薄い壁、高さ 1.5 (向きで軸が変わる)。 */
+    private static final VoxelShape TICKET_GATE_SHAPE_X =
+        Shapes.box(0.375D, 0.0D, 0.0D, 0.625D, 1.5D, 1.0D);
+    private static final VoxelShape TICKET_GATE_SHAPE_Z =
+        Shapes.box(0.0D, 0.0D, 0.375D, 1.0D, 1.5D, 0.625D);
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
@@ -171,11 +196,163 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             case RAILROAD_SIGN -> level.getBlockState(pos.above()).isAir() ? SIGN_SHAPE : SIGN_SHAPE_UNDER;
             case POINT -> POINT_SHAPE;
             case CROSSING -> CROSSING_SHAPE;
-            case INSULATOR, CONNECTOR_INPUT, CONNECTOR_OUTPUT -> CONNECTOR_SHAPE;
+            case INSULATOR, CONNECTOR_INPUT, CONNECTOR_OUTPUT -> connectorShape(level, pos);
+            case FLAG -> FLAG_SHAPE;
+            case TICKET_GATE -> ticketGateShape(level, pos);
+            //★本家 BlockScaffold/BlockScaffoldStairs の選択枠は<b>フルブロック</b>
+            //  (setAABB(FULL_BLOCK_AABB) が既定)。床+手すりの複合形状は
+            //  addCollisionBoxToList (=衝突) にしか使わない。選択枠へ流用すると
+            //  枠が手すり形になり、狙い先も歩行感も本家とズレる。
+            case SCAFFOLD, STAIR -> RTM_SELECTION_SHAPE;
             // 信号・架線柱・看板・券売機・スピーカー・照明などは本家も BlockContainer 既定の
             // 1 ブロックのまま (setBlockBounds を持っていない)。
             default -> RTM_SELECTION_SHAPE;
         };
+    }
+
+    /**
+     * 本家 {@code BlockConnector.getBlockBounds}: 中心 0.25〜0.75 の小箱を
+     * <b>取付面の側へ伸ばす</b> (meta%6 = クリック面)。
+     */
+    private static VoxelShape connectorShape(BlockGetter level, BlockPos pos) {
+        int face = -1;
+        if (level.getBlockEntity(pos) instanceof com.portofino.realtrainmodunofficial.blockentity
+                .InstalledObjectBlockEntity be) {
+            face = be.getMountFace();
+        }
+        double minX = 0.25D, minY = 0.25D, minZ = 0.25D, maxX = 0.75D, maxY = 0.75D, maxZ = 0.75D;
+        switch (face) {
+            case 0 -> maxY = 1.0D;   //本家 case0: 上へ (1.7.10 の面番号)
+            case 1 -> minY = 0.0D;
+            case 2 -> maxZ = 1.0D;
+            case 3 -> minZ = 0.0D;
+            case 4 -> maxX = 1.0D;
+            case 5 -> minX = 0.0D;
+            default -> {
+            }
+        }
+        return Shapes.box(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    /** 本家 {@code BlockTurnstile.getSelectedBoundingBox}: 向きで薄い壁の軸が変わる。 */
+    private static VoxelShape ticketGateShape(BlockGetter level, BlockPos pos) {
+        if (level.getBlockEntity(pos) instanceof com.portofino.realtrainmodunofficial.blockentity
+                .InstalledObjectBlockEntity be) {
+            int dir = net.minecraft.util.Mth.floor(be.getYaw() / 90.0F + 0.5F) & 3;
+            //本家: meta 0/2 → Z 薄・X 貫通、それ以外 → X 薄・Z 貫通
+            return (dir == 0 || dir == 2) ? TICKET_GATE_SHAPE_Z : TICKET_GATE_SHAPE_X;
+        }
+        return TICKET_GATE_SHAPE_Z;
+    }
+
+    /**
+     * 本家 {@code BlockScaffold.addCollisionBoxToList} の移植。
+     *
+     * <p>★手すりは 4 方向に出るのではなく、<b>自分の向き (dir) に対して横になる 2 面</b>だけ。
+     * 隣に足場/階段が続いていればその面は出さない。
+     */
+    private static VoxelShape scaffoldShape(BlockGetter level, BlockPos pos) {
+        int dir = scaffoldDir(level, pos);
+        boolean b0 = (dir == 0 || dir == 2);
+
+        byte flag0 = connectionType(level, pos.east(), (byte) 1);
+        byte flag1 = connectionType(level, pos.west(), (byte) 1);
+        byte flag2 = connectionType(level, pos.south(), (byte) 0);
+        byte flag3 = connectionType(level, pos.north(), (byte) 0);
+
+        boolean crossZ = (flag2 == 1 || flag3 == 1 || flag2 == 3 || flag3 == 3);
+        boolean crossX = (flag0 == 2 || flag1 == 2 || flag0 == 3 || flag1 == 3);
+
+        VoxelShape shape = SCAFFOLD_FLOOR;
+        if (!inRange(flag0) && (b0 || crossZ))  shape = Shapes.or(shape, SCAFFOLD_RAIL_XP);
+        if (!inRange(flag1) && (b0 || crossZ))  shape = Shapes.or(shape, SCAFFOLD_RAIL_XN);
+        if (!inRange(flag2) && (!b0 || crossX)) shape = Shapes.or(shape, SCAFFOLD_RAIL_ZP);
+        if (!inRange(flag3) && (!b0 || crossX)) shape = Shapes.or(shape, SCAFFOLD_RAIL_ZN);
+        return shape;
+    }
+
+    /**
+     * 本家 {@code BlockScaffoldStairs.addCollisionBoxToList}: 4 段の階段 + 両側の壁 (高さ 2.0)。
+     * 壁は隣に<b>同じ向きの階段</b>が続いていれば出さない。
+     */
+    private static VoxelShape stairShape(BlockGetter level, BlockPos pos) {
+        int dir = jp.ngt.rtm.block.BlockScaffold.dirAt(level, pos);
+        VoxelShape shape = Shapes.empty();
+        if (dir == 0 || dir == 2) {
+            if (jp.ngt.rtm.block.BlockScaffoldStairs.getConnectionType(level, pos.getX() - 1, pos.getY(), pos.getZ(), dir) != 3) {
+                shape = Shapes.or(shape, STAIR_WALL_XN);
+            }
+            if (jp.ngt.rtm.block.BlockScaffoldStairs.getConnectionType(level, pos.getX() + 1, pos.getY(), pos.getZ(), dir) != 3) {
+                shape = Shapes.or(shape, STAIR_WALL_XP);
+            }
+            for (int i = 0; i < 4; ++i) {
+                double f0 = i * 0.25D;
+                double f1 = (dir == 2) ? f0 : 0.75D - f0;
+                shape = Shapes.or(shape, Shapes.box(0.0D, f0, f1, 1.0D, f0 + 0.25D, f1 + 0.25D));
+            }
+        } else {
+            if (jp.ngt.rtm.block.BlockScaffoldStairs.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() - 1, dir) != 3) {
+                shape = Shapes.or(shape, STAIR_WALL_ZN);
+            }
+            if (jp.ngt.rtm.block.BlockScaffoldStairs.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() + 1, dir) != 3) {
+                shape = Shapes.or(shape, STAIR_WALL_ZP);
+            }
+            for (int i = 0; i < 4; ++i) {
+                double f0 = i * 0.25D;
+                double f1 = (dir == 1) ? f0 : 0.75D - f0;
+                shape = Shapes.or(shape, Shapes.box(f1, f0, 0.0D, f1 + 0.25D, f0 + 0.25D, 1.0D));
+            }
+        }
+        return shape;
+    }
+
+    private static boolean inRange(byte flag) {
+        return flag >= 1 && flag <= 3;
+    }
+
+    /** ★判定は {@link jp.ngt.rtm.block.BlockScaffold} に一本化する (描画スクリプトと同じ物を使う)。 */
+    private static byte connectionType(BlockGetter level, BlockPos pos, byte dir) {
+        return jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ(), dir);
+    }
+
+    private static int scaffoldDir(BlockGetter level, BlockPos pos) {
+        return jp.ngt.rtm.block.BlockScaffold.dirAt(level, pos);
+    }
+
+    /**
+     * 本家 {@code BlockScaffold.modifyAcceleration}: エスカレーター (conveyorSpeed 付きの足場) は
+     * 乗っている物を押す。向きは {@code TileEntityScaffold.getMotionVec} と同じで
+     * <b>(0,0,speed) を 180 - dir*90 度だけ Y 軸回転</b>。
+     */
+    @Override
+    protected void entityInside(BlockState state, Level level, BlockPos pos, Entity entity) {
+        if (!(level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be)) {
+            return;
+        }
+        InstalledObjectCategory category = be.getCategory();
+        if (category != InstalledObjectCategory.SCAFFOLD && category != InstalledObjectCategory.STAIR) {
+            return;
+        }
+        var definition = be.getDefinition();
+        float speed = definition == null ? 0.0F : definition.getConveyorSpeed();
+        if (speed == 0.0F) {
+            return;
+        }
+        //本家 TileEntityScaffold.getVec = (0,0,s)。
+        //★階段 (TileEntityScaffoldStairs) は<b>斜め上 (0, s·sin45, s·sin45)</b>。
+        //  これが無いと上りエスカレーターに乗っても押し上げられず、段で止まる。
+        double horizontal = speed;
+        double vertical = 0.0D;
+        if (category == InstalledObjectCategory.STAIR) {
+            double d0 = Math.sin(Math.toRadians(45.0D));
+            horizontal = speed * d0;
+            vertical = speed * d0;
+        }
+        int dir = scaffoldDir(level, pos);
+        float rad = (float) Math.toRadians(180.0F - (dir * 90.0F));
+        double mx = net.minecraft.util.Mth.sin(rad) * horizontal;
+        double mz = net.minecraft.util.Mth.cos(rad) * horizontal;
+        entity.setDeltaMovement(entity.getDeltaMovement().add(mx, vertical, mz));
     }
 
     /**
@@ -194,6 +371,14 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             if (category == InstalledObjectCategory.FLUORESCENT) {
                 return EMPTY_SHAPE;   //本家 BlockFluorescent: 当たり判定なし (壊せはする)
+            }
+            //★足場/階段の衝突は本家 addCollisionBoxToList の複合形状 (床 1/16 + 手すり 1.5 /
+            //  4 段 + 壁 2.0)。選択枠 (getShape) はフルブロックのままにする。
+            if (category == InstalledObjectCategory.SCAFFOLD) {
+                return scaffoldShape(level, pos);
+            }
+            if (category == InstalledObjectCategory.STAIR) {
+                return stairShape(level, pos);
             }
             return shiftToModel(outlineShape(category, level, pos), blockEntity);
         }
@@ -334,9 +519,8 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     protected int getSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos,
                             net.minecraft.core.Direction direction) {
         if (getter.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
-            if (be.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
-                return net.minecraft.util.Mth.clamp(be.getElectricity(), 0, 15);
-            }
+            //★本家のコネクタはレッドストーンを出さない (RS との橋渡しは信号変換機)。
+            //  出力コネクタは「取り付け先ブロックから信号出力」して配線へ流す側。
             // 本家 BlockPoint.getWeakPower: 転轍機は切り替わっている間 15 を出す。
             // これで分岐器 (レール) やレッドストーン回路を直接動かせる。
             if (be.getCategory() == InstalledObjectCategory.POINT) {

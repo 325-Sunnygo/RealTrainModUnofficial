@@ -220,4 +220,9 @@ public class FormationEditScreen extends Screen {
             return super.mouseClicked(mouseX, mouseY, button);
         }
     }
+
+    /** 1.21 のメニューぼかしを無効化 (本家 1.7.10 の GUI にぼかしは無い)。 */
+    @Override
+    protected void renderBlurredBackground(float partialTick) {
+    }
 }

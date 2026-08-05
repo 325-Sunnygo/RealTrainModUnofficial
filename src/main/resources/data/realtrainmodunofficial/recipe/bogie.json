@@ -1,0 +1,25 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    " W W ",
+    "PPPPP",
+    " S S ",
+    "PPPPP",
+    " W W "
+  ],
+  "key": {
+    "W": {
+      "item": "realtrainmodunofficial:material_wheel"
+    },
+    "P": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "S": {
+      "item": "realtrainmodunofficial:material_shaft"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:bogie",
+    "count": 1
+  }
+}

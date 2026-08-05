@@ -92,7 +92,7 @@ public class ATSAssistCore {
 
     //本家 CreativeTabATSAssist
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TAB = TABS.register(
-            "atsassist", () -> CreativeModeTab.builder()
+            "atsassist", () -> CreativeModeTab.builder(CreativeModeTab.Row.TOP, 0)
                     .title(Component.literal("ATSAssistMod"))
                     .icon(() -> GROUND_UNIT_ITEM.get().getDefaultInstance())
                     .displayItems((parameters, output) -> {
@@ -108,11 +108,14 @@ public class ATSAssistCore {
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);
         TABS.register(modEventBus);
-        modEventBus.addListener(this::registerPayloads);
+        //★イベント型を明示すること (引数1個版は型消去で Fabric のシムが解決できない)
+        modEventBus.addListener(RegisterPayloadHandlersEvent.class, this::registerPayloads);
 
         //車上装置の tick (本家 TrainControllerManager.onTick)
-        NeoForge.EVENT_BUS.addListener(TrainControllerManager::onServerTick);
-        NeoForge.EVENT_BUS.addListener(this::registerCommands);
+        NeoForge.EVENT_BUS.addListener(
+                net.neoforged.neoforge.event.tick.ServerTickEvent.Post.class,
+                TrainControllerManager::onServerTick);
+        NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, this::registerCommands);
         LOGGER.info("RTMU-ATSAssistMod loaded (original ATSAssistMod by Kaiz_JP)");
     }
 

@@ -1,0 +1,28 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    " YIY",
+    " RIR",
+    " BIB",
+    "  I ",
+    "  I "
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "Y": {
+      "item": "minecraft:yellow_dye"
+    },
+    "B": {
+      "item": "minecraft:ink_sac"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:crossing_gate",
+    "count": 1
+  }
+}

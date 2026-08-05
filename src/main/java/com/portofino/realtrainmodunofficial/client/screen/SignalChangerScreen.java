@@ -56,4 +56,9 @@ public class SignalChangerScreen extends Screen {
     public boolean isPauseScreen() {
         return false;
     }
+
+    /** 1.21 のメニューぼかしを無効化 (本家 1.7.10 の GUI にぼかしは無い)。 */
+    @Override
+    protected void renderBlurredBackground(float partialTick) {
+    }
 }

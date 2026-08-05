@@ -50,12 +50,95 @@ public final class RealTrainModUnofficialClientModEvents {
             "[RTMU] customIconTexture 用にアイテムモデルを {} 個包みました", wrapped);
     }
 
+    /**
+     * 弾薬 / 紙幣の絵を variant で切り替える。
+     * 本家はアイテムのメタでモデルを分けていたが 1.21 にメタが無いので、
+     * モデル json の {@code overrides} が読む述語をここで用意する。
+     */
+    /** 作業台の画面を紐づける。 */
+    @SubscribeEvent
+    public static void registerScreens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
+        event.register(RealTrainModUnofficialMenus.WORK_BENCH.get(),
+            com.portofino.realtrainmodunofficial.client.screen.WorkBenchScreen::new);
+        event.register(RealTrainModUnofficialMenus.NPC.get(),
+            com.portofino.realtrainmodunofficial.client.screen.NpcScreen::new);
+    }
+
+    @SubscribeEvent
+    public static void registerItemProperties(net.neoforged.fml.event.lifecycle.FMLClientSetupEvent event) {
+        event.enqueueWork(() -> {
+            net.minecraft.resources.ResourceLocation key =
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+                    RealTrainModUnofficial.MODID, "variant");
+            //★ClampedItemPropertyFunction にすると値が 0〜1 に丸められ、variant 2 以上が
+            //  全部 1 に潰れる (枕木のアイコンが砲弾になる)。素の ItemPropertyFunction を使う。
+            net.minecraft.client.renderer.item.ItemPropertyFunction fn =
+                (stack, level, entity, seed) -> {
+                    Integer v = stack.get(
+                        com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents
+                            .ITEM_VARIANT.get());
+                    return v == null ? 0.0F : v;
+                };
+            net.minecraft.client.renderer.item.ItemProperties.register(
+                RealTrainModUnofficialItems.BULLET_ITEM.get(), key, fn);
+            net.minecraft.client.renderer.item.ItemProperties.register(
+                RealTrainModUnofficialItems.ITEM_CARGO.get(), key, fn);
+        });
+    }
+
     @SubscribeEvent
     public static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        // ブロック製の乗り物 (乗り物生成機)
+        event.registerEntityRenderer(jp.ngt.rtm.entity.RTMEntities.NGTO_CAR.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.NgtoVehicleRenderer::new);
+        event.registerEntityRenderer(jp.ngt.rtm.entity.RTMEntities.NGTO_SHIP.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.NgtoVehicleRenderer::new);
+        event.registerEntityRenderer(jp.ngt.rtm.entity.RTMEntities.NGTO_PLANE.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.NgtoVehicleRenderer::new);
+
+        // NPC (本家 RenderNPC)
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.NPC.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.NpcRenderer::new
+        );
+
+        // 貨物 (本家 RenderContainer / RenderArtillery)
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.CONTAINER.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.CargoRenderer::new
+        );
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.ARTILLERY.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.CargoRenderer::new
+        );
+        // 貨物用枕木 (本家 RenderTie: 2.5x0.125x2.5 の板)
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.TIE.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.TieRenderer::new
+        );
+
+        // 溶けた金属 / コークスの粒 (本家 RenderFluid)
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.FLUID.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.FluidRenderer::new
+        );
+
+        // 銃の弾 (本家 RenderBullet)
+        event.registerEntityRenderer(
+            jp.ngt.rtm.entity.RTMEntities.BULLET.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.BulletRenderer::new
+        );
+
         // エディタの選択範囲 (neo mcte)
         event.registerEntityRenderer(
             com.portofino.realtrainmodunofficial.RealTrainModUnofficialEntities.EDITOR.get(),
             com.portofino.realtrainmodunofficial.client.renderer.EditorEntityRenderer::new
+        );
+
+        // 装飾ブロック (本家 RenderDecoration)
+        event.registerBlockEntityRenderer(
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities.DECORATION.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.DecorationRenderer::new
         );
 
         // 設置済みミニチュア (neo mcte)

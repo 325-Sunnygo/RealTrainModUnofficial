@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "  ",
+    " S",
+    " I"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:railroad_sign",
+    "count": 2
+  },
+  "category": "misc"
+}

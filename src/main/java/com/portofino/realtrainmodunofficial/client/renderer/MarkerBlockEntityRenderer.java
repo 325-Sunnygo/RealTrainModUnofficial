@@ -581,15 +581,25 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         float r = ((color >> 16) & 0xFF) / 255.0F;
         float g = ((color >> 8) & 0xFF) / 255.0F;
         float b = (color & 0xFF) / 255.0F;
-        float size = 0.4F;
+        // ★AppleExtended (1.12.2) 方式の十字マーク。
+        // 1.7.10 は 0.4 四方の四角を「10m 地点そのもの」に置くが、
+        // 実際の 10m は<b>ブロックの境目</b>なので四角の中心が半ブロックずれる。
+        // AppleExtended は目盛りを 0.5 手前へ寄せ、境目に十字を描いて位置を分かりやすくする
+        // (fixRTM の markerDistanceMoreRealPosition 相当)。
         for (int i = 1; i < count; i++) {
             float moveZ = i * 10.0F;
             for (int k = -1; k <= 1; k++) {
                 float moveX = moveZ * k;
-                quads.addVertex(m, -size + moveX, 0.01F, size + moveZ).setColor(r, g, b, 1.0F);
-                quads.addVertex(m, -size + moveX, 0.01F, -size + moveZ).setColor(r, g, b, 1.0F);
-                quads.addVertex(m, size + moveX, 0.01F, -size + moveZ).setColor(r, g, b, 1.0F);
-                quads.addVertex(m, size + moveX, 0.01F, size + moveZ).setColor(r, g, b, 1.0F);
+                // 横棒 (幅 0.8 / 奥行 0.2)
+                quads.addVertex(m, -0.4F + moveX, 0.01F, -0.4F + moveZ).setColor(r, g, b, 1.0F);
+                quads.addVertex(m, -0.4F + moveX, 0.01F, -0.6F + moveZ).setColor(r, g, b, 1.0F);
+                quads.addVertex(m, 0.4F + moveX, 0.01F, -0.6F + moveZ).setColor(r, g, b, 1.0F);
+                quads.addVertex(m, 0.4F + moveX, 0.01F, -0.4F + moveZ).setColor(r, g, b, 1.0F);
+                // 縦棒 (幅 0.2 / 奥行 0.8)
+                quads.addVertex(m, -0.1F + moveX, 0.01F, -0.1F + moveZ).setColor(r, g, b, 1.0F);
+                quads.addVertex(m, -0.1F + moveX, 0.01F, -0.9F + moveZ).setColor(r, g, b, 1.0F);
+                quads.addVertex(m, 0.1F + moveX, 0.01F, -0.9F + moveZ).setColor(r, g, b, 1.0F);
+                quads.addVertex(m, 0.1F + moveX, 0.01F, -0.1F + moveZ).setColor(r, g, b, 1.0F);
             }
         }
 
@@ -601,7 +611,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             for (int k = -1; k <= 1; k++) {
                 float moveX = moveZ * k;
                 poseStack.pushPose();
-                poseStack.translate(moveX, 2.5F, moveZ);
+                //目盛りを 0.5 手前へ寄せたのでテキストも合わせる
+                poseStack.translate(moveX, 2.5F, moveZ - 0.5F);
                 // 親の向き回転を打ち消してからカメラビルボード (バニラのネームタグ方式)
                 poseStack.mulPose(new Quaternionf().rotationY(-dir * Mth.DEG_TO_RAD));
                 poseStack.mulPose(cameraRot);

@@ -54,5 +54,27 @@ public enum InstalledObjectCategory {
      * 本家: パイプ (BlockPipe / ModelOrnament ornamentType="Pipe")。
      * 鉄管の飾り。Pipe01 と Pipe01_Connectable (隣接パイプへ接続) がある。
      */
-    PIPE
+    PIPE,
+    /**
+     * 本家: 植物 (ModelOrnament_* / ornamentType="Plant")。
+     * 木・草・柵などの飾り。当たり判定を持たないものもある。
+     */
+    PLANT,
+    /**
+     * 本家: 階段 (ModelOrnament_* / ornamentType="Stair")。
+     */
+    STAIR,
+    /**
+     * 本家: 足場 (ModelOrnament_* / ornamentType="Scaffold")。
+     */
+    SCAFFOLD,
+    /**
+     * 本家: 旗 (ModelFlag_* / RTMResource.FLAG)。
+     */
+    FLAG,
+    /**
+     * 本家: 機構 (ModelMechanism_* / RTMResource.MECHANISM)。
+     * 回転・往復など、スクリプトで動く飾り。
+     */
+    MECHANISM
 }

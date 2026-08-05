@@ -1,0 +1,29 @@
+{
+  "variants": {
+    "facing=down": {
+      "model": "realtrainmodunofficial:block/slot"
+    },
+    "facing=up": {
+      "model": "realtrainmodunofficial:block/slot",
+      "x": 180
+    },
+    "facing=north": {
+      "model": "realtrainmodunofficial:block/slot",
+      "x": 270
+    },
+    "facing=south": {
+      "model": "realtrainmodunofficial:block/slot",
+      "x": 90
+    },
+    "facing=west": {
+      "model": "realtrainmodunofficial:block/slot",
+      "x": 90,
+      "y": 90
+    },
+    "facing=east": {
+      "model": "realtrainmodunofficial:block/slot",
+      "x": 90,
+      "y": 270
+    }
+  }
+}

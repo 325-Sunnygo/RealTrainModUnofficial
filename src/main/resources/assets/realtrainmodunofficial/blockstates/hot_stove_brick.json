@@ -1,0 +1,52 @@
+{
+  "variants": {
+    "heat=0": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=1": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=2": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=3": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=4": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=5": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=6": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=7": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=8": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=9": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=10": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=11": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=12": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=13": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=14": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    },
+    "heat=15": {
+      "model": "realtrainmodunofficial:block/hot_stove_brick"
+    }
+  }
+}

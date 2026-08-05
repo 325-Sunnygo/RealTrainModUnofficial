@@ -1,0 +1,19 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "SSSSS",
+    "S   S",
+    "S   S",
+    "S   S",
+    "SSSSS"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:pipe",
+    "count": 4
+  }
+}

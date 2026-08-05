@@ -284,8 +284,13 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         // 碍子/看板: 本家 ItemInstalledObject 準拠 — クリック面 (meta 0-5) だけを保存し、
         // 描画は本家と同じ (ブロック中心ピボット+面回転)。
         // 持ち上げ/横倒しハックは廃止 (当たり判定に対してモデルがずれる原因だった)。
+        //★コネクタ入出力も本家は meta = クリック面 (BlockUtil.setBlock(..., sideIndex, 3))。
+        //  レンダラは isConnectorCategory で面回転を読むのに、ここで MountFace を保存して
+        //  いなかったため常に既定 1 (上向き) になり、壁に横向きで付けられなかった。
         boolean honkeFaceMount = category == InstalledObjectCategory.INSULATOR
-                || category == InstalledObjectCategory.SIGNBOARD;
+                || category == InstalledObjectCategory.SIGNBOARD
+                || category == InstalledObjectCategory.CONNECTOR_INPUT
+                || category == InstalledObjectCategory.CONNECTOR_OUTPUT;
         // 本家で常に直立している設置物 (転轍機/券売機/標識)。壁挿し・逆さ設置はさせず、
         // 本家 setRotation(player, 15.0F, ...) と同じく向きを 15 度刻みに丸めるだけ。
         boolean uprightOnly = category == InstalledObjectCategory.POINT
@@ -375,6 +380,12 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
                     // 本家 meta = クリック面 (1.7.10 side と 1.21 Direction.ordinal は同一)
                     blockEntity.setMountFace(clickedFace.ordinal());
                     blockEntity.setRenderOffset(0.0D, 0.0D, 0.0D);
+                    //★本家 ItemInstalledObject: コネクタはクリックしたブロックへ DIRECT 接続を張る。
+                    //  出力コネクタはそこから信号を読み、入力コネクタはそこへ信号を書く。
+                    if (category == InstalledObjectCategory.CONNECTOR_INPUT
+                            || category == InstalledObjectCategory.CONNECTOR_OUTPUT) {
+                        blockEntity.setDirectTarget(context.getClickedPos());
+                    }
                     if (category == InstalledObjectCategory.SIGNBOARD) {
                         // 本家 ItemInstalledObject: direction = 設置したプレイヤーの向き (0-3)。
                         blockEntity.setSignDirection(signDirectionOf(player.getYRot()));
@@ -437,6 +448,14 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
 
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> lines, TooltipFlag flag) {
+        //本家 usage.item.istlobj.connector_in / connector_out
+        if (category == InstalledObjectCategory.CONNECTOR_INPUT) {
+            lines.add(Component.translatable("usage.realtrainmodunofficial.connector_in")
+                .withStyle(ChatFormatting.GRAY));
+        } else if (category == InstalledObjectCategory.CONNECTOR_OUTPUT) {
+            lines.add(Component.translatable("usage.realtrainmodunofficial.connector_out")
+                .withStyle(ChatFormatting.GRAY));
+        }
         String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         if (selectedId != null && !selectedId.isBlank()) {
             InstalledObjectDefinition def = InstalledObjectRegistry.getById(selectedId);

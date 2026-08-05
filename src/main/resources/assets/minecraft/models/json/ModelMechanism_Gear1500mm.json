@@ -1,0 +1,20 @@
+{
+	"name": "gear_1500mm",
+	"model": {
+		"modelFile": "gear_1500mm.mqoz",
+		"textures": [["default", "textures/mechanism/mecha_simple.png", ""]],
+		"rendererPath": "scripts/RenderGear.js"
+	},
+	"buttonTexture": "textures/mechanism/button_gear_1500mm.png",
+	"type": "GEAR",
+	"transmissionRatioON": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"transmissionRatioOFF": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"maxSpeed": 10000.0,
+	"acceleration": 0.0,
+	"radius": 0.75,
+	"teethCount": 54,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479"
+}

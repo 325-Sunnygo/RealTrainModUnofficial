@@ -103,6 +103,11 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             poseStack.mulPose(Axis.ZP.rotationDegrees(roll));
 
             poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
+
+            // ★前照灯・尾灯の光 (本家 RenderVehicleBase.renderLightEffect)。
+            //   本家はモデルオフセットまで掛けた状態で描き、<b>モデルの拡大率は掛けない</b>ので
+            //   下の poseStack.scale より前に置く。
+            renderLightEffect(entity, def, poseStack, buffer);
             // ★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。本家は
             // NGTOParts.render の中だけで glScalef(scale) するので、スクリプトが台車/ドアを
             // 置く glTranslatef はブロック単位のまま。ここで掛けると全部が中央に寄る。
@@ -216,6 +221,32 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         } finally {
             poseStack.popPose();
         }
+    }
+
+    /**
+     * 前照灯・尾灯の光。本家 {@code RenderVehicleBase.renderLightEffect} の引数集め。
+     *
+     * <p>本家は {@code getConnectedTrain(dir)} で「その向きに連結相手が居るか」を見て、
+     * 先頭車だけ前照灯・最後尾だけ尾灯を点ける。単行 (isSingleTrain かつ両端とも非連結) は
+     * 進行方向側が前照灯・反対側が尾灯になる。
+     */
+    private static void renderLightEffect(EntityTrain entity, VehicleDefinition def,
+                                          PoseStack poseStack, MultiBufferSource buffer) {
+        int mode = entity.getTrainStateData(
+            jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Light.id);
+        if (mode <= 0) {
+            return;
+        }
+        int dir = entity.getTrainDirection();
+        boolean frontFree = entity.getConnectedTrain(dir) == null;
+        boolean rearFree = entity.getConnectedTrain(1 - dir) == null;
+        int ambient = TrainEntityRenderer.ambientLightValue(
+            entity.level(), entity.getX(), entity.getY(), entity.getZ());
+        com.portofino.realtrainmodunofficial.client.render.VehicleLightEffect.render(
+            def, mode, dir, frontFree, rearFree,
+            entity.getX(), entity.getY(), entity.getZ(),
+            entity.getYRot(), entity.getXRot(),
+            ambient, poseStack, buffer);
     }
 
     /**

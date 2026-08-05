@@ -142,59 +142,9 @@ public class RtmTrainControlScreen extends Screen {
                 addRenderableWidget(Button.builder(Component.literal(text), b -> send("cycle_custom_button", packed))
                         .bounds(x, y, 52, 22).build());
             }
-        } else if (selectedTab == ControlTab.DEDICATED) {
-            // 速度設定タブ: 最高速度と加速度を車両ごとに決める。
-            // JSON (maxSpeed / acceleration) は読まなくなったので、性能はここで指定する。
-            int maxSpeed = train.getConfiguredMaxSpeedKmh();
-            int accelCenti = train.getConfiguredAccelCentiKmhS();
-
-            graphics_maxSpeedLabel = maxSpeed > 0 ? String.valueOf(maxSpeed) : "既定";
-            // 単位はラベル側に出さない (数値だけ)。"6.00 km/h/s" は 60px あり、
-            // 左右のボタンに挟まれた 60px の隙間で右の +10 と重なる。
-            graphics_accelLabel = accelCenti > 0
-                    ? String.format(java.util.Locale.ROOT, "%.2f", accelCenti / 100.0F) : "既定";
-
-            // --- 最高速度 ---
-            addButton(left + 6, top + 22, 26, "-10", "set_max_speed", Math.max(0, effMaxSpeed(maxSpeed) - 10));
-            addButton(left + 34, top + 22, 24, "-1", "set_max_speed", Math.max(0, effMaxSpeed(maxSpeed) - 1));
-            addButton(left + 106, top + 22, 24, "+1", "set_max_speed", Math.min(1000, effMaxSpeed(maxSpeed) + 1));
-            addButton(left + 132, top + 22, 26, "+10", "set_max_speed", Math.min(1000, effMaxSpeed(maxSpeed) + 10));
-
-            // --- 加速度 (km/h/s ×100 で保持) ---
-            addButton(left + 6, top + 62, 26, "-50", "set_acceleration", Math.max(0, effAccel(accelCenti) - 50));
-            addButton(left + 34, top + 62, 24, "-10", "set_acceleration", Math.max(0, effAccel(accelCenti) - 10));
-            addButton(left + 106, top + 62, 24, "+10", "set_acceleration", Math.min(10000, effAccel(accelCenti) + 10));
-            addButton(left + 132, top + 62, 26, "+50", "set_acceleration", Math.min(10000, effAccel(accelCenti) + 50));
-
-            // --- それぞれを既定値へ戻す ---
-            addButton(left + 6, top + 96, PANEL_W - 12, 20, "速度を戻す", "set_max_speed", 0);
-            addRenderableWidget(Button.builder(Component.literal("加速度を戻す"),
-                    b -> send("set_acceleration", 0))
-                    .bounds(left + 6, top + 120, PANEL_W - 12, 20).build());
         }
         addRenderableWidget(new DoorButton(left + PANEL_W + 20, top + 20, false));
         addRenderableWidget(new DoorButton(left - 84, top + 20, true));
-    }
-
-    // 速度設定タブの表示ラベル (init で組み立て、render で描く)
-    private String graphics_maxSpeedLabel = "";
-    private String graphics_accelLabel = "";
-
-    /** 未設定(0)のときは既定値を初期値として扱う (増減の起点)。 */
-    private int effMaxSpeed(int configured) {
-        if (configured > 0) {
-            return configured;
-        }
-        float[] ms = train.getConfig().maxSpeed;
-        return ms != null && ms.length > 0 ? Math.round(ms[ms.length - 1] * 72.0F) : 130;
-    }
-
-    /** 加速度の起点 (km/h/s ×100)。 */
-    private int effAccel(int configured) {
-        if (configured > 0) {
-            return configured;
-        }
-        return Math.round(train.getConfig().accelerateion * 72.0F * 20.0F * 100.0F);
     }
 
     private String[] rollsignNames() {
@@ -409,16 +359,6 @@ public class RtmTrainControlScreen extends Screen {
     }
 
     private void renderTabContents(GuiGraphics graphics, int left, int top) {
-        if (selectedTab == ControlTab.DEDICATED) {
-            // 速度設定タブ: 見出しと現在値
-            graphics.drawString(this.font, Component.literal("最高速度 (km/h)"), left + 8, top + 8, 0xFF404040, false);
-            graphics.drawString(this.font, Component.literal(graphics_maxSpeedLabel),
-                    left + 62, top + 28, 0xFF202020, false);
-            graphics.drawString(this.font, Component.literal("加速度 (km/h/s)"), left + 8, top + 48, 0xFF404040, false);
-            graphics.drawString(this.font, Component.literal(graphics_accelLabel),
-                    left + 62, top + 68, 0xFF202020, false);
-            return;
-        }
         if (selectedTab != ControlTab.FORMATION) {
             return;
         }
@@ -537,9 +477,9 @@ public class RtmTrainControlScreen extends Screen {
         INVENTORY(TAB_INVENTORY_TEXTURE, new ItemStack(Blocks.CHEST)),
         SETTING(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.CROWBAR_ITEM.get())),
         FUNCTION(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.WRENCH_ITEM.get())),
-        FORMATION(TAB_FORMATION_TEXTURE, new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get())),
-        // 専用タブ: ドアカット・連結解除など運転士の追加操作。アイコンは鉄ドア (ドアカット由来)。
-        DEDICATED(TAB_SETTING_TEXTURE, new ItemStack(net.minecraft.world.item.Items.IRON_DOOR));
+        //★ドア(専用)タブは廃止。中身だった速度設定はパックの JSON
+        //  (KaizPatchX TrainConfig の maxSpeed / accelerateion) が決めるようになった。
+        FORMATION(TAB_FORMATION_TEXTURE, new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get()));
 
         final ResourceLocation background;
         final ItemStack icon;
@@ -573,5 +513,10 @@ public class RtmTrainControlScreen extends Screen {
             graphics.blit(TAB_INVENTORY_TEXTURE, getX(), getY(), 192, 0, 64, 80, 256, 256);
             graphics.blit(TAB_INVENTORY_TEXTURE, getX() + 44, getY() + 48, 224, opened ? 80 : 88, 8, 8, 256, 256);
         }
+    }
+
+    /** 1.21 のメニューぼかしを無効化 (本家 1.7.10 の GUI にぼかしは無い)。 */
+    @Override
+    protected void renderBlurredBackground(float partialTick) {
     }
 }

@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "realtrainmodunofficial:block/brick_slab"
+    },
+    "type=top": {
+      "model": "realtrainmodunofficial:block/brick_slab_top"
+    },
+    "type=double": {
+      "model": "realtrainmodunofficial:block/fire_brick"
+    }
+  }
+}

@@ -2,6 +2,11 @@ package org.webctc;
 
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.server.ServerStoppingEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,15 +33,18 @@ public class WebCTCCore {
     public static final Logger LOGGER = LoggerFactory.getLogger("WebCTC");
 
     public WebCTCCore() {
-        NeoForge.EVENT_BUS.addListener(WebCTCServer::onServerStarted);
-        NeoForge.EVENT_BUS.addListener(WebCTCServer::onServerStopping);
+        //★イベント型を明示して登録すること。引数 1 個の addListener(Consumer) は
+        //  型消去で対象イベントが分からず、Fabric 側のシムでは使えない
+        //  (NeoForge は lambda の総称型を実行時に見て解決している)。2 引数版は両方で通る。
+        NeoForge.EVENT_BUS.addListener(ServerStartedEvent.class, WebCTCServer::onServerStarted);
+        NeoForge.EVENT_BUS.addListener(ServerStoppingEvent.class, WebCTCServer::onServerStopping);
         //RailGroup (連動装置) + TeCon (運行盤) — 本家 WebCTCEventHandler
-        NeoForge.EVENT_BUS.addListener(WebCTCEventHandler::onServerStarted);
-        NeoForge.EVENT_BUS.addListener(WebCTCEventHandler::onServerStopping);
-        NeoForge.EVENT_BUS.addListener(WebCTCEventHandler::onServerTick);
-        NeoForge.EVENT_BUS.addListener(WebCTCEventHandler::onBreakBlock);
+        NeoForge.EVENT_BUS.addListener(ServerStartedEvent.class, WebCTCEventHandler::onServerStarted);
+        NeoForge.EVENT_BUS.addListener(ServerStoppingEvent.class, WebCTCEventHandler::onServerStopping);
+        NeoForge.EVENT_BUS.addListener(ServerTickEvent.Post.class, WebCTCEventHandler::onServerTick);
+        NeoForge.EVENT_BUS.addListener(BlockEvent.BreakEvent.class, WebCTCEventHandler::onBreakBlock);
         //本家 CommandWebCTC / CommandRailGroup
-        NeoForge.EVENT_BUS.addListener(WebCTCCommands::onRegisterCommands);
+        NeoForge.EVENT_BUS.addListener(RegisterCommandsEvent.class, WebCTCCommands::onRegisterCommands);
         LOGGER.info("RTMU-WebCTC loaded (original WebCTC by Kaiz_JP, masa0300)");
     }
 }

@@ -55,6 +55,12 @@ public class RealTrainModUnofficialBlockEntities {
         BLOCK_ENTITY_TYPES.register("installed_object", () -> BlockEntityType.Builder.of(InstalledObjectBlockEntity::new,
             RealTrainModUnofficialBlocks.INSTALLED_OBJECT.get()).build(null));
 
+    /** 本家 decoration: 装飾ブロック */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.block.tileentity.TileEntityDecoration>> DECORATION =
+        BLOCK_ENTITY_TYPES.register("decoration", () -> BlockEntityType.Builder.of(
+            jp.ngt.rtm.block.tileentity.TileEntityDecoration::new,
+            RealTrainModUnofficialBlocks.DECORATION.get()).build(null));
+
     /** 本家 electric: 信号変換器 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.electric.TileEntitySignalConverter>> SIGNAL_CONVERTER =
         BLOCK_ENTITY_TYPES.register("signal_converter", () -> BlockEntityType.Builder.of(
@@ -84,4 +90,20 @@ public class RealTrainModUnofficialBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ScriptBlockEntity>> SCRIPT_BLOCK =
         BLOCK_ENTITY_TYPES.register("script_block", () -> BlockEntityType.Builder.of(ScriptBlockEntity::new,
             RealTrainModUnofficialBlocks.SCRIPT_BLOCK.get()).build(null));
+    /** 本家 TileEntitySlot (液体の吸込口)。 */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.block.tileentity.TileEntitySlot>> SLOT =
+        BLOCK_ENTITY_TYPES.register("slot", () -> BlockEntityType.Builder.of(
+            jp.ngt.rtm.block.tileentity.TileEntitySlot::new,
+            RealTrainModUnofficialBlocks.SLOT.get()).build(null));
+    /** 本家 TileEntityStation (駅コア)。 */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.block.tileentity.TileEntityStation>> STATION =
+        BLOCK_ENTITY_TYPES.register("station", () -> BlockEntityType.Builder.of(
+            jp.ngt.rtm.block.tileentity.TileEntityStation::new,
+            RealTrainModUnofficialBlocks.STATION_CORE.get()).build(null));
+    /** 本家 TileEntityMovingMachine (移動装置)。 */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.block.tileentity.TileEntityMovingMachine>> MOVING_MACHINE =
+        BLOCK_ENTITY_TYPES.register("moving_machine", () -> BlockEntityType.Builder.of(
+            jp.ngt.rtm.block.tileentity.TileEntityMovingMachine::new,
+            RealTrainModUnofficialBlocks.MOVING_MACHINE.get(),
+            RealTrainModUnofficialBlocks.VEHICLE_GENERATOR.get()).build(null));
 }

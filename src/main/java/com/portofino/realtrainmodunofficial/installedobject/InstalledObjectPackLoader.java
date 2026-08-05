@@ -42,6 +42,8 @@ public final class InstalledObjectPackLoader {
         }
         loaded = true;
         LOADED.clear();
+        com.portofino.realtrainmodunofficial.cargo.CargoPackLoader.begin();
+        com.portofino.realtrainmodunofficial.npc.NpcRegistry.begin();
         try {
             loadFromModJar();
             loadDirectoryPacks(FMLPaths.GAMEDIR.get());
@@ -71,6 +73,8 @@ public final class InstalledObjectPackLoader {
         }
         ensureDefaultConnectors();
         InstalledObjectRegistry.setDefinitions(LOADED);
+        com.portofino.realtrainmodunofficial.cargo.CargoPackLoader.end();
+        com.portofino.realtrainmodunofficial.npc.NpcRegistry.end();
         long connectors = LOADED.stream().filter(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT
                 || d.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT).count();
         // カテゴリ別の内訳。「看板の選択画面が空」等の切り分けがログだけでできるようにしておく。
@@ -124,6 +128,25 @@ public final class InstalledObjectPackLoader {
                         }
                     });
             }
+            //★旗の既定 (Flag_*.json) は models/json ではなく textures/flag に置かれている。
+            //  ここを走査しないと本家の周年旗が 1 つも選択画面に出ない。
+            Path flagDir = modFile.findResource("assets", "minecraft", "textures", "flag");
+            if (flagDir != null && Files.isDirectory(flagDir)) {
+                try (var stream = Files.list(flagDir)) {
+                    stream.filter(Files::isRegularFile)
+                        .filter(p -> isSupportedJson(normalize(p.getFileName().toString())))
+                        .forEach(path -> {
+                            try {
+                                parse(normalize(path.getFileName().toString()),
+                                    Files.readAllBytes(path), packName);
+                            } catch (Exception e) {
+                                RealTrainModUnofficial.LOGGER.warn(
+                                    "Failed to load built-in flag definition {}", path.getFileName(), e);
+                            }
+                        });
+                }
+            }
+
             // 標識 (RRS) は JSON を持たず textures/rrs/*.png 自体が選択肢になる。
             Path rrsDir = modFile.findResource("assets", "minecraft", "textures", "rrs");
             if (rrsDir != null && Files.isDirectory(rrsDir)) {
@@ -339,6 +362,46 @@ public final class InstalledObjectPackLoader {
         return def;
     }
 
+    /**
+     * 本家 FlagConfig の移植。既定値は FlagConfig.init と同じ
+     * (resolutionU=24 / resolutionV=16 / poleLength=1)。
+     */
+    private static void parseFlag(JsonObject obj, String packName, String file) {
+        try {
+            String texture = obj.get("texture").getAsString();
+            float width = obj.has("width") ? obj.get("width").getAsFloat() : 1.0F;
+            float height = obj.has("height") ? obj.get("height").getAsFloat() : 1.0F;
+            int resolutionU = obj.has("resolutionU") ? obj.get("resolutionU").getAsInt() : 0;
+            int resolutionV = obj.has("resolutionV") ? obj.get("resolutionV").getAsInt() : 0;
+            float poleLength = obj.has("poleLength") ? obj.get("poleLength").getAsFloat() : 0.0F;
+            if (resolutionU <= 0) {
+                resolutionU = 24;
+            }
+            if (resolutionV <= 0) {
+                resolutionV = 16;
+            }
+            if (poleLength <= 0.0F) {
+                poleLength = 1.0F;
+            }
+            String name = file.endsWith(".json") ? file.substring(0, file.length() - 5) : file;
+            String id = "flag:" + packName + ":" + name;
+            java.util.Map<String, String> textures = new HashMap<>();
+            textures.put("default", texture);
+            InstalledObjectDefinition def = new InstalledObjectDefinition(
+                    id, name, packName, InstalledObjectCategory.FLAG,
+                    "", "", texture, textures,
+                    Vec3.ZERO, 1.0F, false,
+                    width, height, 0.0F, "", "", "",
+                    Map.of(), List.of(), Vec3.ZERO, 1, 1);
+            def.setFlagParams(new InstalledObjectDefinition.FlagParams(
+                    texture, width, height, resolutionU, resolutionV, poleLength));
+            LOADED.add(def);
+        } catch (Exception e) {
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                    "[RTMU] 旗記述子を読めません: {} ({})", file, e.toString());
+        }
+    }
+
     private static boolean isSupportedJson(String path) {
         String file = leaf(path).toLowerCase(Locale.ROOT);
         return file.endsWith(".json") && (
@@ -351,6 +414,16 @@ public final class InstalledObjectPackLoader {
             // (足場/階段/パイプ/植物) は categoryFor が null を返して捨てる。
             || file.startsWith("modelornament_")
             || file.startsWith("signboard_")
+            // 貨物 (コンテナ / 火砲)。設置物ではないが、走査はこのローダーに相乗りしている。
+            // ★ここに足し忘れると parse まで届かず、モデル選択が空になる。
+            || file.startsWith("modelcontainer_")
+            || file.startsWith("modelfirearm_")
+            // 本家 ModelFlag_ / ModelMechanism_
+            || file.startsWith("modelflag_")
+            || file.startsWith("modelmechanism_")
+            || file.startsWith("modelnpc_")
+            // 本家の既定旗 (textures/flag/Flag_*.json)。モデルでなくテクスチャ記述子。
+            || file.startsWith("flag_")
         );
     }
 
@@ -370,6 +443,19 @@ public final class InstalledObjectPackLoader {
             String lower = file.toLowerCase(Locale.ROOT);
             if (lower.startsWith("signboard_")) {
                 parseSignboard(obj, packName, file);
+                return;
+            }
+            // 本家の旗記述子 (textures/flag/Flag_*.json)。{texture,width,height,resolutionU/V,poleLength}
+            if (lower.startsWith("flag_") && obj.has("texture") && !obj.has("model")) {
+                parseFlag(obj, packName, file);
+                return;
+            }
+            // 貨物 (コンテナ / 火砲) は設置物ではないので専用の受け皿へ渡す。
+            // 走査はこのローダーが全パックを舐めているのに相乗りする。
+            if (com.portofino.realtrainmodunofficial.cargo.CargoPackLoader.tryParse(obj, lower, packName)) {
+                return;
+            }
+            if (com.portofino.realtrainmodunofficial.npc.NpcRegistry.tryParse(obj, lower, packName)) {
                 return;
             }
 
@@ -465,6 +551,8 @@ public final class InstalledObjectPackLoader {
             // 本家 ModelConfig.doCulling (既定 false = 両面描画)。
             // 車両も設置オブジェクトも同じ経路で !doCulling のとき GL_CULL_FACE を切る。
             def.setDoCulling(getBoolean(obj, "doCulling", false));
+            //本家 OrnamentConfig.conveyorSpeed (足場/エスカレーターが乗った物を押す速さ)
+            def.setConveyorSpeed(getFloat(obj, "conveyorSpeed", 0.0F));
             LOADED.add(def);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse installed object json {} in {}: {}", path, packName, e.getMessage());
@@ -603,7 +691,24 @@ public final class InstalledObjectPackLoader {
             if (ornamentType.equals("pipe") || containsAny(lowerFile, "pipe", "パイプ")) {
                 return InstalledObjectCategory.PIPE;
             }
+            // 本家 ornamentType の残り。以前は null で捨てていたので、同梱パックの
+            // Plant 5 / Stair 3 / Scaffold 2 が丸ごと選べなかった。
+            if (ornamentType.equals("plant") || containsAny(lowerFile, "plant", "植物")) {
+                return InstalledObjectCategory.PLANT;
+            }
+            if (ornamentType.equals("stair") || containsAny(lowerFile, "stair", "階段")) {
+                return InstalledObjectCategory.STAIR;
+            }
+            if (ornamentType.equals("scaffold") || containsAny(lowerFile, "scaffold", "足場")) {
+                return InstalledObjectCategory.SCAFFOLD;
+            }
             return null;
+        }
+        if (lowerFile.startsWith("modelflag_")) {
+            return InstalledObjectCategory.FLAG;
+        }
+        if (lowerFile.startsWith("modelmechanism_")) {
+            return InstalledObjectCategory.MECHANISM;
         }
         // 踏切は改札より先に判定する(CrossingGate を "gate" で改札に誤分類しないため)。
         // 本家 RTM は machineType="Gate" (RTMResource.MACHINE_GATE = MACHINE.getSubType("Gate"),
@@ -701,6 +806,15 @@ public final class InstalledObjectPackLoader {
             return null;
         }
         return object.has(key) && object.get(key).isJsonPrimitive() ? object.get(key).getAsString() : null;
+    }
+
+    private static float getFloat(JsonObject object, String key, float fallback) {
+        try {
+            return object.has(key) && object.get(key).isJsonPrimitive()
+                ? object.get(key).getAsFloat() : fallback;
+        } catch (Exception e) {
+            return fallback;
+        }
     }
 
     private static boolean getBoolean(JsonObject object, String key, boolean fallback) {

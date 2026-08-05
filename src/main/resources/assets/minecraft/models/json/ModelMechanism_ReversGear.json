@@ -1,0 +1,19 @@
+{
+	"name": "revers_gear",
+	"model": {
+		"modelFile": "revers_gear.mqoz",
+		"textures": [["default", "textures/mechanism/revers_gear.png", ""]],
+		"rendererPath": "scripts/RenderReversGear.js"
+	},
+	"buttonTexture": "textures/mechanism/button_revers_gear.png",
+	"type": "TRANSMISSION",
+	"transmissionRatioON": [-1.0, 0.0, 0.0, 0.0, 0.0],
+	"transmissionRatioOFF": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"maxSpeed": 10000.0,
+	"acceleration": 0.0,
+	"radius": 0.0,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479"
+}

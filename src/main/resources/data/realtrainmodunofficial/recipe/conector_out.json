@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "   ",
+    " RD",
+    " I "
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:sandstone"
+    },
+    "D": {
+      "item": "minecraft:red_dye"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:connector_output",
+    "count": 2
+  },
+  "category": "misc"
+}

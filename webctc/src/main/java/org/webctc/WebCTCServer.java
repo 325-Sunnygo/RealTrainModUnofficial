@@ -165,10 +165,11 @@ public final class WebCTCServer {
     private static List<EntityTrainBase> allTrains() {
         //旧 TrainEntity ではなく本家系 EntityTrainBase を列挙する
         //(設置される列車は jp.ngt.rtm.entity.train.EntityTrain)
-        return StreamSupport.stream(minecraftServer.overworld().getEntities().getAll().spliterator(), false)
-            .filter(EntityTrainBase.class::isInstance)
-            .map(EntityTrainBase.class::cast)
-            .collect(Collectors.toList());
+        //★getEntities() (LevelEntityGetter) はバニラでは protected。NeoForge が公開しているだけなので、
+        //  どちらのローダーでも通る公開 API (getEntities(EntityTypeTest, Predicate)) を使う。
+        return new java.util.ArrayList<>(minecraftServer.overworld().getEntities(
+                net.minecraft.world.level.entity.EntityTypeTest.forClass(EntityTrainBase.class),
+                e -> true));
     }
 
     private static String trainsJson() {

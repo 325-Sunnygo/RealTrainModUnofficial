@@ -1,0 +1,22 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "S S",
+    "S S",
+    "S S",
+    "S S",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:bullet",
+    "count": 64,
+    "components": {
+      "realtrainmodunofficial:item_variant": 18
+    }
+  }
+}

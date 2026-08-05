@@ -441,6 +441,41 @@ public class VehicleDefinition {
         return !leftDoors.isEmpty() || !rightDoors.isEmpty();
     }
 
+    /**
+     * KaizPatchX TrainConfig の速度まわりの残り項目。
+     * accelerateions … ノッチ段ごとの加速度 (段数は maxSpeed と同じ)
+     * deccelerations … ブレーキ 9 段 (0=抑速〜8=非常)
+     * useVariableAcceleration/Deceleration … サーバースクリプトで加減速を出す
+     */
+    private List<Float> notchAccelerations = List.of();
+    private List<Float> decelerations = List.of();
+    private boolean useVariableAcceleration;
+    private boolean useVariableDeceleration;
+
+    public List<Float> getNotchAccelerations() {
+        return notchAccelerations;
+    }
+
+    public List<Float> getDecelerations() {
+        return decelerations;
+    }
+
+    public boolean isUseVariableAcceleration() {
+        return useVariableAcceleration;
+    }
+
+    public boolean isUseVariableDeceleration() {
+        return useVariableDeceleration;
+    }
+
+    public void setSpeedProfile(List<Float> notchAccelerations, List<Float> decelerations,
+                                boolean useVariableAcceleration, boolean useVariableDeceleration) {
+        this.notchAccelerations = notchAccelerations == null ? List.of() : List.copyOf(notchAccelerations);
+        this.decelerations = decelerations == null ? List.of() : List.copyOf(decelerations);
+        this.useVariableAcceleration = useVariableAcceleration;
+        this.useVariableDeceleration = useVariableDeceleration;
+    }
+
     public List<Float> getNotchMaxSpeeds() {
         return notchMaxSpeeds;
     }

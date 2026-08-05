@@ -292,10 +292,10 @@ public final class RailGroupData {
     }
 
     private static List<EntityTrainBase> allTrains(ServerLevel level) {
-        return StreamSupport.stream(level.getEntities().getAll().spliterator(), false)
-                .filter(EntityTrainBase.class::isInstance)
-                .map(EntityTrainBase.class::cast)
-                .collect(Collectors.toList());
+        //★同上。getEntities() はバニラでは protected
+        return new java.util.ArrayList<>(level.getEntities(
+                net.minecraft.world.level.entity.EntityTypeTest.forClass(EntityTrainBase.class),
+                e -> true));
     }
 
     /** 本家 RailGroupState を JSON で返す。 */

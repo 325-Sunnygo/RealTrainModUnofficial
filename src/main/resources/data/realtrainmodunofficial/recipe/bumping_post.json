@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ISI",
+    "I I",
+    "I I"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:material_shaft"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:bumping_post",
+    "count": 1
+  },
+  "category": "misc"
+}

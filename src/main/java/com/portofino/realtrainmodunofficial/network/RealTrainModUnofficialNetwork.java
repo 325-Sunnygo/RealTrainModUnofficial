@@ -21,6 +21,9 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(ChangeEntityModelPayload.TYPE, ChangeEntityModelPayload.STREAM_CODEC, ChangeEntityModelPayload::handleOnServer);
         registrar.playToServer(TrainControlPayload.TYPE, TrainControlPayload.STREAM_CODEC, TrainControlPayload::handleOnServer);
         registrar.playToServer(DataMapClientSyncPayload.TYPE, DataMapClientSyncPayload.STREAM_CODEC, DataMapClientSyncPayload::handleOnServer);
+        registrar.playToServer(DecorationRegisterPayload.TYPE, DecorationRegisterPayload.STREAM_CODEC, DecorationRegisterPayload::handleOnServer);
+        registrar.playToServer(NpcTradePayload.TYPE, NpcTradePayload.STREAM_CODEC, NpcTradePayload::handleOnServer);
+        registrar.playToClient(DecorationSyncPayload.TYPE, DecorationSyncPayload.STREAM_CODEC, DecorationSyncPayload::handleOnClient);
         registrar.playToClient(TrainSoundPayload.TYPE, TrainSoundPayload.STREAM_CODEC, TrainSoundPayload::handleOnClient);
         registrar.playToServer(MountTrainPayload.TYPE, MountTrainPayload.STREAM_CODEC, MountTrainPayload::handleOnServer);
         registrar.playToServer(RailPreviewAdjustPayload.TYPE, RailPreviewAdjustPayload.STREAM_CODEC, RailPreviewAdjustPayload::handleOnServer);
@@ -61,6 +64,14 @@ public final class RealTrainModUnofficialNetwork {
         // 本家系列車 (EntityVehicleBase) の DataMap 同期 (ATSA HUD 等が使用)
         registrar.playToClient(DataMapSyncPayload.TYPE, DataMapSyncPayload.STREAM_CODEC, DataMapSyncPayload::handleOnClient);
         // 背景パネルの設定 (画像・大きさ・高さ)
+        registrar.playToServer(SignalConverterPayload.TYPE, SignalConverterPayload.STREAM_CODEC,
+            SignalConverterPayload::handleOnServer);
+        registrar.playToServer(MovingMachinePayload.TYPE, MovingMachinePayload.STREAM_CODEC,
+            MovingMachinePayload::handleOnServer);
+        registrar.playToServer(CargoModelPayload.TYPE, CargoModelPayload.STREAM_CODEC,
+            CargoModelPayload::handleOnServer);
+        registrar.playToServer(StationNamePayload.TYPE, StationNamePayload.STREAM_CODEC,
+            StationNamePayload::handleOnServer);
         registrar.playToServer(BackgroundPanelPayload.TYPE, BackgroundPanelPayload.STREAM_CODEC,
             BackgroundPanelPayload::handleOnServer);
     }

@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " S ",
+    "SSS",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:bullet",
+    "count": 64,
+    "components": {
+      "realtrainmodunofficial:item_variant": 5
+    }
+  },
+  "category": "misc"
+}

@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "realtrainmodunofficial:block/workbench_top",
+    "down": "realtrainmodunofficial:block/workbench_top",
+    "up": "realtrainmodunofficial:block/workbench_top",
+    "north": "realtrainmodunofficial:block/workbench_front_0",
+    "east": "realtrainmodunofficial:block/workbench_side_0",
+    "south": "realtrainmodunofficial:block/workbench_front_0",
+    "west": "realtrainmodunofficial:block/workbench_side_0"
+  }
+}

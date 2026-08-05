@@ -98,6 +98,13 @@ public class InstalledObjectBlockEntity extends BlockEntity
     // 本家 electric: コネクタの信号レベル (配線網)
     private int electricity;
     private int prevConnectorInput = -1;
+    /**
+     * 本家 Connection(DIRECT): コネクタが取り付いている相手ブロック。
+     * 出力コネクタはここから信号を読み、入力コネクタはここへ信号を書く。
+     */
+    private BlockPos directTarget;
+    /** 本家 TileEntityConnector.prevOutputSignal。 */
+    private int prevOutputSignal = Integer.MIN_VALUE;
     // スピーカー: 音が聞こえる範囲(ブロック)。GUIで可変。
     private int speakerRange = 32;
     private final Map<String, String> scriptData = new HashMap<>();
@@ -425,6 +432,12 @@ public class InstalledObjectBlockEntity extends BlockEntity
         tag.putFloat("MountPitch", mountPitch);
         tag.putFloat("MountRoll", mountRoll);
         tag.putInt("MountFace", mountFace);
+        if (directTarget != null) {
+            //本家 Connection(DIRECT) の相手座標
+            tag.putInt("DirectX", directTarget.getX());
+            tag.putInt("DirectY", directTarget.getY());
+            tag.putInt("DirectZ", directTarget.getZ());
+        }
         // 本家 ResourceState と同じキー名 (本家ワールドのデータをそのまま読める)。
         tag.putInt("Color", wireColor);
         tag.putFloat("AdjustRoll", adjustRoll);
@@ -556,6 +569,67 @@ public class InstalledObjectBlockEntity extends BlockEntity
                 : null;
         detectorPlaceOnDetect = !tag.contains("DetectorPlaceOnDetect") || tag.getBoolean("DetectorPlaceOnDetect");
         detectorTrainOnRail = tag.getBoolean("DetectorTrainOnRail");
+        directTarget = tag.contains("DirectX")
+                ? new BlockPos(tag.getInt("DirectX"), tag.getInt("DirectY"), tag.getInt("DirectZ"))
+                : null;
+    }
+
+    // ───── 本家 TileEntityConnector (入出力コネクタ) ─────
+
+    public void setDirectTarget(BlockPos pos) {
+        this.directTarget = pos == null ? null : pos.immutable();
+        this.setChanged();
+    }
+
+    /**
+     * 取り付け先ブロック。本家 ItemInstalledObject はコネクタを置いた瞬間に
+     * {@code setConnectionTo(クリックしたブロック, DIRECT)} を張る。
+     * 保存が無い古い設置物は、取付面の反対側 = クリックしたブロックとして復元する。
+     */
+    public BlockPos getDirectTarget() {
+        if (this.directTarget != null) {
+            return this.directTarget;
+        }
+        int face = this.getMountFace();
+        if (face < 0 || face >= net.minecraft.core.Direction.values().length) {
+            return null;
+        }
+        //取付面 = クリックした面。コネクタはその面の 1 つ手前に置かれるので、逆向きが相手
+        return this.worldPosition.relative(net.minecraft.core.Direction.values()[face].getOpposite());
+    }
+
+    /** 取り付け先が持っている信号 (本家 Connection.getIProvideElectricity → getElectricity)。 */
+    private int readAttachedElectricity() {
+        BlockPos target = this.getDirectTarget();
+        if (this.level == null || target == null) {
+            return 0;
+        }
+        net.minecraft.world.level.block.entity.BlockEntity be = this.level.getBlockEntity(target);
+        if (be instanceof jp.ngt.rtm.electric.IProvideElectricity provider) {
+            return provider.getElectricity();
+        }
+        if (be instanceof InstalledObjectBlockEntity io) {
+            return io.getElectricity();
+        }
+        return 0;
+    }
+
+    /**
+     * 本家 TileEntityConnector.sendElectricity (INPUT かつ DIRECT):
+     * 受け取った信号を取り付け先ブロックへ流し込む。
+     */
+    public void deliverToAttached(int levelValue) {
+        BlockPos target = this.getDirectTarget();
+        if (this.level == null || target == null) {
+            return;
+        }
+        net.minecraft.world.level.block.entity.BlockEntity be = this.level.getBlockEntity(target);
+        if (be instanceof jp.ngt.rtm.electric.IProvideElectricity provider) {
+            provider.setElectricity(this.worldPosition.getX(), this.worldPosition.getY(),
+                this.worldPosition.getZ(), levelValue);
+        } else if (be instanceof InstalledObjectBlockEntity io) {
+            io.setElectricity(levelValue);
+        }
     }
 
     @Override
@@ -700,6 +774,19 @@ public class InstalledObjectBlockEntity extends BlockEntity
     }
 
     public void setElectricity(int levelValue) {
+        //★本家 TileEntitySignal.setElectricity: 現示はモデルが出せる上限 (SignalConfig.maxSignalLevel)
+        //  で頭打ちにする。上限は json の maxSignalLevel、無ければ lights の S(n) の最大値。
+        if (getCategory() == InstalledObjectCategory.SIGNAL) {
+            com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def =
+                com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry
+                    .getById(this.getDefinitionId());
+            if (def != null) {
+                int max = def.getMaxSignalLevel();
+                if (max > 0 && levelValue > max) {
+                    levelValue = max;
+                }
+            }
+        }
         // 信号機は「電気値は同じだが現示 (aspect) がズレている」ことがある
         // (ミラー導入前の設置物や手動変更との競合) — その場合も書き込む
         boolean signalDesynced = getCategory() == InstalledObjectCategory.SIGNAL
@@ -1524,14 +1611,21 @@ public class InstalledObjectBlockEntity extends BlockEntity
             be.applyDetectorOutput(level, onRail);
             return;
         }
-        // 本家 electric: 入力コネクタ = レッドストーンを監視して配線網へ伝播
-        if (be.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT) {
-            int sig = level.getBestNeighborSignal(pos);
-            if (sig != be.prevConnectorInput) {
-                be.prevConnectorInput = sig;
+        // ★本家 TileEntityConnector.checkSignalOutput:
+        //   <b>出力</b>コネクタが「取り付け先ブロックから信号出力」して配線網へ流す。
+        //   (本家 usage.item.istlobj.connector_out = 取付け先ブロックから信号出力)
+        //   入力コネクタは配線から受けて取り付け先へ書き込むだけで、
+        //   レッドストーンには一切触らない (RS との橋渡しは信号変換機の役目)。
+        if (be.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
+            int sig = be.readAttachedElectricity();
+            if (sig != be.prevOutputSignal) {
+                be.prevOutputSignal = sig;
                 be.setElectricity(sig);
                 jp.ngt.rtm.electric.WireManager.propagate(level, pos, sig);
             }
+            return;
+        }
+        if (be.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT) {
             return;
         }
         if (be.getCategory() == InstalledObjectCategory.TICKET_GATE) {

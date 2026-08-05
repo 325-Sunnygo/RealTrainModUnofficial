@@ -1,0 +1,19 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "IIIII",
+    "II II",
+    "I I I",
+    "II II",
+    "IIIII"
+  ],
+  "key": {
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:iron_pillar",
+    "count": 25
+  }
+}

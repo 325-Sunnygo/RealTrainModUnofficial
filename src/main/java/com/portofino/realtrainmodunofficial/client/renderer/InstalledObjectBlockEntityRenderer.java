@@ -62,6 +62,13 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             ClientRenderProfiler.endInstalledObject(profilerStart);
             return;
         }
+        //本家の既定旗 (textures/flag/Flag_*.json)。モデルでなく手続き描画 (RenderFlag)。
+        if (blockEntity.getCategory() == InstalledObjectCategory.FLAG
+                && definition.getFlagParams() != null) {
+            TextureFlagRenderer.render(blockEntity, definition, partialTick, poseStack, buffer, packedLight);
+            ClientRenderProfiler.endInstalledObject(profilerStart);
+            return;
+        }
         Long failedUntil = FAILED_RENDER_UNTIL_NANOS.get(definition.getId());
         if (failedUntil != null) {
             if (System.nanoTime() < failedUntil) {
@@ -159,6 +166,31 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             blockEntity.getMountFace() >= 0 ? blockEntity.getMountFace() : 1);
                         poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
                         poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
+                    } else if (blockEntity.getCategory() == InstalledObjectCategory.SCAFFOLD
+                            || blockEntity.getCategory() == InstalledObjectCategory.STAIR
+                            || blockEntity.getCategory() == InstalledObjectCategory.PLANT
+                            || blockEntity.getCategory() == InstalledObjectCategory.MECHANISM) {
+                        // 本家 RenderOrnament / RenderMechanism: 原点は<b>ブロック中心 (+0.5,+0.5,+0.5)</b>。
+                        // スクリプトが -0.5 で底面へ戻す (RenderScaffold.js 冒頭の glTranslatef(0,-0.5,0))。
+                        // ★底面原点の汎用分岐に落とすと、モデルが半ブロック沈む。
+                        poseStack.translate(0.5D, 0.5D, 0.5D);
+                        Vec3 renderOffset = blockEntity.getRenderOffset();
+                        poseStack.translate(renderOffset.x, renderOffset.y, renderOffset.z);
+                        applyAdjustments(poseStack, blockEntity);
+                        if (blockEntity.getCategory() == InstalledObjectCategory.PLANT) {
+                            // 本家は植物だけ setRotation (プレイヤー向き 15 度刻み) を持つ
+                            poseStack.mulPose(Axis.YP.rotationDegrees(blockEntity.getYaw()));
+                        } else if (blockEntity.getCategory() == InstalledObjectCategory.MECHANISM) {
+                            // 本家 RenderMechanism: dir * 90 度
+                            poseStack.mulPose(Axis.YP.rotationDegrees(
+                                net.minecraft.util.Mth.wrapDegrees(blockEntity.getDir() * 90.0F)));
+                        }
+                        // ★足場/階段はここで回さない。本家は rotation を一度も設定せず (常に 0)、
+                        //   向きはスクリプトが dir を見て自分で決める。ここで回すと
+                        //   スクリプトのワールド軸判定 (partXP 等) と食い違って手すりがずれ、
+                        //   エスカレーターは二重回転になる。
+                        poseStack.translate(definition.getModelOffset().x, definition.getModelOffset().y, definition.getModelOffset().z);
+                        poseStack.scale(definition.getModelScale(), definition.getModelScale(), definition.getModelScale());
                     } else {
                         poseStack.translate(0.5D, 0.0D, 0.5D);
                         Vec3 renderOffset = blockEntity.getRenderOffset();
@@ -196,6 +228,15 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             //   modelSet.modelObj.render(...) = <b>スクリプトだけ</b>を描く。
                             //   RTMU の renderPreferScript 経路は「スクリプト + 焼き込みモデル」の
                             //   2 段構成なので、同じパーツが二重に出てちらついていた。
+                            // ★足場/階段/植物/旗/機構もここ。本家の RenderScaffold.js /
+                            //   RenderEscalatorFlat.js は隣接状態を見てパーツを出し分けるので、
+                            //   スクリプト経路に載せないと<b>全パーツが描かれる</b>
+                            //   (手すりが 4 方向に出る / エスカレーターのステップが動かない)。
+                            || blockEntity.getCategory() == InstalledObjectCategory.SCAFFOLD
+                            || blockEntity.getCategory() == InstalledObjectCategory.STAIR
+                            || blockEntity.getCategory() == InstalledObjectCategory.PLANT
+                            || blockEntity.getCategory() == InstalledObjectCategory.FLAG
+                            || blockEntity.getCategory() == InstalledObjectCategory.MECHANISM
                             || isConnectorCategory(blockEntity.getCategory());
                     boolean hasMachineScript = definition.getScriptPath() != null && !definition.getScriptPath().isBlank();
                     // これらのブロック検知信号パックは json の machineType が "Light" のため SIGNAL でなく

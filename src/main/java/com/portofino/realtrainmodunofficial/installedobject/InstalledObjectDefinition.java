@@ -52,6 +52,58 @@ public class InstalledObjectDefinition {
     // 本家 MachineConfig.rotateByMetadata。true の照明 (サーチライト/回転灯/灯台灯) は
     // RenderMachine と同じく「クリック面 (meta 0-5) の回転 ∘ プレイヤー向き」で描く。
     private boolean rotateByMetadata = false;
+    /**
+     * 本家 FlagConfig (textures/flag/Flag_*.json) の旗。null なら通常の mqo モデル設置物。
+     * texture はパック相対パス ("textures/flag/x.png")。
+     */
+    public record FlagParams(String texture, float width, float height,
+                             int resolutionU, int resolutionV, float poleLength) {}
+
+    /**
+     * 本家 SignalConfig.maxSignalLevel。信号機が出せる現示の上限。
+     * json に無ければ {@code lights} の S(n) の最大値 (本家 SignalConfig.init と同じ導出)。
+     * 0 なら上限なし扱い。
+     */
+    private int maxSignalLevel = -1;
+
+    public int getMaxSignalLevel() {
+        if (this.maxSignalLevel >= 0) {
+            return this.maxSignalLevel;
+        }
+        int max = 0;
+        for (Integer key : this.signalLightGroups.keySet()) {
+            if (key != null && key > max) {
+                max = key;
+            }
+        }
+        this.maxSignalLevel = max;
+        return max;
+    }
+
+    public void setMaxSignalLevel(int maxSignalLevel) {
+        this.maxSignalLevel = maxSignalLevel;
+    }
+
+    private FlagParams flagParams;
+
+    public FlagParams getFlagParams() {
+        return this.flagParams;
+    }
+
+    public void setFlagParams(FlagParams flagParams) {
+        this.flagParams = flagParams;
+    }
+
+    /** 本家 OrnamentConfig.conveyorSpeed。足場 (エスカレーター) が乗った物を押す速さ。 */
+    private float conveyorSpeed = 0.0F;
+
+    public float getConveyorSpeed() {
+        return this.conveyorSpeed;
+    }
+
+    public void setConveyorSpeed(float conveyorSpeed) {
+        this.conveyorSpeed = conveyorSpeed;
+    }
 
     public boolean isRotateByMetadata() {
         return rotateByMetadata;

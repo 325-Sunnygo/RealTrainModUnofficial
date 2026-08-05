@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SSS",
+    "SMS",
+    "SSS"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:steel_material"
+    },
+    "M": {
+      "item": "realtrainmodunofficial:material_motor"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:moving_machine",
+    "count": 1
+  },
+  "category": "misc"
+}

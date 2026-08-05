@@ -20,6 +20,51 @@ public final class ClientHooks {
         invokeClient("openBackgroundPanelScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
+    /** 駅コアの駅名編集画面。 */
+    public static void openStationCoreScreen(BlockPos pos) {
+        invokeClient("openStationCoreScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 設置済み貨物のモデル選択画面。 */
+    public static void openCargoModelScreen(int entityId) {
+        invokeClient("openCargoModelScreen", new Class<?>[]{int.class}, entityId);
+    }
+
+    /** 貨物アイテムのモデル選択画面。 */
+    public static void openCargoItemModelScreen(boolean offHand) {
+        invokeClient("openCargoItemModelScreen", new Class<?>[]{boolean.class}, offHand);
+    }
+
+    /** 移動装置の設定画面。 */
+    public static void openMovingMachineScreen(BlockPos pos) {
+        invokeClient("openMovingMachineScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 設置済み NPC のモデル選択画面。 */
+    public static void openNpcModelScreen(int entityId) {
+        invokeClient("openNpcModelScreen", new Class<?>[]{int.class}, entityId);
+    }
+
+    /** NPC アイテムのモデル選択画面。 */
+    public static void openNpcItemModelScreen(boolean offHand) {
+        invokeClient("openNpcItemModelScreen", new Class<?>[]{boolean.class}, offHand);
+    }
+
+    /** 信号変換機の設定画面。 */
+    public static void openSignalConverterScreen(BlockPos pos) {
+        invokeClient("openSignalConverterScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 装飾ブロックの編集画面 (本家 guiIdDecoration)。 */
+    public static void openDecorationEditScreen() {
+        invokeClient("openDecorationEditScreen", new Class<?>[]{});
+    }
+
+    /** NPC の商売画面 (本家 GuiSalesperson)。 */
+    public static void openNpcTradeScreen(int entityId) {
+        invokeClient("openNpcTradeScreen", new Class<?>[]{int.class}, entityId);
+    }
+
     /** エディタ画面 (neo mcte)。 */
     public static void openEditorScreen() {
         invokeClient("openEditorScreen", new Class<?>[]{});

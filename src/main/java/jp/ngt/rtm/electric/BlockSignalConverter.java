@@ -60,26 +60,28 @@ public class BlockSignalConverter extends BaseEntityBlock {
                 TileEntitySignalConverter::tick);
     }
 
-    /** 本家: 右クリックでタイプ切替 */
+    /**
+     * 本家 BlockSignalConverter.onBlockActivated: 右クリックで<b>設定 GUI</b> を開く。
+     * ★タイプは設置時に決まる (アイテム 4 種)。右クリックでの切替は本家に無い。
+     */
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
-        if (!level.isClientSide) {
-            int next = (state.getValue(TYPE) + 1) % 5;
-            level.setBlock(pos, state.setValue(TYPE, next), 3);
-            SignalConverterType type = SignalConverterType.getType(next);
-            player.displayClientMessage(Component.literal("信号変換器: " + typeName(type)), true);
+        //★本家 onBlockActivated: Increment / Decrement は設定を持たないので画面を開かない
+        int type = state.getValue(TYPE);
+        if (type == SignalConverterType.Increment.id || type == SignalConverterType.Decrement.id) {
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+        if (level.isClientSide) {
+            com.portofino.realtrainmodunofficial.ClientHooks.openSignalConverterScreen(pos);
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
     }
 
-    private static String typeName(SignalConverterType type) {
-        return switch (type) {
-            case RSIn -> "RS入力 (レッドストーン→配線)";
-            case RSOut -> "RS出力 (配線→レッドストーン)";
-            case Increment -> "インクリメント (+1)";
-            case Decrement -> "デクリメント (-1)";
-            case Wireless -> "無線 (未対応)";
-        };
+    /** 本家 getStrongPower = getWeakPower = tile.getRSOutput()。 */
+    @Override
+    protected int getDirectSignal(BlockState state, net.minecraft.world.level.BlockGetter getter,
+                                  BlockPos pos, net.minecraft.core.Direction direction) {
+        return this.getSignal(state, getter, pos, direction);
     }
 
     @Override
@@ -91,7 +93,8 @@ public class BlockSignalConverter extends BaseEntityBlock {
     protected int getSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos, net.minecraft.core.Direction direction) {
         if (state.getValue(TYPE) == SignalConverterType.RSOut.id
                 && getter.getBlockEntity(pos) instanceof TileEntitySignalConverter converter) {
-            return net.minecraft.util.Mth.clamp(converter.getElectricity(), 0, 15);
+            //本家 TileEntitySC_RSOut.getRSOutput: 比較結果のフラグで 0/15
+            return converter.getRSOutput();
         }
         return 0;
     }

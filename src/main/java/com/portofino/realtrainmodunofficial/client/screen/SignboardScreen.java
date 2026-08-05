@@ -470,7 +470,11 @@ public class SignboardScreen extends Screen {
             }
         }
 
-        super.render(graphics, mouseX, mouseY, partialTick);
+        //★super.render は renderBackground をもう一度呼び、描いた内容の上に暗幕が乗る。
+        //  ウィジェットだけを描く (ぼかし根絶と同時に入れた描画順の修正)。
+        for (net.minecraft.client.gui.components.Renderable renderable : this.renderables) {
+            renderable.render(graphics, mouseX, mouseY, partialTick);
+        }
 
         if (selected != null) {
             int px = this.width - PANEL_W + 5;
@@ -545,5 +549,10 @@ public class SignboardScreen extends Screen {
     @Override
     public boolean isPauseScreen() {
         return false;
+    }
+
+    /** 1.21 のメニューぼかしを無効化 (本家 1.7.10 の GUI にぼかしは無い)。 */
+    @Override
+    protected void renderBlurredBackground(float partialTick) {
     }
 }

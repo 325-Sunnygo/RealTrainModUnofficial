@@ -53,6 +53,20 @@ public final class PackButtonTextureCache {
     }
 
     private static ButtonTextureInfo load(String packName, String texturePath) {
+        //同梱アセット (assets/minecraft/...)。旗などパック外の既定素材はここで解決する。
+        try {
+            //ResourceLocation は大文字不可 → 同梱側はファイル名ごと小文字化してある
+            ResourceLocation direct = ResourceLocation.withDefaultNamespace(
+                texturePath.toLowerCase(java.util.Locale.ROOT));
+            var res = Minecraft.getInstance().getResourceManager().getResource(direct);
+            if (res.isPresent()) {
+                try (InputStream in = res.get().open()) {
+                    NativeImage image = NativeImage.read(in);
+                    return registerDynamicTexture(packName, texturePath, image);
+                }
+            }
+        } catch (Exception ignored) {
+        }
         Path packPath = RailPackLoader.resolvePackPath(packName);
         if (packPath == null) {
             try {
@@ -193,7 +207,7 @@ public final class PackButtonTextureCache {
     }
 
     /** パックから buttonTexture の NativeImage を読み込む (登録しない)。呼び出し側で close する。 */
-    private static NativeImage readImage(String packName, String texturePath) throws Exception {
+    public static NativeImage readImage(String packName, String texturePath) throws Exception {
         Path packPath = RailPackLoader.resolvePackPath(packName);
         NativeImage image = null;
         if (packPath != null) {

@@ -1,0 +1,22 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "  W  ",
+    "IIIII",
+    "  I  ",
+    " I I ",
+    " I I "
+  ],
+  "key": {
+    "W": {
+      "item": "minecraft:player_head"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:motorman",
+    "count": 1
+  }
+}

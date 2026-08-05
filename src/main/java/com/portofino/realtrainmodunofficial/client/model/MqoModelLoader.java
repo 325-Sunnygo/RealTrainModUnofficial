@@ -2864,6 +2864,60 @@ public final class MqoModelLoader {
         model.render(poseStack, buffer, packedLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, null, groupTransform, entity);
     }
 
+    /** {@link #loadModelFromModResources} のキャッシュ。 */
+    private static final Map<String, MqoModel> MOD_RESOURCE_MODELS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * <b>mod 自身の jar</b> からモデルを読む (パックではない)。
+     *
+     * <p>本家が {@code ModelLoader.loadModel(new ResourceLocation("rtm", "models/cannonball.obj"))} で
+     * mod 内のモデルを直に読んでいる所のための口。
+     *
+     * @param modelPath   {@code assets/realtrainmodunofficial/} からの相対パス (例 {@code models/entity/cannonball.obj})
+     * @param texturePath 同じく相対パス。材質名に関係なくこの絵を使う
+     */
+    public static MqoModel loadModelFromModResources(String modelPath, String texturePath) {
+        String key = modelPath + "|" + texturePath;
+        MqoModel cached = MOD_RESOURCE_MODELS.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            String base = "/assets/" + RealTrainModUnofficial.MODID + "/";
+            java.io.InputStream in = MqoModelLoader.class.getResourceAsStream(base + modelPath);
+            if (in == null) {
+                RealTrainModUnofficial.LOGGER.warn("mod 内モデルが見つからない: {}", modelPath);
+                return null;
+            }
+            String text;
+            try (java.io.InputStream stream = in) {
+                text = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            }
+            TextureOpener opener = new TextureOpener() {
+                @Override
+                public InputStream open(String rel) {
+                    //材質が何を指していても、指定した 1 枚を返す
+                    return MqoModelLoader.class.getResourceAsStream(base + texturePath);
+                }
+                @Override
+                public String getPackKey() {
+                    return "rtmu-mod:" + texturePath;
+                }
+            };
+            Map<String, String> overrides = Map.of("default", texturePath);
+            MqoModel model = modelPath.toLowerCase(Locale.ROOT).endsWith(".obj")
+                ? bakeObj(text, opener, overrides, true)
+                : bake(text, opener, overrides, true);
+            if (model != null) {
+                MOD_RESOURCE_MODELS.put(key, model);
+            }
+            return model;
+        } catch (Exception e) {
+            RealTrainModUnofficial.LOGGER.warn("mod 内モデルの読み込みに失敗: {}", modelPath, e);
+            return null;
+        }
+    }
+
     @FunctionalInterface
     private interface TextureOpener {
         InputStream open(String path) throws Exception;
@@ -3355,6 +3409,41 @@ public final class MqoModelLoader {
         // グレー板を1枚足して塞ぐ(両面表示は使わない=禁止ルール遵守)。
         private boolean voxelModel;
         private volatile float[] bodyCapRect; // {minX, minZ, maxX, maxZ, bottomY}
+        /** 本家 PolygonModel.sizeBox 相当 {minX,minY,minZ,maxX,maxY,maxZ} (遅延計算)。 */
+        private volatile float[] sizeBox;
+
+        /**
+         * 本家 {@code PolygonModel.getSize()}。モデル選択画面のプレビューが
+         * fit スケール (10/最大寸法) と縦センタリングに使う。
+         * 頂点が無いときは本家 GuiButtonSelectModel の既定 box を返す。
+         */
+        public float[] getSizeBox() {
+            float[] cached = this.sizeBox;
+            if (cached != null) {
+                return cached;
+            }
+            float minX = Float.MAX_VALUE, minY = Float.MAX_VALUE, minZ = Float.MAX_VALUE;
+            float maxX = -Float.MAX_VALUE, maxY = -Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
+            boolean any = false;
+            for (Batch b : batches) {
+                if (b == null || b.data == null || b.vertexCount <= 0) {
+                    continue;
+                }
+                for (int i = 0; i < b.vertexCount; i++) {
+                    int o = i * 8;
+                    float x = b.data[o], y = b.data[o + 1], z = b.data[o + 2];
+                    if (x < minX) minX = x; if (x > maxX) maxX = x;
+                    if (y < minY) minY = y; if (y > maxY) maxY = y;
+                    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+                    any = true;
+                }
+            }
+            float[] box = any
+                ? new float[]{minX, minY, minZ, maxX, maxY, maxZ}
+                : new float[]{-0.5F, 0.0F, -0.5F, 0.5F, 2.0F, 0.5F};
+            this.sizeBox = box;
+            return box;
+        }
         private volatile boolean bodyCapComputed;
 
         public MqoModel(List<Batch> batches, List<ResourceLocation> materialTextures) {

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "realtrainmodunofficial:block/slot_front",
+    "bottom": "realtrainmodunofficial:block/slot_back",
+    "side": "realtrainmodunofficial:block/slot"
+  }
+}

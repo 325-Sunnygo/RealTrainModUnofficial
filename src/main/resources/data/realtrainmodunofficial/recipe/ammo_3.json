@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " B ",
+    "PPP",
+    " C "
+  ],
+  "key": {
+    "B": {
+      "item": "realtrainmodunofficial:bullet"
+    },
+    "C": {
+      "item": "realtrainmodunofficial:bullet"
+    },
+    "P": {
+      "item": "realtrainmodunofficial:material_powder"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:bullet",
+    "count": 1,
+    "components": {
+      "realtrainmodunofficial:item_variant": 12
+    }
+  },
+  "category": "misc"
+}

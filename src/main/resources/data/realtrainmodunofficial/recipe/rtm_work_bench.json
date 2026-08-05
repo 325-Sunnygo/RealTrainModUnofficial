@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "  ",
+    " C"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    },
+    "C": {
+      "item": "minecraft:crafting_table"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:train_workbench",
+    "count": 1
+  },
+  "category": "misc"
+}

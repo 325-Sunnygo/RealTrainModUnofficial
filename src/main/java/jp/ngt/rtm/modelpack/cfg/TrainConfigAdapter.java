@@ -43,7 +43,7 @@ public final class TrainConfigAdapter {
             }
 
             List<Float> speeds = def.getNotchMaxSpeeds();
-            if (speeds != null && speeds.size() == 5) {
+            if (speeds != null && !speeds.isEmpty()) {
                 float[] ms = new float[speeds.size()];
                 for (int i = 0; i < ms.length; ++i) {
                     ms[i] = speeds.get(i);
@@ -54,6 +54,27 @@ public final class TrainConfigAdapter {
             if (def.getAcceleration() > 0.0F) {
                 cfg.accelerateion = def.getAcceleration();
             }
+
+            //KaizPatchX: ノッチ段ごとの加速度 (段数は maxSpeed と同じ)
+            List<Float> accels = def.getNotchAccelerations();
+            if (accels != null && !accels.isEmpty()) {
+                float[] aa = new float[accels.size()];
+                for (int i = 0; i < aa.length; ++i) {
+                    aa[i] = accels.get(i);
+                }
+                cfg.accelerateions = aa;
+            }
+            //KaizPatchX: ブレーキ 9 段
+            List<Float> decels = def.getDecelerations();
+            if (decels != null && !decels.isEmpty()) {
+                float[] dd = new float[decels.size()];
+                for (int i = 0; i < dd.length; ++i) {
+                    dd[i] = decels.get(i);
+                }
+                cfg.deccelerations = dd;
+            }
+            cfg.useVariableAcceleration = def.isUseVariableAcceleration();
+            cfg.useVariableDeceleration = def.isUseVariableDeceleration();
 
             List<String> rollsigns = def.getRollsignNames();
             if (rollsigns != null && !rollsigns.isEmpty()) {

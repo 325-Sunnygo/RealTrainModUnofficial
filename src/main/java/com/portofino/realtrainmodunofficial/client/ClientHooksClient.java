@@ -180,6 +180,51 @@ public final class ClientHooksClient {
      * 背景パネルの設定画面。今の設定を持って開く
      * (開いた瞬間に現在値が入っていないと、保存で既定値に戻ってしまう)。
      */
+    public static void openNpcModelScreen(int entityId) {
+        ClientItemHelper.openNpcModelScreen(entityId, false);
+    }
+
+    public static void openNpcItemModelScreen(boolean offHand) {
+        ClientItemHelper.openNpcModelScreen(-1, offHand);
+    }
+
+    public static void openCargoModelScreen(int entityId) {
+        ClientItemHelper.openCargoModelScreen(entityId, false);
+    }
+
+    public static void openCargoItemModelScreen(boolean offHand) {
+        ClientItemHelper.openCargoModelScreen(-1, offHand);
+    }
+
+    /** NPC の商売画面 (本家 GuiSalesperson)。 */
+    public static void openNpcTradeScreen(int entityId) {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.level != null
+                && mc.level.getEntity(entityId) instanceof jp.ngt.rtm.entity.npc.EntityNPC npc) {
+            mc.setScreen(new com.portofino.realtrainmodunofficial.client.screen.NpcTradeScreen(npc));
+        }
+    }
+
+    /** 装飾ブロックの編集画面 (本家 guiIdDecoration)。 */
+    public static void openDecorationEditScreen() {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.player != null) {
+            mc.setScreen(new com.portofino.realtrainmodunofficial.client.screen.DecorationEditScreen(mc.player));
+        }
+    }
+
+    public static void openMovingMachineScreen(BlockPos pos) {
+        com.portofino.realtrainmodunofficial.client.screen.MovingMachineScreen.open(pos);
+    }
+
+    public static void openSignalConverterScreen(BlockPos pos) {
+        com.portofino.realtrainmodunofficial.client.screen.SignalConverterScreen.open(pos);
+    }
+
+    public static void openStationCoreScreen(BlockPos pos) {
+        com.portofino.realtrainmodunofficial.client.screen.StationCoreScreen.open(pos);
+    }
+
     public static void openBackgroundPanelScreen(BlockPos pos) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) {

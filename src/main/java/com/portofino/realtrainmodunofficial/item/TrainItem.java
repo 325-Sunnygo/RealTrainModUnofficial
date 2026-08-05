@@ -52,10 +52,40 @@ public class TrainItem extends Item {
 
     private static final double PLACEMENT_OCCUPANCY_HALF_WIDTH = 0.45D;
 
+    /**
+     * 本家 ItemTrain のメタ (0=DC/1=EC/2=FC/3=TC/127=TEST) に対応する種別。
+     * 1.21 にメタは無いのでアイテムを 5 つに分ける。
+     *
+     * <p>並びは本家のメタ順。パックは {@code trainType} に "DC"/"EC"/"FC"/"TC" を書く
+     * (実測: 同梱車両は CC 10 / EC 15 / Test 8 / DC 4 / TC 1、外部パックは EC 67 / DC 14)。
+     */
     public enum Category {
-        ELECTRIC,
-        DIESEL,
-        TEST
+        /** 気動車 (メタ 0)。 */
+        DIESEL("DC"),
+        /** 電車 (メタ 1)。 */
+        ELECTRIC("EC"),
+        /** 貨物列車 (メタ 2)。★実データは "CC" (Cargo Car)。本家のアイコン名 itemFC に釣られない。 */
+        FREIGHT("CC", "FC"),
+        /** タンク車 (メタ 3)。 */
+        TANKER("TC"),
+        /** 試験用車両 (メタ 127)。 */
+        TEST("TEST");
+
+        /** パックの trainType に書かれる略号 (複数の綴りを受ける)。 */
+        public final String[] codes;
+
+        Category(String... codes) {
+            this.codes = codes;
+        }
+
+        boolean matches(String type) {
+            for (String c : this.codes) {
+                if (c.equals(type)) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     private final Category category;
@@ -249,12 +279,27 @@ public class TrainItem extends Item {
             return false;
         }
         String type = safe(definition.getVehicleType()).toUpperCase(java.util.Locale.ROOT);
-        boolean test = "TEST".equals(type);
-        return switch (category == null ? Category.ELECTRIC : category) {
-            case TEST -> test;
-            case DIESEL -> false;
-            case ELECTRIC -> !test;
-        };
+        Category c = category == null ? Category.ELECTRIC : category;
+        if ("TEST".equals(type)) {
+            //試験用車両は試験用のアイテムにだけ出す
+            return c == Category.TEST;
+        }
+        if (c == Category.TEST) {
+            return false;
+        }
+        if (c.matches(type)) {
+            return true;
+        }
+        //★trainType が無い/知らない値のパックは<b>電車で拾う</b>。
+        // 種別で弾くと、書いていない古いパックの車両がどのアイテムからも選べなくなる。
+        boolean known = false;
+        for (Category k : Category.values()) {
+            if (k != Category.TEST && k.matches(type)) {
+                known = true;
+                break;
+            }
+        }
+        return !known && c == Category.ELECTRIC;
     }
 
     private static String safe(String value) {
