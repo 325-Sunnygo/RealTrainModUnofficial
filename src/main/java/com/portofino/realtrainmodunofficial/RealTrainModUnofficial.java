@@ -27,7 +27,7 @@ public class RealTrainModUnofficial {
      * ビルド刻印。
      * サーバー/クライアントにどのビルドが入っているかはこれでしか判別できない。
      */
-    public static final String BUILD_TAG = "1.0.17 (Fabric 移植: キー衝突・描画段階・intermediary 名・設置物の当たり判定・可変光源; MOD 自身の規約は非表示)";
+    public static final String BUILD_TAG = "1.0.18 (全アイテム実装: 装飾ブロック・鉄骨・液体金属・NPC の乗車と商売・旗 / 信号系とコネクタ向きを本家仕様へ / 速度はパックの JSON 由来 / GUI のぼかし解消と選択画面の本家準拠)";
 
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
         DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
