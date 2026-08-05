@@ -14,7 +14,6 @@ import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.crafting.ShapedRecipePattern;
 import net.minecraft.world.level.Level;
 
 /**
@@ -24,7 +23,7 @@ import net.minecraft.world.level.Level;
  * 出してあるので普通の作業台でも作れる。ここは 4x4 以上のぶんだけを持つ。
  */
 public record WorkBenchRecipe(String group, CraftingBookCategory category,
-                              ShapedRecipePattern pattern, ItemStack result) implements CraftingRecipe {
+                              WorkBenchPattern pattern, ItemStack result) implements CraftingRecipe {
 
     @Override
     public boolean matches(CraftingInput input, Level level) {
@@ -49,6 +48,14 @@ public record WorkBenchRecipe(String group, CraftingBookCategory category,
     @Override
     public NonNullList<Ingredient> getIngredients() {
         return this.pattern.ingredients();
+    }
+
+    public int patternWidth() {
+        return this.pattern.width();
+    }
+
+    public int patternHeight() {
+        return this.pattern.height();
     }
 
     @Override
@@ -78,7 +85,7 @@ public record WorkBenchRecipe(String group, CraftingBookCategory category,
                     .forGetter(WorkBenchRecipe::group),
                 CraftingBookCategory.CODEC.optionalFieldOf("category", CraftingBookCategory.MISC)
                     .forGetter(WorkBenchRecipe::category),
-                ShapedRecipePattern.MAP_CODEC.forGetter(WorkBenchRecipe::pattern),
+                WorkBenchPattern.MAP_CODEC.forGetter(WorkBenchRecipe::pattern),
                 ItemStack.STRICT_CODEC.fieldOf("result").forGetter(WorkBenchRecipe::result)
             ).apply(instance, WorkBenchRecipe::new));
 
@@ -86,7 +93,7 @@ public record WorkBenchRecipe(String group, CraftingBookCategory category,
             StreamCodec.composite(
                 ByteBufCodecs.STRING_UTF8, WorkBenchRecipe::group,
                 CraftingBookCategory.STREAM_CODEC, WorkBenchRecipe::category,
-                ShapedRecipePattern.STREAM_CODEC, WorkBenchRecipe::pattern,
+                WorkBenchPattern.STREAM_CODEC, WorkBenchRecipe::pattern,
                 ItemStack.STREAM_CODEC, WorkBenchRecipe::result,
                 WorkBenchRecipe::new);
 

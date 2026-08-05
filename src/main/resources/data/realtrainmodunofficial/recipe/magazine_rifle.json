@@ -8,14 +8,11 @@
   "key": {
     "S": {
       "item": "realtrainmodunofficial:material_sheet_steel"
-    },
-    "I": {
-      "item": "realtrainmodunofficial:ingot_steel"
     }
   },
   "result": {
     "id": "realtrainmodunofficial:magazine_rifle",
-    "count": 3
+    "count": 1
   },
   "category": "misc"
 }

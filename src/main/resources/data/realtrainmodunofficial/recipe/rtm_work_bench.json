@@ -1,11 +1,12 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "  ",
-    " C"
+    "III",
+    "ICI",
+    "III"
   ],
   "key": {
-    "S": {
+    "I": {
       "item": "realtrainmodunofficial:ingot_steel"
     },
     "C": {
