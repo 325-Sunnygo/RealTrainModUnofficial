@@ -27,7 +27,7 @@ public class RealTrainModUnofficial {
      * ビルド刻印。
      * サーバー/クライアントにどのビルドが入っているかはこれでしか判別できない。
      */
-    public static final String BUILD_TAG = "1.0.18 (全アイテム実装: 装飾ブロック・鉄骨・液体金属・NPC の乗車と商売・旗 / 信号系とコネクタ向きを本家仕様へ / 速度はパックの JSON 由来 / GUI のぼかし解消と選択画面の本家準拠)";
+    public static final String BUILD_TAG = "1.0.18 (全アイテム実装 / 駅ブロックの重複登録による起動エラーを修正)";
 
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
         DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);

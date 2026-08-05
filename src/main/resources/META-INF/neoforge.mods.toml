@@ -69,7 +69,8 @@ config="${mod_id}.mixins.json"
     # Optional field describing why the dependency is required or why it is incompatible
     # reason="..."
     # The version range of the dependency
-    versionRange="[${neo_version},)" #mandatory
+    #★下限は固定。neo_version (開発で使う版) を上げても、古い NeoForge の人を弾かないようにする。
+    versionRange="[21.1.0,)" #mandatory
     # An ordering relationship for the dependency.
     # BEFORE - This mod is loaded BEFORE the dependency
     # AFTER - This mod is loaded AFTER the dependency

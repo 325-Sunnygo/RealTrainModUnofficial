@@ -95,9 +95,13 @@ public class RealTrainModUnofficialBlockEntities {
         BLOCK_ENTITY_TYPES.register("slot", () -> BlockEntityType.Builder.of(
             jp.ngt.rtm.block.tileentity.TileEntitySlot::new,
             RealTrainModUnofficialBlocks.SLOT.get()).build(null));
-    /** 本家 TileEntityStation (駅コア)。 */
+    /**
+     * 本家 TileEntityStation (駅コア)。
+     * ★id は "station_core"。"station" は<b>乗客シミュの駅ブロック</b>が先に使っている
+     * (PassengerMod.STATION_BE)。同じ名前空間なので重複登録で起動時に落ちる。
+     */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.block.tileentity.TileEntityStation>> STATION =
-        BLOCK_ENTITY_TYPES.register("station", () -> BlockEntityType.Builder.of(
+        BLOCK_ENTITY_TYPES.register("station_core", () -> BlockEntityType.Builder.of(
             jp.ngt.rtm.block.tileentity.TileEntityStation::new,
             RealTrainModUnofficialBlocks.STATION_CORE.get()).build(null));
     /** 本家 TileEntityMovingMachine (移動装置)。 */
