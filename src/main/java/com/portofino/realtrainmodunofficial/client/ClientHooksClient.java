@@ -119,9 +119,22 @@ public final class ClientHooksClient {
         Minecraft.getInstance().setScreen(new TrainDetectorScreen(pos));
     }
 
-    public static void openMarkerConfigScreen(BlockPos pos) {
-        Minecraft.getInstance().setScreen(
-            new com.portofino.realtrainmodunofficial.client.screen.MarkerConfigScreen(pos));
+
+
+    /** 機械の customForm (DataMap) 編集画面。本家 DataForm GUI の移植。 */
+    public static void openMachineConfigScreen(BlockPos pos) {
+        var mc = Minecraft.getInstance();
+        if (mc.level == null
+                || !(mc.level.getBlockEntity(pos)
+                    instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be)) {
+            return;
+        }
+        var def = be.getDefinition();
+        if (def == null || def.getCustomForm() == null) {
+            return;
+        }
+        mc.setScreen(new com.portofino.realtrainmodunofficial.client.screen.MachineConfigScreen(
+            pos, def.getCustomForm(), be.copyScriptData()));
     }
 
     public static void openSpeakerScreen(BlockPos pos) {
@@ -148,6 +161,12 @@ public final class ClientHooksClient {
     /** カメラ: 右クリックでファインダーモードを開閉 */
     public static void toggleCamera() {
         com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.toggle();
+    }
+
+    /** カメラ: ブロック右クリックで本家 GuiCamera 相当の画面を開く (本家 ItemCamera.onItemUse)。 */
+    public static void openCameraScreen() {
+        Minecraft.getInstance().setScreen(
+            new com.portofino.realtrainmodunofficial.client.screen.CameraScreen());
     }
 
     /** 編成アイテムの編集画面。 */

@@ -23,6 +23,24 @@ public final class TileEntityCompat {
         return null;
     }
 
+    /** field_145851_c = TileEntity.xCoord。 */
+    public static int field_145851_c(Object tile) {
+        return tile instanceof net.minecraft.world.level.block.entity.BlockEntity be
+            ? be.getBlockPos().getX() : 0;
+    }
+
+    /** field_145848_d = TileEntity.yCoord。 */
+    public static int field_145848_d(Object tile) {
+        return tile instanceof net.minecraft.world.level.block.entity.BlockEntity be
+            ? be.getBlockPos().getY() : 0;
+    }
+
+    /** field_145849_e = TileEntity.zCoord。 */
+    public static int field_145849_e(Object tile) {
+        return tile instanceof net.minecraft.world.level.block.entity.BlockEntity be
+            ? be.getBlockPos().getZ() : 0;
+    }
+
     private TileEntityCompat() {
     }
 

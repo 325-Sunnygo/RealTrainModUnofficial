@@ -74,7 +74,6 @@ public final class InstalledObjectScriptCache {
             c.timeDependent = true;
         }
         if (c.timeDependent) {
-            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(false);
             VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model, null);
             return;
         }
@@ -89,7 +88,6 @@ public final class InstalledObjectScriptCache {
                     packedLight, packedOverlay, model, null));
             if (!baked) {
                 // シェーダーパック使用中など、焼き込みを使えないときは従来どおり CPU で提出
-                com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(false);
                 VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model, null);
             }
         } else {

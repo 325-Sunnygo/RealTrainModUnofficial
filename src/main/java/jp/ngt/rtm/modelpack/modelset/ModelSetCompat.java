@@ -3,21 +3,17 @@ package jp.ngt.rtm.modelpack.modelset;
 import jp.ngt.rtm.modelpack.cfg.TrainConfig;
 
 /**
- * 本家 ModelSetVehicleBase のスクリプト互換最小移植 (getConfig のみ)。
- * TODO(Phase 4): ModelSetTrain(Client) の本実装に置換。
+ * 本家 ModelSetVehicleBase のスクリプト互換移植。
+ * 本家の継承関係に合わせて {@link ModelSetBase} を継承する (getConfig/isDummy/serverSE/guiSE)。
  */
-public class ModelSetCompat {
-    private final TrainConfig config;
+public class ModelSetCompat extends ModelSetBase<TrainConfig> {
 
     public ModelSetCompat(TrainConfig config) {
-        this.config = config;
+        super(config);
     }
 
-    public TrainConfig getConfig() {
-        return this.config;
-    }
-
-    public boolean isDummy() {
-        return false;
+    @Override
+    public TrainConfig getDummyConfig() {
+        return null;
     }
 }

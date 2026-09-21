@@ -44,10 +44,21 @@ public final class ScriptUtil {
         return se;
     }
 
-    /** JavaScriptの実行 */
+    /** JavaScriptの実行 (本家 ScriptUtil.doScript(String) と同じ名前無し実行)。 */
     public static ScriptEngine doScript(String s) {
+        return doScript(s, "<unnamed script>");
+    }
+
+    /**
+     * 本家 ScriptUtil.doScript(String, String) 完全移植。
+     * 本家は ScriptEngine.FILENAME を設定してから mozilla_compat を読み、本文を評価する。
+     * FILENAME は Nashorn のスタックトレース/行番号表示に使われるため、
+     * 欠落するとエラー箇所が "<eval>" になり原因が追えなくなる。
+     */
+    public static ScriptEngine doScript(String s, String fileName) {
         ScriptEngine se = createEngine();
         try {
+            se.put(ScriptEngine.FILENAME, fileName);
             if (se.toString().contains("Nashorn") || se.getClass().getName().contains("nashorn")) {
                 // Java8ではimportPackageが使えないので、その対策 (本家コメントのまま)
                 se.eval("load(\"nashorn:mozilla_compat.js\");");
@@ -64,23 +75,24 @@ public final class ScriptUtil {
         }
     }
 
+    /**
+     * 本家 ScriptUtil.doScript(ResourceLocation) 完全移植。
+     * パック内スクリプトを NGTText.getText(rl, true) で読み、そのパスを FILENAME にして実行する。
+     */
+    public static ScriptEngine doScript(jp.ngt.mccompat.ResourceLocation resource) {
+        return doScript(NGTText.getText(resource, true), resource.getResourcePath());
+    }
+
+    /** 本家 (実 ResourceLocation) 版。Java 側から本家シグネチャで呼ぶ用。 */
+    public static ScriptEngine doScript(net.minecraft.resources.ResourceLocation resource) {
+        return doScript(NGTText.getText(resource, true), resource.getPath());
+    }
+
     public static Object doScriptFunction(ScriptEngine se, String func, Object... args) {
-        // 軽量化作業の計測点。
-        // 1 箇所で総実行時間を取れる (doScriptIgnoreError もこれを経由する)。
-        if (!com.portofino.realtrainmodunofficial.perf.RtmuProfiler.enabled) {
-            try {
-                return ((Invocable) se).invokeFunction(func, args);
-            } catch (NoSuchMethodException | ScriptException e) {
-                throw new RuntimeException("Script exec error : " + func, e);
-            }
-        }
-        long t0 = System.nanoTime();
         try {
             return ((Invocable) se).invokeFunction(func, args);
         } catch (NoSuchMethodException | ScriptException e) {
             throw new RuntimeException("Script exec error : " + func, e);
-        } finally {
-            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addScriptCall(System.nanoTime() - t0);
         }
     }
 

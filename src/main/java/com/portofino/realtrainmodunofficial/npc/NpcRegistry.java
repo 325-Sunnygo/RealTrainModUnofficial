@@ -55,8 +55,15 @@ public final class NpcRegistry {
                 }
             }
         }
-        LOADING.add(new NpcDefinition(name, packName, str(obj, "buttonTexture"), str(obj, "role"),
-            str(obj, "texture"), modelFile, tex));
+        NpcDefinition definition = new NpcDefinition(name, packName, str(obj, "buttonTexture"), str(obj, "role"),
+            str(obj, "texture"), modelFile, tex);
+        // 本家 NPCConfig.serverScriptPath (ModelConfig 由来)。トップレベルを読む。
+        String serverScriptPath = str(obj, "serverScriptPath");
+        if (serverScriptPath.isBlank() && obj.has("model") && obj.get("model").isJsonObject()) {
+            serverScriptPath = str(obj.getAsJsonObject("model"), "serverScriptPath");
+        }
+        definition.setServerScriptPath(serverScriptPath);
+        LOADING.add(definition);
         return true;
     }
 

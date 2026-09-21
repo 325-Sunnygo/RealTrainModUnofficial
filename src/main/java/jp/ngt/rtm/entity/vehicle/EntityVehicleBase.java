@@ -12,7 +12,8 @@ import net.minecraft.world.level.Level;
  * onUpdate 骨格: onVehicleUpdate → (server) updateMovement → applyPhysicalEffect。
  * @param <T> 本家は VehicleBaseConfig; 当面 TrainConfig のみ。
  */
-public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
+public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity
+        implements jp.ngt.rtm.modelpack.IModelSelector {
     /**
      * 本家 EntityVehicleBase.getBrightnessForRender 相当。
      * 1.7.10 のバニラ Entity.getBrightnessForRender は
@@ -100,6 +101,11 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public double field_70169_q;
     public double field_70167_r;
     public double field_70166_s;
+    // lastTickPosX / lastTickPosY / lastTickPosZ (1.7.10 本来の SRG 名)。
+    // NGTO Builder2 の getInterpolatedPos が field_70142_S 系を読む。
+    public double field_70142_S;
+    public double field_70137_T;
+    public double field_70136_U;
     // boundingBox
     public jp.ngt.mccompat.AxisAlignedBB field_70121_D;
 
@@ -200,6 +206,9 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         this.field_70169_q = this.xOld;
         this.field_70167_r = this.yOld;
         this.field_70166_s = this.zOld;
+        this.field_70142_S = this.xOld;
+        this.field_70137_T = this.yOld;
+        this.field_70136_U = this.zOld;
         this.field_70165_t = this.getX();
         this.field_70163_u = this.getY();
         this.field_70161_v = this.getZ();
@@ -336,6 +345,55 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public String getModelType() {
         return jp.ngt.rtm.modelpack.cfg.TrainConfig.TYPE;
     }
+
+    // ---- 本家 EntityVehicle (1.12 系) の戦車/車両スクリプト API ----
+
+    /** 砲塔の旋回 (度)。スクリプトの entity.getBarrelYaw() が読む。 */
+    protected float barrelYaw;
+    protected float barrelPitch;
+    /** 発砲後のリコイル 0..1。 */
+    protected float recoil;
+    /** 前後/横の加速度。サウンドスクリプト (sound_crusader 等) が読む。 */
+    protected double accelForward;
+    protected double accelStrafe;
+
+    public float getBarrelYaw() {
+        return this.barrelYaw;
+    }
+
+    public float getBarrelPitch() {
+        return this.barrelPitch;
+    }
+
+    public float getRecoil() {
+        return this.recoil;
+    }
+
+    public float getAccelerationForward() {
+        return (float) this.accelForward;
+    }
+
+    public float getAccelerationStrafe() {
+        return (float) this.accelStrafe;
+    }
+
+    public void setBarrelYaw(float value) {
+        this.barrelYaw = value;
+    }
+
+    public void setBarrelPitch(float value) {
+        this.barrelPitch = value;
+    }
+
+    public void setRecoil(float value) {
+        this.recoil = value;
+    }
+
+    /** 本家 Entity.onGround をメソッド名で読むスクリプト用 (RenderNGT-18 等)。 */
+    public boolean isOnGround() {
+        return this.onGround();
+    }
+
 
     /**
      * 本家 useInteriorLight: 室内灯を点けるか (設定で常時オフに出来る)。

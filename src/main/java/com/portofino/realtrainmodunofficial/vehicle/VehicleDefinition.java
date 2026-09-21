@@ -94,6 +94,27 @@ public class VehicleDefinition {
     private String soundBrakeRelease = "";
     /** 本家 sound_BrakeRelease2: 同上 (弱、ノッチ -1 以外から戻したとき)。 */
     private String soundBrakeRelease2 = "";
+    /** 本家 SoundUpdaterTrain: ATS チャイム (signal=1 で走行中に鳴る、ループ)。 */
+    private String soundAtsChime = "";
+    /** 本家 SoundUpdaterTrain: ATS ベル (signal=1 で走行中に鳴る、ループ)。 */
+    private String soundAtsBell = "";
+
+    public String getSoundAtsChime() {
+        return soundAtsChime;
+    }
+
+    public String getSoundAtsBell() {
+        return soundAtsBell;
+    }
+
+    public boolean hasAtsSounds() {
+        return !soundAtsChime.isBlank() || !soundAtsBell.isBlank();
+    }
+
+    public void setAtsSounds(String chime, String bell) {
+        this.soundAtsChime = chime == null ? "" : chime;
+        this.soundAtsBell = bell == null ? "" : bell;
+    }
     /**
      */
     private String soundDoorOpen = "";
@@ -384,6 +405,32 @@ public class VehicleDefinition {
     /** Loader が JSON 読込後に設定する用。コンストラクタ大量改修を避けるため後付け。 */
     public void setServerScriptPath(String path) {
         this.serverScriptPath = path == null ? "" : path;
+    }
+
+    // ---- 本家 ModelConfig.guiScriptPath / guiTexture (KaizPatchX) ----
+    // 運転台 GUI をスクリプトで描く機能。guiSE の renderGui(entity, gui) が呼ばれる。
+    private String guiScriptPath = "";
+    private String guiTexture = "";
+
+    public String getGuiScriptPath() {
+        return guiScriptPath;
+    }
+
+    public boolean hasGuiScript() {
+        return guiScriptPath != null && !guiScriptPath.isBlank();
+    }
+
+    public void setGuiScriptPath(String path) {
+        this.guiScriptPath = path == null ? "" : path;
+    }
+
+    /** 本家 guiTexture。空なら既定の cab テクスチャ。 */
+    public String getGuiTexture() {
+        return guiTexture;
+    }
+
+    public void setGuiTexture(String texture) {
+        this.guiTexture = texture == null ? "" : texture;
     }
 
     /** 本家 slotPos: {x, y, z, seatType} (ブロック単位)。Loader が JSON 読込後に設定。 */

@@ -217,6 +217,26 @@ public final class MachineScriptRenderers {
                 return false;
             }
 
+            // ★視点依存の光エフェクト (normal 付き renderLightEffect) はカメラを動かすだけで
+            //   形が変わる (本家も毎フレーム円錐を計算する)。これを焼き込みキーに混ぜると、
+            //   ミラーボール/サーチライト等が「毎フレーム別物」になり、形 (pass0) まで焼けなくなる。
+            //   → 視点依存があるときだけ、形 (rec0) を焼いて光 (rec2) は生で描く。
+            if (rec2.isViewDependent()) {
+                int key0 = jp.ngt.ngtlib.renderer.GLRecorder.mixKey(rec0.contentKey());
+                boolean baked0 = ObjectMeshCache.draw(be, poseStack, key0, buf -> {
+                    PoseStack local = new PoseStack();
+                    VehicleScriptRenderers.replay(rec0, local, buf, packedLight, packedOverlay, model, graph);
+                });
+                if (!baked0) {
+                    VehicleScriptRenderers.replay(rec0, poseStack, buffer, packedLight, packedOverlay, model, graph);
+                }
+                if (rec2.hasGeometry()) {
+                    VehicleScriptRenderers.replay(rec2, poseStack, buffer, packedLight, packedOverlay, model,
+                            graph, jp.ngt.rtm.render.RenderPass.LIGHT.id, null);
+                }
+                return true;
+            }
+
             // ★本家 RailPartsRenderer.renderRailStatic と同じ流れ:
             // 内容キーが同じなら焼き直さず、GPU に置いた頂点をそのまま描く。
             // ★2 つのパスのキーは撹拌してから混ぜること。

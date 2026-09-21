@@ -136,6 +136,18 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     }
 
     /**
+     * 本家 ModelSetBase.serverSE 相当。サーバースクリプト (Server_*.js) の engine。
+     * 未ロード / クライアント側では null。TrainSpeedManager の可変加減速フックが使う。
+     */
+    public javax.script.ScriptEngine getServerScriptEngine() {
+        // クライアントでロード経路 (client パッケージ) を踏まないようにする。
+        if (!this.level().isClientSide()) {
+            this.ensureServerScriptLoaded();
+        }
+        return this.serverScriptEngine;
+    }
+
+    /**
      * スクリプト entity.getResourceState.getResourceSet.getConfig を
      * entity.getModelSet.getConfig と等価にする。新しめのパック 等) は前者で
      * 設定を読むため、これが無いと描画/サーバースクリプトが TypeError で中断する。
@@ -699,6 +711,72 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         } else {
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
         }
+        // 本家 SoundUpdaterTrain.update: ATS チャイム/ベル (制御車が signal=1 で走行中にループ)。
+        this.tickAtsSounds();
+    }
+
+    /** ATS チャイム/ベル。本家 SoundUpdaterTrain.update の該当部分の移植。 */
+    private int atsCurrentSignal;
+
+    private void tickAtsSounds() {
+        com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
+                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
+        if (def == null || !def.hasAtsSounds()) {
+            return;
+        }
+        String chime = def.getSoundAtsChime();
+        String bell = def.getSoundAtsBell();
+        int signal = this.getSignal();
+        boolean moving = Math.abs(this.getSpeed()) > 0.0F;
+        if (this.isControlCar() && moving) {
+            if (signal == 1) {
+                if (this.atsCurrentSignal != 1) {
+                    stopSoundId(chime);
+                    stopSoundId(bell);
+                    playSoundId(chime);
+                    playSoundId(bell);
+                    this.atsCurrentSignal = 1;
+                }
+            } else if (signal == -1) {
+                if (this.atsCurrentSignal != -1) {
+                    stopSoundId(bell);
+                    this.atsCurrentSignal = -1;
+                }
+            }
+        } else if (signal != -1 && this.atsCurrentSignal != 0) {
+            stopSoundId(chime);
+            stopSoundId(bell);
+            this.atsCurrentSignal = 0;
+        }
+    }
+
+    private void playSoundId(String id) {
+        if (id == null || id.isBlank()) {
+            return;
+        }
+        String ns = "rtm";
+        String name = id;
+        int i = id.indexOf(':');
+        if (i >= 0) {
+            ns = id.substring(0, i);
+            name = id.substring(i + 1);
+        }
+        com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
+                .play(this, ns, name, 1.0F, 1.0F, true);
+    }
+
+    private void stopSoundId(String id) {
+        if (id == null || id.isBlank()) {
+            return;
+        }
+        String ns = "rtm";
+        String name = id;
+        int i = id.indexOf(':');
+        if (i >= 0) {
+            ns = id.substring(0, i);
+            name = id.substring(i + 1);
+        }
+        com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stop(this, ns, name);
     }
 
     @Override

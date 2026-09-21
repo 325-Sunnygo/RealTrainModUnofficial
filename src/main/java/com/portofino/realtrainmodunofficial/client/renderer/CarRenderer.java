@@ -10,6 +10,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import org.jetbrains.annotations.NotNull;
@@ -72,7 +73,13 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
             if (model != null) {
                 poseStack.pushPose();
                 try {
+                    // 本家 RenderVehicleBase と同じ姿勢: ヨー、ピッチ、ロールの順。
+                    // 符号は RTMU の本家車レンダラ (NgtoVehicleRenderer) に合わせる。
                     poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
+                    poseStack.mulPose(Axis.XP.rotationDegrees(
+                        Mth.lerp(partialTick, entity.xRotO, entity.getXRot())));
+                    poseStack.mulPose(Axis.ZP.rotationDegrees(
+                        Mth.lerp(partialTick, entity.prevRotationRoll, entity.rotationRoll)));
                     poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
                     poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
                     MqoModelLoader.renderModel(model, poseStack, bufferSource, packedLight, null, null, entity);

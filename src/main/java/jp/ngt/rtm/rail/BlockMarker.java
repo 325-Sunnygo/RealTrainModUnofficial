@@ -209,15 +209,10 @@ public class BlockMarker extends BaseEntityBlock {
         RailProperty prop = this.hasRail(player, makeRail);
         if (prop != null) {
             int type = this.markerType;
-            // ★敷設できる距離。本家は RTMConfig の固定値だが、RTMU は設定で変えられるようにする。
-            // ここが `RTMConfig.railGeneratingDistance` (固定 64) のままだったため、
-            // 設定 railMarkerSearchRange をいくら伸ばしても敷設距離が変わらなかった。
-            int dis1 = com.portofino.realtrainmodunofficial.Config.railMarkerSearchRange();
+            // 敷設できる距離。本家 RTM と同じく RTMConfig の固定値 (64 / 8) を使う。
+            int dis1 = RTMConfig.railGeneratingDistance;
             int dis3 = dis1 * dis1;
-            int hei1 = com.portofino.realtrainmodunofficial.Config.railMarkerSearchHeight();
-            // 本家互換フィールドも同じ値へ寄せる (スクリプトがリフレクションで読むため)。
-            RTMConfig.railGeneratingDistance = (short) Math.min(Short.MAX_VALUE, dis1);
-            RTMConfig.railGeneratingHeight = (short) Math.min(Short.MAX_VALUE, hei1);
+            int hei1 = RTMConfig.railGeneratingHeight;
             boolean isCreative = player == null || player.getAbilities().instabuild;
 
             if (type == 0 || type == 10) {
@@ -243,8 +238,6 @@ public class BlockMarker extends BaseEntityBlock {
                             rpE.anchorYaw = sE.getYaw();
                             rpE.anchorPitch = sE.getPitch();
                         }
-                        // RTMU: 敷設プレイヤーの設定で自動カント (カーブ) / 自動高さを適用
-                        com.portofino.realtrainmodunofficial.RtmuAutoRail.applyTwo(world, player, rpS, rpE);
                         return createRail0(world, rpS, rpE, prop, makeRail, isCreative);
                     }
                 }
@@ -266,8 +259,6 @@ public class BlockMarker extends BaseEntityBlock {
                     return createTurntable(world, list.get(0), list.get(1), prop, makeRail, isCreative);
                 }
                 if (list.size() >= 3) {
-                    // RTMU: 分岐レールへ自動高さを適用 (自動カントは 2 点レールのみ)
-                    com.portofino.realtrainmodunofficial.RtmuAutoRail.applyList(player, list);
                     return createRail1(world, x, y, z, player, list, prop, makeRail, isCreative);
                 }
             }

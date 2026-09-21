@@ -127,8 +127,8 @@ public class NGTObject {
     /** 本家 importFromFile。読めなければ null。 */
     public static NGTObject importFromFile(java.io.File file) {
         try {
-            CompoundTag tag = net.minecraft.nbt.NbtIo.readCompressed(
-                    file.toPath(), net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+            byte[] bytes = java.nio.file.Files.readAllBytes(file.toPath());
+            CompoundTag tag = readNbtBytes(bytes);
             return tag == null ? null : readFromNBT(tag);
         } catch (java.io.IOException e) {
             jp.ngt.ngtlib.io.NGTLog.debug("[NGTObject] import failed: " + e);
@@ -136,14 +136,37 @@ public class NGTObject {
         }
     }
 
-    /** 本家 load: ストリームから読む (パック内のミニチュア用)。 */
+    /**
+     * 本家 load: ストリームから読む (パック内の .ngto 用)。
+     *
+     * <p>本家 .ngto は<b>非圧縮 NBT</b> (中身の ByteData が gzip) なので、まず素の NBT として読む。
+     * RTMU 独自の export (gzip NBT) も読めるよう、失敗時は gzip として読み直す。
+     */
     public static NGTObject load(java.io.InputStream stream) {
         try {
-            CompoundTag tag = net.minecraft.nbt.NbtIo.readCompressed(
-                    stream, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+            byte[] bytes = stream.readAllBytes();
+            CompoundTag tag = readNbtBytes(bytes);
             return tag == null ? null : readFromNBT(tag);
         } catch (java.io.IOException e) {
             jp.ngt.ngtlib.io.NGTLog.debug("[NGTObject] load failed: " + e);
+            return null;
+        }
+    }
+
+    /** バイト列を NBT として読む (素 → gzip の順で試す)。 */
+    private static CompoundTag readNbtBytes(byte[] bytes) {
+        try (java.io.DataInputStream in = new java.io.DataInputStream(new java.io.ByteArrayInputStream(bytes))) {
+            CompoundTag tag = net.minecraft.nbt.NbtIo.read(in, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+            if (tag != null) {
+                return tag;
+            }
+        } catch (java.io.IOException ignored) {
+            // 本家 .ngto ではない (gzip の可能性)
+        }
+        try (java.io.ByteArrayInputStream bin = new java.io.ByteArrayInputStream(bytes)) {
+            return net.minecraft.nbt.NbtIo.readCompressed(bin, net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+        } catch (java.io.IOException e) {
+            jp.ngt.ngtlib.io.NGTLog.debug("[NGTObject] read failed: " + e);
             return null;
         }
     }
@@ -166,6 +189,115 @@ public class NGTObject {
     }
 
     public static NGTObject readFromNBT(CompoundTag tag) {
+        CompoundTag data = decompressByteData(tag);
+        if (isLegacyFormat(data)) {
+            return readLegacyFromNBT(data);
+        }
+        return readRtmFromNBT(data);
+    }
+
+    /** 本家 .ngto の ByteData (gzip された本家 NBT) を展開する。無ければそのまま。 */
+    private static CompoundTag decompressByteData(CompoundTag tag) {
+        if (!tag.contains("ByteData", Tag.TAG_BYTE_ARRAY)) {
+            return tag;
+        }
+        byte[] data = tag.getByteArray("ByteData");
+        try (java.util.zip.GZIPInputStream in =
+                     new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(data))) {
+            CompoundTag inner = net.minecraft.nbt.NbtIo.read(
+                    new java.io.DataInputStream(in), net.minecraft.nbt.NbtAccounter.unlimitedHeap());
+            return inner != null ? inner : tag;
+        } catch (java.io.IOException e) {
+            jp.ngt.ngtlib.io.NGTLog.debug("[NGTObject] decompress failed: " + e);
+            return tag;
+        }
+    }
+
+    /** 本家 (1.7.10/KaizPatchX) 形式か (IdList パレット + セル id 配列)。 */
+    private static boolean isLegacyFormat(CompoundTag tag) {
+        return tag.contains("IdList") || tag.contains("BData")
+                || tag.contains("IData") || tag.contains("Blocks");
+    }
+
+    /**
+     * 本家形式を読む。セル id 配列は本家 index = x*(ySize*zSize) + y*zSize + z の順なので、
+     * 座標へ逆算して RTMU の grid へ入れる。
+     */
+    private static NGTObject readLegacyFromNBT(CompoundTag data) {
+        NGTObject obj = new NGTObject();
+        obj.objId = data.getLong("ObjId");
+        obj.xSize = Math.max(data.getInt("SizeX"), 1);
+        obj.ySize = Math.max(data.getInt("SizeY"), 1);
+        obj.zSize = Math.max(data.getInt("SizeZ"), 1);
+        obj.origX = data.getInt("OrigX");
+        obj.origY = data.getInt("OrigY");
+        obj.origZ = data.getInt("OrigZ");
+        obj.grid = new BlockSet[obj.xSize * obj.ySize * obj.zSize];
+
+        java.util.Map<Integer, BlockSet> idMap = new java.util.HashMap<>();
+        idMap.put(0, BlockSet.AIR);
+        ListTag idList = data.getList("IdList", Tag.TAG_COMPOUND);
+        for (int i = 0; i < idList.size(); i++) {
+            CompoundTag entry = idList.getCompound(i);
+            idMap.put(entry.getInt("Id"), readLegacySet(entry.getCompound("Set")));
+        }
+
+        int[] ids = readLegacyCellIds(data);
+        if (ids != null) {
+            CompoundTag nbts = data.getCompound("NBTs");
+            int plane = obj.ySize * obj.zSize;
+            for (int i = 0; i < ids.length; i++) {
+                BlockSet base = idMap.getOrDefault(ids[i], BlockSet.AIR);
+                CompoundTag extra = nbts.contains(String.valueOf(i))
+                        ? nbts.getCompound(String.valueOf(i)) : null;
+                BlockSet set = extra != null ? base.setNBT(extra) : base;
+                if (set.block == net.minecraft.world.level.block.Blocks.AIR) {
+                    continue;
+                }
+                int bx = i / plane;
+                int rem = i % plane;
+                int by = rem / obj.zSize;
+                int bz = rem % obj.zSize;
+                BlockSet placed = new BlockSet(bx, by, bz, set.block, set.metadata, set.nbt, set.state);
+                obj.blockList.add(placed);
+                obj.put(placed);
+            }
+        }
+        return obj;
+    }
+
+    /** 本家 BlockSet NBT (Block 名 + Meta) → RTMU BlockSet。 */
+    private static BlockSet readLegacySet(CompoundTag set) {
+        String name = set.getString("Block");
+        int meta = set.contains("Meta", Tag.TAG_INT) ? set.getInt("Meta") : set.getByte("Meta");
+        net.minecraft.world.level.block.state.BlockState state =
+                LegacyBlockStates.toState(name, meta);
+        CompoundTag tagData = set.contains("TagData") ? set.getCompound("TagData") : null;
+        return new BlockSet(0, -1, 0, state.getBlock(), meta, tagData, state);
+    }
+
+    /** セル id 配列 (IData / Blocks / BData)。 */
+    private static int[] readLegacyCellIds(CompoundTag data) {
+        if (data.contains("IData", Tag.TAG_INT_ARRAY)) {
+            return data.getIntArray("IData");
+        }
+        if (data.contains("Blocks", Tag.TAG_INT_ARRAY)) {
+            return data.getIntArray("Blocks");
+        }
+        if (!data.contains("BData", Tag.TAG_BYTE_ARRAY)) {
+            return null;
+        }
+        byte[] raw = data.getByteArray("BData");
+        int[] ids = new int[raw.length];
+        for (int i = 0; i < raw.length; i++) {
+            // 本家は書き出しで 128 を引いている
+            ids[i] = (raw[i] + 128) & 0xFF;
+        }
+        return ids;
+    }
+
+    /** RTMU 独自形式 (BlocksData)。 */
+    private static NGTObject readRtmFromNBT(CompoundTag tag) {
         NGTObject obj = new NGTObject();
         obj.objId = tag.getLong("ObjId");
         obj.xSize = Math.max(tag.getInt("SizeX"), 1);

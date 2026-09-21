@@ -133,6 +133,11 @@ public final class TrainControlKeyHandler {
         }
         if (com.portofino.realtrainmodunofficial.client.renderer.MarkerBlockEntityRenderer.onRightClick()) {
             event.setCanceled(true);
+            return;
+        }
+        // 本家 ActionParts: 乗車中に運転台のマスコン/スイッチへ右クリックを送る。
+        if (com.portofino.realtrainmodunofficial.client.ActionPartsPicker.onRightClick(mc)) {
+            event.setCanceled(true);
         }
     }
 

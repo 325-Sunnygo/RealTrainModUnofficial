@@ -40,7 +40,11 @@ public final class BlockScaffold {
 
     private static byte stairFlag(BlockGetter level, BlockPos pos, int dir) {
         int d2 = dirAt(level, pos);
-        boolean flag = (dir == 1 && (d2 == 1 || d2 == 3)) || (dir == 0 && (d2 == 0 || d2 == 2));
+        // 本家 BlockScaffold.getConnectionType(world,x,y,z,byte dir):
+        //   b0 = dir == 1 ? (stairsDir == 2 || stairsDir == 0) : (stairsDir == 1 || stairsDir == 3)
+        // ★以前は {1,3} / {0,2} と反転していたため、RenderScaffold.js が出す手すりと
+        //   当たり判定が食い違い、見えない壁に阻まれていた。
+        boolean flag = dir == 1 ? (d2 == 0 || d2 == 2) : (d2 == 1 || d2 == 3);
         return (byte) (flag ? 3 : 0);
     }
 

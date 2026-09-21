@@ -5,7 +5,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.portofino.realtrainmodunofficial.client.PackButtonTextureCache;
-import com.portofino.realtrainmodunofficial.RtmuSettings;
 import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 import com.portofino.realtrainmodunofficial.client.renderer.BogieRenderer;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
@@ -118,14 +117,7 @@ public class ModelSelectScreen extends Screen {
                              String initialName, int initialColor) {
         super(title);
         // 本家どおり名前順ソート (カテゴリを名前より優先)
-        // ★同梱モデルを隠す設定が ON なら、ここで一覧から落とす。
-        // 落とすのは<b>表示だけ</b>で、読み込みは通常どおり行う
-        // (既に設置されている物やパックからの参照が壊れないようにするため)。
-        // 選択中の物だけは、隠す設定でも消さない (今何を選んでいるか分からなくなる)。
         this.allModels = models.stream()
-            .filter(i -> !RtmuSettings.hideBundledModels
-                || !RtmuSettings.isBundledPack(i.packName())
-                || (initialSelectedId != null && initialSelectedId.equals(i.id())))
             .sorted(Comparator
                 .comparing((ModelInfo i) -> safe(i.category()), String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(i -> safe(i.displayName()), String.CASE_INSENSITIVE_ORDER)
@@ -235,8 +227,11 @@ public class ModelSelectScreen extends Screen {
         for (int i = 0; i < filtered.size(); i++) {
             int y = cy + BTN_H * (i - currentScroll);
             if (y <= -BTN_H || y >= listBottom) continue;
-            boolean isSel = filtered.get(i).id().equals(selectedId);
-            drawItem(g, filtered.get(i), LIST_LEFT, y, isSel, mouseX, mouseY);
+            ModelInfo info = filtered.get(i);
+            // 可視行は先に背景ロードを仕込む (スクロールしても描画スレッドが固まらない)。
+            requestPreload(info.id(), info.packName());
+            boolean isSel = info.id().equals(selectedId);
+            drawItem(g, info, LIST_LEFT, y, isSel, mouseX, mouseY);
         }
 
         drawScrollbar(g);
@@ -269,23 +264,15 @@ public class ModelSelectScreen extends Screen {
     private static final float PREVIEW_FAR = 500.0F;
 
     private void renderPreview(GuiGraphics g, int mouseX, int mouseY) {
-        //本家 GuiButtonSelectModel: hoverState==2 (マウスが乗っているボタン) のモデルを描く。
-        //RTMU はクリック選択式なので、何も乗っていない間は選択中の物を出し続ける (運用上の補完)。
-        ModelInfo info = null;
+        // ★本家 GuiButtonSelectModel と同じく「マウスが乗っているボタンのモデル」だけを描く。
+        // 以前は非ホバー時に選択中モデルを毎フレーム全力描画し続けていたため、
+        // 大きな車両モデルで選択画面が極端に重くなっていた。
+        // (本家も hoverState==2 のときだけプレビューを描く)
         int hoverIdx = itemIndexAt(mouseX, mouseY);
-        if (hoverIdx >= 0) {
-            info = filtered.get(hoverIdx);
-        } else {
-            for (ModelInfo m : filtered) {
-                if (m.id().equals(selectedId)) {
-                    info = m;
-                    break;
-                }
-            }
-        }
-        if (info == null) {
+        if (hoverIdx < 0) {
             return;
         }
+        ModelInfo info = filtered.get(hoverIdx);
         MqoModelLoader.MqoModel model = getOrLoadModel(info.id(), info.packName());
         if (model == null) {
             return;
@@ -447,6 +434,84 @@ public class ModelSelectScreen extends Screen {
     }
 
     /** 車両 / 設置物 / レールのどれかとして id からモデルを引く。失敗は覚えて再探索しない。 */
+    /**
+     * プレビュー用のモデル/スクリプトを<b>描画スレッドの外</b>で温める。
+     *
+     * <p>以前はホバーした行のモデルをその場で同期ロードしていたため、モデル選択画面で
+     * スクロールすると 1 行ごとに MQO パース + Nashorn 初期化 + テクスチャ登録が走り、
+     * Minecraft が固まっていた。fixRTM と同じく読み込みを背景へ追い出す。
+     */
+    private static final java.util.concurrent.ExecutorService PRELOAD =
+        java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
+            Thread t = new Thread(r, "RTMU-ModelPreload");
+            t.setDaemon(true);
+            return t;
+        });
+    private static final Set<String> PRELOADING = ConcurrentHashMap.newKeySet();
+
+    /** 可視行のモデルを背景で読み込む (描画スレッドでは絶対にパースしない)。 */
+    private void requestPreload(String id, String packName) {
+        if (id == null || id.isBlank() || MODEL_CACHE.containsKey(id) || MISSING_MODEL_CACHE.contains(id)) {
+            return;
+        }
+        if (!PRELOADING.add(id)) {
+            return;
+        }
+        PRELOAD.submit(() -> {
+            try {
+                MqoModelLoader.MqoModel model = loadModelNow(id);
+                if (model == null) {
+                    MISSING_MODEL_CACHE.add(id);
+                    return;
+                }
+                MODEL_CACHE.put(id, model);
+                // Nashorn スクリプトの初期化もここで済ませる (初回ホバーの最大のフリーズ源)。
+                try {
+                    VehicleDefinition vd = VehicleRegistry.getById(id);
+                    if (vd != null && vd.hasScript()) {
+                        com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(vd);
+                    }
+                    var iod = InstalledObjectRegistry.getById(id);
+                    if (iod != null && iod.getScriptPath() != null && !iod.getScriptPath().isBlank()) {
+                        com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(iod);
+                    }
+                } catch (Throwable ignored) {
+                }
+            } catch (Throwable ignored) {
+            } finally {
+                PRELOADING.remove(id);
+            }
+        });
+    }
+
+    /** モデルを実際に読む (重い)。背景スレッドからのみ呼ぶ。 */
+    private static MqoModelLoader.MqoModel loadModelNow(String id) {
+        try {
+            VehicleDefinition vd = VehicleRegistry.getById(id);
+            if (vd != null && vd.getModelFile() != null && !vd.getModelFile().isBlank()) {
+                MqoModelLoader.MqoModel m = MqoModelLoader.loadModelForVehicle(vd);
+                if (m != null) {
+                    return m;
+                }
+            }
+            var iod = InstalledObjectRegistry.getById(id);
+            if (iod != null && iod.getModelFile() != null && !iod.getModelFile().isBlank()) {
+                MqoModelLoader.MqoModel m = MqoModelLoader.loadModelFromPack(
+                    iod.getPackName(), iod.getModelFile(), iod.getTextureOverrides(), null, iod.isSmoothing());
+                if (m != null) {
+                    return m;
+                }
+            }
+            var rd = RailRegistry.getById(id);
+            if (rd != null && rd.getModelFile() != null && !rd.getModelFile().isBlank()) {
+                return MqoModelLoader.loadModelFromPack(
+                    rd.getPackName(), rd.getModelFile(), rd.getTextureOverrides(), null, false);
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
     private MqoModelLoader.MqoModel getOrLoadModel(String id, String packName) {
         if (id == null || id.isBlank() || MISSING_MODEL_CACHE.contains(id)) {
             return null;
@@ -455,35 +520,9 @@ public class ModelSelectScreen extends Screen {
         if (cached != null) {
             return cached;
         }
-        MqoModelLoader.MqoModel model = null;
-        try {
-            VehicleDefinition vd = VehicleRegistry.getById(id);
-            if (vd != null && vd.getModelFile() != null && !vd.getModelFile().isBlank()) {
-                model = MqoModelLoader.loadModelForVehicle(vd);
-            }
-            if (model == null) {
-                var iod = InstalledObjectRegistry.getById(id);
-                if (iod != null && iod.getModelFile() != null && !iod.getModelFile().isBlank()) {
-                    model = MqoModelLoader.loadModelFromPack(
-                        iod.getPackName(), iod.getModelFile(), iod.getTextureOverrides(), null, iod.isSmoothing());
-                }
-            }
-            if (model == null) {
-                var rd = RailRegistry.getById(id);
-                if (rd != null && rd.getModelFile() != null && !rd.getModelFile().isBlank()) {
-                    model = MqoModelLoader.loadModelFromPack(
-                        rd.getPackName(), rd.getModelFile(), rd.getTextureOverrides(), null, false);
-                }
-            }
-        } catch (Exception ignored) {
-            model = null;
-        }
-        if (model != null) {
-            MODEL_CACHE.put(id, model);
-        } else {
-            MISSING_MODEL_CACHE.add(id);
-        }
-        return model;
+        // 描画スレッドでパースするとスクロール中に固まる。背景で読んで次フレーム以降に出す。
+        requestPreload(id, packName);
+        return null;
     }
 
     /**

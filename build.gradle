@@ -144,6 +144,8 @@ def buildE257DefaultPack = tasks.register('buildE257DefaultPack', Zip) {
 tasks.named('jar', Jar).configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     dependsOn buildE257DefaultPack
+    // 開発用プリフライトは頒布物に含めない。
+    exclude 'com/portofino/realtrainmodunofficial/dev/**'
     // LGPL-3.0 §4(b): 頒布物には GNU GPL と本ライセンス文書のコピーを添付すること。
     // LGPL-3.0 は GPL-3.0 の条項を取り込むライセンスなので、2 つで 1 セット。
     // ※ META-INF/LICENSE は依存ライブラリ (GraalVM 等) のもので別物。
@@ -193,6 +195,17 @@ def modrinthModsDirs = modrinthProfilesRoot.isDirectory()
             //  Fabric 版は RTMU-fabric-1.21.1/ から手で入れる。
             .findAll { !it.parentFile.name.toLowerCase().contains('fabric') }
         : []
+
+// 同梱スクリプトを本番と同じ経路で一括ロードし、構文/バインド失敗を検出する検証タスク。
+// ゲームを起動せずに「読めないスクリプト」を洗い出す (開発用。jar には入らない)。
+tasks.register('scriptPreflight', JavaExec) {
+    group = 'verification'
+    description = 'Loads every bundled script through the real Nashorn prelude and reports failures.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.portofino.realtrainmodunofficial.dev.ScriptPreflight'
+    dependsOn tasks.named('classes')
+    workingDir = projectDir
+}
 
 tasks.register('copyJarToModrinthMods') {
     dependsOn tasks.named('jar')
@@ -296,4 +309,5 @@ idea {
         downloadJavadoc = true
     }
 }
+
 

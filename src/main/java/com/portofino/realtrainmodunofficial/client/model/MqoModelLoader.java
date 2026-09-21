@@ -10,11 +10,9 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.portofino.realtrainmodunofficial.client.render.VertexWriter;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import com.portofino.realtrainmodunofficial.Config;
 import net.minecraft.client.renderer.GameRenderer;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.rail.RailDefinition;
 import com.portofino.realtrainmodunofficial.rail.RailPackLoader;
@@ -80,8 +78,13 @@ public final class MqoModelLoader {
     }
     private static final String TEXTURE_META_SEPARATOR = "|ptmeta=";
     /** MQO マテリアルの col(r g b a)。4番目がアルファ(不透明度)。RTM はガラス等をこの a<1 で半透明にする。 */
-    private static final Object MODEL_CACHE_LOCK = new Object();
-    private static final LinkedHashMap<String, CachedModel> MODEL_CACHE = new LinkedHashMap<>(64, 0.75F, true);
+    /**
+     * パース済みモデルのメモリキャッシュ。
+     * ★RTMU 独自の LRU + バイト上限による追い出しは撤去した。
+     *   永続化は fixRTM 方式のディスクキャッシュが担うので、メモリ側は単純なマップでよい。
+     */
+    private static final java.util.concurrent.ConcurrentHashMap<String, MqoModel> MODEL_CACHE =
+        new java.util.concurrent.ConcurrentHashMap<>();
     private static final Set<String> FAILED_MODEL_KEYS = ConcurrentHashMap.newKeySet();
     private static final Map<String, String> SOUND_SCRIPT_SOURCE_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, TextureInfo> TEXTURE_INFO_CACHE = new ConcurrentHashMap<>();
@@ -90,7 +93,6 @@ public final class MqoModelLoader {
     private static final Set<String> SHADER_MOD_IDS = Set.of("iris", "oculus");
     private static volatile List<Path> sharedPackCandidates;
     private static ResourceLocation fallbackWhite;
-    private static long modelCacheBytes;
     private static int bakedFilterLogCount = 0;
     private static volatile long shaderPipelineCacheUntilMillis;
     private static volatile boolean shaderPipelineCacheValue;
@@ -337,7 +339,15 @@ public final class MqoModelLoader {
      */
     private static MqoModel buildNgtoModel(ResourceSearchResult resource, String modelFile, float voxelScale) {
         try {
-            List<NgtoModelGeometry.Part> parts = NgtoModelGeometry.buildParts(readBytes(resource), modelFile, voxelScale);
+            byte[] bytes = readBytes(resource);
+            // ★fixRTM 式ディスクキャッシュ (ボクセル)。テクスチャはブロックアトラス固定なので
+            //   元パスは不要 (ResourceLocation をそのまま復元する)。
+            String diskId = DiskCache.idForBytes(bytes, "ngto|" + modelFile + "|" + voxelScale);
+            MqoModel diskHit = DiskCache.load(diskId, null);
+            if (diskHit != null) {
+                return diskHit;
+            }
+            List<NgtoModelGeometry.Part> parts = NgtoModelGeometry.buildParts(bytes, modelFile, voxelScale);
             if (parts.isEmpty()) {
                 RealTrainModUnofficial.LOGGER.warn("NGTO produced no geometry: {}", modelFile);
                 return null;
@@ -354,6 +364,7 @@ public final class MqoModelLoader {
             }
             MqoModel built = new MqoModel(batches, List.of(atlas));
             built.voxelModel = true;
+            DiskCache.store(diskId, built);
             return built;
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to load NGTO {}", modelFile, e);
@@ -396,6 +407,29 @@ public final class MqoModelLoader {
     }
 
     private static MqoModel buildClassModel(Path packPath, String modelFile, Map<String, String> textureOverrides) {
+        TextureOpener classOpener = new TextureOpener() {
+            @Override
+            public InputStream open(String rel) throws Exception {
+                return openTexture(packPath, rel);
+            }
+
+            @Override
+            public String getPackKey() {
+                return packPath == null ? "" : packPath.toString();
+            }
+        };
+        // ★fixRTM 式ディスクキャッシュ (Java組み立てモデル)。テクスチャはパック依存なので
+        //   元パスから resolveClassModelTexture で再登録する。
+        String diskId = DiskCache.id("class|" + modelFile, textureOverrides, false);
+        MqoModel diskHit = DiskCache.load(diskId, path -> {
+            TextureBinding b = TextureBinding.parse(path);
+            ResourceLocation loc = resolveClassModelTexture(packPath, b.path());
+            ResourceLocation[] em = resolveLegacyLightTextures(b, classOpener);
+            return new TextureInfo(loc, em, false);
+        });
+        if (diskHit != null) {
+            return diskHit;
+        }
         float[] data = ClassModelGeometry.build(modelFile);
         if (data == null || data.length == 0) {
             RealTrainModUnofficial.LOGGER.warn("Built-in class model produced no geometry: {}", modelFile);
@@ -423,16 +457,7 @@ public final class MqoModelLoader {
         TextureBinding classBinding = TextureBinding.parse(texturePath);
         ResourceLocation texture = resolveClassModelTexture(packPath, classBinding.path());
         // Light 材質なら本家どおり ***_light0/1/2 を引く (従来は空配列で発光パスが効かなかった)。
-        ResourceLocation[] classEmissive = resolveLegacyLightTextures(classBinding, new TextureOpener() {
-            @Override
-            public InputStream open(String rel) throws Exception {
-                return openTexture(packPath, rel);
-            }
-            @Override
-            public String getPackKey() {
-                return packPath == null ? "" : packPath.toString();
-            }
-        });
+        ResourceLocation[] classEmissive = resolveLegacyLightTextures(classBinding, classOpener);
         float minU = Float.POSITIVE_INFINITY;
         float maxU = Float.NEGATIVE_INFINITY;
         float minV = Float.POSITIVE_INFINITY;
@@ -447,7 +472,11 @@ public final class MqoModelLoader {
             data, data.length / ClassModelGeometry.STRIDE, 0, false, minU, maxU, minV, maxV);
         batch.lightOptionDeclared = classBinding != null && classBinding.hasLightTextures();
         batch.noSubTextures = classBinding != null && classBinding.noSubTextures();
-        return new MqoModel(List.of(batch), List.of(texture));
+        // ディスクキャッシュでテクスチャを再登録できるよう元パスを覚える。
+        batch.textureSourcePath = classBinding.path();
+        MqoModel classResult = new MqoModel(List.of(batch), List.of(texture));
+        DiskCache.store(diskId, classResult);
+        return classResult;
     }
 
     private static String firstNonBlankValue(String a, String b) {
@@ -749,56 +778,17 @@ public final class MqoModelLoader {
     }
 
     private static MqoModel getCachedModel(String key) {
-        synchronized (MODEL_CACHE_LOCK) {
-            CachedModel cached = MODEL_CACHE.get(key);
-            if (cached == null) {
-                return null;
-            }
-            cached.touch(System.nanoTime());
-            return cached.model();
-        }
+        return key == null ? null : MODEL_CACHE.get(key);
     }
 
     private static void cacheModel(String key, MqoModel model) {
         if (key == null || model == null) {
             return;
         }
-        synchronized (MODEL_CACHE_LOCK) {
-            CachedModel previous = MODEL_CACHE.remove(key);
-            if (previous != null) {
-                modelCacheBytes -= previous.estimatedBytes();
-                // 古いモデルを差し替える時は GPU VBO を解放 (リーク防止)。ただし同じ
-                // オブジェクトを再登録する場合は、今から使う VBO を閉じないようスキップ。
-                if (previous.model != model) {
-                    previous.model.closeGpuResources();
-                }
-            }
-            CachedModel cached = new CachedModel(model, model.estimateMemoryBytes(), System.nanoTime());
-            MODEL_CACHE.put(key, cached);
-            modelCacheBytes += cached.estimatedBytes();
-            evictModelCacheLocked();
-        }
-    }
-
-    private static void evictModelCacheLocked() {
-        long limitBytes = Math.max(1024L, Config.MODEL_CACHE_LIMIT_MIB.get()) * 1024L * 1024L;
-        long protectNanos = Math.max(300L, Config.MODEL_CACHE_PROTECT_SECONDS.get()) * 1_000_000_000L;
-        if (modelCacheBytes <= limitBytes) {
-            return;
-        }
-        long now = System.nanoTime();
-        Iterator<Map.Entry<String, CachedModel>> iterator = MODEL_CACHE.entrySet().iterator();
-        while (modelCacheBytes > limitBytes && iterator.hasNext()) {
-            Map.Entry<String, CachedModel> entry = iterator.next();
-            CachedModel cached = entry.getValue();
-            if (protectNanos > 0L && now - cached.lastAccessNanos() < protectNanos) {
-                continue;
-            }
-            modelCacheBytes -= cached.estimatedBytes();
-            iterator.remove();
-            // 追い出したモデルの GPU VBO を解放する。これを怠ると VertexBuffer が native の
-            // まま残り、巡回中に GPU メモリがリークして徐々に重くなっていた (今回の主因)。
-            cached.model.closeGpuResources();
+        MqoModel previous = MODEL_CACHE.put(key, model);
+        if (previous != null && previous != model) {
+            // 差し替え時は古いモデルの GPU VBO を解放する (同じオブジェクトなら閉じない)。
+            previous.closeGpuResources();
         }
     }
 
@@ -1057,6 +1047,14 @@ public final class MqoModelLoader {
     }
 
     private static MqoModel bake(String mqoText, TextureOpener opener, Map<String, String> textureOverrides, boolean smoothing) throws Exception {
+        // ★fixRTM 式ディスクキャッシュ: 同じ MQO ソースなら前回のパース結果 (描画バッチ) を使う。
+        //   テキストパースと法線スムージングが丸ごと省ける。
+        String diskId = DiskCache.id(mqoText, textureOverrides, smoothing);
+        MqoModel diskHit = DiskCache.load(diskId,
+            path -> registerTextureFromZip(TextureBinding.parse(path), opener));
+        if (diskHit != null) {
+            return diskHit;
+        }
         List<String> materialOrder = new ArrayList<>();
         List<String> materialTexPaths = new ArrayList<>();
         List<Float> materialAlphas = new ArrayList<>();
@@ -1143,10 +1141,19 @@ public final class MqoModelLoader {
                        (byte) i, materialOrder, materialTexPaths, textureOverrides));
         }
         RealTrainModUnofficial.LOGGER.debug("[RTMU] 材質→テクスチャ [{}]: {}", opener.getPackKey(), mapping);
-        return new MqoModel(out, materialTextures);
+        MqoModel result = new MqoModel(out, materialTextures);
+        DiskCache.store(diskId, result);
+        return result;
     }
 
     private static MqoModel bakeObj(String objText, TextureOpener opener, Map<String, String> textureOverrides, boolean smoothing) throws Exception {
+        // ★fixRTM 式ディスクキャッシュ (.obj)。
+        String diskId = DiskCache.id(objText, textureOverrides, smoothing);
+        MqoModel diskHit = DiskCache.load(diskId,
+            path -> registerTextureFromZip(TextureBinding.parse(path), opener));
+        if (diskHit != null) {
+            return diskHit;
+        }
         List<Vec3> vertices = new ArrayList<>();
         List<float[]> texCoords = new ArrayList<>();
         List<Vector3f> normals = new ArrayList<>();
@@ -1232,6 +1239,9 @@ public final class MqoModelLoader {
                 k -> new BatchBuilder(byGroup.size(), batchGroupName, textureInfo.location, textureInfo.emissiveTextures, materialId, translucent, 60.0F));
             bb.lightOptionDeclared |= textureInfo.lightOptionDeclared;
             bb.noSubTextures |= textureInfo.noSubTextures;
+            if (bb.textureSourcePath == null) {
+                bb.textureSourcePath = resolveObjTexturePath(currentMaterial, materialTextures, textureOverrides);
+            }
 
             if (faceVertices.length == 4) {
                 emitObjQuad(faceVertices[0], faceVertices[1], faceVertices[2], faceVertices[3], bb);
@@ -1252,7 +1262,9 @@ public final class MqoModelLoader {
                 uniqueTextures.add(batch.texture);
             }
         }
-        return new MqoModel(out, new ArrayList<>(uniqueTextures));
+        MqoModel objResult = new MqoModel(out, new ArrayList<>(uniqueTextures));
+        DiskCache.store(diskId, objResult);
+        return objResult;
     }
 
     private static ObjFaceVertex[] parseObjFace(String faceSpec, List<Vec3> vertices, List<float[]> texCoords, List<Vector3f> normals) {
@@ -1379,8 +1391,9 @@ public final class MqoModelLoader {
         return sum;
     }
 
-    private static TextureInfo resolveObjTexture(String materialName, Map<String, String> materialTextures,
-                                                 Map<String, String> textureOverrides, TextureOpener opener) throws Exception {
+    /** OBJ の材質名 → テクスチャ元パス (resolveObjTexture と同じ優先順)。ディスクキャッシュ用。 */
+    private static String resolveObjTexturePath(String materialName, Map<String, String> materialTextures,
+                                                Map<String, String> textureOverrides) {
         String path = null;
         if (materialName != null && textureOverrides.containsKey(materialName)) {
             path = textureOverrides.get(materialName);
@@ -1398,9 +1411,12 @@ public final class MqoModelLoader {
         if ((path == null || path.isBlank()) && !materialTextures.isEmpty()) {
             path = materialTextures.values().iterator().next();
         }
-        if (path == null || path.isBlank()) {
-            path = "textures/misc/white.png";
-        }
+        return (path == null || path.isBlank()) ? "textures/misc/white.png" : path;
+    }
+
+    private static TextureInfo resolveObjTexture(String materialName, Map<String, String> materialTextures,
+                                                 Map<String, String> textureOverrides, TextureOpener opener) throws Exception {
+        String path = resolveObjTexturePath(materialName, materialTextures, textureOverrides);
         TextureBinding binding = TextureBinding.parse(path);
         String cacheKey = opener.getPackKey() + "|" + binding.cacheKey();
         logModelLoadDetail("texture-resolve-obj", "materialName={} resolvedPath={} cacheKey={}", materialName, path, cacheKey);
@@ -1500,6 +1516,8 @@ public final class MqoModelLoader {
         final float colB = matColor != null ? matColor[2] : 1.0F;
         BatchBuilder bb = byGroup.computeIfAbsent(batchKey, k -> {
             BatchBuilder b = new BatchBuilder(batchOrder, groupName, textureInfo.location, textureInfo.emissiveTextures, matKey, translucent, facetAngle);
+            // ディスクキャッシュでテクスチャを再登録できるよう元パスを覚える。
+            b.textureSourcePath = resolveTexturePath(matId, materialOrder, materialTexPaths, textureOverrides);
             b.baseAlpha = baseAlpha;
             b.baseColorR = colR;
             b.baseColorG = colG;
@@ -2229,6 +2247,22 @@ public final class MqoModelLoader {
         return dst;
     }
 
+    /**
+     * TextureManager への登録。描画スレッド以外から呼ばれたら描画スレッドへ回す。
+     * TextureManager#register は内部の tickableTextures(List) を触るため、
+     * 背景ロードから直接呼ぶと描画スレッドの tick と衝突して落ちる。
+     * DynamicTexture のアップロード自体は元々 recordRenderCall で描画スレッドに回る。
+     */
+    private static void registerTextureSafe(ResourceLocation loc,
+                                            net.minecraft.client.renderer.texture.AbstractTexture tex) {
+        if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
+            Minecraft.getInstance().getTextureManager().register(loc, tex);
+        } else {
+            com.mojang.blaze3d.systems.RenderSystem.recordRenderCall(
+                () -> Minecraft.getInstance().getTextureManager().register(loc, tex));
+        }
+    }
+
     private static TextureInfo registerTextureFromZip(TextureBinding binding, TextureOpener opener) {
         boolean alphaBlendOption = binding.options().contains("alphablend")
             || binding.options().contains("translucent")
@@ -2245,7 +2279,7 @@ public final class MqoModelLoader {
                 DynamicTexture tex = new DynamicTexture(img);
                 ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                     "dynamic/mqo/" + Integer.toHexString(key));
-                Minecraft.getInstance().getTextureManager().register(loc, tex);
+                registerTextureSafe(loc, tex);
                 ResourceLocation baseLoc = loc;
                 ResourceLocation opaqueLoc = loc;
                 ResourceLocation windowLoc = loc;
@@ -2254,13 +2288,13 @@ public final class MqoModelLoader {
                     DynamicTexture opaqueTex = new DynamicTexture(opaqueImg);
                     opaqueLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_opq");
-                    Minecraft.getInstance().getTextureManager().register(opaqueLoc, opaqueTex);
+                    registerTextureSafe(opaqueLoc, opaqueTex);
                     // pass1用: 半透明ピクセルだけ残し、不透明部分の再描画を防ぐ
                     com.mojang.blaze3d.platform.NativeImage windowImg = copyNonOpaqueAlpha(img);
                     DynamicTexture windowTex = new DynamicTexture(windowImg);
                     windowLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_win");
-                    Minecraft.getInstance().getTextureManager().register(windowLoc, windowTex);
+                    registerTextureSafe(windowLoc, windowTex);
                     // スクリプト経路からも引けるようにする (opaqueVariantOf / windowVariantOf)
                     TEXTURE_ALPHA_SPLIT.put(baseLoc, new ResourceLocation[]{opaqueLoc, windowLoc});
                 }
@@ -3282,6 +3316,8 @@ public final class MqoModelLoader {
         boolean lightOptionDeclared;
         /** TextureInfo#noSubTextures の引き継ぎ。 */
         boolean noSubTextures;
+        /** ディスクキャッシュ用: テクスチャの元パス (動的アトラスは起動ごとに作り直されるため再登録に要る)。 */
+        String textureSourcePath;
 
         BatchBuilder(int order, String groupName, ResourceLocation texture, ResourceLocation[] emissiveTextures, int materialId, boolean translucent, float smoothingAngle) {
             this.order = order;
@@ -3336,6 +3372,7 @@ public final class MqoModelLoader {
             Batch built = new Batch(order, groupName, texture, emissiveTextures, data, data.length / 8, materialId, translucent, safeMinU, safeMaxU, safeMinV, safeMaxV);
             built.lightOptionDeclared = this.lightOptionDeclared;
             built.noSubTextures = this.noSubTextures;
+            built.textureSourcePath = this.textureSourcePath;
             built.baseAlpha = baseAlpha;
             built.baseColorR = baseColorR;
             built.baseColorG = baseColorG;
@@ -3349,6 +3386,288 @@ public final class MqoModelLoader {
             return built;
         }
 
+    }
+
+    // ===================== fixRTM 式: パース済みモデルのディスクキャッシュ =====================
+    /**
+     * 本家 fixRTM の {@code CachedPolygonModel} 相当。MQO のパース結果 (描画バッチ) をディスクへ
+     * 保存し、次回起動時はテキストパースと法線スムージングを丸ごと省いて読み込む。
+     *
+     * <p>キーは MQO ソースの SHA-1 (+ overrides/smoothing) なので、パックを更新すると自動で
+     * 別キーになり古いキャッシュは使われない。
+     *
+     * <p>テクスチャは動的アトラスへ登録し直す必要があるため、バッチに元パスを持たせて
+     * ロード時に {@link #registerTextureFromZip} で再登録する (PNG デコードは残るが、
+     * パース+スムージングは消える)。壊れたキャッシュは必ず無視して従来パースに戻す。
+     */
+    /** ディスクキャッシュのロード時にテクスチャを復元するための関数 (モデル種別ごとに違う)。 */
+    @FunctionalInterface
+    private interface TextureResolver {
+        TextureInfo resolve(String sourcePath) throws Exception;
+    }
+
+    private static final class DiskCache {
+        private static final int MAGIC = 0x52544D43; // "RTMC"
+        private static final int VERSION = 1;
+        private static Path cacheDir;
+        private static boolean cacheDirResolved;
+
+        private DiskCache() {
+        }
+
+        private static Path dir() {
+            if (!cacheDirResolved) {
+                cacheDirResolved = true;
+                try {
+                    cacheDir = net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get()
+                        .resolve("realtrainmodunofficial").resolve("model_cache");
+                    Files.createDirectories(cacheDir);
+                } catch (Throwable t) {
+                    cacheDir = null;
+                }
+            }
+            return cacheDir;
+        }
+
+        static String id(String source, Map<String, String> overrides, boolean smoothing) {
+            if (source == null) {
+                return null;
+            }
+            try {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
+                md.update((byte) (smoothing ? 1 : 0));
+                md.update(String.valueOf(overrides == null ? 0 : overrides.hashCode())
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                md.update(source.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                StringBuilder sb = new StringBuilder(40);
+                for (byte b : md.digest()) {
+                    sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
+                }
+                return sb.toString();
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        /** バイナリ (.ngto/.ngtz) 用。extra に modelFile/voxelScale 等を混ぜて識別する。 */
+        static String idForBytes(byte[] bytes, String extra) {
+            if (bytes == null) {
+                return null;
+            }
+            try {
+                java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-1");
+                md.update(String.valueOf(extra).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                md.update(bytes);
+                StringBuilder sb = new StringBuilder(40);
+                for (byte b : md.digest()) {
+                    sb.append(Character.forDigit((b >> 4) & 0xF, 16)).append(Character.forDigit(b & 0xF, 16));
+                }
+                return sb.toString();
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        static MqoModel load(String id, TextureResolver resolver) {
+            if (id == null) {
+                return null;
+            }
+            Path dir = dir();
+            if (dir == null) {
+                return null;
+            }
+            Path file = dir.resolve(id + ".bin");
+            if (!Files.isRegularFile(file)) {
+                return null;
+            }
+            try (java.io.DataInputStream in = new java.io.DataInputStream(
+                    new java.util.zip.GZIPInputStream(Files.newInputStream(file)))) {
+                if (in.readInt() != MAGIC || in.readInt() != VERSION) {
+                    return null;
+                }
+                boolean voxel = in.readInt() != 0;
+                int count = in.readInt();
+                if (count <= 0 || count > 100_000) {
+                    return null;
+                }
+                List<Batch> batches = new ArrayList<>(count);
+                java.util.LinkedHashSet<ResourceLocation> textures = new java.util.LinkedHashSet<>();
+                for (int i = 0; i < count; i++) {
+                    Batch b = readBatch(in, resolver);
+                    if (b == null) {
+                        return null; // 壊れていたらパースし直す
+                    }
+                    batches.add(b);
+                    textures.add(b.texture);
+                }
+                RealTrainModUnofficial.LOGGER.debug("[RTMU] model disk-cache hit: {} ({} batches)", id, batches.size());
+                MqoModel model = new MqoModel(batches, new ArrayList<>(textures));
+                model.voxelModel = voxel;
+                return model;
+            } catch (Throwable t) {
+                return null; // 壊れたキャッシュは無視 (従来パースへフォールバック)
+            }
+        }
+
+        static void store(String id, MqoModel model) {
+            if (id == null || model == null) {
+                return;
+            }
+            Path dir = dir();
+            if (dir == null) {
+                return;
+            }
+            Path file = dir.resolve(id + ".bin");
+            // 背景ロードと同時書き込みで衝突しないよう、一時ファイル名をスレッドごとに分ける。
+            Path tmp = dir.resolve(id + "." + Thread.currentThread().getId() + ".tmp");
+            try (java.io.DataOutputStream out = new java.io.DataOutputStream(
+                    new java.util.zip.GZIPOutputStream(Files.newOutputStream(tmp)))) {
+                out.writeInt(MAGIC);
+                out.writeInt(VERSION);
+                out.writeInt(model.voxelModel ? 1 : 0);
+                out.writeInt(model.batches.size());
+                for (Batch b : model.batches) {
+                    writeBatch(out, b);
+                }
+            } catch (Throwable t) {
+                try { Files.deleteIfExists(tmp); } catch (Throwable ignored) { }
+                return;
+            }
+            try {
+                Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                RealTrainModUnofficial.LOGGER.debug("[RTMU] model disk-cache store: {}", id);
+            } catch (Throwable ignored) {
+            }
+        }
+
+        private static void writeBatch(java.io.DataOutputStream out, Batch b) throws java.io.IOException {
+            out.writeInt(b.order);
+            out.writeUTF(b.groupName == null ? "" : b.groupName);
+            out.writeUTF(b.textureSourcePath == null ? "" : b.textureSourcePath);
+            // 元パスが無いモデル (NGTO のブロックアトラス等) は ResourceLocation をそのまま復元する。
+            out.writeUTF(b.texture == null ? "" : b.texture.toString());
+            out.writeInt(b.materialId);
+            out.writeBoolean(b.translucent);
+            out.writeFloat(b.baseAlpha);
+            out.writeFloat(b.baseColorR);
+            out.writeFloat(b.baseColorG);
+            out.writeFloat(b.baseColorB);
+            out.writeBoolean(b.glassTranslucent);
+            out.writeBoolean(b.texHasTranslucentPixels);
+            out.writeBoolean(b.lightOptionDeclared);
+            out.writeBoolean(b.noSubTextures);
+            out.writeFloat(b.minU);
+            out.writeFloat(b.maxU);
+            out.writeFloat(b.minV);
+            out.writeFloat(b.maxV);
+            out.writeInt(b.vertexCount);
+            out.writeInt(b.data.length);
+            for (float f : b.data) {
+                out.writeFloat(f);
+            }
+            float[] bias = b.biasNormals;
+            out.writeInt(bias == null ? -1 : bias.length);
+            if (bias != null) {
+                for (float f : bias) {
+                    out.writeFloat(f);
+                }
+            }
+            java.util.BitSet mask = b.pass1Mask;
+            out.writeInt(mask == null ? -1 : mask.length());
+            if (mask != null) {
+                long[] words = mask.toLongArray();
+                out.writeInt(words.length);
+                for (long w : words) {
+                    out.writeLong(w);
+                }
+            }
+        }
+
+        private static Batch readBatch(java.io.DataInputStream in, TextureResolver resolver) throws Exception {
+            int order = in.readInt();
+            String groupName = in.readUTF();
+            String texPath = in.readUTF();
+            String texLoc = in.readUTF();
+            int materialId = in.readInt();
+            boolean translucent = in.readBoolean();
+            float baseAlpha = in.readFloat();
+            float cr = in.readFloat();
+            float cg = in.readFloat();
+            float cb = in.readFloat();
+            boolean glass = in.readBoolean();
+            boolean texTrans = in.readBoolean();
+            boolean lightOpt = in.readBoolean();
+            boolean noSub = in.readBoolean();
+            float minU = in.readFloat();
+            float maxU = in.readFloat();
+            float minV = in.readFloat();
+            float maxV = in.readFloat();
+            int vertexCount = in.readInt();
+            int len = in.readInt();
+            if (len < 0 || len > (1 << 26)) {
+                return null;
+            }
+            float[] data = new float[len];
+            for (int i = 0; i < len; i++) {
+                data[i] = in.readFloat();
+            }
+            int biasLen = in.readInt();
+            float[] bias = null;
+            if (biasLen >= 0) {
+                bias = new float[biasLen];
+                for (int i = 0; i < biasLen; i++) {
+                    bias[i] = in.readFloat();
+                }
+            }
+            int maskLen = in.readInt();
+            java.util.BitSet mask = null;
+            if (maskLen >= 0) {
+                int words = in.readInt();
+                long[] arr = new long[words];
+                for (int i = 0; i < words; i++) {
+                    arr[i] = in.readLong();
+                }
+                mask = java.util.BitSet.valueOf(arr);
+            }
+            // 元パスがあるモデル (MQO/OBJ/Java組み立て) は、起動ごとに作り直される動的アトラスへ
+            // 再登録する。元パスが無いモデル (NGTO のブロックアトラス等) は保存した
+            // ResourceLocation をそのまま使う。
+            ResourceLocation loc;
+            ResourceLocation[] emissive;
+            ResourceLocation opaqueLoc;
+            ResourceLocation windowLoc;
+            if (!texPath.isEmpty() && resolver != null) {
+                TextureInfo info = resolver.resolve(texPath);
+                loc = info.location;
+                emissive = info.emissiveTextures;
+                opaqueLoc = info.opaqueLocation != null ? info.opaqueLocation : info.location;
+                windowLoc = info.windowLocation != null ? info.windowLocation : info.location;
+            } else {
+                loc = ResourceLocation.tryParse(texLoc);
+                if (loc == null) {
+                    return null;
+                }
+                emissive = new ResourceLocation[0];
+                opaqueLoc = loc;
+                windowLoc = loc;
+            }
+            Batch b = new Batch(order, groupName, loc, emissive, data, vertexCount,
+                materialId, translucent, minU, maxU, minV, maxV);
+            b.lightOptionDeclared = lightOpt;
+            b.noSubTextures = noSub;
+            b.textureSourcePath = texPath;
+            b.baseAlpha = baseAlpha;
+            b.baseColorR = cr;
+            b.baseColorG = cg;
+            b.baseColorB = cb;
+            b.glassTranslucent = glass;
+            b.texHasTranslucentPixels = texTrans;
+            b.pass1Mask = mask;
+            b.biasNormals = bias;
+            b.opaqueTexture = opaqueLoc;
+            b.windowTexture = windowLoc;
+            return b;
+        }
     }
 
     public static final class MqoModel {
@@ -4276,6 +4595,22 @@ public final class MqoModelLoader {
                 if (scriptModel != null && scriptRenderer != null) {
                     scriptModel.setActiveRenderer(scriptRenderer);
                 }
+                if (scriptRenderer != null) {
+                    // 静的な renderLightEffectS を車経路の即時描画へ回す。
+                    TrainScriptSystem.ScriptModelRenderer.setActiveLightTarget(scriptRenderer);
+                    // ActionParts の ID 解決用に一覧を記録する。
+                    com.portofino.realtrainmodunofficial.client.ActionPartsPicker
+                        .record(entity, null, scriptRenderer);
+                }
+                // 色ピッキング FBO: 乗車中で ActionParts を持つ車両だけ、renderParts が
+                // ID 色の頂点を専用バッファへ流す。描画後に中央ピクセルを読んで ID を確定する。
+                boolean pickCapture = scriptRenderer != null
+                    && com.portofino.realtrainmodunofficial.client.ActionPartsPicker
+                        .shouldCapture(entity, scriptRenderer);
+                if (pickCapture) {
+                    com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.begin(scriptRenderer);
+                }
+                try {
                 // ★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
                 // 以前はここで記録済み描画の再生キャッシュを使い、状態シグネチャが変わらない限り
                 // JS を呼ばずに済ませていた。
@@ -4312,6 +4647,12 @@ public final class MqoModelLoader {
                         if (scriptRenderer != null) scriptRenderer.endRecording(rendered);
                         noteLegacyPassActivity(pass, rendered);
                         return rendered;
+                    }
+                }
+                } finally {
+                    if (pickCapture) {
+                        int pickedId = com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.finish();
+                        com.portofino.realtrainmodunofficial.client.ActionPartsPicker.setHoveredId(entity, pickedId);
                     }
                 }
             } catch (Exception e) {
@@ -5153,7 +5494,7 @@ public final class MqoModelLoader {
             if (batch == null || scriptTexture || !batch.translucent || !hasActiveShaderPipeline()) {
                 return false;
             }
-            if (!(entity instanceof TrainEntity) && !(entity instanceof LargeRailCoreBlockEntity) && !(entity instanceof InstalledObjectBlockEntity)) {
+            if (!(entity instanceof TrainEntity) && !(entity instanceof InstalledObjectBlockEntity)) {
                 return false;
             }
             if (isGlassGroup(lowerGroupName) || isLegacyDisplayGroup(lowerGroupName)) {
@@ -5320,6 +5661,8 @@ public final class MqoModelLoader {
         final float maxU;
         final float minV;
         final float maxV;
+        /** ディスクキャッシュ用: テクスチャの元パス (ロード時に再登録する)。 */
+        String textureSourcePath;
 
         // GPU VBO キャッシュ。フルブライト経路の同じ batch を毎フレーム再
         // ビルドしていた CPU コストを 1 回ビルド + GPU 側 modelview 変換に
@@ -5527,34 +5870,6 @@ public final class MqoModelLoader {
             }
             entityVboLight = Integer.MIN_VALUE;
             entityVboFailed = false;
-        }
-    }
-
-    private static final class CachedModel {
-        private final MqoModel model;
-        private final long estimatedBytes;
-        private long lastAccessNanos;
-
-        CachedModel(MqoModel model, long estimatedBytes, long lastAccessNanos) {
-            this.model = model;
-            this.estimatedBytes = Math.max(1L, estimatedBytes);
-            this.lastAccessNanos = lastAccessNanos;
-        }
-
-        MqoModel model() {
-            return model;
-        }
-
-        long estimatedBytes() {
-            return estimatedBytes;
-        }
-
-        long lastAccessNanos() {
-            return lastAccessNanos;
-        }
-
-        void touch(long now) {
-            this.lastAccessNanos = now;
         }
     }
 

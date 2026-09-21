@@ -283,7 +283,7 @@ public final class NgtoModelGeometry {
             CompoundTag set = entry.getCompound("Set");
             String name = set.getString("Block");
             int meta = set.getInt("Meta");
-            palette.put(entry.getInt("Id"), LegacyBlocks.toState(name, meta));
+            palette.put(entry.getInt("Id"), jp.ngt.ngtlib.block.LegacyBlockStates.toState(name, meta));
         }
         return palette;
     }

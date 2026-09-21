@@ -1,7 +1,5 @@
 package com.portofino.realtrainmodunofficial.entity;
 
-import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import jp.ngt.rtm.rail.util.RailMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
@@ -20,7 +18,7 @@ public final class BogieTracker {
     private static final int MAX_WALK_GUARDS = 24;
 
     // --- 台車状態（公開: TrainEntity の連結コードが直接アクセスする） ---
-    public LargeRailCoreBlockEntity core;
+    public jp.ngt.rtm.rail.TileEntityLargeRailCore core;
     public RailMap map;
     public int split;
     /** 小数インデックス [0, split]。補間に使用。 */
@@ -69,7 +67,7 @@ public final class BogieTracker {
      * @return スナップに成功すれば true
      */
     public boolean initAt(double x, double y, double z, float initYaw, Level level) {
-        LargeRailCoreBlockEntity c = findCore(level, x, y, z);
+        jp.ngt.rtm.rail.TileEntityLargeRailCore c = findCore(level, x, y, z);
         if (c == null) c = this.core;
         if (c == null) return false;
         this.core = c;
@@ -199,7 +197,7 @@ public final class BogieTracker {
     // 隣接レール探索
     // -------------------------------------------------------------------------
 
-    private record RailTransition(LargeRailCoreBlockEntity core, RailMap map, int split,
+    private record RailTransition(jp.ngt.rtm.rail.TileEntityLargeRailCore core, RailMap map, int split,
                                    double startIndex, int entryDir) {}
 
     private static RailTransition findConnectedRail(Level level, RailMap currentMap,
@@ -221,9 +219,9 @@ public final class BogieTracker {
             for (int dz = -2; dz <= 2; dz++) {
                 for (int dy = -2; dy <= 2; dy++) {
                     BlockPos bp = new BlockPos(px + dx, py + dy, pz + dz);
-                    LargeRailCoreBlockEntity cand = findCoreDirect(level, bp);
+                    jp.ngt.rtm.rail.TileEntityLargeRailCore cand = findCoreDirect(level, bp);
                     if (cand == null) continue;
-                    for (RailMap m : cand.getActiveRailMaps()) {
+                    for (RailMap m : cand.getAllRailMaps()) {
                         if (m == null || m == currentMap) continue;
                         int sp = splitForMap(m);
                         for (int ep : new int[]{0, sp}) {
@@ -263,17 +261,18 @@ public final class BogieTracker {
         return Math.max(2, (int) (map.getHorizontalPathLength() * SPLIT_PER_METER));
     }
 
-    /** ブロック位置の BE を直接取得する（RailCollision 経由含む）。 */
-    public static LargeRailCoreBlockEntity findCoreDirect(Level level, BlockPos pos) {
-        if (level.getBlockEntity(pos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
+    /**
+     * ブロック位置のレールから本家コア ({@link jp.ngt.rtm.rail.TileEntityLargeRailCore}) を解決する。
+     * コア自身か、レール/道床ブロック ({@code TileEntityLargeRailBase}) の {@code getRailCore()} 経由。
+     */
+    public static jp.ngt.rtm.rail.TileEntityLargeRailCore findCoreDirect(Level level, BlockPos pos) {
+        if (level.getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore core && core.isLoaded()) {
             return core;
         }
-        if (level.getBlockEntity(pos) instanceof RailCollisionBlockEntity col) {
-            BlockPos cp = col.getCorePos();
-            if (cp != null
-                    && level.getBlockEntity(cp) instanceof LargeRailCoreBlockEntity c
-                    && c.isLoaded()) {
-                return c;
+        if (level.getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase base) {
+            jp.ngt.rtm.rail.TileEntityLargeRailCore core = base.getRailCore();
+            if (core != null && core.isLoaded()) {
+                return core;
             }
         }
         return null;
@@ -283,13 +282,13 @@ public final class BogieTracker {
      * ワールド座標近傍のレールコアを探す。
      * まず真上~下の列を検索し、見つからなければ XZ ±1 ブロックも検索する。
      */
-    public static LargeRailCoreBlockEntity findCore(Level level, double x, double y, double z) {
+    public static jp.ngt.rtm.rail.TileEntityLargeRailCore findCore(Level level, double x, double y, double z) {
         int px = (int) Math.floor(x);
         int py = (int) Math.floor(y);
         int pz = (int) Math.floor(z);
         // 中心列を先に検索
         for (int dy = 2; dy >= -2; dy--) {
-            LargeRailCoreBlockEntity c = findCoreDirect(level, new BlockPos(px, py + dy, pz));
+            jp.ngt.rtm.rail.TileEntityLargeRailCore c = findCoreDirect(level, new BlockPos(px, py + dy, pz));
             if (c != null) return c;
         }
         // 隣接 XZ も検索
@@ -297,7 +296,7 @@ public final class BogieTracker {
             for (int dz = -1; dz <= 1; dz++) {
                 if (dx == 0 && dz == 0) continue;
                 for (int dy = 2; dy >= -2; dy--) {
-                    LargeRailCoreBlockEntity c = findCoreDirect(level, new BlockPos(px + dx, py + dy, pz + dz));
+                    jp.ngt.rtm.rail.TileEntityLargeRailCore c = findCoreDirect(level, new BlockPos(px + dx, py + dy, pz + dz));
                     if (c != null) return c;
                 }
             }
@@ -306,11 +305,11 @@ public final class BogieTracker {
     }
 
     /** コアが持つ全マップの中で (x, z) に最も近いものを返す。 */
-    public static RailMap bestMap(LargeRailCoreBlockEntity core, double x, double z) {
+    public static RailMap bestMap(jp.ngt.rtm.rail.TileEntityLargeRailCore core, double x, double z) {
         if (core == null) return null;
         RailMap best = null;
         double bestDist = Double.MAX_VALUE;
-        for (RailMap m : core.getActiveRailMaps()) {
+        for (RailMap m : core.getAllRailMaps()) {
             if (m == null) continue;
             int sp = splitForMap(m);
             int nearest = Mth.clamp(m.getNearlestPoint(sp, x, z), 0, sp);

@@ -31,35 +31,44 @@ public final class ObjectMeshCache {
      * (レール側 RailMeshCache.MAX_BAKES_PER_FRAME と同じ考え方)。
      */
     private static final int MAX_BAKES_PER_FRAME = 8;
-    /**
-     * 何フレーム連続で内容が変わったら「可動物」と見なすか。
-     * 本家は renderRailStatic と renderRailDynamic を作る側が分けていて、
-     * 動く部分はそもそも焼き込みに入れない。
-     */
-    private static final int DYNAMIC_AFTER = 4;
-    /** 可動物と判定した後、再び焼けるか試すまでのフレーム数 (点滅が止まった信号を拾い直す)。 */
-    private static final int DYNAMIC_RETRY_FRAMES = 200;
+
 
     private static int bakesThisFrame;
     private static int frameCounter;
 
-    private static final class Entry {
-        int key;
-        boolean hasKey;
-        List<MeshCapture.Section> sections = List.of();
-        /** 連続で内容が変わった回数。 */
-        int churn;
-        /** 可動物と判定した (焼かない)。 */
-        boolean dynamic;
-        /** 可動物判定を解除して再挑戦するフレーム。 */
-        int retryAtFrame;
+    /**
+     * 1 つの設置物が保持できる「向き違いの焼き込み」の数。
+     * 回転灯 (24 ポーズ) / ミラーボール (360 ポーズ) を丸ごと保持できる値にしてある。
+     * これを超えて新しいキーが来続けるものは「連続変化」と見なして焼くのをやめる (dynamic)。
+     */
+    private static final int POSES_PER_ENTRY = 1024;
 
+    private static final class Entry {
+        /**
+         * 内容キー → 焼き込み。本家のディスプレイリストは「形を焼いて回転は行列」なので
+         * 同じ形の向き違いは 1 回焼けば使い回せる。RTMU は向き込みで焼くため、
+         * 向きごとに焼き込みを保持して再焼きを無くす (回転灯/ミラーボール対策)。
+         */
+        final Map<Integer, List<MeshCapture.Section>> poses =
+            new LinkedHashMap<>(8, 0.75F, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Integer, List<MeshCapture.Section>> eldest) {
+                    if (size() > POSES_PER_ENTRY) {
+                        for (MeshCapture.Section s : eldest.getValue()) {
+                            s.close();
+                        }
+                        return true;
+                    }
+                    return false;
+                }
+            };
         void close() {
-            for (MeshCapture.Section s : sections) {
-                s.close();
+            for (List<MeshCapture.Section> sections : poses.values()) {
+                for (MeshCapture.Section s : sections) {
+                    s.close();
+                }
             }
-            sections = List.of();
-            hasKey = false;
+            poses.clear();
         }
     }
 
@@ -97,53 +106,27 @@ public final class ObjectMeshCache {
 
         Entry entry = CACHE.computeIfAbsent(be, k -> new Entry());
 
-        // 可動物と判定済み: 焼かずに CPU 経路へ返す。ときどき再挑戦する。
-        if (entry.dynamic) {
-            if (frameCounter - entry.retryAtFrame < 0) {
-                return false;
-            }
-            entry.dynamic = false;
-            entry.churn = 0;
-        }
-
         // ★本家の要点そのもの: キーが同じなら焼き直さない。
-        boolean valid = entry.hasKey && entry.key == key && isUsable(entry.sections);
-        if (!valid) {
-            // ★視界に大量に入った瞬間のスパイクを散らす。
-            // 枠待ちを「内容が変わった」と数えると、設置物が多い場面ほど可動物と誤判定されて
-            // いちばん効かせたい所でキャッシュが外れる。
-            // ★キーが変わったのに焼き直せないときは古い絵を描かない。
+        // ★回転灯/ミラーボールは向きごとにキーが変わるが、向きの数は有限なので
+        //   「向きごとに焼いて保持」する (poses)。これで再焼きが起きなくなる。
+        List<MeshCapture.Section> sections = entry.poses.get(key);
+        if (sections == null || !isUsable(sections)) {
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
                 return false;
-            } else if (entry.hasKey && ++entry.churn >= DYNAMIC_AFTER) {
-                // 焼き直しが続く = 中身が動き続けている。焼くほうが高くつくので手を引く。
-                entry.close();
-                entry.dynamic = true;
-                entry.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
-                return false;
-            } else {
-                bakesThisFrame++;
-                entry.close();
-                List<MeshCapture.Section> baked = bake(baker);
-                if (baked == null) {
-                    // 焼けなかった (頂点ゼロ/大きすぎ)。以降は CPU 経路に任せる。
-                    entry.dynamic = true;
-                    entry.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
-                    return false;
-                }
-                entry.sections = baked;
-                entry.key = key;
-                entry.hasKey = true;
             }
-        } else {
-            entry.churn = 0;
+            bakesThisFrame++;
+            List<MeshCapture.Section> baked = bake(baker);
+            if (baked == null) {
+                // 焼けなかった (頂点ゼロ/大きすぎ)。CPU 経路に任せる。
+                return false;
+            }
+            entry.poses.put(key, baked);
+            sections = baked;
         }
-        com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addObject(valid);
-
         // 本家 renderStaticDisplayList: push → translate → bindTexture (リストの外) → callList → pop。
         // ここでは RenderType がテクスチャを持ち、pose が translate にあたる。
         boolean drewAny = false;
-        for (MeshCapture.Section s : entry.sections) {
+        for (MeshCapture.Section s : sections) {
             if (RailDrawQueue.enqueue(s.vbo(), s.renderType(), poseStack)) {
                 drewAny = true;
             }

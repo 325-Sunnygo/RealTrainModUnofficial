@@ -3,9 +3,6 @@ package com.portofino.realtrainmodunofficial.item;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.ClientHooks;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import com.portofino.realtrainmodunofficial.formation.TrainFormation;
 import com.portofino.realtrainmodunofficial.formation.TrainFormationData;
@@ -393,7 +390,7 @@ public class TrainVehicleItem extends Item {
                     continue;
                 }
                 for (net.minecraft.world.level.block.entity.BlockEntity be : levelChunk.getBlockEntities().values()) {
-                    if (!(be instanceof LargeRailCoreBlockEntity core) || !core.isLoaded()) {
+                    if (!(be instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore core) || !core.isLoaded()) {
                         continue;
                     }
                     if (!visitedCores.add(core.getBlockPos())) {
@@ -425,25 +422,17 @@ public class TrainVehicleItem extends Item {
     }
 
     private static RailMap getRailMapAt(Level level, BlockPos pos, Vec3 targetPoint) {
-        if (level.getBlockEntity(pos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-            return getNearestRailMap(core, targetPoint);
-        }
-        if (level.getBlockEntity(pos) instanceof RailCollisionBlockEntity collision) {
-            BlockPos corePos = collision.getCorePos();
-            if (corePos != null && level.getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                return getNearestRailMap(core, targetPoint);
-            }
-        }
-        if (level.getBlockEntity(pos) instanceof BallastBlockEntity ballast) {
-            BlockPos corePos = ballast.getCorePos();
-            if (corePos != null && level.getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
+        // 本家 rail (jp.ngt): ベース/コアどちらもコア経由で解決
+        if (level.getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase) {
+            jp.ngt.rtm.rail.TileEntityLargeRailCore core = railBase.getRailCore();
+            if (core != null && core.isLoaded()) {
                 return getNearestRailMap(core, targetPoint);
             }
         }
         return null;
     }
 
-    private static RailMap getNearestRailMap(LargeRailCoreBlockEntity core, Vec3 targetPoint) {
+    private static RailMap getNearestRailMap(jp.ngt.rtm.rail.TileEntityLargeRailCore core, Vec3 targetPoint) {
         RailMap[] maps = core.getAllRailMaps();
         if (maps.length == 0) return null;
         if (maps.length == 1) return maps[0];

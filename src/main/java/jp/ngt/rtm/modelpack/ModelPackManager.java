@@ -40,15 +40,67 @@ public final class ModelPackManager {
         if (resource instanceof String s) {
             return getScript(s);
         }
+        if (resource instanceof jp.ngt.mccompat.ResourceLocation rl) {
+            return getScript(rl.getResourcePath());
+        }
         if (resource instanceof net.minecraft.resources.ResourceLocation rl) {
             return getScript(rl.getPath());
         }
         return getScript(String.valueOf(resource));
     }
 
+    /** 本家 SC_INCLUDE: //include <path> を再帰展開する。 */
+    private static final java.util.regex.Pattern SC_INCLUDE =
+            java.util.regex.Pattern.compile("//include <(.+)>");
+
+    /** 本家 scriptCache: fileName → include 展開済みソース。 */
+    private final java.util.Map<String, String> scriptCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * 本家 ModelPackManager.getScript(String) 完全移植。
+     * //include を再帰展開し、結果をキャッシュして返す。
+     * 本家は読めなければ ModelPackException を投げるが、RTMU は既存呼び出しの
+     * null チェックを壊さないよう null を返す (見つからない include は空文字に置換)。
+     */
     public String getScript(String path) {
-        byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path);
-        return bytes != null ? new String(bytes, java.nio.charset.StandardCharsets.UTF_8) : null;
+        if (path == null) {
+            return null;
+        }
+        return this.loadScript(path);
+    }
+
+    /** 本家 ModelPackManager.loadScript 完全移植 (include 再帰 + キャッシュ)。 */
+    private String loadScript(String fileName) {
+        String cached = this.scriptCache.get(fileName);
+        if (cached != null) {
+            return cached;
+        }
+
+        byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(fileName);
+        if (bytes == null) {
+            return null;
+        }
+        // 本家は indention=true で読む (改行保持)。文字コードは MS932 フォールバック付き。
+        String rawScript = jp.ngt.ngtlib.io.NGTText.decodeText(bytes)
+                .replaceAll("\r\n|[\n\r\u2028\u2029\u0085]", "\n");
+        while (true) {
+            java.util.regex.Matcher matcher = SC_INCLUDE.matcher(rawScript);
+            if (!matcher.find()) {
+                break;
+            }
+            String includePath = matcher.group(1);
+            String rep = this.loadScript(includePath);
+            rawScript = matcher.replaceFirst(
+                    java.util.regex.Matcher.quoteReplacement(rep == null ? "" : rep));
+        }
+
+        this.scriptCache.put(fileName, rawScript);
+        return rawScript;
+    }
+
+    /** キャッシュ破棄 (診断コマンド用)。 */
+    public void clearScriptCache() {
+        this.scriptCache.clear();
     }
 
     /**

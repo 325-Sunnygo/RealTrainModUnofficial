@@ -118,12 +118,12 @@ public final class InstalledObjectServerScripts {
             String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
             // SRB 系のスクリプトが設置物として来た場合もブリッジを効かせる
             // (SuperRailBuilderVersion を含まないスクリプトには何も足さない)。
-            source = TrainScriptSystem.appendSuperRailBuilderOverrides(source);
+            // ★SuperRailBuilder3 専用の関数差し替えは本家に無いため撤去した。
             // ★ //include の展開と FQN remap は全経路で共通 (PackScriptSource.prepare)。
             // 以前この経路だけ prepare を通しておらず、include を使うレール/架線/設置物パックが
             // 「スクリプトはあるのに何も描かない」状態になっていた。
             ScriptEngine se = ScriptUtil.doScript(PRELUDE + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, path));
-            se.put("__SRB__", new com.portofino.realtrainmodunofficial.script.SrbRailBridge());
+            // ★SRB3 専用ブリッジ __SRB__ は本家に無いため撤去。
             return se;
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("[serverScript] 読み込み失敗: {} ({})", def.getId(), path, t);

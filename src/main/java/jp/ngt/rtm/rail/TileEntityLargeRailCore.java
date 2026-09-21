@@ -183,9 +183,20 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         if (this.isLoaded())//同期ができてない状態でのRailMapの生成を防ぐ
         {
             this.railmap = new RailMapBasic(this.railPositions[0], this.railPositions[1], this.fixRTMRailMapVersion);
-            this.collisionGrids = null;
-            this.collisionVersion++;
+            this.invalidateCollisionCache();
         }
+    }
+
+    /**
+     * 当たり判定の焼き直しを促す。レールを引き直した (レンチでの高さ変更など) ら必ず呼ぶ。
+     *
+     * <p>★分岐 (Switch) / 坂 (Slope) / 転車台 (Turntable) の createRailMap はこれを呼んでおらず、
+     * レンチで高さを変えても各レールブロックの当たり判定キャッシュ (cachedShape) が
+     * 古い世代のまま残っていた。そのため<b>分岐レールだけ</b>当たり判定が高さに追従しなかった。
+     */
+    protected void invalidateCollisionCache() {
+        this.collisionGrids = null;
+        this.collisionVersion++;
     }
 
     // ===== 当たり判定 (レール曲線をサンプリングして焼く) =====

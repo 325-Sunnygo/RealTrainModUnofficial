@@ -225,8 +225,12 @@ public final class RailScriptRenderers {
      */
     public static void renderSubRail(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
                                      PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay,
-                                     RailDefinition subDef, MqoModelLoader.MqoModel subModel) {
-        if (be instanceof TileEntityLargeRailSwitchCore || subDef == null || subModel == null) {
+                                     RailDefinition subDef, MqoModelLoader.MqoModel subModel, int railIndex) {
+        // ★分岐コアも対象にする。以前は TileEntityLargeRailSwitchCore を弾いていたため
+        //   分岐レールだけ重ね (サブレール) が描かれなかった。
+        //   renderStaticParts は getAllRailMaps() を全ループするので、分岐でも各分岐先に
+        //   サブレールが乗る (本家 RailPartsRendererBase#createRailPos と同じ)。
+        if (subDef == null || subModel == null) {
             return;
         }
         BlockPos pos = be.getBlockPos();
@@ -241,7 +245,10 @@ public final class RailScriptRenderers {
                 Scripted sc = get(subDef);
                 if (sc != null) {
                     sc.renderer.modelGroupNames = subModel.getOriginalGroupNames();
-                    sc.renderer.currentRailIndex = 0;
+                    //★本家 RenderLargeRail はサブレール i を currentRailIndex = i+1 で描く
+                    //  (添字ごとの静的キャッシュ/キーを持つ)。RTMU は 0 固定だったため、
+                    //  サブレールが増えても添字が衝突していた。
+                    sc.renderer.currentRailIndex = railIndex;
                     sc.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
                     sc.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
                 } else {
@@ -337,7 +344,11 @@ public final class RailScriptRenderers {
             GLRecorder dyn = null;
             if (isSwitch) {
                 long dynKey = computeSwitchDynKey((TileEntityLargeRailSwitchCore) be);
-                DynEntry cached = this.dynamicCache.get(pos);
+                // ★敷設し直し (rebuilt) は線形そのものが変わっている。トング位置 (movement) が
+                //   同じでも可動部の記録を作り直す。これが無いと「同じ場所に分岐を敷き直したのに
+                //   可動部だけ最初に敷いた経路で描かれる」(静的側だけ shouldRerenderRail で
+                //   更新され、動的側はキー一致で古い記録が残るため)。
+                DynEntry cached = rebuilt ? null : this.dynamicCache.get(pos);
                 if (cached != null && cached.key == dynKey) {
                     dyn = cached.rec;
                 } else {
@@ -421,6 +432,25 @@ public final class RailScriptRenderers {
                     for (jp.ngt.rtm.rail.util.Point p : points) {
                         key = key * 31L + (p == null ? 0 : Float.floatToIntBits(p.getMovement()));
                     }
+                }
+            }
+            // ★線形も鍵に含める。同位置に敷き直してトング位置 (movement) が一致しても、
+            //   経路が変わっていれば記録を作り直す。
+            jp.ngt.rtm.rail.util.RailPosition[] positions = be.getRailPositions();
+            if (positions != null) {
+                for (jp.ngt.rtm.rail.util.RailPosition rp : positions) {
+                    if (rp == null) {
+                        key = key * 31L;
+                        continue;
+                    }
+                    key = key * 31L + Double.doubleToLongBits(rp.posX);
+                    key = key * 31L + Double.doubleToLongBits(rp.posY);
+                    key = key * 31L + Double.doubleToLongBits(rp.posZ);
+                    key = key * 31L + rp.direction;
+                    key = key * 31L + rp.height;
+                    key = key * 31L + rp.blockX;
+                    key = key * 31L + rp.blockY;
+                    key = key * 31L + rp.blockZ;
                 }
             }
             return key;

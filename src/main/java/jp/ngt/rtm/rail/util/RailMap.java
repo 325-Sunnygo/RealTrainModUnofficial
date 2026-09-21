@@ -3,7 +3,6 @@ package jp.ngt.rtm.rail.util;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks;
 import com.portofino.realtrainmodunofficial.block.BallastBlock;
 import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
-import com.portofino.realtrainmodunofficial.block.MarkerBlock;
 import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import jp.ngt.ngtlib.io.NGTLog;
@@ -262,7 +261,7 @@ public abstract class RailMap {
                     BlockState state = world.getBlockState(pos);
                     Block block = state.getBlock();
                     if (k == 0) {
-                        if (!(block instanceof jp.ngt.rtm.rail.BlockMarker) && !(block instanceof MarkerBlock) && !(block instanceof BlockLargeRailBase)) {
+                        if (!(block instanceof jp.ngt.rtm.rail.BlockMarker) && !(block instanceof BlockLargeRailBase)) {
                             blocks[i][j] = state;
                         }
                     } else if (blocks[i][j] != null) {
@@ -278,7 +277,8 @@ public abstract class RailMap {
     /** ブロックの破壊 */
     public void breakRail(Level world, RailProperty prop, TileEntityLargeRailCore core) {
         this.createRailList(prop);
-        List<BlockPos> posList = new ArrayList<>();
+        // 重複を避けるため Set で持つ (下の取り残し走査で同じ位置を何度も見るため)。
+        java.util.Set<BlockPos> posSet = new java.util.LinkedHashSet<>();
         this.rails.forEach(anInt -> {
             // ベッド行の算出オフセットがビルド間で変わっても連鎖するよう ±1 行も確認する
             for (int dy = -1; dy <= 1; dy++) {
@@ -293,12 +293,51 @@ public abstract class RailMap {
                     // coreが既に破壊さている場合は続行
                     TileEntityLargeRailCore core2 = ((TileEntityLargeRailBase) rail).getRailCore();
                     if (core2 == null || core2 == core) {
-                        posList.add(pos);
+                        posSet.add(pos);
                     }
                 }
             }
         });
-        posList.forEach(pos -> {
+
+        // ★道床が残る対策:
+        //   道床幅の広いモデルのレールを先に置き、その上に幅の狭いレールを重ねて壊すと、
+        //   このレールの rails 一覧 (自分幅ぶん) からはみ出した「どのコアにも属さない
+        //   道床ブロック」(core == null) が取り残される。
+        //   自分の範囲を少し広げて走査し、持ち主のいない道床だけ撤去する。
+        //   (他のレールが生きていれば core != null なので消さない)
+        if (!this.rails.isEmpty()) {
+            final int margin = 8;
+            int minX = Integer.MAX_VALUE;
+            int maxX = Integer.MIN_VALUE;
+            int minY = Integer.MAX_VALUE;
+            int maxY = Integer.MIN_VALUE;
+            int minZ = Integer.MAX_VALUE;
+            int maxZ = Integer.MIN_VALUE;
+            for (int[] r : this.rails) {
+                minX = Math.min(minX, r[0]);
+                maxX = Math.max(maxX, r[0]);
+                minY = Math.min(minY, r[1]);
+                maxY = Math.max(maxY, r[1]);
+                minZ = Math.min(minZ, r[2]);
+                maxZ = Math.max(maxZ, r[2]);
+            }
+            for (int x = minX - margin; x <= maxX + margin; x++) {
+                for (int y = minY - 1; y <= maxY + 1; y++) {
+                    for (int z = minZ - margin; z <= maxZ + margin; z++) {
+                        BlockPos pos = new BlockPos(x, y, z);
+                        if (posSet.contains(pos)) {
+                            continue;
+                        }
+                        BlockEntity be = world.getBlockEntity(pos);
+                        if (be instanceof TileEntityLargeRailBase railBase && railBase.getRailCore() == null) {
+                            posSet.add(pos);
+                        }
+                    }
+                }
+            }
+        }
+
+        posSet.forEach(pos -> {
             world.removeBlockEntity(pos);
             world.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         });
@@ -319,7 +358,7 @@ public abstract class RailMap {
             BlockState state = world.getBlockState(pos);
             Block block = state.getBlock();
             boolean b0 = state.isAir()
-                    || block instanceof jp.ngt.rtm.rail.BlockMarker || block instanceof MarkerBlock
+                    || block instanceof jp.ngt.rtm.rail.BlockMarker
                     || (block instanceof BlockLargeRailBase && !((BlockLargeRailBase) block).isCore());
             if (!isCreative && !b0) {
                 NGTLog.sendChatMessageToAll("message.rail.obstacle", ":" + rail[0] + "," + rail[1] + "," + rail[2]);
@@ -488,6 +527,8 @@ public abstract class RailMap {
                 }
             }
         }
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+            "[道床] 敷設: 候補 {} / 実際に置いた {} (幅 {})", candidates, placed, prop.ballastWidth);
         this.rails.clear();
     }
 
@@ -515,7 +556,7 @@ public abstract class RailMap {
             boolean passable = block == Blocks.AIR
                     || block == Blocks.CAVE_AIR
                     || block == Blocks.VOID_AIR
-                    || block instanceof MarkerBlock
+                   
                     || block instanceof BallastBlock
                     || block instanceof RailCollisionBlock;
             if (!passable) {

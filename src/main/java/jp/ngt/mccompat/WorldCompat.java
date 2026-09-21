@@ -115,6 +115,64 @@ public class WorldCompat {
         return e;
     }
 
+    // ===== 1.7.10 ワールド探索/チャンク SRG (NGTO Builder2 の Snowfall ブラシ等) =====
+
+    /**
+     * func_72901_a = rayTraceBlocks(start, end, flag)。
+     * NGTO Builder2 の getLookingPos が視線の当たり判定に使う。
+     * start/end は 1.7.10 Vec3 (jp.ngt Vec3 / Vec3Compat) のいずれでも受ける。
+     */
+    public MovingObjectPosition func_72901_a(Object start, Object end, boolean flag) {
+        net.minecraft.world.phys.Vec3 s = toMcVec(start);
+        net.minecraft.world.phys.Vec3 e = toMcVec(end);
+        if (s == null || e == null) {
+            return null;
+        }
+        // ★Entity 版 ctor は CollisionContext.of(entity) を通り、null だと
+        //   EntityCollisionContext が entity.isDescending() で NPE になる。
+        //   スクリプトの視線判定はエンティティ無しなので empty を使う。
+        net.minecraft.world.level.ClipContext ctx = new net.minecraft.world.level.ClipContext(
+                s, e, net.minecraft.world.level.ClipContext.Block.OUTLINE,
+                net.minecraft.world.level.ClipContext.Fluid.NONE,
+                net.minecraft.world.phys.shapes.CollisionContext.empty());
+        return MovingObjectPosition.of(this.level.clip(ctx));
+    }
+
+    private static net.minecraft.world.phys.Vec3 toMcVec(Object v) {
+        if (v instanceof jp.ngt.ngtlib.math.Vec3 nv) {
+            return new net.minecraft.world.phys.Vec3(nv.getX(), nv.getY(), nv.getZ());
+        }
+        if (v instanceof net.minecraft.world.phys.Vec3 mc) {
+            return mc;
+        }
+        if (v instanceof MovingObjectPosition.Vec3Compat c) {
+            return new net.minecraft.world.phys.Vec3(c.field_72450_a, c.field_72448_b, c.field_72449_c);
+        }
+        return null;
+    }
+
+    /** func_72964_e = getChunkFromChunkCoords。1.7.10 Chunk 互換を返す。 */
+    public ChunkCompat func_72964_e(int chunkX, int chunkZ) {
+        net.minecraft.world.level.chunk.LevelChunk chunk = this.level.getChunk(chunkX, chunkZ);
+        return chunk != null ? new ChunkCompat(chunk) : null;
+    }
+
+    /**
+     * 1.7.10 field_73010_i = playerEntities。
+     * 読むたびに現在のプレイヤーを返す live リスト (size/get を使うスクリプト向け)。
+     */
+    public final java.util.List<PlayerCompat> field_73010_i = new java.util.AbstractList<PlayerCompat>() {
+        @Override
+        public PlayerCompat get(int i) {
+            return PlayerCompat.of(level.players().get(i));
+        }
+
+        @Override
+        public int size() {
+            return level.players().size();
+        }
+    };
+
     // ===== 1.7.10 ブロック操作 SRG (SRB3/NGTO Builder のサーバースクリプトが使用) =====
 
     /** func_147465_d = setBlock(x,y,z, Block, meta, flag) */
@@ -147,11 +205,6 @@ public class WorldCompat {
         }
     }
 
-    private static final String[] COLORS_16 = {
-            "white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
-            "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"
-    };
-
     /**
      * 1.7.10 の「1 ブロック + メタで 16 色」を 1.21 の色別ブロックに読み替える。
      * スクリプトは setBlock(x,y,z, Blocks.field_150399_cn, 14, 3) のように
@@ -159,20 +212,7 @@ public class WorldCompat {
      */
     private static net.minecraft.world.level.block.state.BlockState withMeta(
             net.minecraft.world.level.block.Block block, int meta) {
-        if (meta <= 0) {
-            return block.defaultBlockState();
-        }
-        String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
-        if (path.startsWith("white_")) {
-            String colored = COLORS_16[meta & 15] + path.substring("white".length());
-            net.minecraft.world.level.block.Block b2 = net.minecraft.core.registries.BuiltInRegistries.BLOCK
-                    .getOptional(net.minecraft.resources.ResourceLocation.withDefaultNamespace(colored))
-                    .orElse(null);
-            if (b2 != null) {
-                return b2.defaultBlockState();
-            }
-        }
-        return block.defaultBlockState();
+        return jp.ngt.mccompat.init.Blocks.stateFor(block, meta);
     }
 
     /** func_147468_f = setBlockToAir */

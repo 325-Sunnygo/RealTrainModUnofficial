@@ -28,10 +28,31 @@ public final class GLRecorder {
     public static final class TessDraw {
         public final int mode;
         public final float[] verts;
+        /**
+         * 加算合成 (GL_SRC_ALPHA, GL_ONE) で描くか。
+         * 本家 renderLightEffect の前照灯/回転灯は加算合成なので、それだけ true。
+         * 既定 false = 半透明 (entityTranslucent)。
+         */
+        public final boolean additive;
+        /**
+         * 前面カリング (本家 ActionParts の輪郭線 glCullFace(GL_FRONT)) で描くか。
+         * 描画側は RenderSystem.cullFace(FRONT) を設定して即時 flush する。
+         */
+        public final boolean cullFront;
 
         public TessDraw(int mode, float[] verts) {
+            this(mode, verts, false, false);
+        }
+
+        public TessDraw(int mode, float[] verts, boolean additive) {
+            this(mode, verts, additive, false);
+        }
+
+        public TessDraw(int mode, float[] verts, boolean additive, boolean cullFront) {
             this.mode = mode;
             this.verts = verts;
+            this.additive = additive;
+            this.cullFront = cullFront;
         }
     }
 
@@ -88,6 +109,12 @@ public final class GLRecorder {
     private int contentHash = 1;
     private boolean geometry;
     private boolean tess;
+    /**
+     * 記録中に「視点依存の光エフェクト (renderLightEffect に normal を渡した)」があったか。
+     * これがある内容はカメラを動かすだけで形が変わるため、焼き込みキーに混ぜてはいけない
+     * (混ぜると回転灯/ミラーボールの焼き込みが毎フレーム無効になる)。
+     */
+    private boolean viewDependent;
 
     /** 生きているコマンド数 (cmds.size ではない。使い回しのため配列は縮めない)。 */
     private int size;
@@ -134,6 +161,7 @@ public final class GLRecorder {
         this.contentHash = 1;
         this.geometry = false;
         this.tess = false;
+        this.viewDependent = false;
         this.lightSignature = 0L;
     }
 
@@ -304,6 +332,15 @@ public final class GLRecorder {
      */
     public int contentKey() {
         return this.contentHash;
+    }
+
+    /** 視点依存の光エフェクト (normal 付き renderLightEffect) を記録したか。 */
+    public void markViewDependent() {
+        this.viewDependent = true;
+    }
+
+    public boolean isViewDependent() {
+        return this.viewDependent;
     }
 
     /**

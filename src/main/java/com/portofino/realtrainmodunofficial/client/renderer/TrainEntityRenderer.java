@@ -117,11 +117,6 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
 
     @Override
     public boolean shouldRender(TrainEntity entity, Frustum frustum, double camX, double camY, double camZ) {
-        // 軽量化: 車両描画距離が有効なら遠方車両を丸ごと省略 (既定 0 = 無制限)。
-        if (com.portofino.realtrainmodunofficial.RtmuSettings.beyondVehicleRenderDistance(
-                entity.getX(), entity.getY(), entity.getZ(), camX, camY, camZ)) {
-            return false;
-        }
         // Use a square box (halfLength on all horizontal axes) so the train stays
         // visible regardless of rotation. A Z-only offset disappears when the train
         // faces east/west and the camera is slightly off-center.
@@ -211,8 +206,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             boolean nearTrain = cameraDistanceSq < nearThreshold * nearThreshold;
             // ★本家は内装を距離で間引かない。
             // 室内の面そのものが見えているからで、内装を消すと光も消える。
-            boolean distanceCulling =
-                com.portofino.realtrainmodunofficial.RtmuSettings.vehicleRenderDistance > 0;
+            boolean distanceCulling = false;
             boolean renderInterior = ridingThisTrain || !distanceCulling || nearTrain;
             boolean aggressiveDistanceCulling = distanceCulling && !ridingThisTrain
                 && cameraDistanceSq > aggressiveThreshold * aggressiveThreshold;

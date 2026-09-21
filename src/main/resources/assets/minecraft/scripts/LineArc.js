@@ -41,7 +41,7 @@ function getNearlestPoint(split, x, z)
 //Required
 function getPos(split, index)
 {
-	var pos = {0.0, 0.0};//z,x
+	var pos = [0.0, 0.0];//z,x
 
 	var t = getStepLength(split, index);
 	var sid = getSectionId(t);
@@ -70,7 +70,7 @@ function getPos(split, index)
 
 function getCurvePos(angle)
 {
-	var pos = {0.0, 0.0};
+	var pos = [0.0, 0.0];
 	if(angle > 0.0)
 	{
 		pos[0] = Math.sin(angle);

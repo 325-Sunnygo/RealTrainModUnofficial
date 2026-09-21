@@ -20,10 +20,20 @@ public final class PlayerCompat {
     public double field_70165_t;//posX
     public double field_70163_u;//posY
     public double field_70161_v;//posZ
+    public double field_70169_q;//prevPosX
+    public double field_70167_r;//prevPosY
+    public double field_70166_s;//prevPosZ
+    /** Entity.yOffset (1.7.10)。1.21 に相当が無いので常に 0。 */
+    public double field_70129_M;
     public float field_70177_z;//yaw
     public float field_70125_A;//pitch
     public final InventoryCompat field_71071_by = new InventoryCompat();
     public WorldCompat field_70170_p;
+    /**
+     * EntityPlayerMP.playerNetServerHandler (パケット送信用)。
+     * NGTO Builder2 の syncBiomeChunk が {@code player.field_71135_a.func_147359_a(p)} と呼ぶ。
+     */
+    public final ConnectionCompat field_71135_a = new ConnectionCompat();
 
     private PlayerCompat(Player player) {
         this.player = player;
@@ -73,6 +83,10 @@ public final class PlayerCompat {
         this.field_70165_t = player.getX();
         this.field_70163_u = player.getY();
         this.field_70161_v = player.getZ();
+        this.field_70169_q = player.xOld;
+        this.field_70167_r = player.yOld;
+        this.field_70166_s = player.zOld;
+        this.field_70129_M = 0.0D;
         this.field_70177_z = player.getYRot();
         this.field_70125_A = player.getXRot();
         if (this.field_70170_p == null || this.field_70170_p.getLevel() != player.level()) {
@@ -108,6 +122,14 @@ public final class PlayerCompat {
     /** func_70005_c_ = getCommandSenderName */
     public String func_70005_c_() {
         return player.getName().getString();
+    }
+
+    /** func_70676_i = EntityLivingBase.getLookVec (視線ベクトル)。 */
+    public jp.ngt.mccompat.Vec3Compat func_70676_i(float partialTicks) {
+        if (player == null) {
+            return new jp.ngt.mccompat.Vec3Compat(0.0D, 0.0D, 0.0D);
+        }
+        return new jp.ngt.mccompat.Vec3Compat(player.getViewVector(partialTicks));
     }
 
     @Override

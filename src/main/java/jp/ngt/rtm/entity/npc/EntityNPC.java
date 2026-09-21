@@ -69,6 +69,9 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
 
     private Role role = Role.MANNEQUIN;
     private boolean roleDirty = true;
+
+    /** 本家 EntityNPC.executer: NPC 1 体に 1 個。serverScriptPath の onUpdate に渡る。 */
+    public final jp.ngt.rtm.modelpack.ScriptExecuter scriptExecuter = new jp.ngt.rtm.modelpack.ScriptExecuter();
     /** 銃使用の経過 tick (本家 useItemCount)。 */
     private int useItemCount;
 
@@ -186,6 +189,8 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
         }
         if (!this.level().isClientSide()) {
             this.healNPC();
+            // 本家 EntityNPC.onUpdate: executer.execScript(this) で serverSE の onUpdate を回す。
+            com.portofino.realtrainmodunofficial.script.NpcServerScripts.onUpdate(this);
         }
     }
 

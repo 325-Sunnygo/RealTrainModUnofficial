@@ -4,7 +4,6 @@ import com.portofino.realtrainmodunofficial.block.BallastBlock;
 import com.portofino.realtrainmodunofficial.block.CrossingGateBlock;
 import com.portofino.realtrainmodunofficial.block.InstalledObjectBlock;
 import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
-import com.portofino.realtrainmodunofficial.block.MarkerBlock;
 import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
 import com.portofino.realtrainmodunofficial.block.ScriptBlock;
 import com.portofino.realtrainmodunofficial.block.SignalRemoteBlock;
@@ -26,10 +25,17 @@ public class RealTrainModUnofficialBlocks {
     public static final DeferredBlock<com.portofino.realtrainmodunofficial.block.BackgroundPanelBlock> BACKGROUND_PANEL
         = BLOCKS.register("background_panel",
             () -> new com.portofino.realtrainmodunofficial.block.BackgroundPanelBlock());
-    public static final DeferredBlock<MarkerBlock> MARKER
-        = BLOCKS.register("legacy_marker", () -> new MarkerBlock(false));
-    public static final DeferredBlock<MarkerBlock> MARKER_SWITCH
-        = BLOCKS.register("legacy_marker_switch", () -> new MarkerBlock(true));
+    // 旧 Remaster レール系ブロック (legacy_*)。新規の敷設は本家 jp.ngt マーカー/レールを
+    // 使うが、既に設置済みのワールドを活かすため登録は維持する。
+    //★legacy_* は本家 BlockMarker にエイリアスする (同じクラス = 同じ敷設処理)。
+    //  既設ワールドの legacy_marker / legacy_marker_switch ブロックはそのまま残り、
+    //  以後は本家と同じ挙動になる (BE は本家 TileEntityMarker)。
+    public static final DeferredBlock<jp.ngt.rtm.rail.BlockMarker> MARKER
+        = BLOCKS.register("legacy_marker",
+            () -> new jp.ngt.rtm.rail.BlockMarker(0, net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()));
+    public static final DeferredBlock<jp.ngt.rtm.rail.BlockMarker> MARKER_SWITCH
+        = BLOCKS.register("legacy_marker_switch",
+            () -> new jp.ngt.rtm.rail.BlockMarker(1, net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()));
 
     /** 道床ブロック（レールと独立した物理ブロック） */
     public static final DeferredBlock<BallastBlock> BALLAST

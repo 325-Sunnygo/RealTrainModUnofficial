@@ -11,7 +11,6 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
@@ -89,6 +88,7 @@ public class RealTrainModUnofficial {
         output.accept(RealTrainModUnofficialItems.STATION_CORE_ITEM.get());         //stationCore
         output.accept(RealTrainModUnofficialItems.MARKER_ITEM.get());               //marker
         output.accept(RealTrainModUnofficialItems.MARKER_SWITCH_ITEM.get());        //markerSwitch
+        output.accept(RealTrainModUnofficialItems.MARKER_STRAIGHT_ITEM.get());      //markerStraight
         output.accept(RealTrainModUnofficialItems.SIGNAL_CONVERTER_ITEM.get());     //signalConverter:0
         output.accept(RealTrainModUnofficialItems.SIGNAL_CONVERTER_RS_ITEM.get());  //signalConverter:1
         output.accept(RealTrainModUnofficialItems.SIGNAL_CONVERTER_INC_ITEM.get()); //signalConverter:2
@@ -329,7 +329,6 @@ public class RealTrainModUnofficial {
                 }
             });
 
-        modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {

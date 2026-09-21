@@ -15,6 +15,14 @@ public class Vec3 {
     private double y;
     private double z;
 
+    // === 1.7.10 net.minecraft.util.Vec3 の SRG フィールド (スクリプトが直接読む) ===
+    /** xCoord */
+    public double field_72450_a;
+    /** yCoord */
+    public double field_72448_b;
+    /** zCoord */
+    public double field_72449_c;
+
     public Vec3(double x, double y, double z) {
         this.set(x, y, z);
     }
@@ -23,6 +31,9 @@ public class Vec3 {
         this.x = x;
         this.y = y;
         this.z = z;
+        this.field_72450_a = x;
+        this.field_72448_b = y;
+        this.field_72449_c = z;
     }
 
     public double getX() {
@@ -39,6 +50,33 @@ public class Vec3 {
 
     public double length() {
         return Math.sqrt(this.getX() * this.getX() + this.getY() * this.getY() + this.getZ() * this.getZ());
+    }
+
+    /** 本家 Vec3.toNGTVec: 可変版 {@link NGTVec} へ変換する。 */
+    public NGTVec toNGTVec() {
+        return new NGTVec(this.getX(), this.getY(), this.getZ());
+    }
+
+    /**
+     * 1.7.10 {@code net.minecraft.util.Vec3.func_72443_a} (= createVectorHelper)。
+     * パックスクリプトが {@code Vec3.func_72443_a(x,y,z)} の形で静的に呼ぶ。
+     */
+    public static Vec3 func_72443_a(double x, double y, double z) {
+        return new Vec3(x, y, z);
+    }
+
+    /** 同上 (SRG でない名前)。 */
+    public static Vec3 createVectorHelper(double x, double y, double z) {
+        return new Vec3(x, y, z);
+    }
+
+    /**
+     * 1.7.10 {@code net.minecraft.util.Vec3.func_72441_c} (= addVector)。
+     * パックスクリプトが {@code start.func_72441_c(dx, dy, dz)} の形で
+     * レイの終点を作る (NGTO Builder2 の getLookingPos)。
+     */
+    public Vec3 func_72441_c(double x, double y, double z) {
+        return this.add(x, y, z);
     }
 
     public double lengthSq(double px, double py, double pz) {

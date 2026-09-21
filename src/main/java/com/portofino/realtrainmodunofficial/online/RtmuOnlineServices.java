@@ -3,7 +3,6 @@ package com.portofino.realtrainmodunofficial.online;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import net.minecraft.client.Minecraft;
 import net.neoforged.fml.ModList;
 
 import java.net.URI;
@@ -11,9 +10,6 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
 
 /**
  * RTMU のオンライン連携 (クライアント専用・起動時に1回、バックグラウンドで実行)。
@@ -29,16 +25,9 @@ public final class RtmuOnlineServices {
     private static final String GITHUB_LATEST_API =
             "https://api.github.com/repos/325-Sunnygo/RealTrainModUnofficial/releases/latest";
 
-    /**
-     * BAN リストの URL。RTMU 公式サイト (rtmu.net) 上の ban.txt。
-     * 1 行に 1 ユーザー名 (大文字小文字は無視、# で始まる行はコメント)。
-     */
-    private static final String BAN_LIST_URL = "https://rtmu.net/ban.txt";
-
     // --- 結果 (バックグラウンドスレッドが書き、描画/イベントスレッドが読む) ---
     private static volatile String updateLatestVersion; //新しいバージョンがある時のみ非null
     private static volatile String updateUrl = "https://github.com/325-Sunnygo/RealTrainModUnofficial/releases";
-    private static volatile boolean banned;
     private static volatile boolean started;
 
     /** クライアントセットアップから 1 回呼ぶ。ネットワークはバックグラウンドで行う。 */
@@ -47,10 +36,7 @@ public final class RtmuOnlineServices {
             return;
         }
         started = true;
-        Thread t = new Thread(() -> {
-            checkUpdate();
-            checkBan();
-        }, "RTMU-Online-Check");
+        Thread t = new Thread(RtmuOnlineServices::checkUpdate, "RTMU-Online-Check");
         t.setDaemon(true);
         t.start();
     }
@@ -62,11 +48,6 @@ public final class RtmuOnlineServices {
 
     public static String getUpdateUrl() {
         return updateUrl;
-    }
-
-    /** この Minecraft ユーザーが BAN されているか。 */
-    public static boolean isBanned() {
-        return banned;
     }
 
     // ------------------------------------------------------------------
@@ -156,36 +137,4 @@ public final class RtmuOnlineServices {
         }
     }
 
-    // ------------------------------------------------------------------
-    private static void checkBan() {
-        // URL が未設定 (プレースホルダのまま) なら何もしない。
-        if (BAN_LIST_URL.contains("YOUR-SERVER")) {
-            return;
-        }
-        try {
-            HttpRequest req = HttpRequest.newBuilder(URI.create(BAN_LIST_URL))
-                    .timeout(Duration.ofSeconds(10))
-                    .header("User-Agent", "RealTrainModUnofficial-BanCheck")
-                    .GET().build();
-            HttpResponse<String> res = newClient().send(req, HttpResponse.BodyHandlers.ofString());
-            if (res.statusCode() != 200) {
-                return;
-            }
-            Set<String> names = new HashSet<>();
-            for (String line : res.body().split("\n")) {
-                String s = line.trim();
-                if (s.isEmpty() || s.startsWith("#")) {
-                    continue;
-                }
-                names.add(s.toLowerCase(Locale.ROOT));
-            }
-            String me = Minecraft.getInstance().getUser().getName();
-            if (me != null && names.contains(me.toLowerCase(Locale.ROOT))) {
-                banned = true;
-                RealTrainModUnofficial.LOGGER.warn("[Online] user is banned from RTMU");
-            }
-        } catch (Exception e) {
-            // サーバーが落ちている/オフライン → 安全側 (BAN しない)。
-        }
-    }
 }

@@ -58,6 +58,9 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
         if (this.isLoaded() && this.switchObj == null) {
             this.switchObj = (new RailMaker(this.level, this.railPositions, this.fixRTMRailMapVersion)).getSwitch();
         }
+        // ★分岐もレールを引き直したら当たり判定を焼き直す (基底の createRailMap と同じ)。
+        //   これが無いとレンチで高さを変えても分岐だけ当たり判定が古いままになる。
+        this.invalidateCollisionCache();
     }
 
     public SwitchType getSwitch() {

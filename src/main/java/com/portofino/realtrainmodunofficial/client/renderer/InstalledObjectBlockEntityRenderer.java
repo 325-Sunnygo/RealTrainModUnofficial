@@ -43,7 +43,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
     private static final List<String> CROSSING_LIGHT_LEFT_LEGACY = List.of("light1");
     private static final List<String> CROSSING_LIGHT_RIGHT_LEGACY = List.of("light2");
     private static final List<String> CROSSING_LIGHT_COMMON_LEGACY = List.of("light3");
-    private static final Map<String, Long> FAILED_RENDER_UNTIL_NANOS = new ConcurrentHashMap<>();
     /** 信号の点灯用テクスチャ差し替えマップ (定義ID → overrides)。毎フレームの Map 生成を避ける。 */
     private static final Map<String, Map<String, String>> LIGHT_TEXTURE_OVERRIDES = new ConcurrentHashMap<>();
 
@@ -68,14 +67,6 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             TextureFlagRenderer.render(blockEntity, definition, partialTick, poseStack, buffer, packedLight);
             ClientRenderProfiler.endInstalledObject(profilerStart);
             return;
-        }
-        Long failedUntil = FAILED_RENDER_UNTIL_NANOS.get(definition.getId());
-        if (failedUntil != null) {
-            if (System.nanoTime() < failedUntil) {
-                ClientRenderProfiler.endInstalledObject(profilerStart);
-                return;
-            }
-            FAILED_RENDER_UNTIL_NANOS.remove(definition.getId(), failedUntil);
         }
         Vec3 cameraPos = net.minecraft.client.Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         Vec3 center = blockEntity.getRenderCenter();
@@ -267,6 +258,8 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                             }
                             poseStack.popPose();
                             pushed = false;
+                            // 本家 RenderSignal.renderBaseTileEntity: 置き換えた元ブロック (架線柱など) を描く。
+                            renderSignalBase(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay);
                             ClientRenderProfiler.endInstalledObject(profilerStart);
                             return;
                         }
@@ -284,28 +277,54 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
                     // ★スクリプトを実行するかどうかを RTMU の都合で決めない (本家準拠)。
                     boolean takeScriptPath = !customCrossingGateRendering
                         && definition.getScriptPath() != null && !definition.getScriptPath().isBlank();
+                    boolean lightsDrawnInBranch = false;
                     if (takeScriptPath) {
                         com.portofino.realtrainmodunofficial.client.render.InstalledObjectScriptCache.render(
                             blockEntity, model, poseStack, buffer, packedLight, packedOverlay);
+                    } else if (blockEntity.getCategory() == InstalledObjectCategory.SIGNAL
+                            && definition.isRotateBody()) {
+                        // 本家 BasicSignalPartsRenderer: 柱 (fixture) は設置面の4方位のまま、
+                        // ヘッド (body) だけ「本体向き − 柱の向き」回転させる (斜め設置)。
+                        // 現示灯も同じ回転で描く。
+                        if (!definition.getFixtureObjects().isEmpty()) {
+                            MqoModelLoader.GroupPredicate fixtureFilter =
+                                groupName -> matchesAnyRenderObject(groupName, definition.getFixtureObjects());
+                            MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight, packedOverlay,
+                                false, fixtureFilter, null, blockEntity);
+                        }
+                        float bodyRot = net.minecraft.util.Mth.wrapDegrees(
+                            blockEntity.getSignalBodyYaw() - blockEntity.getYaw());
+                        Vec3 bodyPos = definition.getScriptBodyPos();
+                        poseStack.pushPose();
+                        poseStack.translate(bodyPos.x, bodyPos.y, bodyPos.z);
+                        poseStack.mulPose(Axis.YP.rotationDegrees(bodyRot));
+                        poseStack.translate(-bodyPos.x, -bodyPos.y, -bodyPos.z);
+                        MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight, packedOverlay,
+                            false, filter, transform, blockEntity);
+                        if (!veryFar && shouldRenderSupplementalActiveLights(blockEntity, definition, false)) {
+                            renderActiveLights(blockEntity, definition, poseStack, buffer, packedOverlay);
+                            lightsDrawnInBranch = true;
+                        }
+                        poseStack.popPose();
                     } else {
                         MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight, packedOverlay, false, filter, transform, blockEntity);
                         if (model.hasTranslucentBatches() && cameraDistanceSq < translucentThreshold * translucentThreshold) {
                             MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer, packedLight, packedOverlay, true, filter, transform, blockEntity);
                         }
                     }
-                    if (!veryFar && shouldRenderSupplementalActiveLights(blockEntity, definition, customCrossingGateRendering)) {
+                    if (!lightsDrawnInBranch && !veryFar && shouldRenderSupplementalActiveLights(blockEntity, definition, customCrossingGateRendering)) {
                         renderActiveLights(blockEntity, definition, poseStack, buffer, packedOverlay);
                     }
                     poseStack.popPose();
                     pushed = false;
+                    // 本家 RenderSignal.renderBaseTileEntity: 置き換えた元ブロック (架線柱など) を描く。
+                    renderSignalBase(blockEntity, partialTick, poseStack, buffer, packedLight, packedOverlay);
                 } catch (Throwable t) {
                     if (pushed) {
                         try { poseStack.popPose(); } catch (Throwable ignored) {}
                     }
-                    FAILED_RENDER_UNTIL_NANOS.put(definition.getId(), System.nanoTime() + 5_000_000_000L);
                     com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
-                        "Skipping installed object render for {} for 5 seconds after renderer failure.",
-                        definition.getId(), t);
+                        "Installed object render failed for {}.", definition.getId(), t);
                 }
                 ClientRenderProfiler.endInstalledObject(profilerStart);
                 return;
@@ -324,6 +343,46 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
 
 
 
+
+    /**
+     * 本家 {@code RenderSignal.renderBaseTileEntity}: 信号が置き換えた元ブロック (架線柱/碍子など) の
+     * タイルエンティティを復元して描く。
+     *
+     * <p>本家 ItemSignal はクリックした柱ブロックを信号に置き換えるが、信号タイルは
+     * 元のタイル (origTileEntity) を保持していて、信号モデルのあとに元タイルを描く。
+     * RTMU は元タイルの NBT だけ保存して<b>描画していなかった</b>ため、信号を柱に挿すと
+     * <b>柱のモデルだけ消え、当たり判定と信号本体だけが残る</b>状態になっていた。
+     *
+     * <p>保存 NBT から一時的な BlockEntity を作り、通常の設置物描画をそのまま通す
+     * (モデル/スクリプト/向きの扱いを二重実装しない)。
+     */
+    private void renderSignalBase(InstalledObjectBlockEntity signal, float partialTick, PoseStack poseStack,
+                                  MultiBufferSource buffer, int packedLight, int packedOverlay) {
+        if (signal.getCategory() != InstalledObjectCategory.SIGNAL) {
+            return;
+        }
+        net.minecraft.nbt.CompoundTag orig = signal.getSignalOrigTileNbt();
+        net.minecraft.world.level.Level level = signal.getLevel();
+        if (orig == null || level == null) {
+            return;
+        }
+        try {
+            InstalledObjectBlockEntity base =
+                com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities.INSTALLED_OBJECT.get()
+                    .create(signal.getBlockPos(), signal.getBlockState());
+            if (base == null) {
+                return;
+            }
+            base.setLevel(level);
+            base.loadWithComponents(orig, level.registryAccess());
+            // 元が設置物でない (普通のブロック) / 元も信号 (無限再帰) は描かない。
+            if (base.getDefinition() != null && base.getCategory() != InstalledObjectCategory.SIGNAL) {
+                render(base, partialTick, poseStack, buffer, packedLight, packedOverlay);
+            }
+        } catch (Throwable t) {
+            // 元タイルが復元できない場合は描くものが無いので黙って諦める
+        }
+    }
 
     private void renderWire(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
                             PoseStack poseStack, MultiBufferSource buffer,
@@ -400,12 +459,75 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
             if (wireDef == null) {
                 continue;
             }
+            //★本家 RenderElectricalWiring.getConnectedTarget の TO_PLAYER 分岐:
+            //  接続待ちの仮ワイヤーをプレイヤーの手元へ描く。
+            //  (connection.x はプレイヤーのエンティティ ID。ブロック座標ではない)
+            if (connection.type == jp.ngt.rtm.electric.Connection.ConnectionType.TO_PLAYER) {
+                renderWireToPlayer(blockEntity, wireDef, poseStack, buffer, packedLight, packedOverlay);
+                drew = true;
+                continue;
+            }
             renderWireBetween(blockEntity, wireDef, blockEntity.getBlockPos(),
                 new BlockPos(connection.x, connection.y, connection.z),
                 poseStack, buffer, cameraDistanceSq, cameraPos, packedLight, packedOverlay);
             drew = true;
         }
         return drew;
+    }
+
+    /** 接続待ちの仮ワイヤーをローカルプレイヤーの手元へ描く (本家 getConnectedTarget の TO_PLAYER 分岐)。 */
+    private void renderWireToPlayer(InstalledObjectBlockEntity blockEntity, InstalledObjectDefinition definition,
+                                    PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
+        Vec3 toWorld = localPlayerHandPos();
+        Vec3 fromWorld = resolveWireAttachPoint(blockEntity.getLevel(), blockEntity.getBlockPos());
+        if (toWorld == null || fromWorld == null) {
+            return;
+        }
+        Vec3 origin = Vec3.atLowerCornerOf(blockEntity.getBlockPos());
+        Vec3 from = fromWorld.subtract(origin);
+        Vec3 to = toWorld.subtract(origin);
+        MqoModelLoader.MqoModel model = hasRenderableWireModel(definition)
+            ? MqoModelLoader.loadModelFromPack(definition.getPackName(), definition.getModelFile(),
+                definition.getTextureOverrides(), definition.getScriptPath(), definition.isSmoothing())
+            : null;
+        com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.Scripted wire =
+            com.portofino.realtrainmodunofficial.client.render.WireScriptRenderers.get(definition);
+        if (wire != null) {
+            wire.render(blockEntity, from, to, 1.0F, poseStack, buffer, packedLight, packedOverlay, model);
+        }
+    }
+
+    /**
+     * 本家 RenderElectricalWiring.getConnectedTarget の TO_PLAYER 分岐 (手元) の移植。
+     * ローカルプレイヤーの手の位置を返す (一人称/三人称で式が違う)。
+     */
+    private static Vec3 localPlayerHandPos() {
+        net.minecraft.client.player.LocalPlayer p =
+            net.minecraft.client.Minecraft.getInstance().player;
+        if (p == null) {
+            return null;
+        }
+        float partialTick = 1.0F;
+        float f9 = p.getAttackAnim(partialTick);
+        float f10 = net.minecraft.util.Mth.sin(net.minecraft.util.Mth.sqrt(f9) * (float) Math.PI);
+        jp.ngt.ngtlib.math.Vec3 v = new jp.ngt.ngtlib.math.Vec3(-0.46D, -0.2D, 0.65D);
+        v = v.rotateAroundX(-net.minecraft.util.Mth.lerp(partialTick, p.xRotO, p.getXRot()));
+        v = v.rotateAroundY(-net.minecraft.util.Mth.lerp(partialTick, p.yRotO, p.getYRot()));
+        v = v.rotateAroundY(f10 * 0.5F);
+        v = v.rotateAroundX(-f10 * 0.7F);
+        double x0 = net.minecraft.util.Mth.lerp(partialTick, p.xOld, p.getX()) + v.getX();
+        double y0 = net.minecraft.util.Mth.lerp(partialTick, p.yOld, p.getY()) + v.getY();
+        double z0 = net.minecraft.util.Mth.lerp(partialTick, p.zOld, p.getZ()) + v.getZ();
+        if (!net.minecraft.client.Minecraft.getInstance().options.getCameraType().isFirstPerson()) {
+            float f11 = (float) Math.toRadians(net.minecraft.util.Mth.lerp(partialTick, p.yBodyRotO, p.yBodyRot));
+            double d7 = net.minecraft.util.Mth.sin(f11);
+            double d9 = net.minecraft.util.Mth.cos(f11);
+            float eye = 1.62F;
+            x0 = net.minecraft.util.Mth.lerp(partialTick, p.xOld, p.getX()) - d9 * 0.35D - d7 * 0.85D;
+            y0 = net.minecraft.util.Mth.lerp(partialTick, p.yOld, p.getY()) + eye - 0.45D;
+            z0 = net.minecraft.util.Mth.lerp(partialTick, p.zOld, p.getZ()) - d7 * 0.35D + d9 * 0.85D;
+        }
+        return new Vec3(x0, y0, z0);
     }
 
     /** 接続が持つワイヤーモデル名 → 定義。完全 ID → 末尾名の順で解決する。 */
@@ -744,8 +866,16 @@ public class InstalledObjectBlockEntityRenderer implements BlockEntityRenderer<I
         if (definition == null || definition.getRenderObjects().isEmpty()) {
             return true;
         }
-        for (String expected : definition.getRenderObjects()) {
-            if (groupMatches(groupName, expected)) {
+        return matchesAnyRenderObject(groupName, definition.getRenderObjects());
+    }
+
+    /** groupName が指定オブジェクト名のどれかに一致するか (本家 modelParts の objects 判定)。 */
+    private static boolean matchesAnyRenderObject(String groupName, java.util.List<String> expected) {
+        if (expected == null || expected.isEmpty()) {
+            return false;
+        }
+        for (String name : expected) {
+            if (groupMatches(groupName, name)) {
                 return true;
             }
         }

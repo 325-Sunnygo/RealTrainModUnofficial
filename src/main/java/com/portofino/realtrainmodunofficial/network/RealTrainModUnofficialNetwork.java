@@ -21,6 +21,8 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(ChangeEntityModelPayload.TYPE, ChangeEntityModelPayload.STREAM_CODEC, ChangeEntityModelPayload::handleOnServer);
         registrar.playToServer(TrainControlPayload.TYPE, TrainControlPayload.STREAM_CODEC, TrainControlPayload::handleOnServer);
         registrar.playToServer(DataMapClientSyncPayload.TYPE, DataMapClientSyncPayload.STREAM_CODEC, DataMapClientSyncPayload::handleOnServer);
+        registrar.playToServer(SetBlockDataMapPayload.TYPE, SetBlockDataMapPayload.STREAM_CODEC, SetBlockDataMapPayload::handleOnServer);
+        // 旧 Remaster マーカー設定 (既設 legacy_marker を活かすため維持)
         registrar.playToServer(DecorationRegisterPayload.TYPE, DecorationRegisterPayload.STREAM_CODEC, DecorationRegisterPayload::handleOnServer);
         registrar.playToServer(NpcTradePayload.TYPE, NpcTradePayload.STREAM_CODEC, NpcTradePayload::handleOnServer);
         registrar.playToClient(DecorationSyncPayload.TYPE, DecorationSyncPayload.STREAM_CODEC, DecorationSyncPayload::handleOnClient);
@@ -31,7 +33,6 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToServer(SetSignalAspectPayload.TYPE, SetSignalAspectPayload.STREAM_CODEC, SetSignalAspectPayload::handleOnServer);
         registrar.playToServer(SetSignalValuePayload.TYPE, SetSignalValuePayload.STREAM_CODEC, SetSignalValuePayload::handleOnServer);
         registrar.playToServer(ConfigureTrainDetectorPayload.TYPE, ConfigureTrainDetectorPayload.STREAM_CODEC, ConfigureTrainDetectorPayload::handleOnServer);
-        registrar.playToServer(ConfigureMarkerPayload.TYPE, ConfigureMarkerPayload.STREAM_CODEC, ConfigureMarkerPayload::handleOnServer);
         registrar.playToServer(MarkerAnchorPayload.TYPE, MarkerAnchorPayload.STREAM_CODEC, MarkerAnchorPayload::handleOnServer);
         registrar.playToServer(UpdateScriptBlockPayload.TYPE, UpdateScriptBlockPayload.STREAM_CODEC, UpdateScriptBlockPayload::handleOnServer);
         registrar.playToClient(TrainScriptDataPayload.TYPE, TrainScriptDataPayload.STREAM_CODEC, TrainScriptDataPayload::handleOnClient);
@@ -40,7 +41,6 @@ public final class RealTrainModUnofficialNetwork {
         registrar.playToClient(SpeakerPlayPayload.TYPE, SpeakerPlayPayload.STREAM_CODEC, SpeakerPlayPayload::handleOnClient);
         registrar.playToClient(SpeakerStopPayload.TYPE, SpeakerStopPayload.STREAM_CODEC, SpeakerStopPayload::handleOnClient);
         registrar.playToServer(ConfigureSpeakerPayload.TYPE, ConfigureSpeakerPayload.STREAM_CODEC, ConfigureSpeakerPayload::handleOnServer);
-        registrar.playToServer(RtmuSettingsPayload.TYPE, RtmuSettingsPayload.STREAM_CODEC, RtmuSettingsPayload::handleOnServer);
         registrar.playToClient(SyncSpeakerSoundsPayload.TYPE, SyncSpeakerSoundsPayload.STREAM_CODEC, SyncSpeakerSoundsPayload::handleOnClient);
         // 乗客シミュレーション: 駅設定 GUI (右クリックで開く/タグ保存)
         registrar.playToClient(OpenStationScreenPayload.TYPE, OpenStationScreenPayload.STREAM_CODEC, OpenStationScreenPayload::handleOnClient);

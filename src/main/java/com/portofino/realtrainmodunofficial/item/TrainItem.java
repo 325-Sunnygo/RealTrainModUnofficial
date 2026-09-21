@@ -3,8 +3,6 @@ package com.portofino.realtrainmodunofficial.item;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.ClientHooks;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import jp.ngt.rtm.rail.util.RailMap;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
@@ -504,11 +502,8 @@ public class TrainItem extends Item {
                 for (net.minecraft.world.level.block.entity.BlockEntity be : levelChunk.getBlockEntities().values()) {
                     RailMap[] coreMaps = null;
                     BlockPos corePos = null;
-                    if (be instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                        coreMaps = core.getAllRailMaps();
-                        corePos = core.getBlockPos();
-                    } else if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore newCore && newCore.isLoaded()) {
-                        // jp.ngt.rtm.rail (Phase 1 本家忠実システム)
+                    if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore newCore && newCore.isLoaded()) {
+                        // 本家 rail (jp.ngt) のコアのみ
                         coreMaps = newCore.getAllRailMaps();
                         corePos = newCore.getBlockPos();
                     }
@@ -540,24 +535,7 @@ public class TrainItem extends Item {
     }
 
     private static RailMap getRailMapAt(Level level, BlockPos pos, Vec3 targetPoint) {
-        if (level.getBlockEntity(pos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-            return getNearestRailMap(core, targetPoint);
-        }
-        if (level.getBlockEntity(pos) instanceof RailCollisionBlockEntity collision) {
-            BlockPos corePos = collision.getCorePos();
-            if (corePos != null && level.getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                return getNearestRailMap(core, targetPoint);
-            }
-        }
-        // 道床ブロック(BallastBlock)もレールコアを保持する。道床はカーブ全長に敷かれるため、
-        // レール中央の道床をクリックしても列車設置のレール判定が効く (ユーザー報告対応)。
-        if (level.getBlockEntity(pos) instanceof com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity ballast) {
-            BlockPos corePos = ballast.getCorePos();
-            if (corePos != null && level.getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                return getNearestRailMap(core, targetPoint);
-            }
-        }
-        // jp.ngt.rtm.rail (Phase 1 本家忠実システム): ベース/コアどちらもコア経由で解決
+        // 本家 rail (jp.ngt): ベース/コアどちらもコア経由で解決
         if (level.getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase) {
             jp.ngt.rtm.rail.TileEntityLargeRailCore core = railBase.getRailCore();
             if (core != null && core.isLoaded()) {
@@ -582,32 +560,6 @@ public class TrainItem extends Item {
                 double y = map.getRailHeight(max, i);
                 double z = posData[0];
                 double d2 = (x - targetPoint.x) * (x - targetPoint.x) + (y - targetPoint.y) * (y - targetPoint.y) + (z - targetPoint.z) * (z - targetPoint.z);
-                if (d2 < bestDistSq) {
-                    bestDistSq = d2;
-                    best = map;
-                }
-            }
-        }
-        return best;
-    }
-
-    private static RailMap getNearestRailMap(LargeRailCoreBlockEntity core, Vec3 targetPoint) {
-        RailMap[] maps = core.getAllRailMaps();
-        if (maps.length == 0) return null;
-        if (maps.length == 1) return maps[0];
-        double cx = targetPoint.x;
-        double cy = targetPoint.y;
-        double cz = targetPoint.z;
-        RailMap best = null;
-        double bestDistSq = Double.POSITIVE_INFINITY;
-        for (RailMap map : maps) {
-            int max = getSpawnSplit(map);
-            for (int i = 0; i <= max; i++) {
-                double[] posData = map.getRailPos(max, i);
-                double x = posData[1];
-                double y = map.getRailHeight(max, i);
-                double z = posData[0];
-                double d2 = (x - cx) * (x - cx) + (y - cy) * (y - cy) + (z - cz) * (z - cz);
                 if (d2 < bestDistSq) {
                     bestDistSq = d2;
                     best = map;

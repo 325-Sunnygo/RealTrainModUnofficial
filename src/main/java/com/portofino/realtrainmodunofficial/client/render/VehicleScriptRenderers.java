@@ -350,9 +350,6 @@ public final class VehicleScriptRenderers {
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel bodyModel) {
             // ★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
-            // 以前はここで「完全静止した車両は描画結果を GLRecorder ごとキャッシュし、
-            // 一定フレーム間隔でだけ描き直す」間引きをしていた。
-            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addVehicle(false);
             // ★1 両ぶんをまとめてモデルローカル空間で描く (本家 1.7.10 の glPushMatrix 相当)。
             // 中では単位行列の pose が渡るので、頂点ごとの CPU 行列演算が消える。
             // 車体・発光・半透明を全部この 1 つの空間で描くので、
@@ -409,6 +406,13 @@ public final class VehicleScriptRenderers {
         private boolean renderReal(Object entity, float partialTick, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight, int packedOverlay,
                                    MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
+            // ActionParts 対話用: モデルローカル→カメラの行列を記録する (本家 PICK パスの代替)。
+            // LocalSpaceBatch 有効時は pose が単位行列で modelView に外側変換が乗っているため、
+            // 両経路で一致するよう MV * pose を渡す。
+            com.portofino.realtrainmodunofficial.client.ActionPartsPicker.record(entity,
+                new org.joml.Matrix4f(com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix())
+                    .mul(poseStack.last().pose()),
+                this.renderer);
             // 本家 RenderVehicleBase.doRender: 通常描画 (RenderPass.NORMAL) → 発光描画 (renderBodyLight)
             GLRecorder normal = record(entity, RenderPass.NORMAL.id, partialTick);
             // ★ isEmpty ではなく hasGeometry で判定する。スクリプトが何も描かずに落ちると
@@ -431,11 +435,22 @@ public final class VehicleScriptRenderers {
             // (静止判定・内容キーの衝突・可動部との陰影の食い違い)。
             // 代わりに LocalSpaceBatch が pose を GPU 側へ移しているので、
             // 毎フレーム投げても頂点あたりの CPU 演算はゼロで済む。
+            // 色ピッキング FBO: 乗車中の車両だけ、ActionParts を ID 色でオフスクリーンにも流す。
+            boolean pick = com.portofino.realtrainmodunofficial.client.ActionPartsPicker
+                .shouldCapture(entity, this.renderer);
+            if (pick) {
+                com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.begin(this.renderer);
+            }
             try {
                 replay(normal, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph,
                         RenderPass.NORMAL.id, excluded);
             } finally {
                 MqoModelLoader.setLightCoveredGroups(null);
+            }
+            if (pick) {
+                // 描いた色を画面中央ピクセルから読み、当たっているパーツ ID を確定する。
+                int pickedId = com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.finish();
+                com.portofino.realtrainmodunofficial.client.ActionPartsPicker.setHoveredId(entity, pickedId);
             }
             if (sink != null) {
                 // excluded はエンティティ内部のライブ集合なので、キャッシュにはスナップショットを残す。
@@ -1017,6 +1032,9 @@ public final class VehicleScriptRenderers {
                 }
                 case RENDER_PARTS, RENDER_GROUPS -> {
                     if (cmd.payload instanceof Set<?> names) {
+                        // 色ピッキング FBO 用: ActionParts を ID 色で専用バッファへ流す。
+                        com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.emitGroups(
+                            (Set<String>) names, poseStack, packedLight, packedOverlay);
                         if (overrideTex != null && bodyGraph != null) {
                             // テクスチャ差し替え中 (発光/ヘッドライト等): モデルグラフから
                             // 同グループの面を差し替えテクスチャで描画 (UV は MQO のまま)
@@ -1080,13 +1098,64 @@ public final class VehicleScriptRenderers {
     private static final int GL_TRIANGLE_FAN = 6;
     private static final int GL_QUADS = 7;
 
+    /**
+     * 前照灯/回転灯のボリュームライト用の加算合成 RenderType。
+     * 本家 renderLightEffect は glBlendFunc(GL_SRC_ALPHA, GL_ONE) で描くため、
+     * 既定の entityTranslucent (アルファ合成) だと光が薄く暗くなる。
+     */
+    public static final RenderType ADDITIVE_TESS = RenderType.create(
+        "rtmu_additive_light",
+        com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY,
+        com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
+        256,
+        false,
+        true,
+        RenderType.CompositeState.builder()
+            .setShaderState(net.minecraft.client.renderer.RenderStateShard.RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+            .setTextureState(net.minecraft.client.renderer.RenderStateShard.NO_TEXTURE)
+            .setTransparencyState(net.minecraft.client.renderer.RenderStateShard.ADDITIVE_TRANSPARENCY)
+            .setCullState(net.minecraft.client.renderer.RenderStateShard.NO_CULL)
+            .setLightmapState(net.minecraft.client.renderer.RenderStateShard.LIGHTMAP)
+            .setOverlayState(net.minecraft.client.renderer.RenderStateShard.OVERLAY)
+            .setWriteMaskState(net.minecraft.client.renderer.RenderStateShard.COLOR_WRITE)
+            .createCompositeState(false));
+
+    /**
+     * 本家 ActionParts の輪郭線用 RenderType。
+     * glCullFace(GL_FRONT) を再現するため CULL を有効にし、描画側で
+     * {@code RenderSystem.cullFace(FRONT)} を設定して<b>即時 flush</b> する。
+     */
+    public static final RenderType OUTLINE_TESS = RenderType.create(
+        "rtmu_outline_light",
+        com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY,
+        com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
+        256,
+        false,
+        true,
+        RenderType.CompositeState.builder()
+            .setShaderState(net.minecraft.client.renderer.RenderStateShard.RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+            .setTextureState(net.minecraft.client.renderer.RenderStateShard.NO_TEXTURE)
+            .setTransparencyState(net.minecraft.client.renderer.RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+            .setCullState(net.minecraft.client.renderer.RenderStateShard.CULL)
+            .setLightmapState(net.minecraft.client.renderer.RenderStateShard.LIGHTMAP)
+            .setOverlayState(net.minecraft.client.renderer.RenderStateShard.OVERLAY)
+            .setWriteMaskState(net.minecraft.client.renderer.RenderStateShard.COLOR_WRITE)
+            .createCompositeState(false));
+
     private static void drawTess(GLRecorder.TessDraw draw, PoseStack poseStack, MultiBufferSource buffer,
                                  int light, int overlay, ResourceLocation texture) {
         long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
         ResourceLocation tex = texture != null ? texture
                 : ResourceLocation.withDefaultNamespace("textures/misc/white.png");
-        // 本家はブレンド有効の即時描画 — 半透明テクスチャ (方向幕/LCD) を正しく合成する
-        VertexConsumer vc = buffer.getBuffer(RenderType.entityTranslucent(tex));
+        // 本家はブレンド有効の即時描画 — 半透明テクスチャ (方向幕/LCD) を正しく合成する。
+        // ボリュームライト (additive) は加算合成で描く。
+        // 輪郭線 (cullFront) は glCullFace(GL_FRONT) を再現する。
+        if (draw.cullFront) {
+            com.mojang.blaze3d.systems.RenderSystem.enableCull();
+            org.lwjgl.opengl.GL11.glCullFace(org.lwjgl.opengl.GL11.GL_FRONT);
+        }
+        VertexConsumer vc = buffer.getBuffer(draw.cullFront ? OUTLINE_TESS
+                : (draw.additive ? ADDITIVE_TESS : RenderType.entityTranslucent(tex)));
         int stride = 9;
         int count = draw.verts.length / stride;
         switch (draw.mode) {
@@ -1108,6 +1177,14 @@ public final class VehicleScriptRenderers {
             default -> {
                 // LINES 等は未対応
             }
+        }
+        if (draw.cullFront) {
+            // 前面カリングは flush 時の GL 状態で決まる。ここで即時 flush しないと
+            // 復元後の状態で描かれてしまう (= 本家 glCullFace(GL_FRONT) が効かない)。
+            if (buffer instanceof MultiBufferSource.BufferSource bs) {
+                bs.endBatch(OUTLINE_TESS);
+            }
+            org.lwjgl.opengl.GL11.glCullFace(org.lwjgl.opengl.GL11.GL_BACK);
         }
         com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_TESS, secStart);

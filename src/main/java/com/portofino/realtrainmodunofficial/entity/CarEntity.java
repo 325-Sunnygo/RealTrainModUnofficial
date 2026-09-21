@@ -12,8 +12,8 @@ import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
-import javax.script.ScriptEngine;
 import net.minecraft.server.level.ServerEntity;
+import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.DamageSource;
@@ -24,8 +24,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 
-import static com.portofino.realtrainmodunofficial.util.RealTrainModUnofficialConstants.SECONDS_IN_TICK;
-import static com.portofino.realtrainmodunofficial.util.RealTrainModUnofficialConstants.TICK_PER_SECOND;
 import static com.portofino.realtrainmodunofficial.util.UnitConverter.*;
 
 // / 自動車Entityクラス
@@ -66,8 +64,6 @@ public final class CarEntity extends Entity {
     public double field_70159_w;
     public double field_70181_x;
     public double field_70179_y;
-    /** サーバスクリプトが motion を書いた = 移動はスクリプト任せ。RTMU独自の車物理を止める。 */
-    private boolean scriptDrivesMotion;
     /** 1.7.10 riddenByEntity (この車に乗っているプレイヤーのラッパー) */
     public jp.ngt.mccompat.PlayerCompat field_70153_n;
     /** 1.7.10 ridingEntity (この車が乗っている対象=ホストプレイヤーのラッパー) */
@@ -76,12 +72,17 @@ public final class CarEntity extends Entity {
     public double field_70165_t;
     public double field_70163_u;
     public double field_70161_v;
+    /** 1.7.10 lastTickPosX/Y/Z (描画補間用。NGTO Builder2 の getInterpolatedPos が読む) */
+    public double field_70142_S;
+    public double field_70137_T;
+    public double field_70136_U;
+    /** 1.7.10 prevPosX/Y/Z */
+    public double field_70169_q;
+    public double field_70167_r;
+    public double field_70166_s;
 
     // / 車輪のX座標オフセット
     public static final float WHEEL_X_COORD = cm2m(72.47766876220703f);
-    // private static final EntityDataAccessor<Float> DATA_SPEED =
-    // SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.FLOAT);
-    // 自動車の情報
 
     // / 乗車定員
     private static final int RIDING_CAPACITY = 5;
@@ -95,60 +96,28 @@ public final class CarEntity extends Entity {
     public static final float WHEEL_Y_COORD = cm2m(37.28034973144531f);
     // / 車輪の半径
     public static final float WHEEL_RADIUS = WHEEL_Y_COORD;
-    // / ホイールベースの距離
-    private static final float WHEELBASE = WHEEL_F_COORD - WHEEL_R_COORD;
 
-    // 性能
-    // / 加速度（ブロック毎ティック毎ティック）
-    private static final float ACCELERATION = mpss2bpts(4.15f); // ゼロヒャク6.7秒から計算 約0.01f
-    // / 減速度 正の値（ブロック毎ティック毎ティック）
-    private static final float DECELERATION = ACCELERATION * 1.2f; // 加速度より少し強め
-    // / 惰性の減速度 正の値（ブロック毎ティック毎ティック）
-    private static final float SLOWDOWN_DECELERATION = 0.001f;
-    // / 前進の最高速度 120km/h -> 33.33…m/s -> 1.666…block/tick
-    private static final float MAX_SPEED = kph2bpt(120.0f);
+    // 性能: 本家 VehicleConfig の既定値をそのまま使う (KaizPatchX VehicleConfig)
+    // / 滑りやすさ
+    protected static final float FRICTION = 0.9F;
+    // / 加速度
+    protected static final float ACCELERATION = 0.0125F;
+    // / 最大速度
+    protected static final float MAX_SPEED = 0.8F;
+    // / 最大Y軸回転
+    protected static final float MAX_YAW = 15.0F;
+    // / 係数
+    protected static final float YAW_COEFFICIENT = 4.5F;
 
-    // / 車両が停止しているとみなす速度の閾値
-    private static final float SPEED_STOP_THRESHOLD = 0.01f;
-    // / ステアリングレシオ
-    public static final float STEERING_RATIO = 1 / 12.0f; // ステアリング角度は、ハンドルの回転角度の12分の1
-
-    // / 左右入力中の1tick当たりのハンドル回転角度（度毎ティック）
-    private static final float STEERING_WHEEL_ANGULAR_VELOCITY_MANIPULATED = 10.0f;
-    // / セルフセンタリングによる1tick当たりのハンドル回転係数（単位無し 1ブロック移動するごとに変化させる割合を決める）
-    private static final float STEERING_WHEEL_SELF_CENTERING_PARAMETER = 2.0f;
-    // / ハンドルの最大回転角度 左右に1.75回転ずつ（度）
-    private static final float STEERING_WHEEL_MAX_ANGLE = 630.0f;
-    // / ハンドルの回転角度
-    public float currentSteeringWheelAngle = 0.0f; // 単位: 度
-    // / 前回tickでのハンドルの回転角度
-    public float prevSteeringWheelAngle = 0.0f;
-
+    // / 速度 前進方向が正、後進方向が負 (本家 EntityVehicle.speed)
+    public float speed = 0.0f;
     // / 車輪の回転角度 クライアントのみ
     public float wheelRotation = 0.0f;
     // / 前tickでの車輪の回転角度 クライアントのみ
     public float prevWheelRotation = 0.0f;
-
-    // / 踏んでいる間のアクセル開度の変化量
-    private static final float ACCELERATOR_STROKE_CHANGE_RATE = 1.0f / TICK_PER_SECOND / 3.0f; // 3秒でベタ踏み
-    // / アクセル開度 0~1
-    private float acceleratorStroke = 0.0f;
-    // / 踏んでいる間のブレーキストロークの変化量
-    private static final float BRAKE_STROKE_CHANGE_RATE = 1.0f / TICK_PER_SECOND; // 1秒でベタ踏み
-    // / ブレーキのストローク量 0~1
-    private float brakeStroke = 0.0f;
-    // / ギアをリバースに入れているか
-    private boolean isReversing = false;
-    // / 現在ブレーキ中か
-    private boolean isBraking = false;
-    // / 前tickでのwSの値
-    private float prevWs = 0.0f;
-    // / ブレーキ中に停止してもキーを押し続けた際に、方向転換をロックする
-    private boolean isReversalLocked = false;
-    // / 速度 前進方向が正、後進方向が負
-    public float speed = 0.0f;
-    // / 現在のtickでのヨーの変化量（度）
-    private float deltaYaw = 0.0f;
+    // / ロール (本家 rotationRoll)
+    public float rotationRoll = 0.0f;
+    public float prevRotationRoll = 0.0f;
 
 
     public CarEntity(EntityType<? extends CarEntity> entityType, Level level) {
@@ -157,6 +126,12 @@ public final class CarEntity extends Entity {
         // SRB / NGTO Builder の描画スクリプトはワールド座標にマーカーや補助線を描くが、
         // 描画されるのは「車が視錐台に入っているとき」だけ。
         this.noCulling = true;
+    }
+
+    /** 本家 EntityCar: this.stepHeight = 2.0F (1ブロックの段差を乗り越える)。 */
+    @Override
+    public float maxUpStep() {
+        return 2.0F;
     }
 
     @Override
@@ -435,14 +410,6 @@ public final class CarEntity extends Entity {
         };
     }
 
-    // / 乗客の向きを車両と同期するために使用 詳細不明
-    @Override
-    protected void positionRider(@NotNull Entity passenger, Entity.@NotNull MoveFunction callback) {
-        super.positionRider(passenger, callback);
-        if (!(passenger instanceof Player player)) return;
-        player.setYRot(player.getYRot() + this.deltaYaw);
-    }
-
     // / 謎
     @Override
     public boolean canCollideWith(@NotNull Entity entity) {
@@ -455,6 +422,28 @@ public final class CarEntity extends Entity {
     @Override
     public boolean isPushable() {
         return false;
+    }
+
+    /**
+     * 本家 EntityVehicle.applyEntityCollision: 高速で走っている車は乗員以外の生物をはねる
+     * (速度が最大速度の半分を超えたときだけダメージ)。
+     */
+    @Override
+    public void push(@NotNull Entity entity) {
+        super.push(entity);
+        if (this.level().isClientSide() || entity == this.getControllingPassenger()) {
+            return;
+        }
+        if (entity instanceof LivingEntity) {
+            Vec3 m = this.getDeltaMovement();
+            double dxz = m.x * m.x + m.z * m.z;
+            if (dxz > 0.0D) {
+                float strength = (float) (dxz / MAX_SPEED);
+                if (strength > 0.5F) {
+                    entity.hurt(this.damageSources().thorns(this), strength);
+                }
+            }
+        }
     }
 
     // / クリック判定を発生させるかどうかだと思われる
@@ -497,9 +486,14 @@ public final class CarEntity extends Entity {
         this.field_70177_z = getYRot();
         this.field_70125_A = getXRot();
         this.field_70173_aa = this.tickCount;
-        this.field_70165_t = getX();
-        this.field_70163_u = getY();
-        this.field_70161_v = getZ();
+        // 前tickの位置は「今の値で上書きする前」に退避する (描画補間・進行方向算出用)。
+        // field_70165_t/u/v (現在位置) は tick 末尾の移動後に更新する。
+        this.field_70142_S = this.xOld;
+        this.field_70137_T = this.yOld;
+        this.field_70136_U = this.zOld;
+        this.field_70169_q = this.xOld;
+        this.field_70167_r = this.yOld;
+        this.field_70166_s = this.zOld;
         if (this.field_70170_p == null || this.field_70170_p.getLevel() != this.level()) {
             this.field_70170_p = new jp.ngt.mccompat.WorldCompat(this.level());
         }
@@ -575,7 +569,6 @@ public final class CarEntity extends Entity {
                 if (Double.isFinite(mx) && Double.isFinite(my) && Double.isFinite(mz)
                         && (mx != before.x || my != before.y || mz != before.z)) {
                     this.setDeltaMovement(mx, my, mz);
-                    this.scriptDrivesMotion = true;
                 }
             }
             // ホストプレイヤー追従は本家どおり「車がプレイヤーに騎乗する」で行う
@@ -591,24 +584,134 @@ public final class CarEntity extends Entity {
 
         @SuppressWarnings("resource") final var level = this.level();
 
-        this.prevSteeringWheelAngle = this.currentSteeringWheelAngle; // アニメーションのために前回tickの回転角度を保存
+        this.prevRotationRoll = this.rotationRoll;
 
-        // Entity#isControlledByLocalInstance は、自身が乗っている場合はクライアント、そうでなければサーバーでtrue
-        // Entityの移動操作に使うとよいっぽい
-        // マルチプレイでどうなるかはわからないが、テストする友達がいません（泣）
-        // 降りた後に惰性で動かないので、とりあえずコメントアウトして無効化 要研究
-        // if (!this.isControlledByLocalInstance) return;
+        // 本家 EntityVehicle.updateMovement: 運転クライアントが乗員の WASD 入力から走行を計算する。
+        // サーバースクリプトで動く車は「車がプレイヤーに乗る」ので乗員が居らず、ここは素通りする
+        // (スクリプトが書いた motion がそのまま使われる)。
+        if (this.isControlledByLocalInstance()) {
+            if (this.shouldUpdateMotion() && this.getControllingPassenger() instanceof LivingEntity living) {
+                this.updateMotion(living, living.xxa, living.zza);
+            }
+            this.applyPhysicalEffect(); // 本家: 非接地時のみ空気抵抗
+            this.updateFallState();     // 本家: 非接地なら落下
+            this.updateRotation();      // 本家: 坂でピッチ/ロール
+        }
 
-        // 移動はサーバスクリプト任せ (本家 RTM と同じ)。RTMU 独自の車物理は持たない。
-        // スクリプトが書いた motion をそのまま適用する。
         if (level.isClientSide) {
             updateWheelRotationInClient();
         }
         this.move(MoverType.SELF, this.getDeltaMovement());
+        // 移動後の現在位置 (サーバースクリプトは次tickの頭でこれを読む)
+        this.field_70165_t = getX();
+        this.field_70163_u = getY();
+        this.field_70161_v = getZ();
     }
 
-    // / 車輪の回転角度を更新する クライアントのみ。
-    // / 速度はスクリプトが動かす実移動量から取る (独自物理の speed は持たない)。
+    // ===== 本家 EntityVehicle (KaizPatchX) の運転物理 =====
+
+    /** 本家 shouldUpdateMotion: 車は接地時のみ操作できる。 */
+    protected boolean shouldUpdateMotion() {
+        return this.onGround();
+    }
+
+    /** 本家 updateMotion: 加速・旋回・滑り。 */
+    protected void updateMotion(LivingEntity entity, float moveStrafe, float moveForward) {
+        this.speed += moveForward * ACCELERATION;
+        float f0 = -moveStrafe * YAW_COEFFICIENT;
+        f0 *= this.speed / MAX_SPEED; // changeYawOnStopping=false (既定)
+        f0 = Mth.clamp(f0, -MAX_YAW, MAX_YAW);
+        this.setYRot(this.getYRot() + f0);
+
+        this.speed = Mth.clamp(this.speed, -MAX_SPEED, MAX_SPEED);
+
+        Vec3 vec = this.getMotionVec();
+        this.setDeltaMovement(vec.x, this.getDeltaMovement().y, vec.z);
+        if (moveForward == 0.0F) {
+            this.speed *= FRICTION;
+        }
+        if (Math.abs(this.speed) < 0.001D) {
+            this.speed = 0.0F;
+            this.setDeltaMovement(0.0D, this.getDeltaMovement().y, 0.0D);
+        }
+    }
+
+    /** 本家 getMotionVec: 速度が上がるほどヨーの追従が遅れる = 滑り。 */
+    protected Vec3 getMotionVec() {
+        float f0 = 1.0F - (this.speed / MAX_SPEED);
+        float f1 = this.yRotO + (Mth.wrapDegrees(this.getYRot() - this.yRotO) * f0);
+        float yaw2 = (this.onGround() || this.isInWater()) ? f1 : this.getYRot();
+        float rad = (float) Math.toRadians(yaw2);
+        return new Vec3(-Mth.sin(rad) * this.speed, 0.0D, Mth.cos(rad) * this.speed);
+    }
+
+    /** 本家 applyPhysicalEffect: 非接地時の空気抵抗。 */
+    protected void applyPhysicalEffect() {
+        if (!this.shouldUpdateMotion()) {
+            this.speed *= 0.9999D;
+        }
+    }
+
+    /** 本家 updateFallState: 接地していなければ落ちる。 */
+    protected void updateFallState() {
+        if (this.onGround()) {
+            this.setDeltaMovement(this.getDeltaMovement().x, 0.0D, this.getDeltaMovement().z);
+        } else {
+            this.setDeltaMovement(this.getDeltaMovement().add(0.0D, -0.05D, 0.0D));
+        }
+    }
+
+    /** 本家 updateRotation: 前後左右のブロック高さからピッチとロールを出す。 */
+    protected void updateRotation() {
+        float prevPitch = this.getXRot();
+        float prevRoll = this.rotationRoll;
+        float pitch = prevPitch;
+        float roll = prevRoll;
+
+        if (this.onGround() && (this.getDeltaMovement().x != 0.0D || this.getDeltaMovement().z != 0.0D)) {
+            double hFront = this.getBlockHeight(this.getYRot());
+            double hBack = this.getBlockHeight(this.getYRot() + 180.0F);
+            double hLeft = this.getBlockHeight(this.getYRot() + 90.0F);
+            double hRight = this.getBlockHeight(this.getYRot() - 90.0F);
+            pitch = (float) Math.toDegrees(Math.atan2(hFront - hBack, this.getBbWidth()));
+            roll = (float) Math.toDegrees(Math.atan2(hLeft - hRight, this.getBbWidth()));
+        } else {
+            pitch *= 0.75F;
+            roll *= 0.75F;
+        }
+
+        if (Math.abs(pitch) < 0.01F) pitch = 0.0F;
+        if (Math.abs(roll) < 0.01F) roll = 0.0F;
+
+        this.setXRot(pitch);
+        this.rotationRoll = roll;
+    }
+
+    /** 本家 getBlockHeight: その方角のブロック上面の高さ。 */
+    protected double getBlockHeight(float yaw) {
+        float rad = (float) Math.toRadians(yaw);
+        double r = this.getBbWidth() * 0.5D;
+        int blockX = Mth.floor(this.getX() - Mth.sin(rad) * r);
+        int blockZ = Mth.floor(this.getZ() + Mth.cos(rad) * r);
+        int blockY = Mth.floor(this.getY()) + 1;
+        net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(blockX, blockY, blockZ);
+        for (; blockY > this.level().getMinBuildHeight(); --blockY) {
+            net.minecraft.world.phys.shapes.VoxelShape shape =
+                this.level().getBlockState(pos).getCollisionShape(this.level(), pos);
+            if (!shape.isEmpty()) {
+                return shape.bounds().maxY + blockY;
+            }
+            pos = pos.below();
+        }
+        return this.getY();
+    }
+
+    /** 本家 EntityVehicle.getSpeed (スクリプト互換)。 */
+    public float getSpeed() {
+        return this.speed;
+    }
+
+    // / 車輪の回転角度を更新する クライアントのみ (実移動量から求める)。
     private void updateWheelRotationInClient() {
         this.prevWheelRotation = this.wheelRotation;
         Vec3 m = this.getDeltaMovement();
@@ -616,7 +719,6 @@ public final class CarEntity extends Entity {
         // 進行方向 (車体前方) との内積で前進/後退の符号を決める
         Vec3 forward = Vec3.directionFromRotation(0.0F, this.getYRot());
         double signed = (m.x * forward.x + m.z * forward.z) < 0 ? -horizontal : horizontal;
-        this.speed = (float) signed;
         if (WHEEL_RADIUS > 1.0E-5F) {
             this.wheelRotation += (float) (signed / WHEEL_RADIUS);
         }

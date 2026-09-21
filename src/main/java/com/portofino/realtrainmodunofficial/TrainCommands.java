@@ -5,8 +5,6 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.portofino.realtrainmodunofficial.entity.TrainBogieEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
-import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
-import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -302,9 +300,7 @@ public final class TrainCommands {
             removedCount += removeTrainEntities(level);
             removeBogieEntities(level);
             removedCount += removeRtmTrainEntities(level);
-            removeRailCollisionBlocks(level);
         }
-
         int finalRemovedCount = removedCount;
         source.sendSuccess(() -> Component.literal("電車を " + finalRemovedCount + " 両削除しました。残って見える場合はワールドを開き直してください。"), true);
         return removedCount;
@@ -464,39 +460,4 @@ public final class TrainCommands {
         return trainCount;
     }
 
-    private static void removeRailCollisionBlocks(ServerLevel level) {
-        if (!(level.getChunkSource() instanceof ServerChunkCache cache)) {
-            return;
-        }
-
-        try {
-            java.lang.reflect.Field field = ServerChunkCache.class.getDeclaredField("chunkMap");
-            field.setAccessible(true);
-            Object chunkMap = field.get(cache);
-            java.lang.reflect.Method method = chunkMap.getClass().getMethod("getChunks");
-            Iterable<?> chunks = (Iterable<?>) method.invoke(chunkMap);
-
-            for (Object holderObject : chunks) {
-                if (!(holderObject instanceof ChunkHolder holder)) {
-                    continue;
-                }
-                Optional<ChunkAccess> optional = Optional.ofNullable(holder.getLatestChunk());
-                if (optional.isEmpty() || !(optional.get() instanceof LevelChunk chunk)) {
-                    continue;
-                }
-
-                List<BlockPos> blockPositions = new ArrayList<>(chunk.getBlockEntities().keySet());
-                for (BlockPos pos : blockPositions) {
-                    BlockState blockState = chunk.getBlockState(pos);
-                    if (blockState.getBlock() instanceof RailCollisionBlock) {
-                        level.removeBlock(pos, false);
-                    } else if (blockState.getBlock() instanceof LargeRailCoreBlock) {
-                        level.removeBlock(pos, false);
-                    }
-                }
-            }
-        } catch (ReflectiveOperationException e) {
-            // If reflection fails, skip removing block entities rather than crashing.
-        }
-    }
 }

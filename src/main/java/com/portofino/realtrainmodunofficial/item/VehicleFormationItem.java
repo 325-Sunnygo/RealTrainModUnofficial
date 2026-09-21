@@ -186,9 +186,11 @@ public class VehicleFormationItem extends Item {
                 for (int dz = -2; dz <= 2; dz++) {
                     BlockPos pos = clickedPos.offset(dx, dy, dz);
                     var blockState = level.getBlockState(pos);
-                    if (blockState.getBlock() instanceof com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock) {
+                    // 本家 rail (jp.ngt): レール/道床ブロックのコアから向きを得る
+                    if (blockState.getBlock() instanceof jp.ngt.rtm.rail.BlockLargeRailBase) {
                         var blockEntity = level.getBlockEntity(pos);
-                        if (blockEntity instanceof com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity railEntity) {
+                        if (blockEntity instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase
+                                && railBase.getRailCore() instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore railEntity) {
                             // レールの方向をRailPositionから取得
                             jp.ngt.rtm.rail.util.RailPosition[] railPositions = railEntity.getRailPositions();
                             float yaw = 0;

@@ -54,11 +54,10 @@ public final class CarServerScripts {
             // ★SuperRailBuilder3 のビルダーは車として登録されているので、その敷設処理は
             // この経路で読まれる。ここに差し込まないとブリッジが一切効かず、SRB 本来の
             // 1.12.2 向けコードがそのまま走って分岐敷設で失敗する。
-            source = TrainScriptSystem.appendSuperRailBuilderOverrides(source);
+            // ★パック名で分岐する SuperRailBuilder3 専用の関数差し替えは本家に無いため撤去した
+            //   (appendSuperRailBuilderOverrides は no-op 化済み)。
             ScriptEngine engine = ScriptUtil.doScript(PackScriptSource.PRELUDE + source);
-            // 差し込んだ差し替えが呼ぶブリッジ。この経路では束縛されていなかったため、
-            // 差し替えても __SRB__ が未定義で必ず失敗していた。
-            engine.put("__SRB__", new SrbRailBridge());
+            // ★SRB3 専用ブリッジ __SRB__ は本家に無く、どの同梱スクリプトも参照しないため撤去。
             //どのツールのサーバー側が動いているかログで追えるようにする
             //(クライアントの "vehicle script init" と対になる)
             RealTrainModUnofficial.LOGGER.info("[RTMU] サーバースクリプト読み込み: {} ({})",

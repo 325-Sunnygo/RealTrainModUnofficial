@@ -272,8 +272,10 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         int z = Mth.floor(pz);
         int bottom = Math.max(minY, level.getMinBuildHeight());
         for (int y = Mth.floor(py); y > bottom; y--) {
-            LargeRailCoreBlockEntity core = com.portofino.realtrainmodunofficial.entity.BogieTracker
-                .findCoreDirect(level, new BlockPos(x, y, z));
+            // 旧 Remaster コアの走査 (BogieTracker は本家コアへ移行済みのため自前で解決)
+            net.minecraft.world.level.block.entity.BlockEntity be =
+                level.getBlockEntity(new BlockPos(x, y, z));
+            LargeRailCoreBlockEntity core = (be instanceof LargeRailCoreBlockEntity c) ? c : null;
             if (core != null) {
                 return core;
             }
@@ -525,8 +527,11 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         }
         if (be.switchProgress < 1.0F) {
             be.switchProgress = Math.min(1.0F, be.switchProgress + 0.04F);
-            if (level.isClientSide()) {
-                be.requestModelDataUpdate();
+            //Fabric に requestModelDataUpdate は無い (NeoForge の ModelData 専用)。
+            //描画を作り直させるにはブロック更新を投げる
+            if (be.getLevel() != null && be.getLevel().isClientSide()) {
+                be.getLevel().sendBlockUpdated(be.getBlockPos(),
+                    be.getBlockState(), be.getBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
             } else {
                 be.setChanged();
             }

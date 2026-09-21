@@ -47,6 +47,37 @@ public class InstalledObjectDefinition {
     // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate(entity, executer) が呼ばれる
     // スクリプト (列車検知器など)。コンストラクタ引数が既に多いので setter で後付けする。
     private String serverScriptPath = "";
+
+    /** 本家 ModelConfig.customForm: 機械を右クリックしたときの DataMap 編集フォーム。 */
+    public record FormField(String key, String label, int row, int column) {
+    }
+
+    public record CustomForm(String title, java.util.List<FormField> fields) {
+    }
+
+    private CustomForm customForm;
+
+    public CustomForm getCustomForm() {
+        return this.customForm;
+    }
+
+    public void setCustomForm(CustomForm form) {
+        this.customForm = form;
+    }
+
+    /**
+     * 本家 ModelConfig.defaultValues: 設置物の DataMap 既定値。
+     * スクリプトは {@code dataMap.getString("audio_loop_sound")} 等で読む。
+     */
+    public record DefaultValue(String type, String elementType, String key, String value,
+                               java.util.List<String> values) {
+    }
+
+    private final java.util.List<DefaultValue> defaultValues = new java.util.ArrayList<>();
+
+    public java.util.List<DefaultValue> getDefaultValues() {
+        return this.defaultValues;
+    }
     // 本家 ModelConfig.doCulling (既定 false = 両面描画)。上と同じくコンストラクタが肥大するため setter。
     private boolean doCulling = false;
     // 本家 MachineConfig.rotateByMetadata。true の照明 (サーチライト/回転灯/灯台灯) は
@@ -192,6 +223,32 @@ public class InstalledObjectDefinition {
 
     public void setWireAttachPos(Vec3 wireAttachPos) {
         this.wireAttachPos = wireAttachPos == null ? Vec3.ZERO : wireAttachPos;
+    }
+
+    // ---- 信号用 (本家 SignalConfig.modelPartsFixture / rotateBody) ----
+    // 本家 BasicSignalPartsRenderer: 柱 (fixture) は設置面の4方位のまま、
+    // ヘッド (body) だけ「プレイヤー向き (15°/スニーク1°) − 設置面の向き」回転させる。
+    // これで信号だけ斜めに置ける。コンストラクタ引数が既に多いので setter で後付けする。
+    private List<String> fixtureObjects = List.of();
+    private Vec3 fixturePos = Vec3.ZERO;
+    private boolean rotateBody = false;
+
+    public List<String> getFixtureObjects() {
+        return fixtureObjects;
+    }
+
+    public Vec3 getFixturePos() {
+        return fixturePos;
+    }
+
+    public boolean isRotateBody() {
+        return rotateBody;
+    }
+
+    public void setSignalParts(List<String> fixtureObjects, Vec3 fixturePos, boolean rotateBody) {
+        this.fixtureObjects = fixtureObjects == null ? List.of() : List.copyOf(fixtureObjects);
+        this.fixturePos = fixturePos == null ? Vec3.ZERO : fixturePos;
+        this.rotateBody = rotateBody;
     }
 
     // 本家 ModelConnector_*.json の connectorType ("Relay" 等)。NGTO Builder の Wire ツールが

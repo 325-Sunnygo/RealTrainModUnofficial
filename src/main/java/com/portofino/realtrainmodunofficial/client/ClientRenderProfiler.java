@@ -254,12 +254,6 @@ public final class ClientRenderProfiler {
 
     public static void toggleOverlay() {
         overlayEnabled = !overlayEnabled;
-        // スクリプト計測 (共通側カウンタ) も連動させる。計測点の ScriptUtil は共通コードなので
-        // クライアント専用のこのクラスを直接参照できず、カウンタだけ別クラスに分けてある。
-        com.portofino.realtrainmodunofficial.perf.RtmuProfiler.enabled = overlayEnabled;
-        if (!overlayEnabled) {
-            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.reset();
-        }
     }
 
     public static long begin() {
@@ -347,13 +341,6 @@ public final class ClientRenderProfiler {
         long vertsPerFrame = displayFrames > 0 ? displayVertices / displayFrames : 0L;
         int setupPerFrame = displayFrames > 0 ? displayRailStateSetup / displayFrames : 0;
         int drawPerFrame = displayFrames > 0 ? displayRailVboDraw / displayFrames : 0;
-        // Nashorn の実行時間だけを切り出したもの。「レールが重い」と言われたときに
-        // スクリプトなのかそれ以外なのかを、ログだけで切り分けられるようにしておく。
-        double scriptMsPerFrame = displayFrames > 0
-            ? com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastScriptMillis() / displayFrames
-            : 0.0D;
-        sb.append(String.format(java.util.Locale.ROOT, " | script=%.2fms/f(%d)",
-            scriptMsPerFrame, com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastScriptCalls()));
         sb.append(String.format(java.util.Locale.ROOT,
             " | fps=%d verts/f=%d | railMesh merged=%d fallback=%d bake=%d state/f=%d vbo/f=%d",
             displayFrames, vertsPerFrame,
@@ -445,19 +432,8 @@ public final class ClientRenderProfiler {
             + "  (batches " + batchesPerFrame + ", fps " + displayFrames + ")"
             + "  [列車ぶん " + trainVertsPerFrame + " / batch " + trainBatchesPerFrame + "]";
 
-        // ★スクリプト実行の内訳 (軽量化の主指標)。
-        // Train カテゴリの時間には描画も含まれるため、Nashorn 実行だけを切り出して見る。
-        double scriptMs = com.portofino.realtrainmodunofficial.perf.RtmuProfiler.avgScriptMillis();
-        lines[CATEGORY_NAMES.length + 3] = "Script: "
-            + String.format(java.util.Locale.ROOT, "%.2f ms/f", scriptMs)
-            + String.format(java.util.Locale.ROOT, " (%.0f%% of 60fps)", scriptMs / 16.6D * 100.0D)
-            + String.format(java.util.Locale.ROOT, ", %.1f calls/f",
-                com.portofino.realtrainmodunofficial.perf.RtmuProfiler.avgScriptCalls());
-        lines[CATEGORY_NAMES.length + 4] = "Cache: 車両 hit "
-            + com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastVehicleCacheHits()
-            + " / 実行 " + com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastVehicleCacheMisses()
-            + "  設置物 hit " + com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastObjectCacheHits()
-            + " / 実行 " + com.portofino.realtrainmodunofficial.perf.RtmuProfiler.lastObjectCacheMisses();
+        lines[CATEGORY_NAMES.length + 3] = "";
+        lines[CATEGORY_NAMES.length + 4] = "";
         // VBO 経路の内訳: 0 でないものだけを多い順に並べる (どのゲートで落ちているかの特定用)
         StringBuilder vbo = new StringBuilder("VBO: ");
         int shown = 0;
@@ -498,9 +474,6 @@ public final class ClientRenderProfiler {
         lines[CATEGORY_NAMES.length + 7] = String.format(java.util.Locale.ROOT,
             "  loop %.2f = vbo %.2f + buf %.2f + sub %.2f + 判定 %.2f",
             msLoop, msVbo, msGetBuf, msSubmit, msLoop - msVbo - msGetBuf - msSubmit);
-
-        // フレーム境界を確定 (この描画イベントは 1 フレームに 1 回)
-        com.portofino.realtrainmodunofficial.perf.RtmuProfiler.endFrame();
 
         for (String line : lines) {
             width = Math.max(width, font.width(line));

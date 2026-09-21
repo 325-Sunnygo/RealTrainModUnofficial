@@ -58,6 +58,36 @@ public class ScriptExecuter {
      * スクリプトから呼ばれる。バニラコマンドを実行する。
      * 例: scriptExecuter.execCommand("setblock 100 64 100 redstone_block")
      */
+    /**
+     * 本家 ScriptExecuter.fireBullet (1.12 系): 火砲スクリプトが弾を撃つ。
+     * 引数は (world, shooter, bulletType, x,y,z, motionX,motionY,motionZ)。
+     */
+    public void fireBullet(Object world, Object entity, String type, double x, double y, double z,
+                           double motionX, double motionY, double motionZ) {
+        net.minecraft.world.level.Level level = null;
+        if (entity instanceof net.minecraft.world.entity.Entity e) {
+            level = e.level();
+        }
+        if (level == null && world instanceof net.minecraft.world.level.Level l) {
+            level = l;
+        }
+        if (level == null || level.isClientSide) {
+            return;
+        }
+        jp.ngt.rtm.item.ItemAmmunition.BulletType bulletType =
+            jp.ngt.rtm.item.ItemAmmunition.BulletType.getBulletType(type);
+        jp.ngt.rtm.entity.EntityBullet bullet = new jp.ngt.rtm.entity.EntityBullet(level);
+        if (bulletType != null) {
+            bullet.setBulletType(bulletType);
+        }
+        if (entity instanceof net.minecraft.world.entity.LivingEntity living) {
+            bullet.setOwner(living);
+        }
+        bullet.setPos(x, y, z);
+        bullet.setDeltaMovement(motionX, motionY, motionZ);
+        level.addFreshEntity(bullet);
+    }
+
     public void execCommand(String command) {
         if (command == null || command.isBlank() || this.level == null) {
             return;

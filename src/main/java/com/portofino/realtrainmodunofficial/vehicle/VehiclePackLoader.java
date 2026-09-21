@@ -319,58 +319,31 @@ public class VehiclePackLoader {
             JsonElement el = JsonParser.parseString(PackTextDecoder.decodeJson(bytes));
             if (!el.isJsonObject()) return;
             JsonObject obj = el.getAsJsonObject();
-            String id = firstNonBlank(getString(obj, "trainName"), getString(obj, "name"));
+            // ★本家 TrainConfig の項目名をそのまま使う (trainName / trainType / trainModel2 ...)。
+            //   RTMU 独自の別名 (name / vehicleType / model キー) は受け付けない。
+            String id = getString(obj, "trainName");
             if (id == null || id.isBlank()) id = fallbackTrainId(sourcePath);
-            // 本家に displayName は無い。表示名は name / trainName から取る。
-            String displayName = firstNonBlank(getString(obj, "name"), id);
+            String displayName = id;
             JsonObject trainModel = getObject(obj, "trainModel2");
             if (trainModel == null) trainModel = getObject(obj, "trainModel");
-            // SuperRailBuilder3 などは "model" キーを使う。互換のため fallback。
-            if (trainModel == null) trainModel = getObject(obj, "model");
             if (trainModel == null) return;
             String modelFile = getString(trainModel, "modelFile");
             if (modelFile == null || modelFile.isBlank()) return;
-            String buttonTexture = firstNonBlank(getString(obj, "buttonTexture"), getString(trainModel, "buttonTexture"));
+            String buttonTexture = getString(obj, "buttonTexture");
             Map<String, String> tex = parseTextures(trainModel);
-            Vec3 offset = parseVec3(trainModel, "offset", 1.0 / 16.0);
-            // 本家 ModelObject.render / RenderVehicleBase は ModelConfig (=JSON のルート) の
-            // offset を ブロック単位でそのまま glTranslate する。trainModel2 側にしか
-            // offset を見ていなかったので、ルートに書くパックで車体の高さが合わなかった
-            // (mo1600 は "offset": [0, -1, 0] で、無視すると台車から 1 ブロック浮く)。
-            if (offset.equals(Vec3.ZERO)) {
-                offset = parseVec3(obj, "offset", 1.0);
-            }
-            float scale = parseFloat(trainModel, "scale", 1.0F);
-            // .ngto (ボクセル) は本家が ModelConfig の scale をモデル自体に掛ける。
-            // その scale は JSON のルートにあることが多い (mo1600 は 0.1)。
-            if (scale == 1.0F && com.portofino.realtrainmodunofficial.client.model.NgtoModelGeometry.isNgto(modelFile)) {
-                scale = parseFloat(obj, "scale", 1.0F);
-            }
+            // 本家 ModelConfig (=JSON のルート) の offset/scale を見る。
+            Vec3 offset = parseVec3(obj, "offset", 1.0);
+            float scale = parseFloat(obj, "scale", 1.0F);
+            // rendererPath は ModelSource (trainModel2) の項目。
             String scriptPath = getString(trainModel, "rendererPath");
             if (scriptPath == null || scriptPath.isBlank()) {
                 scriptPath = null;
             }
-            if (scriptPath == null || scriptPath.isBlank()) {
-                scriptPath = getString(obj, "rendererPath");
-            }
-            if (scriptPath == null || scriptPath.isBlank()) {
-                scriptPath = null;
-            }
-            if (scriptPath == null || scriptPath.isBlank()) {
-                scriptPath = null;
-            }
-            String soundScriptPath = firstNonBlank(
-                getString(trainModel, "soundScriptPath"),
-                getString(obj, "soundScriptPath")
-            );
+            String soundScriptPath = getString(obj, "soundScriptPath");
             boolean sourceLooksLikeVehicle = isVehicleJsonPath(sourcePath);
-            String vehicleType = firstNonBlank(
-                getString(trainModel, "vehicleType"),
-                getString(obj, "vehicleType"),
-                getString(trainModel, "trainType"),
-                getString(obj, "trainType"),
-                sourceLooksLikeVehicle ? "Car" : "Train"
-            );
+            // ★本家は「JSON の種類 (ModelTrain_* / ModelVehicle_*)」で車両種別を決める。
+            //   RTMU 独自の "vehicleType" フィールドや trainType の流用はしない。
+            String vehicleType = sourceLooksLikeVehicle ? "Car" : "Train";
 
             // 本家に doorType は無い
             String doorType = null;
@@ -442,7 +415,7 @@ public class VehiclePackLoader {
             appendRawArray(obj, "playerPosF", playerPositions);
 
             Vec3 seatOffset = !playerPositions.isEmpty() ? playerPositions.get(0) : (!seats.isEmpty() ? seats.get(0) : null);
-            float trainDistance = parseFloat(trainModel, "trainDistance", parseFloat(obj, "trainDistance", 4.5F));
+            float trainDistance = parseFloat(obj, "trainDistance", 4.5F);
             // 本家に driverSeatIndex は無い (運転席は playerPos から決まる)
             int driverSeatIndex = 0;
             int frontDriverSeatIndex = resolveFrontDriverSeatIndex(obj, trainModel, rideableSeatMarkers, driverSeatIndex);
@@ -459,45 +432,44 @@ public class VehiclePackLoader {
             List<String> rollsignNames = parseStringList(obj, trainModel, "rollsignNames");
             List<String> customButtonNames = parseCustomButtonNames(obj, trainModel);
             List<List<String>> customButtonOptions = parseCustomButtonOptions(obj, trainModel);
-            String rollsignTexture = firstNonBlank(getString(trainModel, "rollsignTexture"), getString(obj, "rollsignTexture"));
+            String rollsignTexture = getString(obj, "rollsignTexture");
             List<VehicleDefinition.RollsignDefinition> rollsigns = parseRollsigns(obj, trainModel);
-            // RTMU 追加: 種別幕 (方向幕と同じ書式・別項目)。typeSignNames / typeSignTexture / typeSigns。
+            // 種別幕 (方向幕と同じ書式・別項目)。typeSignNames / typeSignTexture / typeSigns。
             List<String> typeSignNames = parseStringList(obj, trainModel, "typeSignNames");
-            // 本家に typeSignTexture は無い
             String typeSignTexture = null;
             List<VehicleDefinition.RollsignDefinition> typeSigns = parseSignPanels(obj, trainModel, "typeSigns");
             List<VehicleDefinition.LightDefinition> headLights = parseLights(obj, trainModel, "headLights");
             List<VehicleDefinition.LightDefinition> tailLights = parseLights(obj, trainModel, "tailLights");
             List<VehicleDefinition.LightDefinition> interiorLights = parseLights(obj, trainModel, "interiorLights");
-            String hornSound = firstNonBlank(getString(trainModel, "sound_Horn"), getString(obj, "sound_Horn"));
-            String soundStop = firstNonBlank(getString(trainModel, "sound_Stop"), getString(obj, "sound_Stop"));
-            String soundStartAcceleration = firstNonBlank(getString(trainModel, "sound_S_A"), getString(obj, "sound_S_A"));
-            String soundAcceleration = firstNonBlank(getString(trainModel, "sound_Acceleration"), getString(obj, "sound_Acceleration"));
-            String soundDeceleration = firstNonBlank(getString(trainModel, "sound_Deceleration"), getString(obj, "sound_Deceleration"));
-            String soundDecelerationStop = firstNonBlank(getString(trainModel, "sound_D_S"), getString(obj, "sound_D_S"));
-            String soundBrakeRelease = firstNonBlank(getString(trainModel, "sound_BrakeRelease"), getString(obj, "sound_BrakeRelease"));
-            String soundBrakeRelease2 = firstNonBlank(getString(trainModel, "sound_BrakeRelease2"), getString(obj, "sound_BrakeRelease2"));
-            String soundDoorOpen = firstNonBlank(getString(trainModel, "sound_DoorOpen"), getString(obj, "sound_DoorOpen"));
-            String soundDoorClose = firstNonBlank(getString(trainModel, "sound_DoorClose"), getString(obj, "sound_DoorClose"));
+            String hornSound = getString(obj, "sound_Horn");
+            String soundStop = getString(obj, "sound_Stop");
+            String soundStartAcceleration = getString(obj, "sound_S_A");
+            String soundAcceleration = getString(obj, "sound_Acceleration");
+            String soundDeceleration = getString(obj, "sound_Deceleration");
+            String soundDecelerationStop = getString(obj, "sound_D_S");
+            String soundBrakeRelease = getString(obj, "sound_BrakeRelease");
+            String soundBrakeRelease2 = getString(obj, "sound_BrakeRelease2");
+            // 本家 SoundUpdaterTrain: ATS チャイム/ベル (signal=1 の走行中にループで鳴る)。
+            String soundAtsChime = getString(obj, "sound_ATSChime");
+            String soundAtsBell = getString(obj, "sound_ATSBell");
+            String soundDoorOpen = getString(obj, "sound_DoorOpen");
+            String soundDoorClose = getString(obj, "sound_DoorClose");
             List<String> announcementSounds = parseAnnouncementSounds(obj, trainModel);
             //★本家のキーは綴りミスのまま accelerateion。0 = 既定 (0.001736)。
-            float acceleration = parseFloat(trainModel, "accelerateion",
-                    parseFloat(obj, "accelerateion", 0.0F));
-            boolean useVariableAcceleration = parseBoolean(trainModel, "useVariableAcceleration",
-                    parseBoolean(obj, "useVariableAcceleration", false));
-            boolean useVariableDeceleration = parseBoolean(trainModel, "useVariableDeceleration",
-                    parseBoolean(obj, "useVariableDeceleration", false));
-            boolean smoothing = parseBoolean(trainModel, "smoothing", parseBoolean(obj, "smoothing", false));
-            boolean doCulling = parseBoolean(trainModel, "doCulling", parseBoolean(obj, "doCulling", false));
+            float acceleration = parseFloat(obj, "accelerateion", 0.0F);
+            boolean useVariableAcceleration = parseBoolean(obj, "useVariableAcceleration", false);
+            boolean useVariableDeceleration = parseBoolean(obj, "useVariableDeceleration", false);
+            boolean smoothing = parseBoolean(obj, "smoothing", false);
+            boolean doCulling = parseBoolean(obj, "doCulling", false);
             boolean hasConfiguredLights = !headLights.isEmpty() || !tailLights.isEmpty() || !interiorLights.isEmpty();
-            boolean renderLight = parseBoolean(trainModel, "renderLight", parseBoolean(obj, "renderLight", hasConfiguredLights));
-            boolean notDisplayCab = parseBoolean(trainModel, "notDisplayCab", parseBoolean(obj, "notDisplayCab", false));
-            boolean singleTrain = parseBoolean(trainModel, "isSingleTrain", parseBoolean(obj, "isSingleTrain", false));
+            boolean renderLight = parseBoolean(obj, "renderLight", hasConfiguredLights);
+            boolean notDisplayCab = parseBoolean(obj, "notDisplayCab", false);
+            boolean singleTrain = parseBoolean(obj, "isSingleTrain", false);
 
-            String serverScriptPath = firstNonBlank(
-                getString(trainModel, "serverScriptPath"),
-                getString(obj, "serverScriptPath")
-            );
+            String serverScriptPath = getString(obj, "serverScriptPath");
+            // 本家 ModelConfig.guiScriptPath / guiTexture (運転台 GUI スクリプト)。
+            String guiScriptPath = getString(obj, "guiScriptPath");
+            String guiTexture = getString(obj, "guiTexture");
             VehicleDefinition definition = new VehicleDefinition(
                 id,
                 displayName,
@@ -541,10 +513,11 @@ public class VehiclePackLoader {
                 singleTrain
             );
             definition.setServerScriptPath(serverScriptPath);
+            definition.setGuiScriptPath(guiScriptPath);
+            definition.setGuiTexture(guiTexture);
             // 本家 KaizPatchX の customIconTexture。持ち物欄でのアイテムの絵を差し替える。
             // 車両 (自動車) も設置物と同じく「1 つのアイテムで中身を選ぶ」ので同じ扱いにする。
-            definition.setCustomIconTexture(firstNonBlank(getString(obj, "customIconTexture"),
-                getString(trainModel, "customIconTexture")));
+            definition.setCustomIconTexture(getString(obj, "customIconTexture"));
             // 本家 sound_Announcement の表示名 ([[名前, 音]] の名前側)
             definition.setAnnouncementNames(parseAnnouncementNames(obj, trainModel));
             definition.setSlotPositions(parseSlotPositions(trainModel, obj));
@@ -556,6 +529,7 @@ public class VehiclePackLoader {
                 soundDecelerationStop
             );
             definition.setBrakeReleaseSounds(soundBrakeRelease, soundBrakeRelease2);
+            definition.setAtsSounds(soundAtsChime, soundAtsBell);
             definition.setDoorSounds(soundDoorOpen, soundDoorClose);
             definition.setTypeSign(typeSignNames, typeSignTexture, typeSigns);
             definition.setSpeedProfile(notchAccelerations, decelerations,
@@ -571,23 +545,23 @@ public class VehiclePackLoader {
      * trainModel2 側と JSON ルートの両方を読む。
      */
     private static java.util.List<float[]> parseSlotPositions(JsonObject trainModel, JsonObject obj) {
+        // ★本家は JSON のルートのみ (入れ子 trainModel は見ない)。
         java.util.List<float[]> out = new ArrayList<>();
-        for (JsonObject src : new JsonObject[]{trainModel, obj}) {
-            if (src == null || !src.has("slotPos")) continue;
-            try {
-                for (var el : src.getAsJsonArray("slotPos")) {
-                    var arr = el.getAsJsonArray();
-                    if (arr.size() < 3) continue;
-                    float type = arr.size() >= 4 ? arr.get(3).getAsFloat() : 2.0F;
-                    out.add(new float[]{
-                            arr.get(0).getAsFloat(),
-                            arr.get(1).getAsFloat(),
-                            arr.get(2).getAsFloat(),
-                            type});
-                }
-            } catch (Exception ignored) {
+        if (obj == null || !obj.has("slotPos")) {
+            return out;
+        }
+        try {
+            for (var el : obj.getAsJsonArray("slotPos")) {
+                var arr = el.getAsJsonArray();
+                if (arr.size() < 3) continue;
+                float type = arr.size() >= 4 ? arr.get(3).getAsFloat() : 2.0F;
+                out.add(new float[]{
+                        arr.get(0).getAsFloat(),
+                        arr.get(1).getAsFloat(),
+                        arr.get(2).getAsFloat(),
+                        type});
             }
-            if (!out.isEmpty()) break;
+        } catch (Exception ignored) {
         }
         return out;
     }
@@ -678,8 +652,8 @@ public class VehiclePackLoader {
     }
 
     private static List<VehicleDefinition.DoorAnimationDefinition> parseDoorAnimations(JsonObject root, JsonObject trainModel, String key) {
+        // ★本家は JSON のルートのみ。
         List<VehicleDefinition.DoorAnimationDefinition> doors = new ArrayList<>();
-        appendDoorAnimations(trainModel, key, doors);
         appendDoorAnimations(root, key, doors);
         return doors;
     }
@@ -758,10 +732,9 @@ public class VehiclePackLoader {
 
 
     private static List<Float> parseFloatList(JsonObject root, JsonObject trainModel, String key) {
+        // ★本家 TrainConfig は JSON のルートを見る (入れ子 trainModel は見ない)。
         JsonArray array = null;
-        if (trainModel != null && trainModel.has(key) && trainModel.get(key).isJsonArray()) {
-            array = trainModel.getAsJsonArray(key);
-        } else if (root != null && root.has(key) && root.get(key).isJsonArray()) {
+        if (root != null && root.has(key) && root.get(key).isJsonArray()) {
             array = root.getAsJsonArray(key);
         }
         if (array == null) {
@@ -778,10 +751,9 @@ public class VehiclePackLoader {
     }
 
     private static List<String> parseStringList(JsonObject root, JsonObject trainModel, String key) {
+        // ★本家 TrainConfig は JSON のルートを見る (入れ子 trainModel は見ない)。
         JsonArray array = null;
-        if (trainModel != null && trainModel.has(key) && trainModel.get(key).isJsonArray()) {
-            array = trainModel.getAsJsonArray(key);
-        } else if (root != null && root.has(key) && root.get(key).isJsonArray()) {
+        if (root != null && root.has(key) && root.get(key).isJsonArray()) {
             array = root.getAsJsonArray(key);
         }
         if (array == null) {
@@ -810,7 +782,7 @@ public class VehiclePackLoader {
             }
             return labels;
         }
-        List<String> values = parseNamedButtonList(trainModel, "customButtonNames");
+        List<String> values = parseNamedButtonList(root, "customButtonNames");
         if (!values.isEmpty()) {
             return values;
         }
@@ -842,10 +814,7 @@ public class VehiclePackLoader {
     }
 
     private static List<List<String>> parseCustomButtonOptions(JsonObject root, JsonObject trainModel) {
-        List<List<String>> values = parseButtonOptionGrid(trainModel, "customButtons");
-        if (!values.isEmpty()) {
-            return values;
-        }
+        // ★本家は JSON のルートのみ。
         return parseButtonOptionGrid(root, "customButtons");
     }
 
@@ -1288,14 +1257,22 @@ public class VehiclePackLoader {
     }
 
     public static String readScriptContent(VehicleDefinition definition) {
-        if (definition == null || definition.getScriptPath() == null || definition.getScriptPath().isBlank()) {
+        return readScriptContent(definition, definition == null ? null : definition.getScriptPath());
+    }
+
+    /**
+     * 任意パスのスクリプト読込 (rendererPath / guiScriptPath / soundScriptPath 共通)。
+     * 解決規則 (パック内 → 前提パック横断索引) は rendererPath と同一。
+     */
+    public static String readScriptContent(VehicleDefinition definition, String path) {
+        if (definition == null || path == null || path.isBlank()) {
             return null;
         }
+        String scriptPath = normalize(path);
         Path packPath = RailPackLoader.resolvePackPath(definition.getPackName());
         if (packPath == null) {
-            return null;
+            return readScriptFromGlobalIndex(scriptPath);
         }
-        String scriptPath = normalize(definition.getScriptPath());
         String scriptFileName = scriptPath.contains("/") ? scriptPath.substring(scriptPath.lastIndexOf('/') + 1).toLowerCase() : scriptPath.toLowerCase();
 
         try {
@@ -1328,7 +1305,7 @@ public class VehiclePackLoader {
                 }
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to read vehicle script {} from pack {}", definition.getScriptPath(), definition.getPackName(), e);
+            RealTrainModUnofficial.LOGGER.warn("Failed to read vehicle script {} from pack {}", path, definition.getPackName(), e);
         }
         // 自パックに無い / パック解決失敗: 前提・ベーススクリプトパックを横断して探す。
         // (例: JRCT_Keiyo が車両を定義し、実体スクリプト scripts/Render_script_jre233_mi.js は

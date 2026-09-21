@@ -127,8 +127,39 @@ public final class TrainHudOverlay {
         boolean showCabOverlay = def == null || !def.isNotDisplayCab();
 
         if (!cabHidden && showCabOverlay) {
-            renderDefaultRtmCab(g, font, data, def, screenW, screenH);
+            // 本家 GuiIngameCustom.renderVehicleGui: guiSE があれば既定 cab の代わりに
+            // renderGui(vehicle, gui) を呼ぶ。無ければ既定 cab を描く。
+            javax.script.ScriptEngine guiSe =
+                com.portofino.realtrainmodunofficial.client.render.VehicleGuiScripts.get(def);
+            Object vehicle = getControlledVehicle(mc);
+            if (guiSe != null && vehicle != null) {
+                ResourceLocation tex =
+                    com.portofino.realtrainmodunofficial.client.render.VehicleGuiScripts.resolveGuiTexture(def);
+                com.portofino.realtrainmodunofficial.client.render.VehicleGuiScripts.Gui gui =
+                    new com.portofino.realtrainmodunofficial.client.render.VehicleGuiScripts.Gui(
+                        g, font, screenW, screenH, tex != null ? tex : CAB_TEXTURE);
+                jp.ngt.ngtlib.io.ScriptUtil.doScriptIgnoreError(guiSe, "renderGui", vehicle, gui);
+            } else {
+                renderDefaultRtmCab(g, font, data, def, screenW, screenH);
+            }
         }
+    }
+
+    /** 運転中の車両エンティティ (gui スクリプトの renderGui に渡す実体)。 */
+    private static Object getControlledVehicle(Minecraft mc) {
+        if (mc.player == null) {
+            return null;
+        }
+        if (mc.player.getVehicle() instanceof TrainEntity train) {
+            return train;
+        }
+        if (mc.player.getVehicle() instanceof TrainSeatEntity seat) {
+            return seat.getTrain();
+        }
+        if (mc.player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain) {
+            return rtmTrain;
+        }
+        return mc.player.getVehicle();
     }
 
     private static void renderDefaultRtmCab(GuiGraphics graphics, Font font, HudData train,

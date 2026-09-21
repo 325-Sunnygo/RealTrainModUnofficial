@@ -2,7 +2,6 @@ package com.portofino.realtrainmodunofficial.item;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.ClientHooks;
-import com.portofino.realtrainmodunofficial.block.MarkerBlock;
 import com.portofino.realtrainmodunofficial.rail.RailDefinition;
 import com.portofino.realtrainmodunofficial.rail.RailRegistry;
 import jp.ngt.rtm.rail.TileEntityLargeRailBase;
@@ -63,23 +62,10 @@ public class RailItem extends Item {
             }
         }
 
-        if (stack.get(RealTrainModUnofficialComponents.RAIL_PREVIEW_START.get()) == null) {
-            return InteractionResult.PASS;
-        }
-
-        if (!level.isClientSide) {
-            String selectedId = stack.get(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get());
-            // バニラのブロック設置と同様、クリックした面の隣(地面の上)を基準位置にする。
-            // クリックした地面ブロックそのものを渡すとレールが1ブロック低く=地面にめり込んで
-            // 削れて見えるため。コピー元レールのコアも地面の1つ上にあったので +1 で高さが合う。
-            BlockPos placePos = context.getClickedPos().relative(context.getClickedFace());
-            boolean created = MarkerBlock.placeCopiedRailAt(level, placePos, player, stack, selectedId);
-            if (created && !player.getAbilities().instabuild) {
-                stack.shrink(1);
-            }
-            return created ? InteractionResult.SUCCESS : InteractionResult.FAIL;
-        }
-        return InteractionResult.SUCCESS;
+        //★「コピーしたレールを貼り付ける」独自機能は本家に無く、RTMU 独自マーカー
+        //  (MarkerBlock) に依存していたため削除した。本家 ItemRail はマーカーを
+        //  レンチ/レールアイテムで設置して敷設する方式。
+        return InteractionResult.PASS;
     }
 
     /**

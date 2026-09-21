@@ -161,7 +161,9 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
      */
     private void renderSubRails(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
                                 PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
-        for (jp.ngt.rtm.rail.util.RailProperty sub : be.subRails) {
+        java.util.List<jp.ngt.rtm.rail.util.RailProperty> subs = be.subRails;
+        for (int i = 0; i < subs.size(); i++) {
+            jp.ngt.rtm.rail.util.RailProperty sub = subs.get(i);
             if (sub == null || sub.railModel == null || sub.railModel.isBlank()) {
                 continue;
             }
@@ -173,8 +175,9 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             if (subModel == null) {
                 continue;
             }
+            // 本家 RenderLargeRail と同じくサブレール i を railIndex = i+1 で描く。
             com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.renderSubRail(
-                    be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, subDef, subModel);
+                    be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, subDef, subModel, i + 1);
         }
     }
 
@@ -900,8 +903,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     @Override
     public int getViewDistance() {
-        // RTMU 設定でレール描画距離を変更可能 (既定 128)。「レールの描画が短い」対策。
-        return com.portofino.realtrainmodunofficial.RtmuSettings.clampRailRenderDistance(
-            com.portofino.realtrainmodunofficial.RtmuSettings.railRenderDistance);
+        return 128;
     }
 }

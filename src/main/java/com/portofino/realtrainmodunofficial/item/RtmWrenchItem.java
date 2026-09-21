@@ -34,7 +34,7 @@ import java.util.List;
  */
 public class RtmWrenchItem extends Item {
     // モード 9 (アンカー移動) 中はアンカー線を右クリックで掴んで動かす (MarkerBlockEntityRenderer)
-    private static final int[] MODE_CYCLE = {0, 1, 6, 7, 8, 9, 10, 11, 12};
+    private static final int[] MODE_CYCLE = {0, 1, 2, 6, 7, 8, 9, 10, 11, 12};
     /** マーカーをブロック未満の位置に動かす (本家に無い。ペンマーカーの代わり)。 */
     public static final int MODE_OFFSET = 12;
     public static final int MODE_ANCHOR = 9;
@@ -69,6 +69,7 @@ public class RtmWrenchItem extends Item {
         return switch (mode) {
             case 0 -> "マーカー設置";
             case 1 -> "分岐マーカー設置";
+            case 2 -> "直線マーカー設置";
             case 6 -> "距離表示 切替";
             case 7 -> "表示モード切替";
             case 8 -> "マーカー高さ変更";
@@ -171,6 +172,8 @@ public class RtmWrenchItem extends Item {
         switch (mode) {
             case 0 -> this.placeMarker(player, level, above, jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get());
             case 1 -> this.placeMarker(player, level, above, jp.ngt.rtm.rail.RTMRailBlocks.MARKER_SWITCH.get());
+            // 本家 onItemUse case 2: 直線マーカー (RTMBlock.markerStraight)
+            case 2 -> this.placeMarker(player, level, above, jp.ngt.rtm.rail.RTMRailBlocks.MARKER_STRAIGHT.get());
             default -> {
                 return InteractionResult.PASS;
             }

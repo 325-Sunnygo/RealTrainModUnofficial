@@ -89,6 +89,8 @@ public class TileEntityTurnTableCore extends TileEntityLargeRailCore {
             if (!this.level.isClientSide) {
                 ((RailMapTurntable) this.railmap).setRotation(this.rotation);
             }
+            // ★転車台もレールを引き直したら当たり判定を焼き直す。
+            this.invalidateCollisionCache();
         }
     }
 

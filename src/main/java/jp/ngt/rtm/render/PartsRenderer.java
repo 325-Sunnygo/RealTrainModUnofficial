@@ -15,7 +15,7 @@ import javax.script.ScriptEngine;
  * 本家 jp.ngt.rtm.render.PartsRenderer の段階的移植 (レールスクリプトが使う面から)。
  * GL 呼び出し・Parts 描画は GLRecorder に記録され、BER 側で PoseStack に再生される。
  */
-public class PartsRenderer {
+public class PartsRenderer implements com.portofino.realtrainmodunofficial.client.ActionPartsHost {
     public static java.util.Calendar CALENDAR = java.util.Calendar.getInstance();
 
     // スクリプトが時刻系API (getTick/getSystemTime/getMCTime等) を読んだ = 描画結果が時間依存の合図。
@@ -171,6 +171,32 @@ public class PartsRenderer {
 
     public ModelObject getModelObject() {
         return this.modelObj;
+    }
+
+    /** 本家 targetsList: クリック可能パーツ (ActionParts) の一覧。ActionPartsPicker が使う。 */
+    @Override
+    public java.util.List<Parts> getTargetsList() {
+        return this.targetsList;
+    }
+
+    /** ActionPartsPicker 用: グループ頂点を持つポリゴンモデル。 */
+    @Override
+    public jp.ngt.ngtlib.renderer.model.PolygonModel getPolygonModel() {
+        return this.modelObj != null ? this.modelObj.model : null;
+    }
+
+    /**
+     * 本家 hittedParts / hittedEntity を更新する (スクリプトが参照する)。
+     * PICK パスの代わりに ActionPartsPicker が三角形レイキャストで当たりを求めて呼ぶ。
+     */
+    @Override
+    public void setHoveredParts(Object entity, Parts part) {
+        this.hittedEntity = entity;
+        if (part != null) {
+            this.hittedParts.put(entity, part);
+        } else {
+            this.hittedParts.remove(entity);
+        }
     }
 
     /**
@@ -346,8 +372,41 @@ public class PartsRenderer {
         this.dataMap.put(id, value);
     }
 
-    /** 本家: 前照灯のボリュームライト描画。TODO: 未移植 (安全に無視)。 */
-    public void renderLightEffect(Object normal, double[] pos, float rL, float rS, float length, int color, int type, boolean reverse) {
+    /** 本家: 前照灯のボリュームライト描画 (KaizPatchX PartsRenderer.renderLightEffect)。 */
+    public void renderLightEffect(Object normal, double[] pos, float rL, float rS,
+                                  float length, int color, int type, boolean reverse) {
+        if (pos == null || pos.length < 3) {
+            return;
+        }
+        renderLightEffectS(normal, pos[0], pos[1], pos[2], rL, rS, length, color, type, reverse);
+    }
+
+    /**
+     * 本家 PartsRenderer.renderLightEffectS の移植。
+     * 幾何計算は {@link com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry}
+     * に共通化し (車経路と共有)、ここでは GLRecorder の DRAW_TESS (加算合成) として記録する。
+     */
+    public static void renderLightEffectS(Object normal, double x, double y, double z,
+                                          float rL, float rS, float length, int color, int type, boolean reverse) {
+        GLRecorder recorder = GLRecorder.active();
+        if (recorder == null) {
+            return;
+        }
+        jp.ngt.ngtlib.math.Vec3 viewerVec =
+            normal instanceof jp.ngt.ngtlib.math.Vec3 ? getViewerVec(x, y, z) : null;
+        if (viewerVec != null) {
+            // 視点依存 = カメラを動かすと形が変わる。焼き込みキーに混ぜてはいけない印。
+            recorder.markViewDependent();
+        }
+        // 本家 renderLightEffect は disableLighting → setLightmapMaxBrightness → 描画。
+        recorder.brightness(0xF000F0);
+        for (com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.Piece p
+                : com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.compute(
+                    normal, viewerVec, rL, rS, length, color, type, reverse)) {
+            recorder.drawTess(new GLRecorder.TessDraw(p.mode, p.verts, true));
+        }
+        // 以降の描画は環境光へ戻す (本家 enableLighting)。
+        recorder.brightness(-1);
     }
 
     /** Parts.render から呼ばれる (GLRecorder への記録)。 */
@@ -369,6 +428,50 @@ public class PartsRenderer {
     public void bindTexture(Object texture) {
         // GLRecorder に BIND_TEXTURE として記録 (null でデフォルト復帰)
         jp.ngt.ngtlib.util.NGTUtilClient.bindTexture(texture);
+    }
+
+    /**
+     * 本家: 対象に乗員がいるか (NPC/車両スクリプトが使う)。
+     * 旧経路 (TrainScriptSystem.ScriptRenderer) にしか無かったため、
+     * jp.ngt レンダラ経路のスクリプトで未定義になっていた。
+     */
+    public boolean isRidden(Object entity) {
+        if (entity instanceof net.minecraft.world.entity.Entity e) {
+            return !e.getPassengers().isEmpty();
+        }
+        return false;
+    }
+
+    /** 本家: 設置物がレッドストーン給電されているか。 */
+    public boolean isPowered(Object entity) {
+        if (entity instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be) {
+            return be.isPowered();
+        }
+        if (entity instanceof BlockEntity be) {
+            Level lvl = be.getLevel();
+            if (lvl != null) {
+                return lvl.hasNeighborSignal(be.getBlockPos());
+            }
+        }
+        return false;
+    }
+
+    /** 本家: 描画視点 (運転席) のプレイヤーの向き。 */
+    public float getPlayerYaw() {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        return mc.player != null ? mc.player.getYRot() : 0.0F;
+    }
+
+    /** 本家: インベントリ操作系 (未移植スタブ)。 */
+    public Object getInventoryItem(Object entity, int slot) {
+        return null;
+    }
+
+    public int getStackSize(Object stack) {
+        return stack == null ? 0 : 1;
+    }
+
+    public void renderItem(Object entity, Object item) {
     }
 
     /** 本家: world.getLightBrightnessForSkyBlocks 相当のパック輝度。 */
@@ -474,10 +577,7 @@ public class PartsRenderer {
             && jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path) != null;
     }
 
-    /** 本家renderLightEffectS: ボリュームライトは未対応(安全に無視)。 */
-    public static void renderLightEffectS(Object normal, double x, double y, double z,
-                                          float rL, float rS, float length, int color, int type, boolean reverse) {
-    }
+
 
     /** 本家TileEntityPartsRenderer.getMetadata互換。 */
     public int getMetadata(Object tile) {

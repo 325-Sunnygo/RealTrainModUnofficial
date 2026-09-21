@@ -29,8 +29,10 @@ import java.util.List;
 import java.util.Map;
 
 public class InstalledObjectBlockEntity extends BlockEntity
-        implements jp.ngt.rtm.electric.TileEntityInsulator, jp.ngt.ngtlib.block.TileEntityPlaceable {
-    private static final int TICKET_GATE_OPEN_TICKS = 60;
+        implements jp.ngt.rtm.electric.TileEntityInsulator, jp.ngt.ngtlib.block.TileEntityPlaceable,
+                   jp.ngt.rtm.modelpack.IModelSelector {
+    /** 本家 BlockTurnstile.openGate: tile.setCount(30) — 開扉は 30 tick。 */
+    private static final int TICKET_GATE_OPEN_TICKS = 30;
     private static final int TICKET_GATE_MOVE_TICKS = 12;
     private String definitionId = "";
     /**
@@ -93,6 +95,22 @@ public class InstalledObjectBlockEntity extends BlockEntity
     private double offsetX;
     private double offsetY;
     private double offsetZ;
+    /**
+     * 本家 TileEntitySignal.setOrigBlock 用: 信号を置くときに置き換えた元ブロック。
+     * 本家 ItemSignal はクリックした柱ブロックを信号に置き換えるため、壊すと元に戻す。
+     */
+    private BlockState signalOrigBlock;
+    /**
+     * 本家 TileEntitySignal.origTileEntity: 置き換えた元タイルの NBT。
+     * 碍子/架線柱の配線などを、信号を壊して元に戻したとき失わないために持つ。
+     */
+    private CompoundTag signalOrigTileNbt;
+    /**
+     * 本家 TileEntitySignal の「本体向き (rotation)」。設置時のプレイヤー向きを 15 度刻み
+     * (スニーク時 1 度) で丸めた値。柱 (blockDirection) は 4 方位のままで、
+     * ヘッドだけ「この値 − 柱の向き」回転させる (BasicSignalPartsRenderer.rotateBody)。
+     */
+    private float signalBodyYaw;
     private int signalChannel = -1;
     private int signalAspect = SignalAspect.STOP.getId();
     // 本家 electric: コネクタの信号レベル (配線網)
@@ -108,6 +126,27 @@ public class InstalledObjectBlockEntity extends BlockEntity
     // スピーカー: 音が聞こえる範囲(ブロック)。GUIで可変。
     private int speakerRange = 32;
     private final Map<String, String> scriptData = new HashMap<>();
+
+    /** DataMap (scriptData) の値設定。機械の customForm GUI / ネットワークから使う。 */
+    public void putScriptData(String key, String value) {
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        this.scriptData.put(key, value == null ? "" : value);
+        this.setChanged();
+        if (this.level != null && !this.level.isClientSide()) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+        }
+    }
+
+    public Map<String, String> copyScriptData() {
+        return new HashMap<>(this.scriptData);
+    }
+
+    /** DataMapCompat と同じ「毎tick値 (powered 等) を除いた」生の保存値。 */
+    public String getScriptDataValue(String key) {
+        return this.scriptData.getOrDefault(key, "");
+    }
 
     // ---- 蛍光灯 (本家 TileEntityFluorescent) ----
     // 本家 dirF: 設置面とプレイヤーの向きから決まる 0..7 の取付方向。
@@ -413,6 +452,13 @@ public class InstalledObjectBlockEntity extends BlockEntity
         super.saveAdditional(tag, registries);
         tag.putString("DefinitionId", definitionId);
         tag.putString("WireModelId", wireModel);
+        if (this.signalOrigBlock != null) {
+            tag.put("SignalOrigBlock", net.minecraft.nbt.NbtUtils.writeBlockState(this.signalOrigBlock));
+        }
+        if (this.signalOrigTileNbt != null) {
+            tag.put("SignalOrigTile", this.signalOrigTileNbt.copy());
+        }
+        tag.putFloat("SignalBodyYaw", this.signalBodyYaw);
         if (!this.connections.isEmpty()) {
             net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
             for (jp.ngt.rtm.electric.Connection c : this.connections) {
@@ -501,6 +547,15 @@ public class InstalledObjectBlockEntity extends BlockEntity
         super.loadAdditional(tag, registries);
         definitionId = tag.getString("DefinitionId");
         wireModel = tag.getString("WireModelId");
+        if (tag.contains("SignalOrigBlock")) {
+            this.signalOrigBlock = net.minecraft.nbt.NbtUtils.readBlockState(
+                registries.lookupOrThrow(net.minecraft.core.registries.Registries.BLOCK),
+                tag.getCompound("SignalOrigBlock"));
+        }
+        if (tag.contains("SignalOrigTile")) {
+            this.signalOrigTileNbt = tag.getCompound("SignalOrigTile").copy();
+        }
+        this.signalBodyYaw = tag.getFloat("SignalBodyYaw");
         this.connections.clear();
         net.minecraft.nbt.ListTag connList =
             tag.getList("Connections", net.minecraft.nbt.Tag.TAG_COMPOUND);
@@ -553,6 +608,8 @@ public class InstalledObjectBlockEntity extends BlockEntity
                 scriptData.put(key, scriptDataTag.getString(key));
             }
         }
+        // 既設ワールドの設置物にも defaultValues を補完する (未設定キーのみ)
+        this.applyDefaultScriptData();
         // 看板
         signTexts.clear();
         if (tag.contains("Texts")) {
@@ -649,7 +706,29 @@ public class InstalledObjectBlockEntity extends BlockEntity
         if (category == InstalledObjectCategory.SIGNAL) {
             this.signalAspect = SignalAspect.STOP.getId();
         }
+        this.applyDefaultScriptData();
         setChanged();
+    }
+
+    /**
+     * 本家 ModelConfig.defaultValues を DataMap (scriptData) へ適用する。
+     * 未設定のキーだけに入れる (既にスクリプトが書いた値を上書きしない)。
+     * List は {@code "a|b|c"} 形式で保存し、DataMapCompat.getArray が Vec3 等へ復元する。
+     */
+    private void applyDefaultScriptData() {
+        InstalledObjectDefinition def = this.getDefinition();
+        if (def == null) {
+            return;
+        }
+        for (InstalledObjectDefinition.DefaultValue dv : def.getDefaultValues()) {
+            if (this.scriptData.containsKey(dv.key())) {
+                continue;
+            }
+            String stored = "List".equalsIgnoreCase(dv.type())
+                ? String.join("|", dv.values())
+                : dv.value();
+            this.scriptData.put(dv.key(), stored);
+        }
     }
 
     /** 張ってある架線のモデル ID。空なら未指定。 */
@@ -752,6 +831,36 @@ public class InstalledObjectBlockEntity extends BlockEntity
 
     public Vec3 getRenderOffset() {
         return new Vec3(offsetX, offsetY, offsetZ);
+    }
+
+    /** 本家 TileEntitySignal.renderBlock: 信号が置き換えた元ブロック。 */
+    public void setSignalOrigBlock(BlockState state) {
+        this.signalOrigBlock = state;
+        setChanged();
+    }
+
+    public BlockState getSignalOrigBlock() {
+        return this.signalOrigBlock;
+    }
+
+    /** 本家 TileEntitySignal.origTileEntity: 置き換えた元タイルの NBT。 */
+    public void setSignalOrigTileNbt(CompoundTag nbt) {
+        this.signalOrigTileNbt = nbt;
+        setChanged();
+    }
+
+    public CompoundTag getSignalOrigTileNbt() {
+        return this.signalOrigTileNbt;
+    }
+
+    /** 本家 TileEntitySignal.getRotation (= 本体向き)。柱の向きとの差だけヘッドを回す。 */
+    public float getSignalBodyYaw() {
+        return this.signalBodyYaw;
+    }
+
+    public void setSignalBodyYaw(float yaw) {
+        this.signalBodyYaw = yaw % 360.0F;
+        setChanged();
     }
 
     public void setWireEndpoints(BlockPos start, BlockPos end) {
@@ -1111,6 +1220,35 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return new ModelSetCompat(this);
     }
 
+    /** 本家 EntityInstalledObject.getModelType は設置物では常に "ModelMachine"。 */
+    @Override
+    public String getModelType() {
+        return "ModelMachine";
+    }
+
+    /**
+     * 本家 IModelSelector.setModelName: 設置物のモデルを差し替える。
+     * フル ID ("pack:name") でも素の名前でも解決し、実際に定義を差し替えて同期する
+     * (無行為スタブにしない — スクリプトから見て「変えたのに変わらない」を防ぐ)。
+     */
+    @Override
+    public void setModelName(String name) {
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        InstalledObjectDefinition def = InstalledObjectRegistry.getById(name);
+        if (def == null) {
+            def = InstalledObjectRegistry.getByBareName(name, this.getCategory());
+        }
+        if (def == null) {
+            return;
+        }
+        this.setDefinition(def.getId(), def.getCategory(), this.yaw);
+        if (this.level != null && !this.level.isClientSide()) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
+        }
+    }
+
     /**
      * The installed-object renderer already applies block yaw before the script runs,
      * so returning zero here avoids rotating scripted signals twice.
@@ -1258,6 +1396,11 @@ public class InstalledObjectBlockEntity extends BlockEntity
     }
 
     // ---- 転轍機 (本家 TileEntityPoint) ----
+
+    /** 本家 (1.12 系) TileEntityPoint.isActivated。パックのスクリプトが読む。 */
+    public boolean isActivated() {
+        return this.isPointActivated();
+    }
 
     public boolean isPointActivated() {
         return pointActivated;
@@ -1507,7 +1650,12 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
+    /** 本家 TileEntityMachineBase.isGettingPower: スクリプトが<b>フィールド</b>として読む。 */
+    public boolean isGettingPower;
+
     public static void tick(Level level, BlockPos pos, BlockState state, InstalledObjectBlockEntity be) {
+        // 本家 TileEntityMachineBase.isGettingPower を毎 tick 更新 (スクリプトが括弧なしで読む)
+        be.isGettingPower = be.isPowered();
         // ATS 連動: 信号機は現示 (legacy 値) を signalLevel フィールドに毎 tick 反映しておく。
         // ATS-Ps 地上子ビーコンが NGTUtil.getField(..., "signalLevel") でこれを読む (GAP C)。
         if (be.getCategory() == InstalledObjectCategory.SIGNAL) {
@@ -1630,13 +1778,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
         if (be.getCategory() == InstalledObjectCategory.TICKET_GATE) {
             boolean changed = false;
-            // レッドストーン入力でも開く (本家 Turnstile は切符で openGate だが、
-            // 自動化/検知ブロック連携用に RS 開扉を追加)
-            if (!be.powered && be.redstoneOn(level, pos)) {
-                be.powered = true;
-                be.tickCountOnActive = 0;
-                changed = true;
-            }
+            // 本家 BlockTurnstile は<b>切符で開く</b>だけ (RS 開扉は本家に無い独自拡張だったため撤去)。
             if (be.powered) {
                 if (be.barMoveCount < 90) {
                     be.barMoveCount = Math.min(90, be.barMoveCount + Math.max(1, 90 / TICKET_GATE_MOVE_TICKS));
@@ -1853,6 +1995,68 @@ public class InstalledObjectBlockEntity extends BlockEntity
                 blockEntity.scriptData.put(key, safeValue);
                 blockEntity.setChanged();
             }
+        }
+
+        /**
+         * 本家 (1.12 系) DataMap: 配列。
+         * {@code getArray("speakerPosList")} のように使い、要素は {@link jp.ngt.ngtlib.math.Vec3}
+         * (getX/getY/getZ を持つ) として返す。scriptData は文字列のみ保持できるため
+         * {@code "x y z|x y z"} 形式で保存する。
+         */
+        public Object[] getArray(String key) {
+            Object value = get(key);
+            if (value instanceof Object[] arr) {
+                return arr;
+            }
+            if (value instanceof java.util.Collection<?> col) {
+                return col.toArray();
+            }
+            if (value instanceof String s && !s.isEmpty()) {
+                String[] parts = s.split("\\|");
+                Object[] out = new Object[parts.length];
+                for (int i = 0; i < parts.length; i++) {
+                    out[i] = parseVecLike(parts[i]);
+                }
+                return out;
+            }
+            return new Object[0];
+        }
+
+        public void setArray(String key, Object value, int syncType) {
+            Object stored = value;
+            if (value instanceof java.util.Collection<?> col) {
+                stored = col.toArray();
+            }
+            values.put(key, stored);
+            if (blockEntity != null) {
+                StringBuilder sb = new StringBuilder();
+                if (stored instanceof Object[] arr) {
+                    for (Object o : arr) {
+                        if (sb.length() > 0) {
+                            sb.append('|');
+                        }
+                        sb.append(o == null ? "" : o);
+                    }
+                } else if (stored != null) {
+                    sb.append(stored);
+                }
+                blockEntity.scriptData.put(key, sb.toString());
+                blockEntity.setChanged();
+            }
+        }
+
+        /** "x y z" を Vec3 に、それ以外は文字列のまま返す。 */
+        private static Object parseVecLike(String s) {
+            String[] n = s == null ? new String[0] : s.trim().split("\\s+");
+            if (n.length >= 3) {
+                try {
+                    return new jp.ngt.ngtlib.math.Vec3(
+                        Double.parseDouble(n[0]), Double.parseDouble(n[1]), Double.parseDouble(n[2]));
+                } catch (NumberFormatException ignored) {
+                    // 数値でなければ文字列のまま
+                }
+            }
+            return s;
         }
 
         private void refresh() {

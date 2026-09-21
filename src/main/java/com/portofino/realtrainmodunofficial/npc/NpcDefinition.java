@@ -41,4 +41,18 @@ public class NpcDefinition {
     public String getModelFile() { return modelFile; }
     public Map<String, String> getTextureOverrides() { return textureOverrides; }
     public boolean hasModel() { return !this.modelFile.isBlank(); }
+
+    // ---- 本家 NPCConfig.serverScriptPath (ModelConfig 由来) ----
+    // サーバー側で毎 tick onUpdate(npc, executer) が呼ばれる。Loader が読込後に設定する。
+    private String serverScriptPath = "";
+
+    public String getServerScriptPath() { return serverScriptPath; }
+
+    public boolean hasServerScript() {
+        return serverScriptPath != null && !serverScriptPath.isBlank();
+    }
+
+    public void setServerScriptPath(String path) {
+        this.serverScriptPath = path == null ? "" : path;
+    }
 }

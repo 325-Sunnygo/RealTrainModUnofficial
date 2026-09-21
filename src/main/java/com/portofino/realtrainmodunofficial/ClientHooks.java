@@ -154,8 +154,11 @@ public final class ClientHooks {
         invokeClient("openTrainDetectorScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
-    public static void openMarkerConfigScreen(BlockPos pos) {
-        invokeClient("openMarkerConfigScreen", new Class<?>[]{BlockPos.class}, pos);
+
+
+    /** 機械の customForm (DataMap) 編集画面。 */
+    public static void openMachineConfigScreen(BlockPos pos) {
+        invokeClient("openMachineConfigScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
     public static void openSpeakerScreen(BlockPos pos) {
@@ -189,6 +192,11 @@ public final class ClientHooks {
     /** カメラ: 右クリックでファインダーモードを開閉 (本家 GuiCamera 相当) */
     public static void toggleCamera() {
         invokeClient("toggleCamera", new Class<?>[]{});
+    }
+
+    /** カメラ: ブロック右クリックで本家 GuiCamera 相当の画面を開く (本家 ItemCamera.onItemUse)。 */
+    public static void openCameraScreen() {
+        invokeClient("openCameraScreen", new Class<?>[]{});
     }
 
     /** 駅ブロック右クリック → 現在のタグを添えて駅設定 GUI を開く (client のみ)。 */

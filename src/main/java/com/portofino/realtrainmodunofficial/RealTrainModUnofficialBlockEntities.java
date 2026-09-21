@@ -1,7 +1,6 @@
 package com.portofino.realtrainmodunofficial;
 
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.MarkerBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.ScriptBlockEntity;
@@ -17,9 +16,8 @@ public class RealTrainModUnofficialBlockEntities {
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
         DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, RealTrainModUnofficial.MODID);
 
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MarkerBlockEntity>> MARKER =
-        BLOCK_ENTITY_TYPES.register("legacy_marker", () -> BlockEntityType.Builder.of(MarkerBlockEntity::new,
-            RealTrainModUnofficialBlocks.MARKER.get(), RealTrainModUnofficialBlocks.MARKER_SWITCH.get()).build(null));
+    // 旧 Remaster マーカーは本家 BlockMarker/TileEntityMarker へエイリアス済み。
+    // (legacy_marker ブロックの BE は jp.ngt.rtm.rail.RTMRailBlockEntities.MARKER が持つ)
 
     /** 設置済みミニチュア (neo mcte)。 */
     public static final net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>,
@@ -35,7 +33,7 @@ public class RealTrainModUnofficialBlockEntities {
             com.portofino.realtrainmodunofficial.blockentity.BackgroundPanelBlockEntity::new,
             RealTrainModUnofficialBlocks.BACKGROUND_PANEL.get()).build(null));
 
-    /** レールコア: 起点ブロック1個。道床とは無関係。 */
+    /** レールコア: 起点ブロック1個。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LargeRailCoreBlockEntity>> LARGE_RAIL_CORE =
         BLOCK_ENTITY_TYPES.register("legacy_large_rail_core", () -> BlockEntityType.Builder.of(LargeRailCoreBlockEntity::new,
             RealTrainModUnofficialBlocks.LARGE_RAIL_CORE.get()).build(null));
@@ -45,7 +43,7 @@ public class RealTrainModUnofficialBlockEntities {
         BLOCK_ENTITY_TYPES.register("legacy_rail_collision", () -> BlockEntityType.Builder.of(RailCollisionBlockEntity::new,
             RealTrainModUnofficialBlocks.RAIL_COLLISION.get()).build(null));
 
-    /** 道床ブロック: 対応レールコア位置を保持し、壊すとレールも撤去・列車設置検出にも使う。 */
+    /** 道床ブロック: 対応レールコア位置を保持する。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity>> BALLAST =
         BLOCK_ENTITY_TYPES.register("legacy_ballast", () -> BlockEntityType.Builder.of(
             com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity::new,

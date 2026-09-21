@@ -162,7 +162,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             if (blockEntity.getWireStart() != null && blockEntity.getWireEnd() != null) {
                 return EMPTY_SHAPE;
             }
-            return shiftToModel(outlineShape(blockEntity.getCategory(), level, pos), blockEntity);
+            return outlineShape(blockEntity.getCategory(), level, pos);
         }
         return RTM_SELECTION_SHAPE;
     }
@@ -176,17 +176,6 @@ public class InstalledObjectBlock extends BaseEntityBlock {
      * ずれた場所に残る (柱に挿したときだけズレる = 置き方で当たり判定が変わる)。
      * 描画オフセットぶん当たり判定も動かすことで、<b>どう置いても信号の当たり判定は常に同じ</b>になる。
      */
-    private static VoxelShape shiftToModel(VoxelShape shape, InstalledObjectBlockEntity be) {
-        if (be.getCategory() != InstalledObjectCategory.SIGNAL) {
-            return shape;
-        }
-        net.minecraft.world.phys.Vec3 off = be.getRenderOffset();
-        if (off == null || (off.x == 0.0D && off.y == 0.0D && off.z == 0.0D)) {
-            return shape;
-        }
-        return shape.move(off.x, off.y, off.z);
-    }
-
     /** 種類ごとの見た目どおりの形 (選択枠)。本家の setBlockBounds と同じ。 */
     private static VoxelShape outlineShape(InstalledObjectCategory category, BlockGetter level, BlockPos pos) {
         if (category == null) {
@@ -252,22 +241,29 @@ public class InstalledObjectBlock extends BaseEntityBlock {
      * 隣に足場/階段が続いていればその面は出さない。
      */
     private static VoxelShape scaffoldShape(BlockGetter level, BlockPos pos) {
+        // 本家 BlockScaffold.addCollisionBoxesToList の完全移植:
+        //   床 (1/16) + 自分の向きに対して横 2 面の手すり (高さ 1.5)。
+        //   隣が足場/階段で続いていればその面は出さない。
         int dir = scaffoldDir(level, pos);
-        boolean b0 = (dir == 0 || dir == 2);
-
-        byte flag0 = connectionType(level, pos.east(), (byte) 1);
-        byte flag1 = connectionType(level, pos.west(), (byte) 1);
-        byte flag2 = connectionType(level, pos.south(), (byte) 0);
-        byte flag3 = connectionType(level, pos.north(), (byte) 0);
-
-        boolean crossZ = (flag2 == 1 || flag3 == 1 || flag2 == 3 || flag3 == 3);
-        boolean crossX = (flag0 == 2 || flag1 == 2 || flag0 == 3 || flag1 == 3);
+        boolean b0 = dir == 0;
+        byte f0 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX() + 1, pos.getY(), pos.getZ(), dir);
+        byte f1 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX() - 1, pos.getY(), pos.getZ(), dir);
+        byte f2 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() + 1, dir);
+        byte f3 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() - 1, dir);
 
         VoxelShape shape = SCAFFOLD_FLOOR;
-        if (!inRange(flag0) && (b0 || crossZ))  shape = Shapes.or(shape, SCAFFOLD_RAIL_XP);
-        if (!inRange(flag1) && (b0 || crossZ))  shape = Shapes.or(shape, SCAFFOLD_RAIL_XN);
-        if (!inRange(flag2) && (!b0 || crossX)) shape = Shapes.or(shape, SCAFFOLD_RAIL_ZP);
-        if (!inRange(flag3) && (!b0 || crossX)) shape = Shapes.or(shape, SCAFFOLD_RAIL_ZN);
+        if ((b0 && f0 == 0) || (!b0 && f0 == 0 && (f2 == 1 || f3 == 1 || f2 == 3 || f3 == 3))) {
+            shape = Shapes.or(shape, SCAFFOLD_RAIL_XP);
+        }
+        if ((b0 && f1 == 0) || (!b0 && f1 == 0 && (f2 == 1 || f3 == 1 || f2 == 3 || f3 == 3))) {
+            shape = Shapes.or(shape, SCAFFOLD_RAIL_XN);
+        }
+        if ((!b0 && f2 == 0) || (b0 && f2 == 0 && (f0 == 2 || f1 == 2 || f0 == 3 || f1 == 3))) {
+            shape = Shapes.or(shape, SCAFFOLD_RAIL_ZP);
+        }
+        if ((!b0 && f3 == 0) || (b0 && f3 == 0 && (f0 == 2 || f1 == 2 || f0 == 3 || f1 == 3))) {
+            shape = Shapes.or(shape, SCAFFOLD_RAIL_ZN);
+        }
         return shape;
     }
 
@@ -276,43 +272,41 @@ public class InstalledObjectBlock extends BaseEntityBlock {
      * 壁は隣に<b>同じ向きの階段</b>が続いていれば出さない。
      */
     private static VoxelShape stairShape(BlockGetter level, BlockPos pos) {
-        int dir = jp.ngt.rtm.block.BlockScaffold.dirAt(level, pos);
+        // 本家 BlockScaffoldStairs.addCollisionBoxesToList の完全移植:
+        //   4 段の踏面 (0.25 刻み) + 両側の壁 (高さ 2.0)。壁は隣が同じ向きの階段なら出さない。
+        int dir = scaffoldDir(level, pos);
+        byte f0 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX() + 1, pos.getY(), pos.getZ(), dir);
+        byte f1 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX() - 1, pos.getY(), pos.getZ(), dir);
+        byte f2 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() + 1, dir);
+        byte f3 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() - 1, dir);
+
         VoxelShape shape = Shapes.empty();
         if (dir == 0 || dir == 2) {
-            if (jp.ngt.rtm.block.BlockScaffoldStairs.getConnectionType(level, pos.getX() - 1, pos.getY(), pos.getZ(), dir) != 3) {
+            if (f1 != 3) {
                 shape = Shapes.or(shape, STAIR_WALL_XN);
             }
-            if (jp.ngt.rtm.block.BlockScaffoldStairs.getConnectionType(level, pos.getX() + 1, pos.getY(), pos.getZ(), dir) != 3) {
+            if (f0 != 3) {
                 shape = Shapes.or(shape, STAIR_WALL_XP);
             }
             for (int i = 0; i < 4; ++i) {
-                double f0 = i * 0.25D;
-                double f1 = (dir == 2) ? f0 : 0.75D - f0;
-                shape = Shapes.or(shape, Shapes.box(0.0D, f0, f1, 1.0D, f0 + 0.25D, f1 + 0.25D));
+                double f = i * 0.25D;
+                double z = (dir == 2) ? f : 0.75D - f;
+                shape = Shapes.or(shape, Shapes.box(0.0D, f, z, 1.0D, 0.25D + f, 0.25D + z));
             }
         } else {
-            if (jp.ngt.rtm.block.BlockScaffoldStairs.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() - 1, dir) != 3) {
+            if (f3 != 3) {
                 shape = Shapes.or(shape, STAIR_WALL_ZN);
             }
-            if (jp.ngt.rtm.block.BlockScaffoldStairs.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() + 1, dir) != 3) {
+            if (f2 != 3) {
                 shape = Shapes.or(shape, STAIR_WALL_ZP);
             }
             for (int i = 0; i < 4; ++i) {
-                double f0 = i * 0.25D;
-                double f1 = (dir == 1) ? f0 : 0.75D - f0;
-                shape = Shapes.or(shape, Shapes.box(f1, f0, 0.0D, f1 + 0.25D, f0 + 0.25D, 1.0D));
+                double f = i * 0.25D;
+                double x = (dir == 1) ? f : 0.75D - f;
+                shape = Shapes.or(shape, Shapes.box(x, f, 0.0D, 0.25D + x, 0.25D + f, 1.0D));
             }
         }
         return shape;
-    }
-
-    private static boolean inRange(byte flag) {
-        return flag >= 1 && flag <= 3;
-    }
-
-    /** ★判定は {@link jp.ngt.rtm.block.BlockScaffold} に一本化する (描画スクリプトと同じ物を使う)。 */
-    private static byte connectionType(BlockGetter level, BlockPos pos, byte dir) {
-        return jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ(), dir);
     }
 
     private static int scaffoldDir(BlockGetter level, BlockPos pos) {
@@ -355,6 +349,40 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         entity.setDeltaMovement(entity.getDeltaMovement().add(mx, vertical, mz));
     }
 
+    /** 「ブロックの中を歩けない」調査用: カテゴリごとに一度だけ衝突形状をログに出す。 */
+    private static final java.util.Set<String> COLLISION_PROBED =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private static VoxelShape probe(InstalledObjectCategory category, VoxelShape shape) {
+        if (COLLISION_PROBED.add(category.name())) {
+            net.minecraft.world.phys.AABB b = shape.bounds();
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+                "[RTMU] collision probe {}: full={} empty={} bounds=[{},{},{} -> {},{},{}]",
+                category, isFullBlockShape(shape), shape.isEmpty(),
+                b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ);
+            // ★「ブロックの中を歩けない」の切り分け用: 実際の衝突箱を全部出す。
+            StringBuilder sb = new StringBuilder();
+            int n = 0;
+            for (net.minecraft.world.phys.AABB box : shape.toAabbs()) {
+                if (n++ >= 24) {
+                    sb.append(" ...");
+                    break;
+                }
+                sb.append(String.format(" [%.3f,%.3f,%.3f-%.3f,%.3f,%.3f]",
+                    box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ));
+            }
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+                "[RTMU] collision boxes {} ({}):{}", category, n, sb);
+        }
+        return shape;
+    }
+
+    private static boolean isFullBlockShape(VoxelShape shape) {
+        net.minecraft.world.phys.AABB b = shape.bounds();
+        return b.minX <= 0.0D && b.minY <= 0.0D && b.minZ <= 0.0D
+            && b.maxX >= 1.0D && b.maxY >= 1.0D && b.maxZ >= 1.0D;
+    }
+
     /**
      * ぶつかる判定。本家で {@code getCollisionBoundingBoxFromPool} が null を返す設置物は、
      * <b>すり抜けられるが壊せる</b> (選択枠だけ残る)。蛍光灯がこれ。
@@ -375,12 +403,17 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             //★足場/階段の衝突は本家 addCollisionBoxToList の複合形状 (床 1/16 + 手すり 1.5 /
             //  4 段 + 壁 2.0)。選択枠 (getShape) はフルブロックのままにする。
             if (category == InstalledObjectCategory.SCAFFOLD) {
-                return scaffoldShape(level, pos);
+                return probe(category, scaffoldShape(level, pos));
             }
             if (category == InstalledObjectCategory.STAIR) {
-                return stairShape(level, pos);
+                return probe(category, stairShape(level, pos));
             }
-            return shiftToModel(outlineShape(category, level, pos), blockEntity);
+            VoxelShape outline = outlineShape(category, level, pos);
+            // 「ブロックの中を歩けない」調査用: フルブロック衝突になっているカテゴリを一度だけ記録する。
+            if (isFullBlockShape(outline)) {
+                probe(category, outline);
+            }
+            return outline;
         }
         return RTM_SELECTION_SHAPE;
     }
@@ -440,13 +473,25 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
+        // 本家 BlockMachineBase.clickMachine: 素の右クリック → customForm の DataMap GUI を開く。
+        if (!player.isShiftKeyDown()
+            && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
+            && be.getDefinition() != null && be.getDefinition().getCustomForm() != null) {
+            if (level.isClientSide) {
+                com.portofino.realtrainmodunofficial.ClientHooks.openMachineConfigScreen(pos);
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 
     @Override
     protected net.minecraft.world.InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
             net.minecraft.world.entity.player.Player player, net.minecraft.world.phys.BlockHitResult hit) {
-        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be && be.isSpeaker()) {
+        // 本家 BlockSpeaker.onBlockActivated: スニーク中は機械処理 (モデル選択等)、
+        // 通常の右クリックだけスピーカー GUI (GuiSpeaker) を開く。
+        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be && be.isSpeaker()
+            && !player.isShiftKeyDown()) {
             if (level.isClientSide) {
                 com.portofino.realtrainmodunofficial.ClientHooks.openSpeakerScreen(pos);
             }
@@ -495,6 +540,15 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             && be.getCategory() == InstalledObjectCategory.RAILROAD_SIGN) {
             if (level.isClientSide) {
                 com.portofino.realtrainmodunofficial.ClientHooks.openRailroadSignScreen(pos);
+            }
+            return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
+        }
+        // 本家 BlockMachineBase.clickMachine: 素手の右クリック → customForm の DataMap GUI。
+        if (!player.isShiftKeyDown()
+            && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity cfgBe
+            && cfgBe.getDefinition() != null && cfgBe.getDefinition().getCustomForm() != null) {
+            if (level.isClientSide) {
+                com.portofino.realtrainmodunofficial.ClientHooks.openMachineConfigScreen(pos);
             }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }
@@ -555,6 +609,22 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
         if (!level.isClientSide && state.getBlock() != newState.getBlock()) {
+            // 本家 BlockSignal.onBlockDestroyedByPlayer → TileEntitySignal.setOrigBlock:
+            // 信号は置いたときにクリックした柱ブロックを置き換えているので、壊したら元に戻す。
+            if (newState.isAir()
+                    && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
+                    && be.getSignalOrigBlock() != null) {
+                BlockState orig = be.getSignalOrigBlock();
+                net.minecraft.nbt.CompoundTag origTileNbt = be.getSignalOrigTileNbt();
+                be.setSignalOrigBlock(null);
+                level.setBlock(pos, orig, 3);
+                // 本家 setOrigBlock: 元タイルの NBT も書き戻す (配線などを復元)
+                if (origTileNbt != null
+                        && level.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.BlockEntity restored) {
+                    restored.loadWithComponents(origTileNbt, level.registryAccess());
+                }
+                return;
+            }
             removeSignalLink(level, pos);
             removeAttachedWires(level, pos);
             stopSpeakerSoundOnRemove(level, pos);

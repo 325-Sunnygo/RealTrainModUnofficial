@@ -10,7 +10,6 @@ import com.portofino.realtrainmodunofficial.item.TrainItem;
 import com.portofino.realtrainmodunofficial.item.InstalledObjectItem;
 import com.portofino.realtrainmodunofficial.item.TrainVehicleItem;
 import com.portofino.realtrainmodunofficial.item.WireItem;
-import com.portofino.realtrainmodunofficial.item.WrenchItem;
 import com.portofino.realtrainmodunofficial.item.RtmWrenchItem;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -30,14 +29,11 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<MarkerItem> MARKER_ITEM = ITEMS.register(
         "marker", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get(), false)
     );
-    public static final DeferredItem<MarkerItem> MARKER_DIAGONAL_ITEM = ITEMS.register(
-        "marker_diagonal", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get(), true)
+    public static final DeferredItem<MarkerItem> MARKER_STRAIGHT_ITEM = ITEMS.register(
+        "marker_straight", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER_STRAIGHT.get(), false)
     );
     public static final DeferredItem<MarkerItem> MARKER_SWITCH_ITEM = ITEMS.register(
         "marker_switch", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER_SWITCH.get(), false)
-    );
-    public static final DeferredItem<MarkerItem> MARKER_SWITCH_DIAGONAL_ITEM = ITEMS.register(
-        "marker_switch_diagonal", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER_SWITCH.get(), true)
     );
     public static final DeferredItem<RailItem> RAIL_ITEM = ITEMS.register(
         "rail", RailItem::new

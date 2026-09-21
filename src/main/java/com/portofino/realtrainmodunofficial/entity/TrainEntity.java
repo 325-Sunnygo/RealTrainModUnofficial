@@ -3,10 +3,6 @@ package com.portofino.realtrainmodunofficial.entity;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialEntities;
-import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
-import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
-import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import jp.ngt.rtm.rail.util.RailMap;
 import jp.ngt.rtm.rail.util.RailPosition;
 import com.portofino.realtrainmodunofficial.script.TrainScriptSystem;
@@ -44,7 +40,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
 
-public class TrainEntity extends Entity {
+public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSelector {
     /** 本家 EntityVehicleBase:43 相当。車両ごとに永続する ScriptExecuter (count を進める)。 */
     public final jp.ngt.rtm.modelpack.ScriptExecuter scriptExecuter = new jp.ngt.rtm.modelpack.ScriptExecuter();
 
@@ -230,6 +226,7 @@ public class TrainEntity extends Entity {
     private int interactionHitboxRefreshCooldown;
     private float rotationRoll;
     private float prevRotationRoll;
+
     public float doorMoveL;
     public float doorMoveR;
     // クライアント側ドア開閉音 (sound_DoorOpen/sound_DoorClose) の状態変化検出用。
@@ -345,6 +342,23 @@ public class TrainEntity extends Entity {
 
     public String getVehicleId() { return entityData.get(VEHICLE_ID); }
     public void setVehicleId(String id) { entityData.set(VEHICLE_ID, id != null ? id : ""); }
+
+    // ---- IModelSelector (車経路。本家 EntityVehicle と同じ型名/意味) ----
+
+    @Override
+    public String getModelName() {
+        return this.getVehicleId();
+    }
+
+    @Override
+    public void setModelName(String name) {
+        this.setVehicleId(name);
+    }
+
+    @Override
+    public String getModelType() {
+        return "ModelVehicle";
+    }
     public float getSpeed() { return entityData.get(SPEED); }
     public void setSpeed(float speed) { entityData.set(SPEED, speed); }
     /** 動輪/ロッドの累積回転角(度, 0-360)。毎tickの移動距離で加算。スクリプトの getWheelRotationR が参照。 */
@@ -680,10 +694,9 @@ public class TrainEntity extends Entity {
             if (level().isClientSide()) {
                 com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
             }
-            // 音は毎tick更新するが、重い描画スクリプトは既存の間引き設定を尊重する。
-            if (runScriptTick && scriptEngine != null) {
-                TrainScriptSystem.invokeScriptTick(scriptEngine, this);
-            }
+            // ★描画スクリプトを毎tick tick/onUpdate で叩く独自フックは撤去した。
+            //   本家は描画スクリプトのフックを init / render のみとし、
+            //   onUpdate は serverSE (サーバースクリプト) にだけ送る。
         }
 
         if (level().isClientSide()) {
@@ -822,8 +835,10 @@ public class TrainEntity extends Entity {
         clientLerpZ = z;
         clientLerpYRot = yRot;
         clientLerpXRot = xRot;
-        // 位置更新は毎tick来るのでsteps=1で即スナップし台車位置と揃える
-        clientLerpSteps = 1;
+        //★本家 EntityVehicleBase.setPositionAndRotation2 は par6 (通常 3) tick かけて
+        //  位置/向きを補間する。以前は steps=1 で即スナップしていたため、継ぎ目の多い
+        //  レール (SRB3 等) で本体が微振動していた。呼び出し側の steps を尊重する。
+        clientLerpSteps = Math.max(1, steps);
         setDeltaMovement(Vec3.ZERO);
     }
 
@@ -1014,7 +1029,7 @@ public class TrainEntity extends Entity {
         for (int dy = -1; dy <= 1; dy++) {
             BlockPos pos = base.offset(0, dy, 0);
             var block = level().getBlockState(pos).getBlock();
-            if (block instanceof RailCollisionBlock || block instanceof LargeRailCoreBlock) {
+            if (block instanceof jp.ngt.rtm.rail.BlockLargeRailBase) {
                 return true;
             }
         }
@@ -1362,9 +1377,7 @@ public class TrainEntity extends Entity {
                 for (int dz = -1; dz <= 1; dz++) {
                     net.minecraft.world.level.block.Block b =
                         level().getBlockState(base.offset(dx, dy, dz)).getBlock();
-                    if (b instanceof com.portofino.realtrainmodunofficial.block.RailCollisionBlock
-                        || b instanceof com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock
-                        || b instanceof com.portofino.realtrainmodunofficial.block.BallastBlock) {
+                    if (b instanceof jp.ngt.rtm.rail.BlockLargeRailBase) {
                         return true;
                     }
                 }
@@ -1752,25 +1765,21 @@ public class TrainEntity extends Entity {
         float yaw = horizontal > 1.0E-4D
             ? (float) Math.toDegrees(Math.atan2(dx, dz))
             : fallbackYaw;
-        // 前後台車の微小なY差(分岐マップの縦ベジェのわずかな膨らみ等)で小さなピッチが付き、本体が
-        // 跳ねて見える。Y差が小さいうち(0.15ブロック未満)はピッチに反映しない(デッドゾーン)。実際の
-        // 勾配はこれより大きなY差になるので従来通り正確に追従する。
-        double pitchDy = Math.abs(dy) < 0.15D ? 0.0D : dy;
+        //★本家 EntityVehicleBase.updatePosAndRotationClient に合わせる:
+        //  目標 (vehicleY / vehiclePitch) を<b>そのまま</b>与え、位置/向きは
+        //  数 tick かけた補間で追従させる。以前はここでデッドゾーン・1tick クランプ・
+        //  filterBodyY という独自の揺れ抑制をしていたが、本家に無い上に
+        //  「継ぎ目の多いレール (SRB3 等) で揺れる」原因になっていたため撤去した。
         float pitch = horizontal > 1.0E-4D
-            ? (float) Math.toDegrees(Math.atan2(pitchDy, horizontal))
+            ? (float) Math.toDegrees(Math.atan2(dy, horizontal))
             : fallbackPitch;
-        // 分岐境界などで前後台車のY差が急変したとき、本体ピッチが瞬間的に振れて跳ねるのを抑える。
-        // 1tickのピッチ変化量を制限し急なジョルトだけ平滑化する(通常走行・カーブ・坂は無影響)。
-        if (move) {
-            float prevPitch = getXRot();
-            float maxPitchDelta = 6.0F;
-            pitch = Mth.clamp(pitch, prevPitch - maxPitchDelta, prevPitch + maxPitchDelta);
-        }
         yaw = keepNearestYaw(yaw, getYRot());
         RailSample centerSample = resolveBodyCenterSample(front, rear);
         Vec3 center = new Vec3(centerSample.x, centerSample.y + TRAIN_BODY_HEIGHT_OFFSET, centerSample.z);
         if (move) {
-            moveTo(center.x, center.y, center.z, yaw, pitch);
+            // 本家は更新を受けて vehiclePosRotationInc tick かけて補間する。1.21 の
+            // バニラ補間 (lerpTo) で同じことをする (瞬間スナップさせない)。
+            this.lerpTo(center.x, center.y, center.z, yaw, pitch, 3);
         } else {
             setPos(center.x, center.y, center.z);
         }
@@ -2253,25 +2262,14 @@ public class TrainEntity extends Entity {
     /** true の間はスイッチの全分岐をレール探索候補にする(アクティブ分岐で見つからない時のフォールバック)。 */
     private boolean railLookupIncludeAllSegments = false;
 
-    private RailMap[] switchCandidateMaps(LargeRailCoreBlockEntity core, RailMap currentMap) {
-        if (railLookupIncludeAllSegments || shouldInspectAllSegments(core, currentMap)) {
-            return core.getAllRailMaps();
-        }
-        return core.getActiveRailMaps();
+    /** スイッチの候補 RailMap。本家コアは全マップを返す (getActiveRailMaps は本家に無い)。 */
+    private RailMap[] switchCandidateMaps(jp.ngt.rtm.rail.TileEntityLargeRailCore core, RailMap currentMap) {
+        return core == null ? new RailMap[0] : core.getAllRailMaps();
     }
 
     private RailMap[] getConnectionCandidateMapsAt(BlockPos pos, RailMap currentMap) {
+        // 本家 rail (jp.ngt): ベース/コアどちらでもコア経由で全 RailMap を返す
         BlockEntity blockEntity = level().getBlockEntity(pos);
-        if (blockEntity instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-            return switchCandidateMaps(core, currentMap);
-        }
-        if (blockEntity instanceof RailCollisionBlockEntity collision) {
-            BlockPos corePos = collision.getCorePos();
-            if (corePos != null && level().getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                return switchCandidateMaps(core, currentMap);
-            }
-        }
-        // jp.ngt.rtm.rail (Phase 1 本家忠実システム): ベース/コアどちらでもコア経由で全 RailMap を返す
         if (blockEntity instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase) {
             jp.ngt.rtm.rail.TileEntityLargeRailCore core = railBase.getRailCore();
             if (core != null && core.isLoaded()) {
@@ -2284,7 +2282,7 @@ public class TrainEntity extends Entity {
         return new RailMap[0];
     }
 
-    private boolean shouldInspectAllSegments(LargeRailCoreBlockEntity core, RailMap currentMap) {
+    private boolean shouldInspectAllSegments(jp.ngt.rtm.rail.TileEntityLargeRailCore core, RailMap currentMap) {
         if (core == null || currentMap == null) {
             return false;
         }
@@ -3267,16 +3265,7 @@ public class TrainEntity extends Entity {
     }
 
     private RailMap[] getRailMapsAt(BlockPos pos) {
-        if (level().getBlockEntity(pos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-            return railLookupIncludeAllSegments ? core.getAllRailMaps() : core.getActiveRailMaps();
-        }
-        if (level().getBlockEntity(pos) instanceof RailCollisionBlockEntity collision) {
-            BlockPos corePos = collision.getCorePos();
-            if (corePos != null && level().getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                return railLookupIncludeAllSegments ? core.getAllRailMaps() : core.getActiveRailMaps();
-            }
-        }
-        // jp.ngt.rtm.rail (Phase 1 本家忠実システム)
+        // 本家 rail (jp.ngt) のみ
         if (level().getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase) {
             jp.ngt.rtm.rail.TileEntityLargeRailCore core = railBase.getRailCore();
             if (core != null && core.isLoaded()) {

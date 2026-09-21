@@ -19,6 +19,37 @@ public class RailPartsRenderer extends PartsRenderer {
      */
     public jp.ngt.rtm.rail.util.RailMap renderMapOverride;
 
+    /** 本家: モデルの全グループ名 (renderKey 計算やスクリプトが使う)。 */
+    public String[] getAllObjNames() {
+        ModelObject mo = this.getModelObject();
+        if (mo == null || mo.model == null) {
+            return new String[0];
+        }
+        return mo.model.getGroupObjects().stream()
+                .map(g -> g.name)
+                .toArray(String[]::new);
+    }
+
+    /**
+     * 本家: レール描画原点 (先頭 RailPosition のブロック端数)。
+     * 表示リストの平行移動や、スクリプトが原点補正するときに使う。
+     */
+    public double[] getRailRenderOrigin(Object tileObj) {
+        if (!(tileObj instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore core)) {
+            return new double[]{0.0D, 0.0D, 0.0D};
+        }
+        jp.ngt.rtm.rail.util.RailPosition[] rps = core.getRailPositions();
+        if (rps == null || rps.length == 0 || rps[0] == null) {
+            return new double[]{0.0D, 0.0D, 0.0D};
+        }
+        jp.ngt.rtm.rail.util.RailPosition rp = rps[0];
+        return new double[]{
+            rp.posX - (double) rp.blockX,
+            rp.posY - (double) rp.blockY - 0.0625D,
+            rp.posZ - (double) rp.blockZ
+        };
+    }
+
     public boolean isSwitchRail(Object tile) {
         return tile instanceof TileEntityLargeRailSwitchCore;
     }
