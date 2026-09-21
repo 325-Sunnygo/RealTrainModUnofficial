@@ -195,15 +195,22 @@ public final class PackButtonTextureCache {
         return out;
     }
 
-    /** RTM 256-UV のボタンソース矩形 (正方キャンバスの左上 62.5%×12.5%)。 */
+    /**
+     * 本家 RTM のボタンソース矩形。
+     *
+     * <p>本家は {@code drawTexturedModalRect(x, y, 0, 0, 160, 32)} で描く。1.7.10/1.12.2 の
+     * この API は UV を <b>256px 固定</b>で割るため、実際にサンプルされるのは
+     * テクスチャ左上の <b>160/256 × 32/256 の割合</b> (62.5% × 12.5%) になる。
+     * 解像度 (256/512/…) に依らずこの割合で切るのが本家と同じ。
+     *
+     * <p>★以前は「160×128 以上なら割合、それ以外は 160×32 固定」という RTMU 独自の
+     * 分岐があり、解像度がデフォルトと違うボタンで切り出しがずれて縮小/見切れしていた。
+     */
     private static int[] computeSourceRegion(int width, int height) {
-        if (width >= 160 && height >= 128) {
-            return new int[]{
-                Math.min(width, Math.round(width * 160.0F / 256.0F)),
-                Math.min(height, Math.round(height * 32.0F / 256.0F))
-            };
-        }
-        return new int[]{Math.min(width, 160), Math.min(height, 32)};
+        return new int[]{
+            Math.max(1, Math.min(width, Math.round(width * 160.0F / 256.0F))),
+            Math.max(1, Math.min(height, Math.round(height * 32.0F / 256.0F)))
+        };
     }
 
     /** パックから buttonTexture の NativeImage を読み込む (登録しない)。呼び出し側で close する。 */
@@ -228,19 +235,11 @@ public final class PackButtonTextureCache {
         );
         int width = image.getWidth();
         int height = image.getHeight();
-        // RTM 本家のボタン UV は 256px 空間で (0,0)-(160,32) を 固定倍率 f=1/256 で描く。
-        // = テクスチャ左上の 62.5% × 12.5% をサンプルする (解像度に依らずこの割合)。
-        int srcW;
-        int srcH;
-        if (width >= 160 && height >= 128) {
-            // 256 以上の(ほぼ)正方ボタンキャンバス: 左上 160/256 × 32/256。
-            srcW = Math.min(width, Math.round(width * 160.0F / 256.0F));
-            srcH = Math.min(height, Math.round(height * 32.0F / 256.0F));
-        } else {
-            // 想定外 (小さい/横長) のファイルは従来どおり左上 160×32 (無ければ全体)。
-            srcW = Math.min(width, 160);
-            srcH = Math.min(height, 32);
-        }
+        // 本家と同じく 256px 空間の UV (0,0)-(160,32) = 左上 62.5% × 12.5% をサンプルする。
+        // 解像度に依らずこの割合 (RTMU 独自の「160×32 固定」分岐は撤去)。
+        int[] region = computeSourceRegion(width, height);
+        int srcW = region[0];
+        int srcH = region[1];
         DynamicTexture dynamicTexture = new DynamicTexture(image);
         // GUI ボタンはピクセル等倍で鮮明に見せたい。
         // 拡大縮小時ににじむ (ユーザー報告「ボタンがぼやける」)。最近傍・ミップマップ無しに固定する。

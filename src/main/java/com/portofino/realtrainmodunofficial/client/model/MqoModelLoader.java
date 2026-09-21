@@ -2271,41 +2271,49 @@ public final class MqoModelLoader {
             if (in != null) {
                 byte[] data = in.readAllBytes();
                 com.mojang.blaze3d.platform.NativeImage img = com.mojang.blaze3d.platform.NativeImage.read(new ByteArrayInputStream(data));
+                // ★NativeImage を読む処理は、DynamicTexture へ渡す (= 描画スレッドが
+                //   アップロードして native メモリを解放する) より<b>前に全部済ませる</b>。
+                //   背景ロード (RTMU-ModelPreload) では登録だけ描画スレッドへ回していたため、
+                //   描画スレッドのアップロードと画像読み取りが競合し、解放済みメモリを読んで
+                //   EXCEPTION_ACCESS_VIOLATION で落ちていた
+                //   (hs_err: MqoModelLoader.buildPass1Mask / NativeImage.getPixelRGBA)。
                 // テクスチャに「中間アルファ(0/255以外)」があれば本当の半透明 (ガラス等)。
                 // cutout 用の二値アルファ(車体の穴)と区別し、本当の半透明だけ translucent 扱いにする。
                 boolean partialAlpha = hasPartialAlpha(img);
                 boolean glassBand = hasGlassBand(img);
+                boolean splitAlpha = alphaBlendOption || partialAlpha || glassBand;
+                com.mojang.blaze3d.platform.NativeImage opaqueImg = splitAlpha ? copyOpaqueOnlyAlpha(img) : null;
+                com.mojang.blaze3d.platform.NativeImage windowImg = splitAlpha ? copyNonOpaqueAlpha(img) : null;
+                // 発光解決はサブライトテクスチャがあるときのみ(無条件だと二重描画)
+                ResourceLocation[] legacyLights = resolveLegacyLightTextures(binding, opener, img);
+                // 割合判定 (3%/1.5%) は運転席窓のような小さなガラス領域を見逃すため、正確な全画素判定で上書き
+                boolean anyTranslucent = hasAnyTranslucentPixel(img);
+                // pass1 で実際に色が出るテクセルの位置。面ごとの提出要否をこれで判定する。
+                java.util.BitSet pass1Mask = buildPass1Mask(img);
+
+                // ここから登録 (描画スレッドへ回る)。以降この img は読まない。
                 int key = Math.abs(binding.cacheKey().hashCode());
-                DynamicTexture tex = new DynamicTexture(img);
-                ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
+                ResourceLocation baseLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                     "dynamic/mqo/" + Integer.toHexString(key));
-                registerTextureSafe(loc, tex);
-                ResourceLocation baseLoc = loc;
-                ResourceLocation opaqueLoc = loc;
-                ResourceLocation windowLoc = loc;
-                if (alphaBlendOption || partialAlpha || glassBand) {
-                    com.mojang.blaze3d.platform.NativeImage opaqueImg = copyOpaqueOnlyAlpha(img);
-                    DynamicTexture opaqueTex = new DynamicTexture(opaqueImg);
+                ResourceLocation opaqueLoc = baseLoc;
+                ResourceLocation windowLoc = baseLoc;
+                registerTextureSafe(baseLoc, new DynamicTexture(img));
+                if (splitAlpha) {
                     opaqueLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_opq");
-                    registerTextureSafe(opaqueLoc, opaqueTex);
+                    registerTextureSafe(opaqueLoc, new DynamicTexture(opaqueImg));
                     // pass1用: 半透明ピクセルだけ残し、不透明部分の再描画を防ぐ
-                    com.mojang.blaze3d.platform.NativeImage windowImg = copyNonOpaqueAlpha(img);
-                    DynamicTexture windowTex = new DynamicTexture(windowImg);
                     windowLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_win");
-                    registerTextureSafe(windowLoc, windowTex);
+                    registerTextureSafe(windowLoc, new DynamicTexture(windowImg));
                     // スクリプト経路からも引けるようにする (opaqueVariantOf / windowVariantOf)
                     TEXTURE_ALPHA_SPLIT.put(baseLoc, new ResourceLocation[]{opaqueLoc, windowLoc});
                 }
-                // 発光解決はサブライトテクスチャがあるときのみ(無条件だと二重描画)
-                TextureInfo info = new TextureInfo(baseLoc, resolveLegacyLightTextures(binding, opener, img), alphaBlendOption || partialAlpha || glassBand, partialAlpha, glassBand, opaqueLoc, windowLoc);
+                TextureInfo info = new TextureInfo(baseLoc, legacyLights, splitAlpha, partialAlpha, glassBand, opaqueLoc, windowLoc);
                 info.lightOptionDeclared = binding.hasLightTextures();
                 info.noSubTextures = binding.noSubTextures();
-                // 割合判定 (3%/1.5%) は運転席窓のような小さなガラス領域を見逃すため、正確な全画素判定で上書き
-                info.hasAnyTranslucentPixel = hasAnyTranslucentPixel(img);
-                // pass1 で実際に色が出るテクセルの位置。面ごとの提出要否をこれで判定する。
-                info.pass1Mask = buildPass1Mask(img);
+                info.hasAnyTranslucentPixel = anyTranslucent;
+                info.pass1Mask = pass1Mask;
                 return info;
             }
         } catch (Exception e) {

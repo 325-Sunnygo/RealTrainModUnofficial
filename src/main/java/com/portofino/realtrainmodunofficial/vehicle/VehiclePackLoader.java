@@ -319,12 +319,18 @@ public class VehiclePackLoader {
             JsonElement el = JsonParser.parseString(PackTextDecoder.decodeJson(bytes));
             if (!el.isJsonObject()) return;
             JsonObject obj = el.getAsJsonObject();
-            // ★本家 TrainConfig の項目名をそのまま使う (trainName / trainType / trainModel2 ...)。
-            //   RTMU 独自の別名 (name / vehicleType / model キー) は受け付けない。
-            String id = getString(obj, "trainName");
+            // ★本家 KaizPatchX のスキーマは 2 種類ある。それぞれの項目名をそのまま使う。
+            //   ModelTrain   : trainName / trainType (EC/DC/…) / trainModel2
+            //   ModelVehicle : name / vehicleType (Car/Plane/Ship) / model   ← 自動車はこちら
+            boolean sourceLooksLikeVehicle = isVehicleJsonPath(sourcePath);
+            String id = sourceLooksLikeVehicle
+                ? getString(obj, "name")
+                : getString(obj, "trainName");
             if (id == null || id.isBlank()) id = fallbackTrainId(sourcePath);
             String displayName = id;
-            JsonObject trainModel = getObject(obj, "trainModel2");
+            JsonObject trainModel = sourceLooksLikeVehicle
+                ? getObject(obj, "model")
+                : getObject(obj, "trainModel2");
             if (trainModel == null) trainModel = getObject(obj, "trainModel");
             if (trainModel == null) return;
             String modelFile = getString(trainModel, "modelFile");
@@ -340,10 +346,12 @@ public class VehiclePackLoader {
                 scriptPath = null;
             }
             String soundScriptPath = getString(obj, "soundScriptPath");
-            boolean sourceLooksLikeVehicle = isVehicleJsonPath(sourcePath);
-            // ★本家は「JSON の種類 (ModelTrain_* / ModelVehicle_*)」で車両種別を決める。
-            //   RTMU 独自の "vehicleType" フィールドや trainType の流用はしない。
-            String vehicleType = sourceLooksLikeVehicle ? "Car" : "Train";
+            // ★車両種別 (アイテムの振り分けに使う)。
+            //   ModelVehicle: vehicleType (Car/Plane/Ship)
+            //   ModelTrain  : trainType (EC/DC/EL/DL/SL/CC/TC/N) — 無いパックは電車扱いに落ちる
+            String vehicleType = sourceLooksLikeVehicle
+                ? firstNonBlank(getString(obj, "vehicleType"), "Car")
+                : firstNonBlank(getString(obj, "trainType"), "");
 
             // 本家に doorType は無い
             String doorType = null;
