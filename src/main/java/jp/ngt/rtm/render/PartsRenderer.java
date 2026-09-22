@@ -419,8 +419,17 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
 
     /** Parts.render から呼ばれる — 正規化済み名前 Set を 1 コマンドで記録。 */
     public void recordRenderPartsSet(java.util.Set<String> normalizedNames) {
+        this.recordRenderPartsSet(normalizedNames, null);
+    }
+
+    /**
+     * Parts インスタンス付き版。色ピッキング (ActionParts) で同名パーツを区別するために
+     * インスタンス参照を記録へ添える。描画そのものは名前 Set だけで決まる。
+     */
+    public void recordRenderPartsSet(java.util.Set<String> normalizedNames, Object partsRef) {
         GLRecorder r = GLRecorder.active();
         if (r != null) {
+            r.partsRef(partsRef);
             r.renderGroups(normalizedNames);
         }
     }
@@ -460,6 +469,42 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
     public float getPlayerYaw() {
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         return mc.player != null ? mc.player.getYRot() : 0.0F;
+    }
+
+    /**
+     * 本家 (1.7.10) の {@code PartsRenderer.getPlayerYaw(entity)}。
+     * RTM 公式スクリプトが {@code renderer.getPlayerYaw(entity)} の形で呼ぶ
+     * (引数なし版しか無かったため "do not match any of its method signatures" で
+     *  描画スクリプトが落ちていた)。運転席のプレイヤーの向きを返す。
+     */
+    /**
+     * RTM 1.7.10 互換: 対象エンティティの向き (yaw)。
+     * RTM 公式スクリプトが {@code renderer.getYaw(entity)} と呼ぶ
+     * (無いと "getYaw is not a function" で描画スクリプトが丸ごと落ちる)。
+     */
+    public float getYaw(Object entity) {
+        if (entity instanceof net.minecraft.world.entity.Entity e) {
+            return e.getYRot();
+        }
+        return 0.0F;
+    }
+
+    public float getPlayerYaw(Object entity) {
+        try {
+            if (entity instanceof net.minecraft.world.entity.Entity e) {
+                if (e.getControllingPassenger() instanceof net.minecraft.world.entity.LivingEntity living) {
+                    return living.getYRot();
+                }
+                java.util.List<net.minecraft.world.entity.Entity> passengers = e.getPassengers();
+                if (!passengers.isEmpty()
+                        && passengers.get(0) instanceof net.minecraft.world.entity.LivingEntity living) {
+                    return living.getYRot();
+                }
+                return e.getYRot();
+            }
+        } catch (Throwable ignored) {
+        }
+        return this.getPlayerYaw();
     }
 
     /** 本家: インベントリ操作系 (未移植スタブ)。 */

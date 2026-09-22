@@ -75,7 +75,9 @@ public class Parts {
     public void render(PartsRenderer renderer) {
         // 名前ごとの記録ではなく正規化済み Set を 1 コマンドで記録する
         // (再生側キャッシュに同一インスタンスでヒットさせる + コマンド数削減)
-        renderer.recordRenderPartsSet(this.normalizedNames);
+        // ★Parts インスタンスも一緒に記録する: 色ピッキングで同名パーツ
+        //   (RenderTorii.js の数字キー 10 個 = 全て "key") を区別するため。
+        renderer.recordRenderPartsSet(this.normalizedNames, this);
     }
 
     public void render(Object renderer) {

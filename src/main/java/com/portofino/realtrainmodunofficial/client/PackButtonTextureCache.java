@@ -132,8 +132,7 @@ public final class PackButtonTextureCache {
                     RealTrainModUnofficial.MODID,
                     "dynamic/button_crisp/" + sanitize(packName) + "/" + sanitize(texturePath)
                         + "/" + targetW + "x" + targetH);
-                DynamicTexture tex = new DynamicTexture(out);
-                Minecraft.getInstance().getTextureManager().register(loc, tex);
+                com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(loc, out);
                 result = loc;
             }
         } catch (Exception ignored) {
@@ -170,8 +169,7 @@ public final class PackButtonTextureCache {
                     RealTrainModUnofficial.MODID,
                     "dynamic/button_full/" + sanitize(packName) + "/" + sanitize(texturePath)
                         + "/" + targetW + "x" + targetH);
-                DynamicTexture tex = new DynamicTexture(out);
-                Minecraft.getInstance().getTextureManager().register(loc, tex);
+                com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(loc, out);
                 result = loc;
             }
         } catch (Exception ignored) {
@@ -240,12 +238,14 @@ public final class PackButtonTextureCache {
         int[] region = computeSourceRegion(width, height);
         int srcW = region[0];
         int srcH = region[1];
-        DynamicTexture dynamicTexture = new DynamicTexture(image);
         // GUI ボタンはピクセル等倍で鮮明に見せたい。
         // 拡大縮小時ににじむ (ユーザー報告「ボタンがぼやける」)。最近傍・ミップマップ無しに固定する。
-        Minecraft.getInstance().getTextureManager().register(location, dynamicTexture);
-        dynamicTexture.setFilter(false, false);
-        forceNearestFilter(dynamicTexture);
+        DynamicTexture dynamicTexture =
+            com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(location, image);
+        if (dynamicTexture != null) {
+            dynamicTexture.setFilter(false, false);
+            forceNearestFilter(dynamicTexture);
+        }
         return new ButtonTextureInfo(location, width, height, 0, 0, srcW, srcH);
     }
 

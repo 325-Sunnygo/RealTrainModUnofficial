@@ -160,7 +160,12 @@ public final class CarEntity extends Entity {
     @Override
     protected void defineSynchedData(SynchedEntityData.@NotNull Builder builder) {
         builder.define(DATA_VEHICLE_ID, "");
+        builder.define(DATA_SPEED, 0.0F);
     }
+
+    /** 本家 EntityVehicleBase.speed の同期値。サーバーが書き、クライアントのスクリプトが読む。 */
+    private static final EntityDataAccessor<Float> DATA_SPEED =
+        SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.FLOAT);
 
     public String getVehicleId() {
         return this.entityData.get(DATA_VEHICLE_ID);
@@ -210,60 +215,106 @@ public final class CarEntity extends Entity {
         }
     }
 
-    /** RTM 互換: スクリプトから entity.getResourceState で呼ばれる。 */
-    public ResourceStateCompat getResourceState() {
-        return new ResourceStateCompat(this);
+    /**
+     * 本家 API: スクリプトから {@code entity.getResourceState()} で呼ばれる。
+     *
+     * <p>★以前は RTMU 独自の薄いラッパ (getDataMap だけ) を返していたため、
+     * 本家スクリプトが使う {@code getResourceName()} が無く
+     * (Tank.js: {@code entity.getResourceState().getResourceName is not a function}) で
+     * サーバースクリプトが落ちていた。本家と同じ {@code ResourceState} を返す。
+     *
+     * <p>DataMap は既存の保存先 (scriptData) とサーバー同期へブリッジしたもので、
+     * 本家と同じく {@code state.dataMap.setXxx(key, value, syncFlag)} がそのまま使える。
+     */
+    private final jp.ngt.rtm.modelpack.state.ResourceState resourceState =
+        new jp.ngt.rtm.modelpack.state.ResourceState(this::getScriptResourceName, null, new ScriptDataMap(this));
+
+    public jp.ngt.rtm.modelpack.state.ResourceState getResourceState() {
+        return this.resourceState;
     }
 
-    public static final class ResourceStateCompat {
-        private final CarEntity car;
-        public ResourceStateCompat(CarEntity car) { this.car = car; }
-        public DataMapCompat getDataMap() { return new DataMapCompat(car); }
+    /**
+     * 本家 ResourceState.getResourceName が返すモデル名 (例 "Crusader")。
+     * RTM 公式スクリプトは {@code modelName == "Crusader"} のように比較するため、
+     * id (vehicle:pack:Crusader) ではなく表示名を返す。
+     */
+    private String getScriptResourceName() {
+        VehicleDefinition def = VehicleRegistry.getById(this.getVehicleId());
+        if (def == null) {
+            return "";
+        }
+        String name = def.getDisplayName();
+        return name == null ? "" : name;
     }
 
     /** 送信失敗を 1 キーにつき 1 回だけ知らせる。 */
     private static final java.util.Set<String> WARNED_SEND_FAILURE =
         java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    /** RTM 互換: scriptData への読み書きを media する。 */
-    public static final class DataMapCompat {
+    /**
+     * 本家 DataMap を CarEntity の scriptData へブリッジする。
+     * 読み書きは scriptData に対して行い、クライアントで syncFlag!=0 の書き込みは
+     * サーバーへ送る (render スクリプトが書いた砲撃フラグ等を server onUpdate へ届ける)。
+     */
+    public static final class ScriptDataMap extends jp.ngt.rtm.modelpack.state.DataMap {
         private final CarEntity car;
-        public DataMapCompat(CarEntity car) { this.car = car; }
-        public String getString(String key) { return car == null ? "" : car.getScriptDataValue(key); }
+
+        public ScriptDataMap(CarEntity car) {
+            this.car = car;
+        }
+
+        @Override
+        public String getString(String key) {
+            return car == null ? "" : car.getScriptDataValue(key);
+        }
+
+        @Override
         public boolean getBoolean(String key) {
             String v = getString(key);
             return "true".equalsIgnoreCase(v) || "1".equals(v);
         }
+
+        @Override
         public int getInt(String key) {
             try { return Integer.parseInt(getString(key)); } catch (Exception e) { return 0; }
         }
+
+        @Override
         public double getDouble(String key) {
             try { return Double.parseDouble(getString(key)); } catch (Exception e) { return 0.0; }
         }
-        public void setString(String key, String value, int syncType) {
-            apply(key, value == null ? "" : value, syncType);
+
+        @Override
+        public void setString(String key, String value, int flag) {
+            apply(key, value == null ? "" : value, flag);
         }
-        public void setBoolean(String key, boolean value, int syncType) {
-            apply(key, Boolean.toString(value), syncType);
+
+        @Override
+        public void setBoolean(String key, boolean value, int flag) {
+            apply(key, Boolean.toString(value), flag);
         }
-        public void setInt(String key, int value, int syncType) {
-            apply(key, Integer.toString(value), syncType);
+
+        @Override
+        public void setInt(String key, int value, int flag) {
+            apply(key, Integer.toString(value), flag);
         }
-        public void setDouble(String key, double value, int syncType) {
-            apply(key, Double.toString(value), syncType);
+
+        @Override
+        public void setDouble(String key, double value, int flag) {
+            apply(key, Double.toString(value), flag);
         }
+
         /**
-         * ローカルへ書き込みつつ、クライアント側で syncType!=0 の値はサーバへ送る。
+         * ローカルへ書き込みつつ、クライアント側で syncFlag!=0 の値はサーバへ送る。
          * render(クライアント)スクリプトが書いた設置点/ビルドフラグをサーバ onUpdate へ届け、
-         * 実際の敷設をサーバで行えるようにする。
+         * 実際の敷設/砲撃をサーバで行えるようにする。
          */
-        private void apply(String key, String value, int syncType) {
+        private void apply(String key, String value, int flag) {
             if (car == null) {
                 return;
             }
-            // サーバーが書いた値のクライアントへの配布は tick 側の CarScriptDataSyncPayload が行う。
             car.setScriptDataValue(key, value);
-            if (syncType != 0 && car.level().isClientSide()) {
+            if ((flag & jp.ngt.rtm.modelpack.state.DataMap.SYNC_FLAG) != 0 && car.level().isClientSide()) {
                 try {
                     net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new com.portofino.realtrainmodunofficial.network.CarScriptDataPayload(car.getId(), key, value));
@@ -480,6 +531,10 @@ public final class CarEntity extends Entity {
     // / 毎Tick呼び出される
     @Override
     public void tick() {
+        // ★サーバーは位置同期だけで this.speed を更新しない (移動は運転クライアント主導)。
+        //   さらに super.tick() (= baseTick) が xOld を今tickの位置で上書きするため、
+        //   スクリプト実行時点では getX()-xOld が常に 0 になり、速度が取れなかった。
+        //   上書きされる前に「前tickからの実移動量 (前進が正)」を退避しておく。
         super.tick();
 
         // RTM 互換フィールドを最新値に同期 (SRB3 等のレガシースクリプトが直接読む)
@@ -586,26 +641,28 @@ public final class CarEntity extends Entity {
 
         this.prevRotationRoll = this.rotationRoll;
 
-        // 本家 EntityVehicle.updateMovement: 運転クライアントが乗員の WASD 入力から走行を計算する。
-        // サーバースクリプトで動く車は「車がプレイヤーに乗る」ので乗員が居らず、ここは素通りする
-        // (スクリプトが書いた motion がそのまま使われる)。
-        if (this.isControlledByLocalInstance()) {
+        // ★本家 EntityVehicleBase と同じく<b>サーバー権威</b>で物理を回す。
+        //   乗員の入力は 1.21 では ServerPlayer.setPlayerInput が xxa/zza に入れるので
+        //   サーバーでもそのまま読める。クライアントは何もせず、バニラの補間で位置が来る。
+        //   (クライアント主導だとサーバーの getSpeed が 0 になり、サーバースクリプトが
+        //    動かない等、本家と挙動が食い違って面倒になるためサーバー権威に統一。)
+        if (!level.isClientSide) {
             if (this.shouldUpdateMotion() && this.getControllingPassenger() instanceof LivingEntity living) {
                 this.updateMotion(living, living.xxa, living.zza);
             }
             this.applyPhysicalEffect(); // 本家: 非接地時のみ空気抵抗
             this.updateFallState();     // 本家: 非接地なら落下
             this.updateRotation();      // 本家: 坂でピッチ/ロール
-        }
-
-        if (level.isClientSide) {
+            this.move(MoverType.SELF, this.getDeltaMovement());
+            // 移動後の現在位置 (サーバースクリプトは次tickの頭でこれを読む)
+            this.field_70165_t = getX();
+            this.field_70163_u = getY();
+            this.field_70161_v = getZ();
+            // 物理で求めた速度を同期 (クライアントのスクリプト getSpeed 用)
+            this.publishSpeed();
+        } else {
             updateWheelRotationInClient();
         }
-        this.move(MoverType.SELF, this.getDeltaMovement());
-        // 移動後の現在位置 (サーバースクリプトは次tickの頭でこれを読む)
-        this.field_70165_t = getX();
-        this.field_70163_u = getY();
-        this.field_70161_v = getZ();
     }
 
     // ===== 本家 EntityVehicle (KaizPatchX) の運転物理 =====
@@ -706,9 +763,30 @@ public final class CarEntity extends Entity {
         return this.getY();
     }
 
-    /** 本家 EntityVehicle.getSpeed (スクリプト互換)。 */
+    /**
+     * 本家 EntityVehicle.getSpeed (スクリプト互換)。
+     * サーバーが物理で求めた速度を同期値から読む (本家と同じく両サイドで同じ値)。
+     */
     public float getSpeed() {
-        return this.speed;
+        return this.entityData.get(DATA_SPEED);
+    }
+
+    /**
+     * ★サーバー権威にするため false を返す。
+     *
+     * <p>1.21 の {@code LocalPlayer.tick()} は「操作中の乗り物」に対して
+     * {@code ServerboundMoveVehiclePacket} を送る。true のままだとクライアントの
+     * 位置でサーバーの権威位置が上書きされ、サーバー側の getSpeed やスクリプトが
+     * 本家と食い違う。物理はサーバーだけが回し、クライアントは補間で受ける。
+     */
+    @Override
+    public boolean isControlledByLocalInstance() {
+        return false;
+    }
+
+    /** サーバー側: 物理で求めた速度を同期値へ書き出す。 */
+    private void publishSpeed() {
+        this.entityData.set(DATA_SPEED, this.speed);
     }
 
     // / 車輪の回転角度を更新する クライアントのみ (実移動量から求める)。

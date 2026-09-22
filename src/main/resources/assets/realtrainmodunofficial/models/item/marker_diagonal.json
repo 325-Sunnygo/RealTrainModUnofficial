@@ -1,4 +1,0 @@
-{
-    "parent": "minecraft:item/generated",
-    "textures": { "layer0": "realtrainmodunofficial:block/marker2_0" }
-}

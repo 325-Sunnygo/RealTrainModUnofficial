@@ -26,7 +26,14 @@ public class RealTrainModUnofficial {
      * ビルド刻印。
      * サーバー/クライアントにどのビルドが入っているかはこれでしか判別できない。
      */
-    public static final String BUILD_TAG = "1.0.18 (全アイテム実装 / 駅ブロックの重複登録による起動エラーを修正)";
+    /**
+     * 起動ログに出すバージョン。ハードコードすると jar と食い違う (1.0.18 のまま等) ので、
+     * mods.toml / gradle のバージョンを実行時に読む。
+     */
+    public static final String BUILD_TAG = net.neoforged.fml.ModList.get()
+        .getModContainerById(MODID)
+        .map(c -> c.getModInfo().getVersion().toString())
+        .orElse("dev");
 
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS =
         DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);

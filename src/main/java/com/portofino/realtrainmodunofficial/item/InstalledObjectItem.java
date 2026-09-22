@@ -178,6 +178,27 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
      * RTMU は 22.5 度刻み (スニークで生の角度) にしていたので、斜めに置いたときの向きが
      * 本家とずれていた。符号と +180 も本家に無いと 180 度反対を向く。
      */
+    /**
+     * 本家でエンティティ実装になっている設置物 (ATC / 列車検知器 / 車止め) のエンティティを作る。
+     * それ以外は null (従来どおり設置物ブロックとして置く)。
+     */
+    private static jp.ngt.rtm.entity.EntityInstalledObject createWiringEntity(
+            InstalledObjectCategory category, net.minecraft.world.level.Level level) {
+        var entities = com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.class;
+        return switch (category) {
+            case ATC -> new jp.ngt.rtm.entity.EntityATC(
+                com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.ATC.get(), level);
+            case TRAIN_DETECTOR -> new jp.ngt.rtm.entity.EntityTrainDetector(
+                com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.TRAIN_DETECTOR.get(),
+                level);
+            case BUMPING_POST -> new jp.ngt.rtm.entity.EntityBumpingPost(
+                com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities
+                    .BUMPING_POST_ENTITY.get(),
+                level);
+            default -> null;
+        };
+    }
+
     private static float honkeRotation(net.minecraft.world.entity.player.Player player) {
         float interval = player.isShiftKeyDown() ? 1.0F : 15.0F;
         return honkeRotation(player, interval);
@@ -376,6 +397,34 @@ public class InstalledObjectItem extends jp.ngt.rtm.item.ItemInstalledObject imp
         } else {
             // 本家 setRotation(player, 15.0F)
             placeYaw = honkeRotation(player);
+        }
+        // ★本家: ATC / 列車検知器 / 車止め は設置物<b>ブロックではなくエンティティ</b>
+        //   (EntityInstalledObject) としてレール上に出す。定義モデルは同じものを使う。
+        jp.ngt.rtm.entity.EntityInstalledObject wiringEntity = createWiringEntity(category, level);
+        if (wiringEntity != null) {
+            if (!level.isClientSide) {
+                wiringEntity.setModelName(definition.getId());
+                // ★本家 ItemInstalledObject.setEntityOnRail:
+                //     double posX = rm.getRailPos(split, i)[1];
+                //     double posY = rm.getRailHeight(split, i) + 0.0625D;
+                //     double posZ = rm.getRailPos(split, i)[0];
+                //     entity.setPosition(posX, posY, posZ);
+                //   引数の y (par5 - 1) は getRailMapFromCoordinates でレールを引くためだけに使い、
+                //   最終座標はレールマップから直接出す。つまりレール面 + 1/16 が絶対座標。
+                //   computeRailSnap は placePos からの相対値 (off = pos - placePos) を返すので、
+                //   placePos + off が本家の posX/posY/posZ と厳密に一致する。
+                //   (以前はここで -1.0 していたため posY - 1.0 = 1 ブロック埋まっていた)
+                double offX = railSnap != null ? railSnap.offX() : 0.0D;
+                double offY = railSnap != null ? railSnap.offY() : 0.0D;
+                double offZ = railSnap != null ? railSnap.offZ() : 0.0D;
+                wiringEntity.moveTo(placePos.getX() + 0.5D + offX, placePos.getY() + offY,
+                    placePos.getZ() + 0.5D + offZ, placeYaw, 0.0F);
+                level.addFreshEntity(wiringEntity);
+            }
+            if (!player.getAbilities().instabuild) {
+                stack.shrink(1);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
         }
         if (!level.isClientSide) {
             // 本家 TileEntitySignal.origTileEntity: 置き換える元タイルの NBT を setBlock の前に退避する

@@ -270,6 +270,15 @@ public final class WireManager {
                 io.deliverToAttached(lvl);
             }
         }
+        // ★本家 ElectricalWiringManager はエンティティ (EntityElectricalWiring) もノードにする。
+        //   RTMU の配線はブロック座標ベースなので、その座標に居る配線エンティティへ流す。
+        if (!isOrigin) {
+            jp.ngt.rtm.entity.EntityElectricalWiring wiring =
+                jp.ngt.rtm.entity.EntityElectricalWiring.find(level, pos);
+            if (wiring != null) {
+                wiring.setElectricity(lvl);
+            }
+        }
         return lvl;
     }
 }

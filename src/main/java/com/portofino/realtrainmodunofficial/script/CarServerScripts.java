@@ -71,7 +71,6 @@ public final class CarServerScripts {
 
     public static final class Entry {
         private final ScriptEngine engine;
-        private boolean broken;
         private boolean warned;
         // エンティティごとの ScriptExecuter (NGTO Builder の Measure が executer.count % 20 を使う。
         // null を渡すと毎 tick TypeError で onUpdate が中断していた)。
@@ -84,9 +83,14 @@ public final class CarServerScripts {
             this.engine = engine;
         }
 
+        /** 本家 ModelSetBase.serverSE 相当 (TrainSpeedManager / ScriptExecuter が参照する)。 */
+        public ScriptEngine engine() {
+            return this.engine;
+        }
+
         /** onUpdate(entity, executer) を 1tick 分実行。 */
         public void onUpdate(Object entity) {
-            if (engine == null || broken) {
+            if (engine == null) {
                 return;
             }
             // ★サーバースクリプトはサーバーでしか実行してはならない。
@@ -119,8 +123,11 @@ public final class CarServerScripts {
                     executer.count++;
                 }
             } catch (NoSuchMethodException e) {
-                broken = true;
+                // onUpdate を持たないスクリプト (本家も doScriptIgnoreError で黙って無視する)。
             } catch (Throwable t) {
+                // ★本家 ScriptUtil.doScriptIgnoreError と同じく「エラーは無視して毎tick呼ぶ」。
+                //   RTMU は以前「N 回失敗したら停止」という独自処理を入れており、
+                //   一度失敗したモデルのサーバースクリプトが以後一切動かなくなっていた。
                 if (!warned) {
                     warned = true;
                     RealTrainModUnofficial.LOGGER.warn("[ScriptUtil] server onUpdate failed: {}", t.toString());

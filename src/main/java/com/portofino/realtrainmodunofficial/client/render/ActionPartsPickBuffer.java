@@ -133,37 +133,64 @@ public final class ActionPartsPickBuffer {
         VertexConsumer vc = pickBuffer.getBuffer(PICK_RT);
         Matrix4f mat = poseStack.last().pose();
         for (Parts p : targets) {
-            if (!(p instanceof ActionParts ap)) {
+            if (p instanceof ActionParts ap) {
+                emitOne(vc, model, ap, mat, normalizedNames);
+            }
+        }
+    }
+
+    /**
+     * 特定の {@link ActionParts} インスタンスだけを ID 色で流す。
+     *
+     * <p>名前一致 ({@link #emitGroups}) だけだと、<b>同じグループ名を複数箇所に描く</b>
+     * スクリプトで別パーツを区別できない。たとえば {@code RenderTorii.js} の数字キーは
+     * 10 個すべて {@code "key"} という同名グループで、スクリプトが位置を変えて 10 回描く。
+     * インスタンス単位で流すことで、押したキーに対応する ID が正しく返る。
+     */
+    public static void emitParts(ActionParts ap, PoseStack poseStack, int light, int overlay) {
+        if (!active || host == null || pickBuffer == null || ap == null) {
+            return;
+        }
+        PolygonModel model = host.getPolygonModel();
+        if (model == null) {
+            return;
+        }
+        emitOne(pickBuffer.getBuffer(PICK_RT), model, ap, poseStack.last().pose(), null);
+    }
+
+    /**
+     * @param nameFilter null ならインスタンスの全グループを流す。
+     *                   非 null ならこの名前 Set に含まれるグループだけ流す。
+     */
+    private static void emitOne(VertexConsumer vc, PolygonModel model, ActionParts ap, Matrix4f mat,
+                                Set<String> nameFilter) {
+        float cr = ((ap.id >> 16) & 0xFF) / 255.0F;
+        float cg = ((ap.id >> 8) & 0xFF) / 255.0F;
+        float cb = (ap.id & 0xFF) / 255.0F;
+        String[] names = ap.getNames();
+        if (names == null) {
+            return;
+        }
+        for (String rawName : names) {
+            if (rawName == null) {
                 continue;
             }
-            float cr = ((ap.id >> 16) & 0xFF) / 255.0F;
-            float cg = ((ap.id >> 8) & 0xFF) / 255.0F;
-            float cb = (ap.id & 0xFF) / 255.0F;
-            String[] names = ap.getNames();
-            if (names == null) {
+            String key = rawName.trim().toLowerCase(Locale.ROOT);
+            if (nameFilter != null && !nameFilter.contains(key)) {
                 continue;
             }
-            for (String rawName : names) {
-                if (rawName == null) {
-                    continue;
-                }
-                String key = rawName.trim().toLowerCase(Locale.ROOT);
-                if (!normalizedNames.contains(key)) {
-                    continue;
-                }
-                GroupObject group = findGroup(model, key);
-                if (group == null) {
-                    continue;
-                }
-                float[] tris = ActionParts.buildOutlineTriangles(group, cr, cg, cb);
-                int count = tris.length / 9;
-                for (int t = 0; t + 2 < count; t += 3) {
-                    for (int k = 0; k < 3; k++) {
-                        int o = (t + k) * 9;
-                        // POSITION_COLOR 形式なので position と color だけ書く。
-                        VertexWriter.addVertex(vc, mat, tris[o], tris[o + 1], tris[o + 2])
-                            .setColor(cr, cg, cb, 1.0F);
-                    }
+            GroupObject group = findGroup(model, key);
+            if (group == null) {
+                continue;
+            }
+            float[] tris = ActionParts.buildOutlineTriangles(group, cr, cg, cb);
+            int count = tris.length / 9;
+            for (int t = 0; t + 2 < count; t += 3) {
+                for (int k = 0; k < 3; k++) {
+                    int o = (t + k) * 9;
+                    // POSITION_COLOR 形式なので position と color だけ書く。
+                    VertexWriter.addVertex(vc, mat, tris[o], tris[o + 1], tris[o + 2])
+                        .setColor(cr, cg, cb, 1.0F);
                 }
             }
         }

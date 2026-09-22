@@ -140,11 +140,20 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      * 未ロード / クライアント側では null。TrainSpeedManager の可変加減速フックが使う。
      */
     public javax.script.ScriptEngine getServerScriptEngine() {
-        // クライアントでロード経路 (client パッケージ) を踏まないようにする。
-        if (!this.level().isClientSide()) {
-            this.ensureServerScriptLoaded();
+        // ★本家 ModelSetBase.serverSE 相当: エンジンは「モデルセット (定義) ごとに 1 個」で
+        //   全インスタンスが共有する。RTMU は以前エンティティごとに別エンジンを作っていた。
+        if (this.level().isClientSide()) {
+            return null;
         }
-        return this.serverScriptEngine;
+        com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry entry = this.serverScriptEntry();
+        return entry == null ? null : entry.engine();
+    }
+
+    /** この車両のモデル定義に対応する共有サーバースクリプト (無ければ null)。 */
+    private com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry serverScriptEntry() {
+        com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
+                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
+        return com.portofino.realtrainmodunofficial.script.CarServerScripts.get(def);
     }
 
     /**
@@ -510,9 +519,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     /** スクリプトの読み込みを 1 度だけ試すためのフラグ (無い車両で毎 tick 探しに行かない)。 */
     private boolean attemptedSoundScriptLoad;
 
-    /** 車両パックのサーバースクリプト (serverScriptPath, Server_*.js)。サーバー専用。 */
-    private javax.script.ScriptEngine serverScriptEngine;
-    private boolean attemptedServerScriptLoad;
+
 
     @Override
     public void tick() {
@@ -560,36 +567,16 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      * 方向幕・種別・trainType 等を決める。
      */
     private void tickServerScript() {
-        this.ensureServerScriptLoaded();
-        if (this.serverScriptEngine == null) {
-            return;
+        // ★本家 EntityVehicleBase (サーバー側 tick): rider 更新のあと
+        //   executer.execScript(this) → updateBlockCollisionState → updateMovement の順で呼ぶ。
+        //   RTMU も共有エンジン経由で同じ経路に統一した (エンジンは定義ごとに 1 個)。
+        com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry entry = this.serverScriptEntry();
+        if (entry != null) {
+            entry.onUpdate(this);
         }
-        // ★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
-        // 以前は「停車中は 4tick に 1 回」に間引いていたが、停車中こそスクリプトが
-        // パンタ・ドア・方向幕を動かす。
-        com.portofino.realtrainmodunofficial.script.TrainScriptSystem
-                .invokeServerScriptOnUpdate(this.serverScriptEngine, this, this.scriptExecuter);
     }
 
-    private void ensureServerScriptLoaded() {
-        if (this.attemptedServerScriptLoad) {
-            return;
-        }
-        this.attemptedServerScriptLoad = true;
-        com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
-                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
-        if (def == null || !def.hasServerScript()) {
-            return;
-        }
-        try {
-            this.serverScriptEngine =
-                    com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadServerScriptForVehicle(def);
-        } catch (Throwable t) {
-            // 専用サーバー等で client パッケージのモデルローダが読めなくても列車 tick を巻き込まない。
-            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER
-                    .warn("Failed to load train server script for {}: {}", this.getModelName(), t.toString());
-        }
-    }
+
 
     /**
      * サーバー: DataMap の flag=1 書き込み (ATSA の HUD 情報等) をクライアントへ配信する。

@@ -1033,8 +1033,17 @@ public final class VehicleScriptRenderers {
                 case RENDER_PARTS, RENDER_GROUPS -> {
                     if (cmd.payload instanceof Set<?> names) {
                         // 色ピッキング FBO 用: ActionParts を ID 色で専用バッファへ流す。
-                        com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.emitGroups(
-                            (Set<String>) names, poseStack, packedLight, packedOverlay);
+                        // ★Parts インスタンスが分かる場合はインスタンス単位で流す。
+                        //   名前一致だけだと、同じグループ名を複数箇所に描くスクリプト
+                        //   (RenderTorii.js の数字キー 10 個 = 全て "key") で別パーツを
+                        //   区別できず、押したキーと違う ID が返る。
+                        if (cmd.partsRef instanceof jp.ngt.rtm.render.ActionParts apRef) {
+                            com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.emitParts(
+                                apRef, poseStack, packedLight, packedOverlay);
+                        } else {
+                            com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.emitGroups(
+                                (Set<String>) names, poseStack, packedLight, packedOverlay);
+                        }
                         if (overrideTex != null && bodyGraph != null) {
                             // テクスチャ差し替え中 (発光/ヘッドライト等): モデルグラフから
                             // 同グループの面を差し替えテクスチャで描画 (UV は MQO のまま)

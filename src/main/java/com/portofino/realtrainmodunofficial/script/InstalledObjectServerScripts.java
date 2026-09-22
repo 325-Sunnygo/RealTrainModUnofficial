@@ -105,6 +105,42 @@ public final class InstalledObjectServerScripts {
         }
     }
 
+    /**
+     * エンティティ版 (本家 {@code EntityInstalledObject} = ATC/列車検知器/車止め)。
+     * ブロック版と同じエンジンを共有し、{@code onUpdate(entity, executer)} を回す。
+     */
+    public static void tickEntity(jp.ngt.rtm.entity.EntityInstalledObject entity, InstalledObjectDefinition def) {
+        if (def == null || !def.hasServerScript()) {
+            return;
+        }
+        String id = def.getId();
+        if (INVALID.contains(id)) {
+            return;
+        }
+        ScriptEngine se = ENGINES.get(id);
+        if (se == null) {
+            se = load(def);
+            if (se == null) {
+                INVALID.add(id);
+                return;
+            }
+            ENGINES.put(id, se);
+        }
+        entity.refreshScriptFields();
+        ScriptExecuter executer = entity.getScriptExecuter();
+        try {
+            ((Invocable) se).invokeFunction("onUpdate", entity, executer);
+            executer.count++;
+        } catch (NoSuchMethodException e) {
+            INVALID.add(id);
+        } catch (Throwable t) {
+            if (LOGGED.add(id)) {
+                RealTrainModUnofficial.LOGGER.warn("[serverScript] {} の onUpdate が失敗しました (実行は継続します): {}",
+                        id, String.valueOf(t.getCause() != null ? t.getCause() : t));
+            }
+        }
+    }
+
     private static ScriptEngine load(InstalledObjectDefinition def) {
         String path = def.getServerScriptPath();
         try {

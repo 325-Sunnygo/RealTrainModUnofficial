@@ -43,6 +43,27 @@ public final class ObjectMeshCache {
      */
     private static final int POSES_PER_ENTRY = 1024;
 
+    /**
+     * これより頂点が多いモデルは「向き別キャッシュ」の対象外にする。
+     * 1 ポーズの焼き込みが重い巨大モデルを毎フレーム焼くと、そのままクライアントが
+     * 固まってしまう (MSE の 4.9MB MQO 等)。回転灯/ミラーボールは数千頂点なので対象内。
+     */
+    private static final int MAX_POSES_VERTICES = 16384;
+
+    /** 何フレーム連続で内容が変わったら「可動物」と見なすか。 */
+    private static final int DYNAMIC_AFTER = 4;
+    /** 可動物と判定した後、再び焼けるか試すまでのフレーム数。 */
+    private static final int DYNAMIC_RETRY_FRAMES = 200;
+
+    /** 焼いたセクションの総頂点数。 */
+    private static int vertexCountOf(List<MeshCapture.Section> sections) {
+        int n = 0;
+        for (MeshCapture.Section s : sections) {
+            n += s.vertexCount();
+        }
+        return n;
+    }
+
     private static final class Entry {
         /**
          * 内容キー → 焼き込み。本家のディスプレイリストは「形を焼いて回転は行列」なので
@@ -62,6 +83,15 @@ public final class ObjectMeshCache {
                     return false;
                 }
             };
+        /** 焼いたメッシュが大きすぎる (巨大モデル) なら true。向き別キャッシュにしない。 */
+        boolean big;
+        /** 連続で内容が変わった回数。 */
+        int churn;
+        /** 可動物と判定した (焼かない)。 */
+        boolean dynamic;
+        /** 可動物判定を解除して再挑戦するフレーム。 */
+        int retryAtFrame;
+
         void close() {
             for (List<MeshCapture.Section> sections : poses.values()) {
                 for (MeshCapture.Section s : sections) {
@@ -106,22 +136,55 @@ public final class ObjectMeshCache {
 
         Entry entry = CACHE.computeIfAbsent(be, k -> new Entry());
 
+        // 可動物と判定済み: 焼かずに CPU 経路へ返す。ときどき再挑戦する。
+        if (entry.dynamic) {
+            if (frameCounter - entry.retryAtFrame < 0) {
+                return false;
+            }
+            entry.dynamic = false;
+            entry.churn = 0;
+        }
+
         // ★本家の要点そのもの: キーが同じなら焼き直さない。
         // ★回転灯/ミラーボールは向きごとにキーが変わるが、向きの数は有限なので
         //   「向きごとに焼いて保持」する (poses)。これで再焼きが起きなくなる。
+        // ★ただし巨大モデル (MSE 等) は 1 ポーズが重すぎるので向き別キャッシュにしない。
+        //   向き別に持つと毎フレーム焼き続けてクライアントが固まる (統合サーバーが
+        //   "Can't keep up!" を出す)。その場合は 1 ポーズだけ保持し、
+        //   内容が変わり続けるなら焼くのをやめる (dynamic)。
         List<MeshCapture.Section> sections = entry.poses.get(key);
         if (sections == null || !isUsable(sections)) {
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
                 return false;
             }
+            int poseCap = entry.big ? 1 : POSES_PER_ENTRY;
+            if (entry.poses.size() >= poseCap) {
+                if (++entry.churn >= DYNAMIC_AFTER) {
+                    entry.close();
+                    entry.dynamic = true;
+                    entry.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
+                    return false;
+                }
+            } else {
+                entry.churn = 0;
+            }
             bakesThisFrame++;
             List<MeshCapture.Section> baked = bake(baker);
             if (baked == null) {
                 // 焼けなかった (頂点ゼロ/大きすぎ)。CPU 経路に任せる。
+                entry.dynamic = true;
+                entry.retryAtFrame = frameCounter + DYNAMIC_RETRY_FRAMES;
                 return false;
+            }
+            if (vertexCountOf(baked) > MAX_POSES_VERTICES) {
+                // 巨大モデル: これ以降は向き別キャッシュせず 1 ポーズだけ持つ。
+                entry.close();
+                entry.big = true;
             }
             entry.poses.put(key, baked);
             sections = baked;
+        } else {
+            entry.churn = 0;
         }
         // 本家 renderStaticDisplayList: push → translate → bindTexture (リストの外) → callList → pop。
         // ここでは RenderType がテクスチャを持ち、pose が translate にあたる。

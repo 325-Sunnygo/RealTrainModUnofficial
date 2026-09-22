@@ -1,7 +1,7 @@
 package com.portofino.realtrainmodunofficial.client.sound;
 
 import com.mojang.blaze3d.audio.SoundBuffer;
-import com.portofino.polygondtrainmod.mixin.SoundBufferAccessor;
+import com.portofino.realtrainmodunofficial.mixin.SoundBufferAccessor;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import net.minecraft.resources.ResourceLocation;
 

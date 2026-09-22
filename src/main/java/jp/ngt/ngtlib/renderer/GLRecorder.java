@@ -65,6 +65,14 @@ public final class GLRecorder {
         public float a, b, c, d;
         public String name;
         public Object payload;
+        /**
+         * RENDER_PARTS / RENDER_GROUPS を出した {@code jp.ngt.rtm.render.Parts} インスタンス。
+         * 色ピッキング (ActionParts) で<b>同名パーツを区別</b>するために運ぶ。
+         * 名前一致だけだと、同じグループ名を複数箇所に描くスクリプト
+         * (RenderTorii.js の数字キー 10 個 = 全て "key") で別パーツを区別できない。
+         * ★contentKey には混ぜない (同一名なら幾何は同じなので焼き込みキーを変えない)。
+         */
+        public Object partsRef;
 
         Cmd(Op op, float a, float b, float c, float d, String name) {
             this(op, a, b, c, d, name, null);
@@ -82,6 +90,7 @@ public final class GLRecorder {
             this.d = d;
             this.name = name;
             this.payload = payload;
+            this.partsRef = null;
         }
     }
 
@@ -119,9 +128,24 @@ public final class GLRecorder {
     /** 生きているコマンド数 (cmds.size ではない。使い回しのため配列は縮めない)。 */
     private int size;
 
+    /** 次に積む RENDER_PARTS/RENDER_GROUPS へ添える Parts インスタンス (1 コマンド限り)。 */
+    private Object pendingPartsRef;
+
+    /**
+     * 直後に積む RENDER_PARTS/RENDER_GROUPS へ Parts インスタンスを添える。
+     * 色ピッキングで同名パーツを区別するために使う (描画そのものには影響しない)。
+     */
+    public void partsRef(Object parts) {
+        this.pendingPartsRef = parts;
+    }
+
     /** 別の記録から取り込むとき用。 */
     private void add(Cmd cmd) {
         addCmd(cmd.op, cmd.a, cmd.b, cmd.c, cmd.d, cmd.name, cmd.payload);
+        // 取り込みでも色ピッキング用のインスタンス参照を保つ
+        if (cmd.partsRef != null && this.size > 0) {
+            this.cmds.get(this.size - 1).partsRef = cmd.partsRef;
+        }
     }
 
     /** payload 無し版。 */
@@ -143,6 +167,9 @@ public final class GLRecorder {
             this.cmds.add(cmd);
         }
         this.size++;
+        // Parts インスタンス参照は 1 コマンド限り (取りこぼすと以降のコマンドに付いて回る)。
+        cmd.partsRef = this.pendingPartsRef;
+        this.pendingPartsRef = null;
         this.contentHash = 31 * this.contentHash + cmdKey(cmd);
         switch (op) {
             case RENDER_PARTS, RENDER_GROUPS, DRAW_MODEL_GROUP, RENDER_BLOCK -> this.geometry = true;
@@ -163,6 +190,7 @@ public final class GLRecorder {
         this.tess = false;
         this.viewDependent = false;
         this.lightSignature = 0L;
+        this.pendingPartsRef = null;
     }
 
     /** 生きている範囲のビュー。記録が作り直されると中身が変わるので持ち越さないこと。 */

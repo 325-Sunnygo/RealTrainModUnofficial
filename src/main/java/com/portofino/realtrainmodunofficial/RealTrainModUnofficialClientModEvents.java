@@ -214,6 +214,21 @@ public final class RealTrainModUnofficialClientModEvents {
             com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.CAR.get(),
             CarRenderer::new
         );
+        // 本家 EntityInstalledObject 系 (ATC / 列車検知器 / 車止め)。レンダラ未登録だと
+        // EntityRenderDispatcher が null を返して描画時にクラッシュする。
+        event.registerEntityRenderer(
+            com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.ATC.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.InstalledObjectEntityRenderer::new
+        );
+        event.registerEntityRenderer(
+            com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.TRAIN_DETECTOR.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.InstalledObjectEntityRenderer::new
+        );
+        event.registerEntityRenderer(
+            com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities
+                .BUMPING_POST_ENTITY.get(),
+            com.portofino.realtrainmodunofficial.client.renderer.InstalledObjectEntityRenderer::new
+        );
         // 本家 EntityMotorman (運転士): プレイヤーモデル + 同梱スキン
         event.registerEntityRenderer(
             jp.ngt.rtm.entity.RTMEntities.MOTORMAN.get(),

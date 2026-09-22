@@ -228,8 +228,6 @@ public class ModelSelectScreen extends Screen {
             int y = cy + BTN_H * (i - currentScroll);
             if (y <= -BTN_H || y >= listBottom) continue;
             ModelInfo info = filtered.get(i);
-            // 可視行は先に背景ロードを仕込む (スクロールしても描画スレッドが固まらない)。
-            requestPreload(info.id(), info.packName());
             boolean isSel = info.id().equals(selectedId);
             drawItem(g, info, LIST_LEFT, y, isSel, mouseX, mouseY);
         }
@@ -264,15 +262,14 @@ public class ModelSelectScreen extends Screen {
     private static final float PREVIEW_FAR = 500.0F;
 
     private void renderPreview(GuiGraphics g, int mouseX, int mouseY) {
-        // ★本家 GuiButtonSelectModel と同じく「マウスが乗っているボタンのモデル」だけを描く。
-        // 以前は非ホバー時に選択中モデルを毎フレーム全力描画し続けていたため、
-        // 大きな車両モデルで選択画面が極端に重くなっていた。
-        // (本家も hoverState==2 のときだけプレビューを描く)
-        int hoverIdx = itemIndexAt(mouseX, mouseY);
-        if (hoverIdx < 0) {
+        // ★プレビューは「選択中 (クリックで決定した) モデル」だけを描く。
+        //   ホバーに追従させると (1) スクロールのたびに別モデルを読み込んで重く、
+        //   (2) スクロールしただけで選択されたように見える、の両方が起きる。
+        int selIdx = indexOf(selectedId);
+        if (selIdx < 0) {
             return;
         }
-        ModelInfo info = filtered.get(hoverIdx);
+        ModelInfo info = filtered.get(selIdx);
         MqoModelLoader.MqoModel model = getOrLoadModel(info.id(), info.packName());
         if (model == null) {
             return;
@@ -434,57 +431,7 @@ public class ModelSelectScreen extends Screen {
     }
 
     /** 車両 / 設置物 / レールのどれかとして id からモデルを引く。失敗は覚えて再探索しない。 */
-    /**
-     * プレビュー用のモデル/スクリプトを<b>描画スレッドの外</b>で温める。
-     *
-     * <p>以前はホバーした行のモデルをその場で同期ロードしていたため、モデル選択画面で
-     * スクロールすると 1 行ごとに MQO パース + Nashorn 初期化 + テクスチャ登録が走り、
-     * Minecraft が固まっていた。fixRTM と同じく読み込みを背景へ追い出す。
-     */
-    private static final java.util.concurrent.ExecutorService PRELOAD =
-        java.util.concurrent.Executors.newFixedThreadPool(2, r -> {
-            Thread t = new Thread(r, "RTMU-ModelPreload");
-            t.setDaemon(true);
-            return t;
-        });
-    private static final Set<String> PRELOADING = ConcurrentHashMap.newKeySet();
-
-    /** 可視行のモデルを背景で読み込む (描画スレッドでは絶対にパースしない)。 */
-    private void requestPreload(String id, String packName) {
-        if (id == null || id.isBlank() || MODEL_CACHE.containsKey(id) || MISSING_MODEL_CACHE.contains(id)) {
-            return;
-        }
-        if (!PRELOADING.add(id)) {
-            return;
-        }
-        PRELOAD.submit(() -> {
-            try {
-                MqoModelLoader.MqoModel model = loadModelNow(id);
-                if (model == null) {
-                    MISSING_MODEL_CACHE.add(id);
-                    return;
-                }
-                MODEL_CACHE.put(id, model);
-                // Nashorn スクリプトの初期化もここで済ませる (初回ホバーの最大のフリーズ源)。
-                try {
-                    VehicleDefinition vd = VehicleRegistry.getById(id);
-                    if (vd != null && vd.hasScript()) {
-                        com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(vd);
-                    }
-                    var iod = InstalledObjectRegistry.getById(id);
-                    if (iod != null && iod.getScriptPath() != null && !iod.getScriptPath().isBlank()) {
-                        com.portofino.realtrainmodunofficial.client.render.MachineScriptRenderers.get(iod);
-                    }
-                } catch (Throwable ignored) {
-                }
-            } catch (Throwable ignored) {
-            } finally {
-                PRELOADING.remove(id);
-            }
-        });
-    }
-
-    /** モデルを実際に読む (重い)。背景スレッドからのみ呼ぶ。 */
+    /** モデルを実際に読む (描画スレッド専用)。 */
     private static MqoModelLoader.MqoModel loadModelNow(String id) {
         try {
             VehicleDefinition vd = VehicleRegistry.getById(id);
@@ -520,9 +467,16 @@ public class ModelSelectScreen extends Screen {
         if (cached != null) {
             return cached;
         }
-        // 描画スレッドでパースするとスクロール中に固まる。背景で読んで次フレーム以降に出す。
-        requestPreload(id, packName);
-        return null;
+        // ★モデル本体は描画スレッドで読む (本家と同じ)。DynamicTexture の生成/登録は
+        //   描画スレッドでのみ行うことで、初期化コールバックの競合 (NPE) を避ける。
+        //   パースはディスクキャッシュで軽いので、ここで同期ロードしてよい。
+        MqoModelLoader.MqoModel model = loadModelNow(id);
+        if (model != null) {
+            MODEL_CACHE.put(id, model);
+        } else {
+            MISSING_MODEL_CACHE.add(id);
+        }
+        return model;
     }
 
     /**
@@ -576,11 +530,13 @@ public class ModelSelectScreen extends Screen {
             String name = safe(m.displayName()).isBlank() ? m.id() : m.displayName();
             g.drawString(font, name, left + 4, top + (BTN_H - 8) / 2, 0xFFFFFFFF, false);
         }
-        // 本家 renderButtonOverlay: 選択中/ホバー中は button_blue の (0,32)-(160,64) を
-        // 50% ブレンドで重ねる (UV は本家の 1/512 規約 → texW/H=512 で blit すると同じ切り出し)。
+        // 本家 renderButtonOverlay: button_blue の (0,32)-(160,64) を重ねる
+        // (UV は本家の 1/512 規約 → texW/H=512 で blit すると同じ切り出し)。
+        // ★選択中とホバーを同じ濃さにすると「スクロールしただけで選択された」ように見えるため、
+        //   選択中=50%、ホバー=薄め(20%) にして区別する。
         if (selected || hovered) {
             com.mojang.blaze3d.systems.RenderSystem.enableBlend();
-            g.setColor(1.0F, 1.0F, 1.0F, 0.5F);
+            g.setColor(1.0F, 1.0F, 1.0F, selected ? 0.5F : 0.2F);
             g.blit(BUTTON_BLUE, left, top, BTN_W, BTN_H, 0.0F, 32.0F, 160, 32, 512, 512);
             g.setColor(1.0F, 1.0F, 1.0F, 1.0F);
             com.mojang.blaze3d.systems.RenderSystem.disableBlend();

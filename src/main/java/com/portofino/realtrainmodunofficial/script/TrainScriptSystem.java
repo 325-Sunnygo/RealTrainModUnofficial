@@ -330,13 +330,9 @@ public class TrainScriptSystem {
         } catch (Throwable ignored) {
         }
         Invocable invocable = (Invocable) scriptEngine;
-        // ★止めてあるものは呼ばない (noteScriptFailure の説明を参照)。
-        // サーバースクリプトは編成の全車ぶん毎 tick 走るので、
-        // 失敗し続けると tick 時間がそのまま溶ける。
-        if (isScriptDisabled(scriptEngine, "onUpdate(entity, executer) [server]")
-                || isScriptDisabled(scriptEngine, "onUpdate(entity, executer) [server-runtime]")) {
-            return;
-        }
+        // ★本家 ScriptUtil.doScriptIgnoreError と同じく「エラーは無視して毎tick呼ぶ」。
+        //   RTMU は以前「N 回失敗したら停止」という独自処理を入れており、
+        //   一度失敗したモデルのサーバースクリプトが以後一切動かなくなっていた。
         try {
             invocable.invokeFunction("onUpdate", entity, executer);
             if (executer != null) {

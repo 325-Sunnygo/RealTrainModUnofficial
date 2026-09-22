@@ -78,6 +78,21 @@ public final class InstalledObjectScriptCache {
             return;
         }
         if (rec.hasGeometry()) {
+            // ★色ピッキング: 本家 PartsRenderer は通常描画のたびに当たりを取る。
+            //   焼き込み経路だと再生が焼き直し時にしか走らずホバーが出ないため、
+            //   ピッキング候補のときは焼かずに生 replay して当たりを取る。
+            com.portofino.realtrainmodunofficial.client.ActionPartsHost pickHost =
+                com.portofino.realtrainmodunofficial.client.ActionPartsPicker.hostOf(be);
+            if (pickHost != null && com.portofino.realtrainmodunofficial.client.ActionPartsPicker.shouldCapture(be)) {
+                com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.begin(pickHost);
+                try {
+                    VehicleScriptRenderers.replay(rec, poseStack, buffer, packedLight, packedOverlay, model, null);
+                } finally {
+                    int pickedId = com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.finish();
+                    com.portofino.realtrainmodunofficial.client.ActionPartsPicker.setHoveredId(be, pickedId);
+                }
+                return;
+            }
             // ★本家 RailPartsRenderer.renderRailStatic と同じ流れ:
             // 内容キーが同じなら焼き直さず、GPU に置いた頂点をそのまま描く。
             int key = 31 * rec.contentKey() + packedLight;

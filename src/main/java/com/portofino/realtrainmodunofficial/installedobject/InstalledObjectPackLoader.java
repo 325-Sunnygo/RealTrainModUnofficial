@@ -75,22 +75,6 @@ public final class InstalledObjectPackLoader {
         InstalledObjectRegistry.setDefinitions(LOADED);
         com.portofino.realtrainmodunofficial.cargo.CargoPackLoader.end();
         com.portofino.realtrainmodunofficial.npc.NpcRegistry.end();
-        long connectors = LOADED.stream().filter(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT
-                || d.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT).count();
-        // カテゴリ別の内訳。「看板の選択画面が空」等の切り分けがログだけでできるようにしておく。
-        java.util.Map<InstalledObjectCategory, Long> byCategory = LOADED.stream()
-                .collect(java.util.stream.Collectors.groupingBy(InstalledObjectDefinition::getCategory,
-                        java.util.stream.Collectors.counting()));
-        RealTrainModUnofficial.LOGGER.info("[RTMU] 設置物モデル {} 件 / コネクタ {} 件: {}",
-                LOADED.size(), connectors, byCategory);
-        // 転轍機は「スクリプトが無いとレバーが動かない」ので、読み込み結果を必ずログに残す
-        // (アニメーションが出ないときの切り分け用)。
-        for (InstalledObjectDefinition d : LOADED) {
-            if (d.getCategory() == InstalledObjectCategory.POINT) {
-                RealTrainModUnofficial.LOGGER.info("[RTMU] POINT {} model={} script={}",
-                        d.getId(), d.getModelFile(), d.getScriptPath());
-            }
-        }
     }
 
     private static void loadFromModJar() {
@@ -620,7 +604,7 @@ public final class InstalledObjectPackLoader {
                         }
                         JsonObject f = fe.getAsJsonObject();
                         String key = getString(f, "key");
-                        if (key.isBlank()) {
+                        if (key == null || key.isBlank()) {
                             continue;
                         }
                         fields.add(new InstalledObjectDefinition.FormField(

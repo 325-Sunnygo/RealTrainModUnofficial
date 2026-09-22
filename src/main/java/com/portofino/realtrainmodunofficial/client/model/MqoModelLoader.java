@@ -2176,9 +2176,8 @@ public final class MqoModelLoader {
                 img.setPixelRGBA(x, y, 0xFFFFFFFF);
             }
         }
-        DynamicTexture tex = new DynamicTexture(img);
         loc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "dynamic/white");
-        Minecraft.getInstance().getTextureManager().register(loc, tex);
+        com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(loc, img);
         whiteTextureLoc = loc;
         return loc;
     }
@@ -2253,16 +2252,6 @@ public final class MqoModelLoader {
      * 背景ロードから直接呼ぶと描画スレッドの tick と衝突して落ちる。
      * DynamicTexture のアップロード自体は元々 recordRenderCall で描画スレッドに回る。
      */
-    private static void registerTextureSafe(ResourceLocation loc,
-                                            net.minecraft.client.renderer.texture.AbstractTexture tex) {
-        if (com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread()) {
-            Minecraft.getInstance().getTextureManager().register(loc, tex);
-        } else {
-            com.mojang.blaze3d.systems.RenderSystem.recordRenderCall(
-                () -> Minecraft.getInstance().getTextureManager().register(loc, tex));
-        }
-    }
-
     private static TextureInfo registerTextureFromZip(TextureBinding binding, TextureOpener opener) {
         boolean alphaBlendOption = binding.options().contains("alphablend")
             || binding.options().contains("translucent")
@@ -2297,15 +2286,15 @@ public final class MqoModelLoader {
                     "dynamic/mqo/" + Integer.toHexString(key));
                 ResourceLocation opaqueLoc = baseLoc;
                 ResourceLocation windowLoc = baseLoc;
-                registerTextureSafe(baseLoc, new DynamicTexture(img));
+                com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(baseLoc, img);
                 if (splitAlpha) {
                     opaqueLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_opq");
-                    registerTextureSafe(opaqueLoc, new DynamicTexture(opaqueImg));
+                    com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(opaqueLoc, opaqueImg);
                     // pass1用: 半透明ピクセルだけ残し、不透明部分の再描画を防ぐ
                     windowLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
                         "dynamic/mqo/" + Integer.toHexString(key) + "_win");
-                    registerTextureSafe(windowLoc, new DynamicTexture(windowImg));
+                    com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(windowLoc, windowImg);
                     // スクリプト経路からも引けるようにする (opaqueVariantOf / windowVariantOf)
                     TEXTURE_ALPHA_SPLIT.put(baseLoc, new ResourceLocation[]{opaqueLoc, windowLoc});
                 }
@@ -3508,7 +3497,6 @@ public final class MqoModelLoader {
                     batches.add(b);
                     textures.add(b.texture);
                 }
-                RealTrainModUnofficial.LOGGER.debug("[RTMU] model disk-cache hit: {} ({} batches)", id, batches.size());
                 MqoModel model = new MqoModel(batches, new ArrayList<>(textures));
                 model.voxelModel = voxel;
                 return model;
@@ -3543,7 +3531,6 @@ public final class MqoModelLoader {
             }
             try {
                 Files.move(tmp, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                RealTrainModUnofficial.LOGGER.debug("[RTMU] model disk-cache store: {}", id);
             } catch (Throwable ignored) {
             }
         }
@@ -4610,11 +4597,12 @@ public final class MqoModelLoader {
                     com.portofino.realtrainmodunofficial.client.ActionPartsPicker
                         .record(entity, null, scriptRenderer);
                 }
-                // 色ピッキング FBO: 乗車中で ActionParts を持つ車両だけ、renderParts が
-                // ID 色の頂点を専用バッファへ流す。描画後に中央ピクセルを読んで ID を確定する。
-                boolean pickCapture = scriptRenderer != null
-                    && com.portofino.realtrainmodunofficial.client.ActionPartsPicker
-                        .shouldCapture(entity, scriptRenderer);
+                // ★ここでは色ピッキングしない。ここは「記録」だけで、ピッキング頂点は
+                //   replay 時にしか流れない (begin → 記録 → finish では常に当たり無しになり、
+                //   しかも毎フレーム glReadPixels の同期ストールを起こしていた)。
+                //   本家 PartsRenderer と同じく、通常描画 (replay) のたびに
+                //   MachineScriptRenderers / InstalledObjectScriptCache 側で当たりを取る。
+                boolean pickCapture = false;
                 if (pickCapture) {
                     com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.begin(scriptRenderer);
                 }

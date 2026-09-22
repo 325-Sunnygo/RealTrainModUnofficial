@@ -354,26 +354,6 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private static VoxelShape probe(InstalledObjectCategory category, VoxelShape shape) {
-        if (COLLISION_PROBED.add(category.name())) {
-            net.minecraft.world.phys.AABB b = shape.bounds();
-            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-                "[RTMU] collision probe {}: full={} empty={} bounds=[{},{},{} -> {},{},{}]",
-                category, isFullBlockShape(shape), shape.isEmpty(),
-                b.minX, b.minY, b.minZ, b.maxX, b.maxY, b.maxZ);
-            // ★「ブロックの中を歩けない」の切り分け用: 実際の衝突箱を全部出す。
-            StringBuilder sb = new StringBuilder();
-            int n = 0;
-            for (net.minecraft.world.phys.AABB box : shape.toAabbs()) {
-                if (n++ >= 24) {
-                    sb.append(" ...");
-                    break;
-                }
-                sb.append(String.format(" [%.3f,%.3f,%.3f-%.3f,%.3f,%.3f]",
-                    box.minX, box.minY, box.minZ, box.maxX, box.maxY, box.maxZ));
-            }
-            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
-                "[RTMU] collision boxes {} ({}):{}", category, n, sb);
-        }
         return shape;
     }
 

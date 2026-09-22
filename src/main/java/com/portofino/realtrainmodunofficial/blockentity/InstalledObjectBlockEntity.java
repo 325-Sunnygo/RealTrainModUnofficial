@@ -668,6 +668,13 @@ public class InstalledObjectBlockEntity extends BlockEntity
         if (be instanceof InstalledObjectBlockEntity io) {
             return io.getElectricity();
         }
+        // ★本家はエンティティ (EntityElectricalWiring: ATC/列車検知器/車止め) も取り付け先になれる。
+        //   その座標に居る配線エンティティから getElectricity() を読む。
+        jp.ngt.rtm.entity.EntityElectricalWiring wiring =
+            jp.ngt.rtm.entity.EntityElectricalWiring.find(this.level, target);
+        if (wiring != null) {
+            return wiring.getElectricity();
+        }
         return 0;
     }
 
@@ -1614,6 +1621,10 @@ public class InstalledObjectBlockEntity extends BlockEntity
             }
             jp.ngt.rtm.electric.WireManager.INSTANCE.removeWire(level, wireStart, wireEnd);
         }
+        // 本家 EntityATC.attackEntityFrom: ATC を撤去したらレールの信号を 0 に戻す。
+        if (level != null && !level.isClientSide && getCategory() == InstalledObjectCategory.ATC) {
+            setRailSignal(level, worldPosition, 0);
+        }
         // 接続式 (本家構造) の配線も解除
         if (level != null) {
             for (jp.ngt.rtm.electric.Connection c : this.connections) {
@@ -1631,21 +1642,62 @@ public class InstalledObjectBlockEntity extends BlockEntity
     }
 
     /**
-     * ATS 基礎 (Phase 1): ATC 地上子。
-     * の signal に、隣接レッドストーンの最大強度 (0-15) を書き込む。
+     * ATC 地上子: 下のレールの signal に値を書き込む。
+     *
+     * <p>★本家 {@code EntityATC.setElectricity(int)} と同じく、<b>電気配線 (Connection) で
+     * 給電された値</b>をそのまま書く。RTMU は以前「隣接レッドストーンの最大強度」を読む
+     * 独自実装だったが、本家の ATC はコネクタ/配線で給電される (レッドストーンではない)。
      */
     private void emitAtcSignal(Level level, BlockPos pos) {
-        int redstone = level.getBestNeighborSignal(pos);
-        if (redstone <= 0) {
+        int value = Math.max(0, Math.min(15, this.electricity));
+        setRailSignal(level, pos, value);
+    }
+
+    /** 本家でエンティティ実装になっているカテゴリか (ATC / 列車検知器 / 車止め)。 */
+    private static boolean isLegacyEntityCategory(InstalledObjectCategory category) {
+        return category == InstalledObjectCategory.ATC
+            || category == InstalledObjectCategory.TRAIN_DETECTOR
+            || category == InstalledObjectCategory.BUMPING_POST;
+    }
+
+    /**
+     * 旧ワールドの該当設置物ブロックを、本家と同じエンティティへ変換する (移行処理)。
+     * モデル名・向きを引き継ぎ、ブロックは消す。
+     */
+    private void convertToInstalledEntity(Level level, BlockPos pos) {
+        jp.ngt.rtm.entity.EntityInstalledObject entity = switch (getCategory()) {
+            case ATC -> new jp.ngt.rtm.entity.EntityATC(
+                com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.ATC.get(), level);
+            case TRAIN_DETECTOR -> new jp.ngt.rtm.entity.EntityTrainDetector(
+                com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities
+                    .TRAIN_DETECTOR.get(), level);
+            case BUMPING_POST -> new jp.ngt.rtm.entity.EntityBumpingPost(
+                com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities
+                    .BUMPING_POST_ENTITY.get(), level);
+            default -> null;
+        };
+        if (entity == null) {
             return;
         }
+        entity.setModelName(this.getDefinitionId());
+        // 移行も本家の位置 (レールブロックの Y) に合わせる。既存ブロックはレールの 1 つ上に
+        // 置かれていたので、そのぶん下げて引き継ぐ。
+        net.minecraft.world.phys.Vec3 off = this.getRenderOffset();
+        entity.moveTo(pos.getX() + 0.5D + off.x, pos.getY() - 1.0D + off.y, pos.getZ() + 0.5D + off.z,
+            this.getYaw(), 0.0F);
+        level.addFreshEntity(entity);
+        level.removeBlock(pos, false);
+    }
+
+    /** レールの signal へ書き込む (本家 EntityATC.setSignalToRail 相当)。 */
+    private void setRailSignal(Level level, BlockPos pos, int value) {
         jp.ngt.rtm.rail.TileEntityLargeRailBase rail =
                 jp.ngt.rtm.rail.TileEntityLargeRailBase.getRailFromCoordinates(
                         level, pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D);
         if (rail != null) {
             jp.ngt.rtm.rail.TileEntityLargeRailCore core = rail.getRailCore();
             if (core != null) {
-                core.setSignal(redstone);
+                core.setSignal(value);
             }
         }
     }
@@ -1691,6 +1743,13 @@ public class InstalledObjectBlockEntity extends BlockEntity
         // 列車検知器パック (hi03TrainDetector 等) は全処理をこのスクリプトに書くので、
         // スクリプトを持つ設置物はパック側の実装に任せて RTMU 内蔵の検知器処理は動かさない
         // (両方が出力を書くと奪い合いになる)。
+        // ★本家エンティティ化 移行: 旧ワールドに残っている ATC/列車検知器/車止め ブロックを
+        //   エンティティ (EntityInstalledObject) へ自動変換する。これを入れないと、既存の設置が
+        //   本家と違う構造のまま残ってしまう。
+        if (isLegacyEntityCategory(be.getCategory())) {
+            be.convertToInstalledEntity(level, pos);
+            return;
+        }
         if (be.getCategory() == InstalledObjectCategory.ATC
                 && (be.getDefinition() == null || !be.getDefinition().hasServerScript())) {
             be.emitAtcSignal(level, pos);
@@ -1752,6 +1811,16 @@ public class InstalledObjectBlockEntity extends BlockEntity
             boolean onRail = detectTrainOnRailBelow(level, pos);
             if (be.detectorTrainOnRail != onRail) {
                 be.detectorTrainOnRail = onRail;
+                be.setChanged();
+                level.sendBlockUpdated(pos, state, state, 3);
+            }
+            // ★本家 EntityTrainDetector.getElectricity(): 検知=STOP(0) / 未検知=PROCEED(5)。
+            //   本家は配線網が getElectricity() を読みに来る (プル型)。RTMU には
+            //   「出力コネクタが取り付け先の getElectricity() を読んで配線網へ流す」経路が
+            //   既にあるので、検知器の electricity をこの値にしておけば配線 (=信号機/ATC) へ届く。
+            int detectLevel = onRail ? 0 : 5;
+            if (be.electricity != detectLevel) {
+                be.setElectricity(detectLevel);
                 be.setChanged();
                 level.sendBlockUpdated(pos, state, state, 3);
             }
