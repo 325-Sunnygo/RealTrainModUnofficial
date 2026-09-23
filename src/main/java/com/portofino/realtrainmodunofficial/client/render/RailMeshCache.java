@@ -115,8 +115,16 @@ public final class RailMeshCache {
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
             return false;
         }
-        // ★ Iris/Oculus 使用中も統合メッシュ (VBO) を使う。
-        // 以前はここで諦めていた。
+        // ★ Iris/Oculus (シェーダーパック) 使用中は統合メッシュ (VBO) を使わない。
+        //   Iris は自前の行列・頂点フォーマットで描くため、CPU で合成した ModelView を
+        //   drawWithShader で渡すと行列が一致せず、レールがカメラ方向へ引き伸ばされる
+        //   (空へ飛ぶ)。呼び出し元 (RailCoreBlockEntityRenderer) は false で
+        //   従来の逐次描画 (renderLegacy) に落ちるので、シェーダーでも正しく描ける。
+        //   MqoModelLoader の VBO 経路も同じ理由でシェーダー使用時は使っていない。
+        if (com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
+            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
+            return false;
+        }
         dropIfLevelChanged();
 
         RailMesh mesh = CACHE.get(pos);

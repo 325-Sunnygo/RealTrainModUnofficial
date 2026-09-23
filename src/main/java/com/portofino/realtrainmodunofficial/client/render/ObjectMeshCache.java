@@ -134,6 +134,14 @@ public final class ObjectMeshCache {
             return false;
         }
 
+        // ★ シェーダーパック使用中は焼き込み VBO を使わない。
+        //   この VBO は RailDrawQueue 経由 (CPU 合成 ModelView + drawWithShader) で描かれるため、
+        //   Iris では行列が一致せず設置物が引き伸ばされる。false を返すと呼び出し側
+        //   (InstalledObjectScriptCache / MachineScriptRenderers) が毎フレーム即時描画する。
+        if (com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
+            return false;
+        }
+
         Entry entry = CACHE.computeIfAbsent(be, k -> new Entry());
 
         // 可動物と判定済み: 焼かずに CPU 経路へ返す。ときどき再挑戦する。

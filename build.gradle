@@ -196,6 +196,27 @@ def modrinthModsDirs = modrinthProfilesRoot.isDirectory()
             .findAll { !it.parentFile.name.toLowerCase().contains('fabric') }
         : []
 
+// Prism Launcher のインスタンスにも配る。ただし mmc-pack.json に net.minecraft 1.21.1 が
+// あるものだけ (1.7.10 など別バージョンのインスタンスへ入れると絶対に動かないため)。
+// こちらは「既に mod が入っている」ことを条件にしない (新規インスタンスへも入れたい)。
+def prismInstancesRoot = System.getenv('APPDATA') != null
+        ? file("${System.getenv('APPDATA')}/PrismLauncher/instances")
+        : file("${System.properties['user.home']}/Library/Application Support/PrismLauncher/instances")
+
+def prismModsDirs = prismInstancesRoot.isDirectory()
+        ? prismInstancesRoot.listFiles()
+            .findAll { it.isDirectory() }
+            .findAll { inst ->
+                def pack = new File(inst, 'mmc-pack.json')
+                pack.isFile() && pack.text.contains('"net.minecraft"') && pack.text.contains('"1.21.1"')
+            }
+            .collect { new File(it, 'minecraft/mods') }
+            .findAll { it.isDirectory() }
+        : []
+
+// ビルドした jar を配る先 (Modrinth プロファイル + Prism の 1.21.1 インスタンス)
+def deployTargets = (modrinthModsDirs + prismModsDirs).unique()
+
 // 同梱スクリプトを本番と同じ経路で一括ロードし、構文/バインド失敗を検出する検証タスク。
 // ゲームを起動せずに「読めないスクリプト」を洗い出す (開発用。jar には入らない)。
 tasks.register('scriptPreflight', JavaExec) {
@@ -210,7 +231,7 @@ tasks.register('scriptPreflight', JavaExec) {
 tasks.register('copyJarToModrinthMods') {
     dependsOn tasks.named('jar')
     def jarFile = tasks.named('jar').flatMap { it.archiveFile }
-    def targets = modrinthModsDirs
+    def targets = deployTargets
     inputs.file(jarFile)
     onlyIf { !targets.isEmpty() }
     doLast {
