@@ -22,8 +22,11 @@ public record CarScriptDataPayload(int entityId, String key, String value) imple
 
     public static final StreamCodec<ByteBuf, CarScriptDataPayload> STREAM_CODEC = StreamCodec.composite(
         ByteBufCodecs.INT, CarScriptDataPayload::entityId,
-        ByteBufCodecs.STRING_UTF8, CarScriptDataPayload::key,
-        ByteBufCodecs.STRING_UTF8, CarScriptDataPayload::value,
+        ByteBufCodecs.stringUtf8(256), CarScriptDataPayload::key,
+        // ★既定の STRING_UTF8 は 32767 文字まで。NGTO Builder のビーム/架線は
+        //   設置点の配列を JSON 1 本で送るので、少し長い橋を作るとここで溢れて
+        //   <b>送信ごと失敗する</b> (しかも送信側が握りつぶしていたので無音だった)。
+        ByteBufCodecs.stringUtf8(262144), CarScriptDataPayload::value,
         CarScriptDataPayload::new
     );
 

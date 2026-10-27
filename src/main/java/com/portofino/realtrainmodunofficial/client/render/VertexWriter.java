@@ -22,6 +22,8 @@ import org.joml.Matrix4fc;
  */
 public final class VertexWriter {
 
+    private static final ThreadLocal<org.joml.Vector3f> POSITION = ThreadLocal.withInitial(org.joml.Vector3f::new);
+
     private VertexWriter() {
     }
 
@@ -34,10 +36,11 @@ public final class VertexWriter {
         if (isIdentity(m)) {
             return consumer.addVertex(x, y, z);
         }
-        return consumer.addVertex(
-            m.m00() * x + m.m10() * y + m.m20() * z + m.m30(),
-            m.m01() * x + m.m11() * y + m.m21() * z + m.m31(),
-            m.m02() * x + m.m12() * y + m.m22() * z + m.m32());
+        // Match VertexConsumer.addVertex(Matrix4f,...) exactly, including JOML's
+        // fused arithmetic and matrix-property paths. A different rounding path
+        // moves coplanar overlays to different depth values.
+        var position=m.transformPosition(x,y,z,POSITION.get());
+        return consumer.addVertex(position.x,position.y,position.z);
     }
 
     /** setNormal(Pose, x, y, z) と同じ結果を確保なしで (バニラ同様、正規化はしない)。 */

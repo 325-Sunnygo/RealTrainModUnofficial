@@ -11,6 +11,7 @@ import jp.ngt.ngtlib.renderer.GLRecorder;
  * 描画を renderWireStatic / renderWireDynamic に書く。
  */
 public class WirePartsRenderer extends TileEntityPartsRenderer {
+    private boolean useScript = true;
 
     /**
      * 定義 (ModelWire_*.json) の値。本家は ModelSetWire/WireConfig から引くが、
@@ -28,6 +29,49 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
         super(par1);
     }
 
+    public WirePartsRenderer(boolean useScript, String... args) {
+        super(args);
+        this.useScript = useScript;
+    }
+
+    public void renderWire(Object tile, Object connection, Object vec, float partialTicks, RenderPass pass) {
+        this.renderWire(tile, connection, vec, partialTicks, pass.id);
+    }
+
+    @Deprecated
+    public void renderWireDeflection2(Object tile, Object connection, Object vector, float partialTicks, int pass) {
+        GLRecorder rec = GLRecorder.active();
+        Vec3 target = toVec3(vector);
+        if (rec == null || target == null || this.sectionLength <= 0.0F) return;
+        double lx = Math.sqrt(target.getX() * target.getX() + target.getZ() * target.getZ());
+        if (lx == 0.0D) {
+            this.renderWireStraight(tile, connection, vector, partialTicks, pass, null);
+            return;
+        }
+        double alpha = this.deflectionCoefficient * NGTMath.cos(target.getPitch())
+                / Math.pow(1.0F + this.lengthCoefficient, lx);
+        if (alpha == 0.0D) {
+            this.renderWireStraight(tile, connection, vector, partialTicks, pass, null);
+            return;
+        }
+        double a = (lx - target.getY() / (alpha * lx)) / 2.0D;
+        rec.push();
+        rec.rotate(target.getYaw(), 0.0F, 1.0F, 0.0F);
+        for (double x = 0.0D; x < lx;) {
+            double y = alpha * (x * x - 2.0D * a * x);
+            double angle = Math.atan(2.0D * alpha * (x - a));
+            rec.push();
+            rec.translate(0.0F, (float) y, (float) x);
+            rec.rotate((float) -Math.toDegrees(angle) + 90.0F, 1.0F, 0.0F, 0.0F);
+            this.renderPartsOrModel(null);
+            rec.pop();
+            double step = Math.cos(angle) * this.sectionLength;
+            if (!(step > 0.0D) || !Double.isFinite(step)) break;
+            x += step;
+        }
+        rec.pop();
+    }
+
     /** 本家 renderWire: static → dynamic の順に呼ぶ。 */
     public void renderWire(Object tile, Object connection, Object vec, float partialTicks, int pass) {
         this.renderWireStatic(tile, connection, vec, partialTicks, pass);
@@ -35,14 +79,56 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
     }
 
     public void renderWireStatic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
-        if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "renderWireStatic", tile, connection, vec, partialTicks, pass);
+        if (this.useScript) callWireScript("renderWireStatic", tile, connection, vec, partialTicks, pass);
+    }
+
+    /**
+     * 本家 renderWireDynamic。
+     * スクリプトを持たないモデルは、ここで直接敷き詰めるのが本家
+     * (レンダラ側に別経路を持たせない)。pass0 でのみ描くのは発光防止。
+     */
+    public void renderWireDynamic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
+        if (this.useScript && this.script != null) {
+            callWireScript("renderWireDynamic", tile, connection, vec, partialTicks, pass);
+        } else if (pass == RenderPass.NORMAL.id) {
+            if (this.deflectionCoefficient > 0.0F) {
+                this.renderWireDeflection(tile, connection, vec, partialTicks, pass, null);
+            } else {
+                this.renderWireStraight(tile, connection, vec, partialTicks, pass, null);
+            }
         }
     }
 
-    public void renderWireDynamic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
-        if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "renderWireDynamic", tile, connection, vec, partialTicks, pass);
+    /** 既にログした失敗 (関数名, 例外) の組。 */
+    private final java.util.Set<String> loggedFailures = new java.util.HashSet<>();
+
+    /**
+     * 架線スクリプトを呼ぶ。
+     *
+     * <p>★例外を握りつぶさない。以前は {@code doScriptIgnoreError} で捨てていたので、
+     * スクリプトが未対応 API で落ちても「何も描かない」だけになり、
+     * RTMU 内蔵の素ケーブルへフォールバックして<b>既定のワイヤーに見えていた</b>。
+     * 原因が一切ログに出ないので追えなかった。
+     */
+    private void callWireScript(String function, Object tile, Object connection, Object vec,
+                                float partialTicks, int pass) {
+        if (this.script == null) {
+            return;
+        }
+        try {
+            ScriptUtil.doScriptFunction(this.script, function, tile, connection, vec, partialTicks, pass);
+        } catch (Throwable t) {
+            Throwable cause = t.getCause() != null ? t.getCause() : t;
+            // 関数を持たないのは異常ではない (renderWireStatic が空のパックがある)
+            if (cause instanceof NoSuchMethodException) {
+                return;
+            }
+            String key = function + "|" + cause;
+            if (this.loggedFailures.size() < 16 && this.loggedFailures.add(key)) {
+                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                    "[架線] スクリプトが落ちました {} script={}: {}",
+                    function, this.scriptName == null ? "?" : this.scriptName, String.valueOf(cause));
+            }
         }
     }
 

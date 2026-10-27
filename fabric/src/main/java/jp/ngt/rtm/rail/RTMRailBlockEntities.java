@@ -19,7 +19,7 @@ public final class RTMRailBlockEntities {
                     RTMRailBlocks.LARGE_RAIL_BASE.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TileEntityLargeRailNormalCore>> LARGE_RAIL_NORMAL_CORE =
-            REGISTER.register("large_rail_normal_core", () -> BlockEntityType.Builder.of(TileEntityLargeRailNormalCore::new,
+            REGISTER.register("large_rail_normal_core", () -> BlockEntityType.Builder.<TileEntityLargeRailNormalCore>of((pos,state)->state.hasProperty(BlockLargeRailCore.SECTIONED) && state.getValue(BlockLargeRailCore.SECTIONED)?new jp.kaiz.kaizpatch.rtm.rail.TileEntityLargeRailSectionCore(pos,state):new TileEntityLargeRailNormalCore(pos,state),
                     RTMRailBlocks.LARGE_RAIL_NORMAL_CORE.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TileEntityLargeRailSwitchBase>> LARGE_RAIL_SWITCH_BASE =
@@ -44,7 +44,13 @@ public final class RTMRailBlockEntities {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TileEntityMarker>> MARKER =
             REGISTER.register("marker", () -> BlockEntityType.Builder.of(TileEntityMarker::new,
-                    RTMRailBlocks.MARKER.get(), RTMRailBlocks.MARKER_SWITCH.get()).build(null));
+                    RTMRailBlocks.MARKER.get(), RTMRailBlocks.MARKER_SWITCH.get(),
+                    // ★marker_straight を追加した際にここへ入れ忘れると、
+                    //   設置時に「Invalid block entity ... got marker_straight」でクラッシュする。
+                    RTMRailBlocks.MARKER_STRAIGHT.get(),
+                    // legacy_* は本家 BlockMarker にエイリアス (同じ BE = 同じ処理)
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks.MARKER.get(),
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks.MARKER_SWITCH.get()).build(null));
 
     private RTMRailBlockEntities() {
     }

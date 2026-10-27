@@ -1,0 +1,22 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "WIWIW",
+    " I I ",
+    "WIWIW",
+    " I I ",
+    "WIWIW"
+  ],
+  "key": {
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    },
+    "W": {
+      "item": "minecraft:oak_planks"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:rail",
+    "count": 1
+  }
+}

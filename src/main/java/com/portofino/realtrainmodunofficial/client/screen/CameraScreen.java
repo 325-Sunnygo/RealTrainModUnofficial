@@ -19,7 +19,7 @@ public class CameraScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        this.renderBackground(g, mouseX, mouseY, partialTick);
+        g.fillGradient(0,0,width,height,0xC0101010,0xD0101010);
         super.render(g, mouseX, mouseY, partialTick);
 
         int halfW = this.width / 2;
@@ -35,8 +35,4 @@ public class CameraScreen extends Screen {
         g.fill(halfW + 8, 20, halfW + 40, 52, 0xFFFFFFFF);
     }
 
-    @Override
-    public boolean isPauseScreen() {
-        return false;
-    }
 }

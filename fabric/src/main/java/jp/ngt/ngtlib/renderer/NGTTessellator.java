@@ -8,7 +8,7 @@ import java.util.List;
  * 頂点列を蓄積し、draw で GLRecorder に DRAW_TESS として記録する。
  */
 @SuppressWarnings("unused")
-public final class NGTTessellator {
+public final class NGTTessellator implements IRenderer {
     public static final NGTTessellator instance = new NGTTessellator();
 
     private static final int GL_QUADS = 7;
@@ -23,6 +23,8 @@ public final class NGTTessellator {
     private boolean hasTexture;
     /** disableColor 中は色を送らない (白扱い)。 */
     private boolean colorDisabled;
+    private boolean hasColor;
+    private float normalX, normalY, normalZ = 1.0F;
 
     private NGTTessellator() {
     }
@@ -39,9 +41,11 @@ public final class NGTTessellator {
         this.textureU = this.textureV = 0.0F;
         this.hasTexture = false;
         this.colorDisabled = false;
+        this.hasColor=false;
     }
 
     public void setColorRGBA(int red, int green, int blue, int alpha) {
+        this.hasColor=true;
         this.r = red / 255.0F;
         this.g = green / 255.0F;
         this.b = blue / 255.0F;
@@ -53,6 +57,7 @@ public final class NGTTessellator {
     }
 
     public void setColorRGBA_F(float red, float green, float blue, float alpha) {
+        this.hasColor=true;
         this.r = red;
         this.g = green;
         this.b = blue;
@@ -106,6 +111,7 @@ public final class NGTTessellator {
     }
 
     public void setNormal(float x, float y, float z) {
+        this.normalX=x; this.normalY=y; this.normalZ=z;
     }
 
     public void setBrightness(int packed) {
@@ -115,11 +121,10 @@ public final class NGTTessellator {
         }
     }
 
-    public void addVertexWithUV(double x, double y, double z, double u, double v) {
-        this.textureU = (float) u;
-        this.textureV = (float) v;
-        this.hasTexture = true;
-        this.addVertex(x, y, z);
+    /** Java callers may pass doubles; scripts use the original fixed float signature. */
+    public void addVertexWithUV(double... values) {
+        if(values.length!=5)throw new IllegalArgumentException("Expected x,y,z,u,v");
+        addVertexWithUV((float)values[0],(float)values[1],(float)values[2],(float)values[3],(float)values[4]);
     }
 
     public void addVertex(double x, double y, double z) {
@@ -127,10 +132,12 @@ public final class NGTTessellator {
         float cg = this.colorDisabled ? 1.0F : this.g;
         float cb = this.colorDisabled ? 1.0F : this.b;
         float ca = this.colorDisabled ? 1.0F : this.a;
+        var recorder=GLRecorder.active();
+        float[] uv=recorder==null?new float[]{textureU,textureV}:recorder.matrices.uv(textureU,textureV);
         this.verts.add(new float[]{
                 (float) x + this.xOffset, (float) y + this.yOffset, (float) z + this.zOffset,
-                this.hasTexture ? this.textureU : 0.0F, this.hasTexture ? this.textureV : 0.0F,
-                cr, cg, cb, ca});
+                this.hasTexture ? uv[0] : 0.0F, this.hasTexture ? uv[1] : 0.0F,
+                cr, cg, cb, ca, this.normalX, this.normalY, this.normalZ});
     }
 
     /**
@@ -141,8 +148,10 @@ public final class NGTTessellator {
     public static final class TesselatorVertexState {
         private final List<float[]> verts;
         private final int mode;
+        private final boolean hasColor;
 
-        TesselatorVertexState(List<float[]> verts, int mode) {
+        TesselatorVertexState(List<float[]> verts, int mode,boolean hasColor) {
+            this.hasColor=hasColor;
             this.verts = verts;
             this.mode = mode;
         }
@@ -161,7 +170,7 @@ public final class NGTTessellator {
         for (float[] v : this.verts) {
             copy.add(v.clone());
         }
-        return new TesselatorVertexState(copy, this.mode);
+        return new TesselatorVertexState(copy, this.mode,this.hasColor);
     }
 
     public void setVertexState(Object state) {
@@ -173,18 +182,27 @@ public final class NGTTessellator {
             this.verts.add(v.clone());
         }
         this.mode = s.mode;
+        this.hasColor=s.hasColor;
     }
 
     /** 本家 draw は積んだバイト数を返す。値を見るスクリプトがあるので合わせる。 */
+    public void addVertexWithUV(float x,float y,float z,float u,float v) {
+        this.textureU=u;this.textureV=v;this.hasTexture=true;this.addVertex(x,y,z);
+    }
+
+    public void abortDrawing() { this.verts.clear(); }
+
     public int draw() {
         int count = this.verts.size();
         GLRecorder rec = GLRecorder.active();
         if (rec != null && count > 0) {
             float[] flat = new float[count * 9];
+            float[] normals = new float[count * 3];
             for (int i = 0; i < count; i++) {
                 System.arraycopy(this.verts.get(i), 0, flat, i * 9, 9);
+                System.arraycopy(this.verts.get(i), 9, normals, i * 3, 3);
             }
-            rec.drawTess(new GLRecorder.TessDraw(this.mode, flat));
+            rec.drawTess(new GLRecorder.TessDraw(this.mode, flat, false, false, normals,!this.hasColor));
         }
         this.verts.clear();
         this.xOffset = this.yOffset = this.zOffset = 0.0F;

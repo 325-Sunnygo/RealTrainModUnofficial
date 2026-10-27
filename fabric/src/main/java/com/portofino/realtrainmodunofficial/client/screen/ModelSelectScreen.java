@@ -5,7 +5,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.portofino.realtrainmodunofficial.client.PackButtonTextureCache;
-import com.portofino.realtrainmodunofficial.RtmuSettings;
 import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 import com.portofino.realtrainmodunofficial.client.renderer.BogieRenderer;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
@@ -43,7 +42,8 @@ import java.util.function.Consumer;
 @OnlyIn(Dist.CLIENT)
 public class ModelSelectScreen extends Screen {
     /** 選択結果。旧呼び出し互換のため (modelId, dataMapValue) のコンストラクタも残す。 */
-    public record SelectionResult(String modelId, String dataMapValue, String customName, int color) {
+    public record SelectionResult(String modelId, String dataMapValue, String customName, int color,boolean autoSplit) {
+        public SelectionResult(String modelId,String dataMapValue,String customName,int color) {this(modelId,dataMapValue,customName,color,true);}
         public SelectionResult(String modelId, String dataMapValue) {
             this(modelId, dataMapValue, "", 0xFFFFFF);
         }
@@ -55,12 +55,18 @@ public class ModelSelectScreen extends Screen {
         }
     }
 
-    // 一覧項目 (5:1)。本家は 160×32 だが「項目でかい」との指摘で少し小さめに。
-    private static final int BTN_W = 140;
-    private static final int BTN_H = 28;
-    private static final int LIST_LEFT = 8;
-    private static final int SCROLLBAR_W = 6;
-    private static final int FIELD_H = 18;
+    // 本家 GuiSelectModel / GuiButtonSelectModel の数値そのまま。
+    /** 本家 GuiButtonSelectModel: ボタンは 160×32。 */
+    private static final int BTN_W = 160;
+    private static final int BTN_H = 32;
+    /** 本家 resetModelList: ボタン x=10。 */
+    private static final int LIST_LEFT = 10;
+    /** 本家 drawScrollBar: つまみは 16×16 (右端 16px がクリック域)。 */
+    private static final int SCROLLBAR_W = 16;
+    private static final int FIELD_H = 20;
+    /** 本家 ButtonBlue (rtm:textures/gui/button_blue.png)。UV は 1/512 規約。 */
+    private static final net.minecraft.resources.ResourceLocation BUTTON_BLUE =
+        net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("rtm", "textures/gui/button_blue.png");
 
     private final List<ModelInfo> allModels;
     private final Consumer<SelectionResult> onSelected;
@@ -84,6 +90,8 @@ public class ModelSelectScreen extends Screen {
     /** 右上入力群の左端 x (init で確定)。ホイール判定などに使う。 */
     private int clusterLeftX;
 
+    private Boolean railAutoSplit;
+    public ModelSelectScreen withRailOptions(boolean enabled) {railAutoSplit=enabled;return this;}
     private boolean draggingScrollbar = false;
 
     // ---- モデルプレビュー ----
@@ -112,14 +120,7 @@ public class ModelSelectScreen extends Screen {
                              String initialName, int initialColor) {
         super(title);
         // 本家どおり名前順ソート (カテゴリを名前より優先)
-        // ★同梱モデルを隠す設定が ON なら、ここで一覧から落とす。
-        // 落とすのは<b>表示だけ</b>で、読み込みは通常どおり行う
-        // (既に設置されている物やパックからの参照が壊れないようにするため)。
-        // 選択中の物だけは、隠す設定でも消さない (今何を選んでいるか分からなくなる)。
         this.allModels = models.stream()
-            .filter(i -> !RtmuSettings.hideBundledModels
-                || !RtmuSettings.isBundledPack(i.packName())
-                || (initialSelectedId != null && initialSelectedId.equals(i.id())))
             .sorted(Comparator
                 .comparing((ModelInfo i) -> safe(i.category()), String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(i -> safe(i.displayName()), String.CASE_INSENSITIVE_ORDER)
@@ -135,8 +136,10 @@ public class ModelSelectScreen extends Screen {
     private static String safe(String v) { return v == null ? "" : v; }
 
     // ---- レイアウト ----
-    private int scrollbarX() { return width - SCROLLBAR_W - 3; }   // 画面右端
+    /** 本家: スクロールバーのクリック域は右端 16px (width-16 〜 width)。 */
+    private int scrollbarX() { return width - SCROLLBAR_W; }
     private int listRight() { return LIST_LEFT + BTN_W; }
+    /** 本家 resetModelList: i0 = height/2 - 16 (=BTN_H/2)。 */
     private int centerY() { return height / 2 - BTN_H / 2; }
 
 
@@ -148,23 +151,19 @@ public class ModelSelectScreen extends Screen {
         // JourneyMap は hideGui を無視するので、ミニマップを一時的にオフにする。
         com.portofino.realtrainmodunofficial.client.JourneyMapCompat.setSuppressed(true);
 
-        // 本家配置: 右上にコンパクトな2列。スクロールバー(右端)の左に収める。
-        // 一覧と重ならないよう clusterLeftX >= listArea を先に確定してから幅を出す。
-        int fieldsRight = scrollbarX() - 6;
-        int listArea = listRight() + 12;
-        this.clusterLeftX = Math.max(listArea, fieldsRight - 220);
-        int clusterW = Math.max(60, fieldsRight - clusterLeftX);
-        int gap = 6;
-        int colW = (clusterW - gap) / 2;
-        int c1 = clusterLeftX;
-        int c2 = clusterLeftX + colW + gap;
-        int fy = 8;   // もっと右上へ
+        // 本家 initGui の座標そのまま:
+        //   nameField   (width-205,  5, 120x20) "Custom Name"
+        //   argField    (width-205, 30, 100x20) "Custom Parameters" (RTMU では DataMap)
+        //   searchField (width-80,   5,  60x20) "Search Box"
+        //   colorButton (width-80,  30,  40x20) + 色見本 (width-40,30)-(width-20,50)
+        this.clusterLeftX = width - 205;
+        nameField = addBox(width - 205, 5, 120, "Custom Name", initialName);
+        searchField = addBox(width - 80, 5, 60, "Search", "");
+        dataMapField = addBox(width - 205, 30, 100, "DataMap", initialDataMapValue);
+        colorField = addBox(width - 80, 30, 40, "Color", String.format("0x%06X", initialColor & 0xFFFFFF));
 
-        nameField = addBox(c1, fy, colW, "Custom Name", initialName);
-        searchField = addBox(c2, fy, colW, "Search", "");
-        fy += FIELD_H + 8;
-        dataMapField = addBox(c1, fy, colW, "DataMap", initialDataMapValue);
-        colorField = addBox(c2, fy, Math.max(48, colW - 22), "Color", String.format("0x%06X", initialColor & 0xFFFFFF));
+        if(railAutoSplit!=null)addRenderableWidget(net.minecraft.client.gui.components.Checkbox.builder(Component.literal("Disable Auto Split"),font)
+            .pos(width-205,55).selected(!railAutoSplit).onValueChange((box,disabled)->railAutoSplit=!disabled).build());
 
         // 完了・キャンセルは画面下・中央 (真ん中)。一覧側は下マージンを空けて重なりを避ける。
         int bw = Math.min(100, Math.max(70, width / 5));
@@ -220,10 +219,10 @@ public class ModelSelectScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
-        // 全画面「半透明の黒」を一番下に一度だけ敷く (world はうっすら透ける)。
-        // renderBackground には置かない — super.render がそれを再度呼び、ボタンの上に黒が重なって
-        // ボタンだけ暗くなるため。ここで先に敷けば、この後に描くボタン/フィールドは黒に載る=暗くならない。
-        g.fill(0, 0, width, height, 0xB0000000);
+        // 本家 drawDefaultBackground と同じ暗いグラデーションを一番下に一度だけ敷く。
+        // renderBackground には置かない — super.render がそれを再度呼び、ボタンの上に黒が
+        // 重なってボタンだけ暗くなるため。
+        g.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
 
         // タイトルは影付きで、明るい空を背景にしても読めるように。
         g.drawString(font, getTitle(), LIST_LEFT, 8, 0xFFFFFF, true);
@@ -234,23 +233,24 @@ public class ModelSelectScreen extends Screen {
         for (int i = 0; i < filtered.size(); i++) {
             int y = cy + BTN_H * (i - currentScroll);
             if (y <= -BTN_H || y >= listBottom) continue;
-            boolean isSel = filtered.get(i).id().equals(selectedId);
-            drawItem(g, filtered.get(i), LIST_LEFT, y, isSel, mouseX, mouseY);
+            ModelInfo info = filtered.get(i);
+            boolean isSel = info.id().equals(selectedId);
+            drawItem(g, info, LIST_LEFT, y, isSel, mouseX, mouseY);
         }
 
         drawScrollbar(g);
 
-        // 色プレビュー (color 欄の右)
+        // 本家 drawColorPalet: (width-40,30)-(width-20,50) に選択色を塗る
         if (colorField != null) {
             int c = parseColor(colorField.getValue(), initialColor);
-            int cx = colorField.getX() + colorField.getWidth() + 4;
-            int cyy = colorField.getY();
-            g.fill(cx, cyy, cx + FIELD_H, cyy + FIELD_H, 0xFF000000 | (c & 0xFFFFFF));
-            g.renderOutline(cx, cyy, FIELD_H, FIELD_H, 0xFFFFFFFF);
+            g.fill(width - 40, 30, width - 20, 50, 0xFF000000 | (c & 0xFFFFFF));
         }
 
-        // 一覧のボタンをクリックして選んだモデルを右手に浮かべる
-        renderSelectedPreview(g);
+        // 本家: ホバー中のモデルを右手に浮かべる (何も乗っていなければ選択中を出す)
+        renderPreview(g, mouseX, mouseY);
+        VehicleDefinition loadingDefinition=VehicleRegistry.getById(selectedId);
+        if(com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.isLoading(loadingDefinition))
+            g.drawString(font,Component.literal("スクリプトを読み込み中…"),width-205,82,0xAAAAAA);
 
         super.render(g, mouseX, mouseY, pt);
 
@@ -265,22 +265,20 @@ public class ModelSelectScreen extends Screen {
     // 本家 GuiSelectModel.renderModel + ModelSet*Client.renderModelInGui の移植。
     // 本家は「一覧のボタンにマウスを乗せている間だけ」画面右手にモデルを浮かべる。
 
-    /** 本家 gluPerspective(80, 1.0, 5, 1000)。アスペクトを 1.0 にするのも本家どおり。 */
+    /** 本家 GuiButtonSelectModel.preRenderModelInGui: gluPerspective(80, 1.0, 5, 500)。 */
     private static final float PREVIEW_FOV_DEG = 80.0F;
     private static final float PREVIEW_NEAR = 5.0F;
-    private static final float PREVIEW_FAR = 1000.0F;
+    private static final float PREVIEW_FAR = 500.0F;
 
-    private void renderSelectedPreview(GuiGraphics g) {
-        ModelInfo info = null;
-        for (ModelInfo m : filtered) {
-            if (m.id().equals(selectedId)) {
-                info = m;
-                break;
-            }
-        }
-        if (info == null) {
+    private void renderPreview(GuiGraphics g, int mouseX, int mouseY) {
+        // ★プレビューは「選択中 (クリックで決定した) モデル」だけを描く。
+        //   ホバーに追従させると (1) スクロールのたびに別モデルを読み込んで重く、
+        //   (2) スクロールしただけで選択されたように見える、の両方が起きる。
+        int selIdx = indexOf(selectedId);
+        if (selIdx < 0) {
             return;
         }
+        ModelInfo info = filtered.get(selIdx);
         MqoModelLoader.MqoModel model = getOrLoadModel(info.id(), info.packName());
         if (model == null) {
             return;
@@ -305,9 +303,21 @@ public class ModelSelectScreen extends Screen {
             modelView.identity();
             RenderSystem.applyModelViewMatrix();
 
-            // 機種ごとの配置は PoseStack 側に積む (頂点は CPU で変換される)
+            // 本家 GuiButtonSelectModel.drawButton の変換そのまま:
+            //   translate(5, 1, -18) → scale(10 / 最大寸法) → translate(0, -高さ/2, 0)
+            //   → Y 回転 (12 秒で 1 周)。機種別の配置は本家に無い。
             PoseStack ps = new PoseStack();
-            applyGuiPlacement(ps, info.id(), vehicleDef);
+            ps.translate(5.0F, 1.0F, -18.0F);
+            float[] box = model.getSizeBox();
+            float sx = box[3] - box[0];
+            float sy = box[4] - box[1];
+            float sz = box[5] - box[2];
+            float maxSize = Math.max(sx, Math.max(sy, sz));
+            float fit = 10.0F * (maxSize > 1.0E-4F ? 1.0F / maxSize : 1.0F);
+            ps.scale(fit, fit, fit);
+            ps.translate(0.0F, -sy * 0.5F, 0.0F);
+            float rotation = (System.currentTimeMillis() % 12000L) * 360.0F / 12000.0F;
+            ps.mulPose(Axis.YP.rotationDegrees(rotation));
 
             // 本家 RenderHelper.enableStandardItemLighting + GL_DEPTH_TEST
             Lighting.setupFor3DItems();
@@ -334,52 +344,6 @@ public class ModelSelectScreen extends Screen {
             RenderSystem.restoreProjectionMatrix();
             RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
         }
-    }
-
-    /** 本家 renderModelInGui の機種別配置。X:右が+, Z:手前が+ (本家のコメントどおり)。 */
-    private static void applyGuiPlacement(PoseStack ps, String id, VehicleDefinition vehicleDef) {
-        if (vehicleDef != null) {
-            // ModelSetVehicleBaseClient
-            ps.translate(11.0F, -1.0F, -12.0F);
-            ps.mulPose(Axis.YP.rotationDegrees(-65.0F));
-            ps.scale(1.2F, 1.2F, 1.2F);
-            return;
-        }
-        if (RailRegistry.getById(id) != null) {
-            // ModelSetRailClient
-            ps.translate(3.0F, -2.0F, -6.0F);
-            ps.mulPose(Axis.ZP.rotationDegrees(10.0F));
-            ps.mulPose(Axis.YP.rotationDegrees(-50.0F));
-            ps.scale(1.5F, 1.5F, 1.5F);
-            return;
-        }
-        // ここから設置物。本家は種類ごとに別クラスで配置が違うので、それに合わせて分ける。
-        // 以前は全部 ModelSetMachineClient の配置で描いていたため、信号機が 1/5 の大きさになり、
-        // 碍子・コネクタ・架線は距離も傾きも本家と別物になっていた。
-        var objDef = com.portofino.realtrainmodunofficial.installedobject
-            .InstalledObjectRegistry.getById(id);
-        var category = objDef == null ? null : objDef.getCategory();
-        if (category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.SIGNAL) {
-            // 本家 ModelSetSignalClient
-            ps.translate(3.0F, -2.0F, -10.0F);
-            ps.mulPose(Axis.YP.rotationDegrees(-50.0F));
-            ps.scale(5.0F, 5.0F, 5.0F);
-            return;
-        }
-        if (category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.INSULATOR
-                || category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.CONNECTOR_INPUT
-                || category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.CONNECTOR_OUTPUT
-                || category == com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.WIRE) {
-            // 本家 ModelSetConnectorClient / ModelSetWireClient (レールと同じ配置)
-            ps.translate(3.0F, -2.0F, -6.0F);
-            ps.mulPose(Axis.ZP.rotationDegrees(10.0F));
-            ps.mulPose(Axis.YP.rotationDegrees(-50.0F));
-            ps.scale(1.5F, 1.5F, 1.5F);
-            return;
-        }
-        // 本家 ModelSetMachineClient / ModelSetOrnamentClient (踏切・照明・スピーカー・架線柱等)
-        ps.translate(3.0F, -1.0F, -10.0F);
-        ps.mulPose(Axis.YP.rotationDegrees(-60.0F));
     }
 
     /**
@@ -476,6 +440,34 @@ public class ModelSelectScreen extends Screen {
     }
 
     /** 車両 / 設置物 / レールのどれかとして id からモデルを引く。失敗は覚えて再探索しない。 */
+    /** モデルを実際に読む (描画スレッド専用)。 */
+    private static MqoModelLoader.MqoModel loadModelNow(String id) {
+        try {
+            VehicleDefinition vd = VehicleRegistry.getById(id);
+            if (vd != null && vd.getModelFile() != null && !vd.getModelFile().isBlank()) {
+                MqoModelLoader.MqoModel m = MqoModelLoader.loadModelForVehicle(vd);
+                if (m != null) {
+                    return m;
+                }
+            }
+            var iod = InstalledObjectRegistry.getById(id);
+            if (iod != null && iod.getModelFile() != null && !iod.getModelFile().isBlank()) {
+                MqoModelLoader.MqoModel m = MqoModelLoader.loadModelFromPack(
+                    iod.getPackName(), iod.getModelFile(), iod.getTextureOverrides(), null, iod.isSmoothing());
+                if (m != null) {
+                    return m;
+                }
+            }
+            var rd = RailRegistry.getById(id);
+            if (rd != null && rd.getModelFile() != null && !rd.getModelFile().isBlank()) {
+                return MqoModelLoader.loadModelFromPack(
+                    rd.getPackName(), rd.getModelFile(), rd.getTextureOverrides(), null, false);
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
     private MqoModelLoader.MqoModel getOrLoadModel(String id, String packName) {
         if (id == null || id.isBlank() || MISSING_MODEL_CACHE.contains(id)) {
             return null;
@@ -484,29 +476,10 @@ public class ModelSelectScreen extends Screen {
         if (cached != null) {
             return cached;
         }
-        MqoModelLoader.MqoModel model = null;
-        try {
-            VehicleDefinition vd = VehicleRegistry.getById(id);
-            if (vd != null && vd.getModelFile() != null && !vd.getModelFile().isBlank()) {
-                model = MqoModelLoader.loadModelForVehicle(vd);
-            }
-            if (model == null) {
-                var iod = InstalledObjectRegistry.getById(id);
-                if (iod != null && iod.getModelFile() != null && !iod.getModelFile().isBlank()) {
-                    model = MqoModelLoader.loadModelFromPack(
-                        iod.getPackName(), iod.getModelFile(), iod.getTextureOverrides(), null, iod.isSmoothing());
-                }
-            }
-            if (model == null) {
-                var rd = RailRegistry.getById(id);
-                if (rd != null && rd.getModelFile() != null && !rd.getModelFile().isBlank()) {
-                    model = MqoModelLoader.loadModelFromPack(
-                        rd.getPackName(), rd.getModelFile(), rd.getTextureOverrides(), null, false);
-                }
-            }
-        } catch (Exception ignored) {
-            model = null;
-        }
+        // ★モデル本体は描画スレッドで読む (本家と同じ)。DynamicTexture の生成/登録は
+        //   描画スレッドでのみ行うことで、初期化コールバックの競合 (NPE) を避ける。
+        //   パースはディスクキャッシュで軽いので、ここで同期ロードしてよい。
+        MqoModelLoader.MqoModel model = loadModelNow(id);
         if (model != null) {
             MODEL_CACHE.put(id, model);
         } else {
@@ -552,13 +525,6 @@ public class ModelSelectScreen extends Screen {
 
     private void drawItem(GuiGraphics g, ModelInfo m, int left, int top, boolean selected, int mouseX, int mouseY) {
         boolean hovered = mouseX >= left && mouseX < left + BTN_W && mouseY >= top && mouseY < top + BTN_H;
-        // 土台は renderBackground の全画面「半透明の黒」に任せ、ここではその上に RTM ボタンテクスチャを重ねる。
-        // 選択/ホバー時だけ明るみを足す。
-        if (selected) {
-            g.fill(left, top, left + BTN_W, top + BTN_H, 0x66FFFFFF);
-        } else if (hovered) {
-            g.fill(left, top, left + BTN_W, top + BTN_H, 0x22FFFFFF);
-        }
         // ぼやけ対策: buttonTexture を「GUIサイズ × guiScale」へニアレスト焼き直しし、1:1 で描く。
         // こうするとスケーリングが起きず (テクセル=画面ピクセル)、GUI 描画経路の線形補間に関わらず鮮明。
         int scale = Math.max(1, (int) Math.round(
@@ -573,20 +539,41 @@ public class ModelSelectScreen extends Screen {
             String name = safe(m.displayName()).isBlank() ? m.id() : m.displayName();
             g.drawString(font, name, left + 4, top + (BTN_H - 8) / 2, 0xFFFFFFFF, false);
         }
-        g.renderOutline(left, top, BTN_W, BTN_H, selected ? 0xFFFFFFFF : 0x55FFFFFF);
+        // 本家 renderButtonOverlay: button_blue の (0,32)-(160,64) を重ねる
+        // (UV は本家の 1/512 規約 → texW/H=512 で blit すると同じ切り出し)。
+        // ★選択中とホバーを同じ濃さにすると「スクロールしただけで選択された」ように見えるため、
+        //   選択中=50%、ホバー=薄め(20%) にして区別する。
+        if (selected || hovered) {
+            com.mojang.blaze3d.systems.RenderSystem.enableBlend();
+            g.setColor(1.0F, 1.0F, 1.0F, selected ? 0.5F : 0.2F);
+            g.blit(BUTTON_BLUE, left, top, BTN_W, BTN_H, 0.0F, 32.0F, 160, 32, 512, 512);
+            g.setColor(1.0F, 1.0F, 1.0F, 1.0F);
+            com.mojang.blaze3d.systems.RenderSystem.disableBlend();
+        }
     }
 
+    /** 本家 drawScrollBar: 白い 2px の軌道 (width-9〜width-7, 8〜height-8) + 16×16 の青つまみ。 */
     private void drawScrollbar(GuiGraphics g) {
-        int x = scrollbarX();
-        int top = 8, bottom = height - 8;
-        g.fill(x, top, x + SCROLLBAR_W, bottom, 0xFF303030);
-        if (filtered.size() <= 1) return;
-        int trackH = bottom - top;
-        int thumbH = Math.max(16, trackH / Math.max(1, filtered.size()));
-        int thumbY = top + (int) ((long) currentScroll * (trackH - thumbH) / (filtered.size() - 1));
-        g.fill(x, thumbY, x + SCROLLBAR_W, thumbY + thumbH, 0xFF6A9AE0);
-        g.renderOutline(x, thumbY, SCROLLBAR_W, thumbH, 0xFFFFFFFF);
+        if (filtered.isEmpty()) {
+            return;
+        }
+        g.fill(width - 9, 8, width - 7, height - 8, 0xFFFFFFFF);
+        int thumbY;
+        if (draggingScrollbar) {
+            //本家: クリック中はマウス位置そのまま (8〜height-8 に丸めて -8)
+            double my = lastDragY;
+            thumbY = (int) (my < 8 ? 8 : (my >= height - 8 ? height - 8 : my)) - 8;
+        } else if (filtered.size() > 1) {
+            thumbY = currentScroll * (height - 16) / (filtered.size() - 1);
+        } else {
+            thumbY = 0;
+        }
+        //本家: button_blue の右端 16×16 (UV 0.9375〜1.0, 0〜0.0625 = 512px 換算で 480,0,32,32)
+        g.blit(BUTTON_BLUE, width - 16, thumbY, 16, 16, 480.0F, 0.0F, 32, 32, 512, 512);
     }
+
+    /** ドラッグ中のつまみ描画用に最後のマウス Y を覚える。 */
+    private double lastDragY;
 
     // ---- 入力 ----
     private int itemIndexAt(double mx, double my) {
@@ -604,9 +591,10 @@ public class ModelSelectScreen extends Screen {
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         if (button == 0) {
-            int x = scrollbarX();
-            if (mx >= x && mx < x + SCROLLBAR_W && my >= 8 && my < height - 8) {
+            //本家 drawScreen: クリック域は「右端 16px」全高
+            if (mx >= scrollbarX() && mx < width) {
                 draggingScrollbar = true;
+                lastDragY = my;
                 scrollTo(scrollbarValue(my));
                 return true;
             }
@@ -623,6 +611,7 @@ public class ModelSelectScreen extends Screen {
     @Override
     public boolean mouseDragged(double mx, double my, int button, double dx, double dy) {
         if (draggingScrollbar && button == 0) {
+            lastDragY = my;
             scrollTo(scrollbarValue(my));
             return true;
         }
@@ -635,10 +624,10 @@ public class ModelSelectScreen extends Screen {
         return super.mouseReleased(mx, my, button);
     }
 
+    /** 本家: i1 = floor(mouseY * (size+1) / (height-16))。 */
     private int scrollbarValue(double my) {
-        int top = 8, bottom = height - 8;
-        double frac = (my - top) / (double) Math.max(1, bottom - top);
-        return (int) Math.round(frac * Math.max(0, filtered.size() - 1));
+        double y = my < 8 ? 8 : (my >= height ? height : my);
+        return (int) Math.floor(y * (filtered.size() + 1) / (double) Math.max(1, height - 16));
     }
 
     @Override
@@ -735,7 +724,7 @@ public class ModelSelectScreen extends Screen {
             selectedId,
             dataMapField == null ? "" : dataMapField.getValue(),
             nameField == null ? "" : nameField.getValue(),
-            color));
+            color,railAutoSplit==null || railAutoSplit));
         onClose();
     }
 
@@ -763,4 +752,9 @@ public class ModelSelectScreen extends Screen {
 
     @Override
     public boolean isPauseScreen() { return false; }
+
+    /** 1.21 のメニューぼかしを無効化 (本家 1.7.10 の GUI にぼかしは無い)。 */
+    @Override
+    protected void renderBlurredBackground(float partialTick) {
+    }
 }

@@ -2,143 +2,220 @@ package jp.ngt.rtm.modelpack.cfg;
 
 import java.util.Arrays;
 
-/**
- * 本家 jp.ngt.rtm.modelpack.cfg.TrainConfig の段階的移植 (物理・台車関連フィールド)。
- * 既定値は本家 init と同一。
- */
-public class TrainConfig {
-    /** 本家 IConfigWithType の型名。スクリプトが cfg.TYPE で判定する。 */
+public class TrainConfig extends VehicleBaseConfig implements IConfigWithType {
     public static final String TYPE = "ModelTrain";
 
-    public String trainName = "";
-    public String trainType = "EC";
-    /** 本家 ModelConfig.smoothing (NGTO Builder の renderStatic が getConfig.smoothing を読む)。 */
-    public boolean smoothing;
+    /**
+     * 車両名（重複不可）
+     */
+    public String trainName;
+    /**
+     * 車両のタイプ(EC:電車, DC:気動車, EL:電気機関車, DL:ディーゼル機関車, SL:蒸気機関車, CC:コンテナ車, TC:タンク車, N:なし)
+     */
+    public String trainType;
 
+    /**
+     * 車体モデル
+     */
+    private ModelSource trainModel2;
+    /**
+     * 台車モデル {front, back}
+     */
+    private ModelSource[] bogieModel3;
+
+    @Deprecated
+    private ModelSource bogieModel2;
+    @Deprecated
+    private String trainModel;
+    @Deprecated
+    private String bogieModel;
+    @Deprecated
+    private String trainTexture;
+    @Deprecated
+    private String bogieTexture;
+
+    /**
+     * ブレーキ緩解音
+     */
+    public String sound_BrakeRelease;
+    /**
+     * ブレーキ緩解音(弱め)
+     */
+    public String sound_BrakeRelease2;
+    /**
+     * ジョイント音を鳴らさない
+     */
     public boolean muteJointSound;
-    /** 3つ以上の車輪対応, 台車前後別 */
-    public float[][] jointDelay;
+    /**
+     * 2回目のジョイント音の遅延具合(m)<br>
+     * [2][1~]
+     */
+    public float[][] jointDelay;//3つ以上の車輪対応,台車前後別
+
+    /**
+     * 単行かどうか
+     */
+    public boolean isSingleTrain;
+
+    /**
+     * 台車の位置{x, y, z}
+     */
     private float[][] bogiePos;
+    /**
+     * 車体長の半分
+     */
     public float trainDistance;
-    public float accelerateion;//本家のスペルミスを維持
+
+    /**
+     * 加速度<br>
+     * N km/h/s -> N x 0.0006944
+     */
+    public float accelerateion;
+
+    /**
+     * 加速度ノッチ段数と同一<br>
+     * N km/h/s -> N x 0.0006944
+     */
     public float[] accelerateions;
+    /**
+     * ノッチごとの速度上限(1~5段)
+     */
     public float[] maxSpeed;
+    /**
+     * GUIオフ時は7段でデフォルトブレーキ段数固定
+     */
     public float[] deccelerations;
+
+    /**
+     * カーブでの傾き具合(0.0~1.0)
+     */
     public float rolling;
-    public float rollSpeedCoefficient = 0.02F;
-    public float rollVariationCoefficient = 2.53F;
-    public float rollWidthCoefficient = 0.3F;
+    /**
+     * パンタグラフの摺板位置{X,Z,minY,maxY}
+     */
+    public float[][] pantoPos;
+
+    public float rollSpeedCoefficient;
+    public float rollVariationCoefficient;
+    public float rollWidthCoefficient;
+
     public boolean useVariableAcceleration;
     public boolean useVariableDeceleration;
-    public boolean notDisplayCab;
-    public float[][] pantoPos;
-    public Object[][] smoke;
-    public float[][] playerPos;
 
-    /** 本家 slotPos: {x, y, z, seatType} — EntityFloor (座席/フロア) のスポーン位置 */
-    private float[][] slotPos = new float[0][];
-
-    public String[] rollsignNames = new String[0];
-    public boolean isSingleTrain;
-    public float wheelRotationSpeed = 1.0F;
-
+    public String sound_CpFin;
     public String sound_Joint;
     public String sound_JointReverb;
     public String sound_Notch;
-    public String sound_BrakeRelease;
-    public String sound_BrakeRelease2;
-    public String sound_CpFin;
-    /** レバーサ操作音。 */
     public String sound_Reversal;
 
-    /** 車体モデル (本家 VehicleConfig.model / getModel)。 */
-    public Object model;
-    /** 台車モデル (本家 bogieModel3 / getBogieModel(i))。 */
-    public Object[] bogieModel;
-
-    /** 本家 init の既定値適用。 */
+    @Override
     public void init() {
+        super.init();
+
+        if (this.trainModel2 == null) {
+            this.trainModel2 = new ModelSource();
+            this.trainModel2.modelFile = this.trainModel;
+            this.trainModel2.textures = new String[][]{{"default", this.trainTexture}};
+        }
+
+        if (this.bogieModel3 == null) {
+            this.bogieModel3 = new ModelSource[2];
+            if (this.bogieModel2 != null) {
+                this.bogieModel3[0] = this.bogieModel3[1] = this.bogieModel2;
+            } else {
+                ModelSource model = new ModelSource();
+                model.modelFile = this.bogieModel;
+                model.textures = new String[][]{{"default", this.bogieTexture}};
+                this.bogieModel3[0] = this.bogieModel3[1] = model;
+            }
+        }
+
+        this.sound_BrakeRelease = this.fixSoundPath(this.sound_BrakeRelease);
+        this.sound_BrakeRelease2 = this.fixSoundPath(this.sound_BrakeRelease2);
+
+        this.sound_CpFin = this.fixSoundPath(this.sound_CpFin);
+        this.sound_Joint = this.fixSoundPath(this.sound_Joint);
+        this.sound_JointReverb = this.fixSoundPath(this.sound_JointReverb);
+        this.sound_Notch = this.fixSoundPath(this.sound_Notch);
+        this.sound_Reversal = this.fixSoundPath(this.sound_Reversal);
+
         if (this.bogiePos == null) {
             this.bogiePos = new float[][]{{0.0F, 0.0F, 7.125F}, {0.0F, 0.0F, -7.125F}};
         }
+
         if (this.trainDistance <= 0.0F) {
             this.trainDistance = 10.125F;
         }
+
         if (this.accelerateion <= 0.0F) {
             this.accelerateion = 0.001736F;
         }
+
         if (this.maxSpeed == null || (!this.notDisplayCab && this.maxSpeed.length != 5)) {
             this.maxSpeed = new float[]{0.36F, 0.72F, 1.08F, 1.44F, 1.80F};
         }
+
         if (this.accelerateions == null || (!this.notDisplayCab && this.accelerateions.length != this.maxSpeed.length)) {
             this.accelerateions = new float[this.maxSpeed.length];
             Arrays.fill(this.accelerateions, this.accelerateion);
         }
+
         if (this.deccelerations == null || (!this.notDisplayCab && this.deccelerations.length != 9)) {
             this.deccelerations = new float[]{-0.0002F, -0.0005F, -0.001F, -0.0015F, -0.002F, -0.0025F, -0.003F, -0.0035F, -0.01F};
         }
+
+
         this.rolling *= 5.0F;
+
         if (this.jointDelay == null) {
             float f0 = 1.9F;
             this.jointDelay = new float[][]{{0.0F, f0}, {0.0F, f0}};
         }
-        if (this.playerPos == null) {
-            this.playerPos = new float[][]{{0.8F, 0.0F, 9.187F}, {-0.8F, 0.0F, -9.187F}};
+
+        if (this.serverScriptPath == null) {
+            this.useVariableAcceleration = false;
+            this.useVariableDeceleration = false;
         }
     }
 
-    public float[][] getBogiePos() {
-        return this.bogiePos;
-    }
-
-    public void setBogiePos(float[][] pos) {
-        this.bogiePos = pos;
-    }
-
-    public float[][] getPlayerPos() {
-        return this.playerPos;
-    }
-
-    public float[][] getSlotPos() {
-        return this.slotPos;
-    }
-
-    public void setSlotPos(float[][] pos) {
-        this.slotPos = pos != null ? pos : new float[0][];
-    }
-
+    @Override
     public String getName() {
         return this.trainName;
     }
 
-    public String getSubType() {
-        return this.trainType;
-    }
-
-    /** 本家 getModelType: 設定の型名。 */
+    @Override
     public String getModelType() {
         return TYPE;
     }
 
-    /** 本家 getModel: 車体モデル。 */
-    public Object getModel() {
-        return this.model;
+    @Override
+    public ModelSource getModel() {
+        return this.trainModel2;
     }
 
-    /** 本家 getBogieModel(i): i 番目の台車モデル。未設定なら null。 */
-    public Object getBogieModel(int index) {
-        if (this.bogieModel == null || index < 0 || index >= this.bogieModel.length) {
-            return null;
-        }
-        return this.bogieModel[index];
+    public ModelSource getBogieModel(int par1) {
+        return this.bogieModel3[par1];
     }
 
-    /** 本家 getDummyConfig: モデル未解決時に使う空設定。 */
+    public void setBogiePos(float[][] positions) {this.bogiePos=positions;}
+    public void setSlotPos(float[][] positions) {this.slotPos=positions;}
+    public float[][] getBogiePos() {
+        return this.bogiePos;
+    }
+
+    /**
+     * モデル製作者の方へ<br>
+     * ここは無視してください
+     */
     public static TrainConfig getDummyConfig() {
         TrainConfig config = new TrainConfig();
         config.trainName = "Dummy";
         config.trainType = "N";
         config.init();
         return config;
+    }
+
+    public String getSubType() {
+        return this.trainType;
     }
 }

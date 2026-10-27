@@ -53,6 +53,12 @@ public abstract class EntityInstalledObject extends Entity {
     /** 壊したときにドロップするもの (本家 dropItems)。 */
     protected abstract void dropItems();
 
+    public javax.script.ScriptEngine getServerScriptEngine() {
+        if (this.level().isClientSide()) return null;
+        return com.portofino.realtrainmodunofficial.script.InstalledObjectServerScripts.getEngine(
+                com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry.getById(this.getModelName()));
+    }
+
     public jp.ngt.rtm.modelpack.ScriptExecuter getScriptExecuter() {
         return this.executer;
     }

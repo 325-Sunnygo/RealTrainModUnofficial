@@ -123,7 +123,6 @@ item.rtm:autoloading_rifle.name=Autoloading rifle
 item.rtm:sniper_rifle.name=Sniper rifle
 item.rtm:smg.name=Submachine gun
 item.rtm:amr.name=Anti-materiel rifle
-item.rtm:razer_gun.name=Razer gun
 item.rtm:magazine_handgun.name=Magazine(Hand gun)
 item.rtm:magazine_rifle.name=Magazine(Rifle)
 item.rtm:magazine_alr.name=Magazine(Autoloading rifle)

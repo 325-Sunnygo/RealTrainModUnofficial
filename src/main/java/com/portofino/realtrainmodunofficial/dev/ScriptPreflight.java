@@ -50,6 +50,8 @@ public final class ScriptPreflight {
         int syntaxFailed = 0;
         int envSkipped = 0;
         int bindWarn = 0;
+        int runtimeSkipped = 0;
+        int prepareFailed = 0;
         List<String> syntaxFailures = new ArrayList<>();
         List<String> binds = new ArrayList<>();
 
@@ -60,31 +62,31 @@ public final class ScriptPreflight {
             String prepared;
             boolean preparedOk = true;
             try {
-                prepared = PackScriptSource.prepare(raw, rel);
+                prepared = PackScriptSource.prepare(raw, rel, path -> readInclude(scriptsDir, path));
             } catch (Throwable t) {
                 // prepare は gameDir 等に触るためゲーム外では失敗し得る。
                 // 構文検査だけは生ソースで行う。
                 prepared = raw;
                 preparedOk = false;
+                prepareFailed++;
+                binds.add(rel + " [prepare-failed] " + t);
             }
 
             // --- 構文検査 (プリリュード無し) ---
             try {
                 ScriptEngine se = ScriptUtil.createEngine();
                 se.put(ScriptEngine.FILENAME, rel);
-                se.eval(prepared);
+                ((javax.script.Compilable) se).compile(prepared);
                 syntaxOk++;
             } catch (ScriptException e) {
-                if (isParseError(e)) {
-                    syntaxFailed++;
-                    syntaxFailures.add(formatSyntaxError(rel, prepared, e));
-                    continue;
-                }
-                // 実行時エラー (プリリュード依存) は構文上の不備ではない。
-                syntaxOk++;
+                syntaxFailed++;
+                syntaxFailures.add(formatSyntaxError(rel, prepared, e));
+                continue;
             } catch (Throwable t) {
-                // クラス初期化等の環境要因は無視。
-                syntaxOk++;
+                // An unavailable engine is a failed check, never a syntax pass.
+                syntaxFailed++;
+                syntaxFailures.add(rel + " :: syntax check unavailable: " + t);
+                continue;
             }
 
             // --- 本番同等ロード (プリリュード付き) ---
@@ -107,7 +109,8 @@ public final class ScriptPreflight {
                     syntaxFailures.add(rel + " :: load parse error: " + s);
                 } else {
                     // 実行時エラー: スクリプト側の問題とは限らないため参考表示に留める。
-                    binds.add(rel + " [runtime-skipped] " + t.getClass().getSimpleName());
+                    runtimeSkipped++;
+                    binds.add(rel + " [runtime-skipped] " + t);
                 }
             }
             if (!preparedOk) {
@@ -142,6 +145,8 @@ public final class ScriptPreflight {
         System.out.println("total=" + files.size()
                 + " syntaxOk=" + syntaxOk
                 + " syntaxFailed=" + syntaxFailed
+                + " prepareFailed=" + prepareFailed
+                + " runtimeSkipped=" + runtimeSkipped
                 + " envSkipped=" + envSkipped
                 + " preludeBindWarn=" + bindWarn
                 + " preludeSanityFailed=" + bindFailures.size());
@@ -153,13 +158,29 @@ public final class ScriptPreflight {
         }
         if (envSkipped > 0) {
             System.out.println("ENV-SKIPPED " + envSkipped
-                    + " (ゲーム外でのみ発生するレジストリ/パス初期化失敗。ゲーム内では正常)");
+                    + " (レジストリ/パス初期化が必要なため未検証。ゲーム内での確認が必要)");
         }
         for (String m : binds) {
             System.out.println("NOTE " + m);
         }
-        if (syntaxFailed > 0 || !bindFailures.isEmpty()) {
+        if (syntaxFailed > 0 || prepareFailed > 0 || !bindFailures.isEmpty()) {
             System.exit(1);
+        }
+    }
+
+    private static byte[] readInclude(Path scriptsDir, String resource) {
+        String path = resource.replace('\\', '/');
+        int colon = path.indexOf(':');
+        if (colon >= 0) path = path.substring(colon + 1);
+        Path candidate = path.startsWith("scripts/")
+            ? scriptsDir.resolve(path.substring(8)).normalize()
+            : scriptsDir.getParent().resolve(path).normalize();
+        if (!Files.isRegularFile(candidate)) candidate = scriptsDir.resolve(path).normalize();
+        if (!Files.isRegularFile(candidate)) return null;
+        try {
+            return Files.readAllBytes(candidate);
+        } catch (java.io.IOException e) {
+            throw new java.io.UncheckedIOException(e);
         }
     }
 

@@ -3,8 +3,6 @@ package com.portofino.realtrainmodunofficial.item;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.ClientHooks;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
-import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 import jp.ngt.rtm.rail.util.RailMap;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
@@ -34,7 +32,6 @@ public class TrainItem extends Item {
      * 実際に使われるのは、選択中のモデルが customIconTexture を持つときだけ
      * (com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel が判定する)。
      */
-    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
         consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {
@@ -52,10 +49,40 @@ public class TrainItem extends Item {
 
     private static final double PLACEMENT_OCCUPANCY_HALF_WIDTH = 0.45D;
 
+    /**
+     * 本家 ItemTrain のメタ (0=DC/1=EC/2=FC/3=TC/127=TEST) に対応する種別。
+     * 1.21 にメタは無いのでアイテムを 5 つに分ける。
+     *
+     * <p>並びは本家のメタ順。パックは {@code trainType} に "DC"/"EC"/"FC"/"TC" を書く
+     * (実測: 同梱車両は CC 10 / EC 15 / Test 8 / DC 4 / TC 1、外部パックは EC 67 / DC 14)。
+     */
     public enum Category {
-        ELECTRIC,
-        DIESEL,
-        TEST
+        /** 気動車 (メタ 0)。 */
+        DIESEL("DC"),
+        /** 電車 (メタ 1)。 */
+        ELECTRIC("EC"),
+        /** 貨物列車 (メタ 2)。★実データは "CC" (Cargo Car)。本家のアイコン名 itemFC に釣られない。 */
+        FREIGHT("CC", "FC"),
+        /** タンク車 (メタ 3)。 */
+        TANKER("TC"),
+        /** 試験用車両 (メタ 127)。 */
+        TEST("TEST");
+
+        /** パックの trainType に書かれる略号 (複数の綴りを受ける)。 */
+        public final String[] codes;
+
+        Category(String... codes) {
+            this.codes = codes;
+        }
+
+        boolean matches(String type) {
+            for (String c : this.codes) {
+                if (c.equals(type)) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 
     private final Category category;
@@ -249,12 +276,27 @@ public class TrainItem extends Item {
             return false;
         }
         String type = safe(definition.getVehicleType()).toUpperCase(java.util.Locale.ROOT);
-        boolean test = "TEST".equals(type);
-        return switch (category == null ? Category.ELECTRIC : category) {
-            case TEST -> test;
-            case DIESEL -> false;
-            case ELECTRIC -> !test;
-        };
+        Category c = category == null ? Category.ELECTRIC : category;
+        if ("TEST".equals(type)) {
+            //試験用車両は試験用のアイテムにだけ出す
+            return c == Category.TEST;
+        }
+        if (c == Category.TEST) {
+            return false;
+        }
+        if (c.matches(type)) {
+            return true;
+        }
+        //★trainType が無い/知らない値のパックは<b>電車で拾う</b>。
+        // 種別で弾くと、書いていない古いパックの車両がどのアイテムからも選べなくなる。
+        boolean known = false;
+        for (Category k : Category.values()) {
+            if (k != Category.TEST && k.matches(type)) {
+                known = true;
+                break;
+            }
+        }
+        return !known && c == Category.ELECTRIC;
     }
 
     private static String safe(String value) {
@@ -459,11 +501,8 @@ public class TrainItem extends Item {
                 for (net.minecraft.world.level.block.entity.BlockEntity be : levelChunk.getBlockEntities().values()) {
                     RailMap[] coreMaps = null;
                     BlockPos corePos = null;
-                    if (be instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                        coreMaps = core.getAllRailMaps();
-                        corePos = core.getBlockPos();
-                    } else if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore newCore && newCore.isLoaded()) {
-                        // jp.ngt.rtm.rail (Phase 1 本家忠実システム)
+                    if (be instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore newCore && newCore.isLoaded()) {
+                        // 本家 rail (jp.ngt) のコアのみ
                         coreMaps = newCore.getAllRailMaps();
                         corePos = newCore.getBlockPos();
                     }
@@ -495,24 +534,7 @@ public class TrainItem extends Item {
     }
 
     private static RailMap getRailMapAt(Level level, BlockPos pos, Vec3 targetPoint) {
-        if (level.getBlockEntity(pos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-            return getNearestRailMap(core, targetPoint);
-        }
-        if (level.getBlockEntity(pos) instanceof RailCollisionBlockEntity collision) {
-            BlockPos corePos = collision.getCorePos();
-            if (corePos != null && level.getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                return getNearestRailMap(core, targetPoint);
-            }
-        }
-        // 道床ブロック(BallastBlock)もレールコアを保持する。道床はカーブ全長に敷かれるため、
-        // レール中央の道床をクリックしても列車設置のレール判定が効く (ユーザー報告対応)。
-        if (level.getBlockEntity(pos) instanceof com.portofino.realtrainmodunofficial.blockentity.BallastBlockEntity ballast) {
-            BlockPos corePos = ballast.getCorePos();
-            if (corePos != null && level.getBlockEntity(corePos) instanceof LargeRailCoreBlockEntity core && core.isLoaded()) {
-                return getNearestRailMap(core, targetPoint);
-            }
-        }
-        // jp.ngt.rtm.rail (Phase 1 本家忠実システム): ベース/コアどちらもコア経由で解決
+        // 本家 rail (jp.ngt): ベース/コアどちらもコア経由で解決
         if (level.getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityLargeRailBase railBase) {
             jp.ngt.rtm.rail.TileEntityLargeRailCore core = railBase.getRailCore();
             if (core != null && core.isLoaded()) {
@@ -537,32 +559,6 @@ public class TrainItem extends Item {
                 double y = map.getRailHeight(max, i);
                 double z = posData[0];
                 double d2 = (x - targetPoint.x) * (x - targetPoint.x) + (y - targetPoint.y) * (y - targetPoint.y) + (z - targetPoint.z) * (z - targetPoint.z);
-                if (d2 < bestDistSq) {
-                    bestDistSq = d2;
-                    best = map;
-                }
-            }
-        }
-        return best;
-    }
-
-    private static RailMap getNearestRailMap(LargeRailCoreBlockEntity core, Vec3 targetPoint) {
-        RailMap[] maps = core.getAllRailMaps();
-        if (maps.length == 0) return null;
-        if (maps.length == 1) return maps[0];
-        double cx = targetPoint.x;
-        double cy = targetPoint.y;
-        double cz = targetPoint.z;
-        RailMap best = null;
-        double bestDistSq = Double.POSITIVE_INFINITY;
-        for (RailMap map : maps) {
-            int max = getSpawnSplit(map);
-            for (int i = 0; i <= max; i++) {
-                double[] posData = map.getRailPos(max, i);
-                double x = posData[1];
-                double y = map.getRailHeight(max, i);
-                double z = posData[0];
-                double d2 = (x - cx) * (x - cx) + (y - cy) * (y - cy) + (z - cz) * (z - cz);
                 if (d2 < bestDistSq) {
                     bestDistSq = d2;
                     best = map;

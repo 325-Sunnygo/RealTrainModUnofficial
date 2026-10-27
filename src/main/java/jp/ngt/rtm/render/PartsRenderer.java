@@ -141,6 +141,10 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         this.script = se;
     }
 
+    public void setScript(ScriptEngine engine, Object resource) {
+        this.setScript(engine);
+    }
+
     public ScriptEngine getScript() {
         return this.script;
     }
@@ -507,16 +511,18 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         return this.getPlayerYaw();
     }
 
-    /** 本家: インベントリ操作系 (未移植スタブ)。 */
+    /** Empty legacy slots are null, including native ItemStack.EMPTY. */
     public Object getInventoryItem(Object entity, int slot) {
-        return null;
+        return jp.ngt.ngtlib.renderer.LegacyItemRenderer.inventoryItem(entity,slot);
     }
 
     public int getStackSize(Object stack) {
-        return stack == null ? 0 : 1;
+        var nativeStack=jp.ngt.mccompat.ItemStackCompat.unwrap(stack);
+        return nativeStack==null ? 0 : nativeStack.getCount();
     }
 
     public void renderItem(Object entity, Object item) {
+        jp.ngt.ngtlib.renderer.LegacyItemRenderer.INSTANCE.renderItem(entity,item,0);
     }
 
     /** 本家: world.getLightBrightnessForSkyBlocks 相当のパック輝度。 */
@@ -538,17 +544,14 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
     /**
      * 本家 GLHelper.disableLighting/enableLighting をレンダラー経由で呼ぶスクリプト互換
      * 等: 室内灯で setFullBright; … renderer.enableLighting;)。
-     * enableLighting = 環境光へ復帰 (brightness 負値 = 再生側が packedLight に戻す)。
+     * enableLighting / disableLighting は記録された GL_LIGHTING 状態を切り替える。
      */
     public void disableLighting() {
-        // フルブライト化はスクリプトが直後に setBrightness/setLightmapMaxBrightness で行う
+        jp.ngt.ngtlib.renderer.GLHelper.disableLighting();
     }
 
     public void enableLighting() {
-        GLRecorder r = GLRecorder.active();
-        if (r != null) {
-            r.brightness(-1);
-        }
+        jp.ngt.ngtlib.renderer.GLHelper.enableLighting();
     }
 
     public Level getWorld(Object tile) {
@@ -585,6 +588,10 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
             level.addParticle(jp.ngt.mccompat.EnumParticleTypes.particleByLegacyName(name),
                     posX, posY, posZ, speedX, speedY, speedZ);
         }
+    }
+
+    public void debug(String msg, Object... args) {
+        jp.ngt.ngtlib.io.NGTLog.debug(msg, args);
     }
 
     public void debug(String msg) {

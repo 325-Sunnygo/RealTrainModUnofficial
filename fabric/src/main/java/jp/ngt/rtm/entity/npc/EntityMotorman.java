@@ -68,6 +68,24 @@ public class EntityMotorman extends PathfinderMob {
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
 
+    /**
+     * 別 mod (RTMU-AutoDrive) が運転を握っているか。
+     *
+     * <p>true の間は<b>本家の運転 AI (マクロ/ダイヤ/信号) を全部止める</b>。
+     * 止めないと、信号を置いていない線区では EntityAIDrivingWithSignal が
+     * 「現示 0 = 停止」と読んで毎回 brake_4 を入れてしまい、
+     * 外から力行ノッチを入れても打ち消されて<b>列車が一切動かない</b>。
+     */
+    private boolean externalDrive;
+
+    public boolean isExternallyDriven() {
+        return this.externalDrive;
+    }
+
+    public void setExternallyDriven(boolean value) {
+        this.externalDrive = value;
+    }
+
     @Override
     protected void defineSynchedData(SynchedEntityData.Builder builder) {
         super.defineSynchedData(builder);
@@ -118,6 +136,9 @@ public class EntityMotorman extends PathfinderMob {
             nbt.put("DiagramRTM", diagram.save(this.registryAccess()));
         }
         nbt.putString("SkinRTM", this.getSkin());
+        if (this.externalDrive) {
+            nbt.putBoolean("ExternalDriveRTM", true);
+        }
     }
 
     @Override
@@ -130,6 +151,7 @@ public class EntityMotorman extends PathfinderMob {
         if (nbt.contains("SkinRTM")) {
             this.setSkin(nbt.getString("SkinRTM"));
         }
+        this.externalDrive = nbt.getBoolean("ExternalDriveRTM");
     }
 
     // ------------------------------------------------------------ インタラクト

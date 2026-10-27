@@ -64,6 +64,7 @@ import org.w3c.dom.Node;
 
 /** Metasequoia (.mqo) loader aligned with legacy model library MqoModel: 0.01 vertex scale, triangulation and quad handling. */
 public final class MqoModelLoader {
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(MqoModelLoader.class);
     /** メッシュ捕獲モード。焼き込み中はVBO経路を使わず頂点をVertexConsumerへ流す。 */
     public static boolean captureMode;
 
@@ -139,18 +140,18 @@ public final class MqoModelLoader {
 
     public static MqoModel loadModelForVehicle(VehicleDefinition def) {
         if (def == null) {
-            RealTrainModUnofficial.LOGGER.warn("loadModelForVehicle: def is null");
+            LOGGER.warn("loadModelForVehicle: def is null");
             return null;
         }
         Path packPath = RailPackLoader.resolvePackPath(def.getPackName());
         if (packPath == null) {
-            RealTrainModUnofficial.LOGGER.warn("loadModelForVehicle: packPath is null for pack {}", def.getPackName());
+            LOGGER.warn("loadModelForVehicle: packPath is null for pack {}", def.getPackName());
             return null;
         }
         String scriptPath = resolveVehicleRenderScriptPath(packPath, def);
         String soundScriptPath = def.getSoundScriptPath() != null ? def.getSoundScriptPath() : "";
         // legacy script は init で trainName/modelName ごとの差分を固定するため、車両ID単位で分離する
-        String key = "v|" + def.getId() + "|" + def.getPackName() + "|" + def.getModelFile() + "|" + def.getTextureOverrides().hashCode() + "|" + scriptPath.hashCode() + "|" + soundScriptPath.hashCode() + "|smooth";
+        String key = "v|" + def.getId() + "|" + def.getPackName() + "|" + def.getModelFile() + "|" + def.getTextureOverrides().hashCode() + "|" + scriptPath.hashCode() + "|" + soundScriptPath.hashCode() + "|accuracy="+def.getModelAccuracy()+"|smooth="+def.isSmoothing();
         if (FAILED_MODEL_KEYS.contains(key)) {
             return null;
         }
@@ -158,12 +159,12 @@ public final class MqoModelLoader {
         if (cached != null) {
             return cached;
         }
-        MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), true, def.getModelScale());
+        MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), def.isSmoothing(), def.getModelScale(),def.getModelAccuracy());
         if (model != null) {
-            attachScriptModelGraph(model, def.getModelFile());
+            attachScriptModelGraph(model, def.getModelFile(),def.getModelAccuracy());
             cacheModel(key, model);
         } else {
-            RealTrainModUnofficial.LOGGER.warn("loadModelForVehicle: model is null");
+            LOGGER.warn("loadModelForVehicle: model is null");
             FAILED_MODEL_KEYS.add(key);
         }
         return model;
@@ -178,7 +179,7 @@ public final class MqoModelLoader {
         if (packPath == null) {
             return null;
         }
-        String key = "vns|" + def.getId() + "|" + def.getPackName() + "|" + def.getModelFile() + "|" + def.getTextureOverrides().hashCode();
+        String key = "vns|" + def.getId() + "|" + def.getPackName() + "|" + def.getModelFile() + "|" + def.getTextureOverrides().hashCode()+"|accuracy="+def.getModelAccuracy()+"|smooth="+def.isSmoothing();
         if (FAILED_MODEL_KEYS.contains(key)) {
             return null;
         }
@@ -186,7 +187,7 @@ public final class MqoModelLoader {
         if (cached != null) {
             return cached;
         }
-        MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), true);
+        MqoModel model = loadInternal(packPath, def.getModelFile(), def.getTextureOverrides(), def.isSmoothing(),1F,def.getModelAccuracy());
         if (model != null) {
             cacheModel(key, model);
         } else {
@@ -314,13 +315,13 @@ public final class MqoModelLoader {
         if (def == null || modelFile == null || modelFile.isBlank()) return null;
         Map<String, String> tex = textureOverrides == null ? Map.of() : textureOverrides;
         String script = scriptPath == null ? "" : scriptPath;
-        String key = "vp|" + def.getPackName() + "|" + modelFile + "|" + tex.hashCode() + "|smooth|" + script.hashCode();
+        String key = "vp|" + def.getPackName() + "|" + modelFile + "|" + tex.hashCode() + "|accuracy="+def.getModelAccuracy()+"|smooth="+def.isSmoothing()+"|" + script.hashCode();
         MqoModel cached = getCachedModel(key);
         if (cached != null) {
             return cached;
         }
         Path packPath = RailPackLoader.resolvePackPath(def.getPackName());
-        MqoModel model = loadInternal(packPath, modelFile, tex, true);
+        MqoModel model = loadInternal(packPath, modelFile, tex, def.isSmoothing(),1F,def.getModelAccuracy());
         if (model != null) {
             if (!script.isBlank()) {
             }
@@ -349,7 +350,7 @@ public final class MqoModelLoader {
             }
             List<NgtoModelGeometry.Part> parts = NgtoModelGeometry.buildParts(bytes, modelFile, voxelScale);
             if (parts.isEmpty()) {
-                RealTrainModUnofficial.LOGGER.warn("NGTO produced no geometry: {}", modelFile);
+                LOGGER.warn("NGTO produced no geometry: {}", modelFile);
                 return null;
             }
             ResourceLocation atlas = net.minecraft.client.renderer.texture.TextureAtlas.LOCATION_BLOCKS;
@@ -367,7 +368,7 @@ public final class MqoModelLoader {
             DiskCache.store(diskId, built);
             return built;
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load NGTO {}", modelFile, e);
+            LOGGER.warn("Failed to load NGTO {}", modelFile, e);
             return null;
         }
     }
@@ -432,7 +433,7 @@ public final class MqoModelLoader {
         }
         float[] data = ClassModelGeometry.build(modelFile);
         if (data == null || data.length == 0) {
-            RealTrainModUnofficial.LOGGER.warn("Built-in class model produced no geometry: {}", modelFile);
+            LOGGER.warn("Built-in class model produced no geometry: {}", modelFile);
             return null;
         }
         String texturePath = null;
@@ -586,7 +587,7 @@ public final class MqoModelLoader {
      * スクリプトへ渡すモデルへ、本家 ModelObject.model 相当のグラフを載せる。
      * 解決は VehicleScriptRenderers.buildModelObject と同じ全パック横断の索引。
      */
-    private static void attachScriptModelGraph(MqoModel model, String modelFile) {
+    private static void attachScriptModelGraph(MqoModel model, String modelFile,jp.ngt.ngtlib.renderer.model.VecAccuracy accuracy) {
         if (model == null || modelFile == null || modelFile.isBlank()) {
             return;
         }
@@ -600,10 +601,10 @@ public final class MqoModelLoader {
                 bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(modelFile);
             }
             if (bytes != null) {
-                sm.model = jp.ngt.ngtlib.renderer.model.ModelLoader.parse(bytes, modelFile);
+                sm.model = jp.ngt.ngtlib.renderer.model.ModelLoader.parse(bytes, modelFile,accuracy,4);
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("[RTMU] モデルグラフを作れませんでした ({}): {}", modelFile, e.toString());
+            LOGGER.warn("[RTMU] モデルグラフを作れませんでした ({}): {}", modelFile, e.toString());
         }
     }
 
@@ -623,6 +624,9 @@ public final class MqoModelLoader {
      */
     private static MqoModel loadInternal(Path packPath, String modelFile, Map<String, String> textureOverrides,
                                          boolean smoothing, float voxelScale) {
+        return loadInternal(packPath,modelFile,textureOverrides,smoothing,voxelScale,jp.ngt.ngtlib.renderer.model.VecAccuracy.MEDIUM);
+    }
+    private static MqoModel loadInternal(Path packPath,String modelFile,Map<String,String> textureOverrides,boolean smoothing,float voxelScale,jp.ngt.ngtlib.renderer.model.VecAccuracy accuracy) {
         // 本家 Java 実装モデル (ModelBogie.class / ModelTrain_kiha600.class / ModelTrain_Minecart.class)。
         // ファイルとして存在しないので、パックを探す前にここで組み立てる。
         // ★車体・台車・プレビューで入口が違う (loadModelForVehicle / loadModelForVehiclePart /
@@ -636,12 +640,12 @@ public final class MqoModelLoader {
             if (Files.isDirectory(packPath)) {
                 ResourceSearchResult modelResource = findResource(modelFile, packPath);
                 if (modelResource == null) {
-                    RealTrainModUnofficial.LOGGER.warn("MQO not found in pack {}: {}", packPath.getFileName(), modelFile);
+                    LOGGER.warn("MQO not found in pack {}: {}", packPath.getFileName(), modelFile);
                     return null;
                 }
                 Path modelPackPath = modelResource.packPath();
                 if (modelPackPath == null) {
-                    RealTrainModUnofficial.LOGGER.warn("Resolved MQO had no source pack for {} from {}", modelFile, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
+                    LOGGER.warn("Resolved MQO had no source pack for {} from {}", modelFile, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
                     return null;
                 }
                 logModelLoadDetail("resolved", "modelFile={} resolvedPack={} filePath={} zipEntry={}", modelFile, modelPackPath, modelResource.filePath(), modelResource.zipEntryName());
@@ -661,22 +665,22 @@ public final class MqoModelLoader {
                     return buildNgtoModel(modelResource, modelFile, voxelScale);
                 }
                 if (lowerModelFile.endsWith(".obj")) {
-                    return bakeObj(readText(modelResource), opener, textureOverrides, smoothing);
+                    return accuracy==jp.ngt.ngtlib.renderer.model.VecAccuracy.LOW?bakeObjPrecision(readText(modelResource),modelFile,opener,textureOverrides,smoothing,accuracy):bakeObj(readText(modelResource), opener, textureOverrides, smoothing);
                 }
                 String text = lowerModelFile.endsWith(".mqoz")
                     ? readCompressedMqo(modelResource)
                     : readText(modelResource);
-                return bake(text, opener, textureOverrides, smoothing);
+                return accuracy==jp.ngt.ngtlib.renderer.model.VecAccuracy.LOW?bakeLowPrecision(text,opener,textureOverrides,smoothing):bake(text, opener, textureOverrides, smoothing);
             }
             try (ZipFile zf = new ZipFile(packPath.toFile())) {
                 ResourceSearchResult modelResource = findResource(modelFile, packPath);
                 if (modelResource == null) {
-                    RealTrainModUnofficial.LOGGER.warn("MQO not found in pack {}: {}", packPath.getFileName(), modelFile);
+                    LOGGER.warn("MQO not found in pack {}: {}", packPath.getFileName(), modelFile);
                     return null;
                 }
                 Path modelPackPath = modelResource.packPath();
                 if (modelPackPath == null) {
-                    RealTrainModUnofficial.LOGGER.warn("Resolved MQO had no source pack for {} from {}", modelFile, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
+                    LOGGER.warn("Resolved MQO had no source pack for {} from {}", modelFile, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath));
                     return null;
                 }
                 logModelLoadDetail("resolved", "modelFile={} resolvedPack={} filePath={} zipEntry={}", modelFile, modelPackPath, modelResource.filePath(), modelResource.zipEntryName());
@@ -696,15 +700,15 @@ public final class MqoModelLoader {
                     return buildNgtoModel(modelResource, modelFile, voxelScale);
                 }
                 if (lowerModelFile.endsWith(".obj")) {
-                    return bakeObj(readText(modelResource), opener, textureOverrides, smoothing);
+                    return accuracy==jp.ngt.ngtlib.renderer.model.VecAccuracy.LOW?bakeObjPrecision(readText(modelResource),modelFile,opener,textureOverrides,smoothing,accuracy):bakeObj(readText(modelResource), opener, textureOverrides, smoothing);
                 }
                 String text = lowerModelFile.endsWith(".mqoz")
                     ? readCompressedMqo(modelResource)
                     : readText(modelResource);
-                return bake(text, opener, textureOverrides, smoothing);
+                return accuracy==jp.ngt.ngtlib.renderer.model.VecAccuracy.LOW?bakeLowPrecision(text,opener,textureOverrides,smoothing):bake(text, opener, textureOverrides, smoothing);
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load MQO {} from {}", modelFile, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), e);
+            LOGGER.warn("Failed to load MQO {} from {}", modelFile, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), e);
             return null;
         }
     }
@@ -744,7 +748,7 @@ public final class MqoModelLoader {
         // 別パックから引いた時だけ 1 回記録する。
         // 「どのパックの絵が実際に使われたか」を後から確認できるようにする。
         if (CROSS_PACK_LOGGED.add(packPath + "|" + relative)) {
-            RealTrainModUnofficial.LOGGER.info("[RTMU] テクスチャ/資産を別パックから解決: {} → {} ({})",
+            LOGGER.info("[RTMU] テクスチャ/資産を別パックから解決: {} → {} ({})",
                 relative,
                 com.portofino.realtrainmodunofficial.util.LogPaths.safe(fallback.packPath()),
                 fallback.zipEntryName() != null ? fallback.zipEntryName() : fallback.filePath());
@@ -964,7 +968,7 @@ public final class MqoModelLoader {
                     }
                 } catch (Exception ignored) {}
             } catch (Exception e) {
-                RealTrainModUnofficial.LOGGER.warn("Failed to build shared pack search list", e);
+                LOGGER.warn("Failed to build shared pack search list", e);
             }
             sharedPackCandidates = List.copyOf(candidates);
             return sharedPackCandidates;
@@ -1046,6 +1050,51 @@ public final class MqoModelLoader {
         };
     }
 
+    private static MqoModel bakeLowPrecision(String text,TextureOpener opener,Map<String,String> overrides,boolean smoothing) throws Exception {
+        var graph=jp.ngt.ngtlib.renderer.model.ModelLoader.parse(text.getBytes(java.nio.charset.StandardCharsets.UTF_8),"precision.mqo",jp.ngt.ngtlib.renderer.model.VecAccuracy.LOW,4);
+        List<String> names=new ArrayList<>(),paths=new ArrayList<>();
+        jp.ngt.ngtlib.renderer.model.MqoReader.read(text,new jp.ngt.ngtlib.renderer.model.MqoReader.Handler() {
+            public void material(int index,String name,String texture,float r,float g,float b,float a) {names.add(name);paths.add(texture);}
+        });
+        return bakePrecisionGraph(graph,names,paths,opener,overrides,smoothing);
+    }
+    private static MqoModel bakeObjPrecision(String text,String filename,TextureOpener opener,Map<String,String> overrides,boolean smoothing,jp.ngt.ngtlib.renderer.model.VecAccuracy accuracy) throws Exception {
+        byte[] material=null;String companion=filename.substring(0,filename.length()-4)+".mtl";
+        try(var stream=opener.open(companion)) {if(stream!=null)material=stream.readAllBytes();} catch(java.io.IOException missingMaterial) { /* Original OBJ loading permits a missing sidecar. */ }
+        var streams=new InputStream[]{new ByteArrayInputStream(text.getBytes(java.nio.charset.StandardCharsets.UTF_8)),material==null?null:new ByteArrayInputStream(material)};
+        var graph=jp.ngt.ngtlib.renderer.model.ModelLoader.loadModel(streams,filename,accuracy);
+        List<String> names=new ArrayList<>(graph.materials.keySet());names.sort(java.util.Comparator.comparingInt(name->graph.materials.get(name).id&255));
+        List<String> paths=new ArrayList<>(java.util.Collections.nCopies(names.size(),null));
+        return bakePrecisionGraph(graph,names,paths,opener,overrides,smoothing);
+    }
+    private static MqoModel bakePrecisionGraph(jp.ngt.ngtlib.renderer.model.PolygonModel graph,List<String> names,List<String> paths,TextureOpener opener,Map<String,String> overrides,boolean smoothing) throws Exception {
+        Map<String,BatchBuilder> builders=new LinkedHashMap<>();
+        for(var group:graph.groupObjects)for(var face:group.faces) {
+            int id=face.materialId & 255;var texture=resolveTexture((byte)id,names,paths,overrides,opener);
+            var coords=face.getTextureCoordinates();float[] uv=new float[coords.length*2];float y=0;
+            for(int i=0;i<coords.length;i++) {if(coords[i]!=null) {uv[i*2]=coords[i].getU();uv[i*2+1]=coords[i].getV();}y+=face.vertices[i].y;}
+            boolean translucent=shouldTreatFaceAsTranslucent(texture,group.name,uv,coords.length,y/coords.length);
+            String key=group.name+"|"+id+"|"+translucent;
+            BatchBuilder builder=builders.get(key);
+            if(builder==null) {
+                builder=new BatchBuilder(builders.size(),group.name,texture.location,texture.emissiveTextures,id,translucent,group.smoothingAngle);
+                builder.textureSourcePath=resolveTexturePath((byte)id,names,paths,overrides);
+                builder.glassTranslucent=texture.hasGlassBand;builder.lightOptionDeclared=texture.lightOptionDeclared;
+                builder.noSubTextures=texture.noSubTextures;builder.texHasTranslucentPixels=texture.hasAnyTranslucentPixel;
+                builder.pass1Mask=texture.pass1Mask;builder.opaqueTexture=texture.opaqueLocation;builder.windowTexture=texture.windowLocation;
+                builders.put(key,builder);
+            }
+            for(int i=0;i<face.vertices.length;i+=3)for(int k=0;k<4;k++) {
+                int corner=i+Math.min(k,2);var v=face.vertices[corner];
+                var n=smoothing?face.vertexNormals[corner]:face.faceNormal;
+                builder.put(new Vec3(v.x,v.y,v.z),new Vector3f(n.x,n.y,n.z),uv[corner*2],uv[corner*2+1]);
+            }
+        }
+        List<Batch> batches=new ArrayList<>();for(var builder:builders.values())batches.add(builder.bake());
+        List<ResourceLocation> textures=new ArrayList<>();for(int i=0;i<names.size();i++)textures.add(resolveTexture((byte)i,names,paths,overrides,opener).location);
+        return new MqoModel(batches,textures);
+    }
+
     private static MqoModel bake(String mqoText, TextureOpener opener, Map<String, String> textureOverrides, boolean smoothing) throws Exception {
         // ★fixRTM 式ディスクキャッシュ: 同じ MQO ソースなら前回のパース結果 (描画バッチ) を使う。
         //   テキストパースと法線スムージングが丸ごと省ける。
@@ -1075,8 +1124,9 @@ public final class MqoModelLoader {
             public void material(int index, String name, String texPath, float r, float g, float b, float a) {
                 materialOrder.add(name);
                 materialTexPaths.add(texPath);
-                materialAlphas.add(a);
-                materialColors.add(new float[]{r, g, b});
+                // Original RTM material records contain IDs/textures; MQO col is not applied.
+                materialAlphas.add(1.0F);
+                materialColors.add(new float[]{1.0F, 1.0F, 1.0F});
             }
 
             @Override
@@ -1094,7 +1144,7 @@ public final class MqoModelLoader {
             @Override
             public void mirrorAxis(int axis) {
                 // mirror_axis はビットマスク(1=X,2=Y,4=Z)。ビット判定で取りこぼしを防ぐ
-                mirrorType[0] = (axis & 1) != 0 ? 0 : (axis & 2) != 0 ? 1 : (axis & 4) != 0 ? 2 : -1;
+                mirrorType[0] = axis == 1 ? 0 : axis == 2 ? 1 : 2;
             }
 
             @Override
@@ -1140,7 +1190,7 @@ public final class MqoModelLoader {
                    .append(materialOrder.get(i)).append("->").append(resolveTexturePath(
                        (byte) i, materialOrder, materialTexPaths, textureOverrides));
         }
-        RealTrainModUnofficial.LOGGER.debug("[RTMU] 材質→テクスチャ [{}]: {}", opener.getPackKey(), mapping);
+        LOGGER.debug("[RTMU] 材質→テクスチャ [{}]: {}", opener.getPackKey(), mapping);
         MqoModel result = new MqoModel(out, materialTextures);
         DiskCache.store(diskId, result);
         return result;
@@ -1320,11 +1370,6 @@ public final class MqoModelLoader {
 
     private static void emitObjQuad(ObjFaceVertex v0, ObjFaceVertex v1, ObjFaceVertex v2, ObjFaceVertex v3, BatchBuilder bb) {
         Vector3f normal = chooseFaceNormal(v0, v1, v2, v3);
-        if (!bb.markFace(
-            new Vec3[]{v0.position(), v1.position(), v2.position(), v3.position()},
-            new float[]{v0.u(), v0.v(), v1.u(), v1.v(), v2.u(), v2.v(), v3.u(), v3.v()})) {
-            return;
-        }
         putObjVertex(bb, v0, normal);
         putObjVertex(bb, v1, normal);
         putObjVertex(bb, v2, normal);
@@ -1333,11 +1378,6 @@ public final class MqoModelLoader {
 
     private static void emitObjTri(ObjFaceVertex v0, ObjFaceVertex v1, ObjFaceVertex v2, BatchBuilder bb) {
         Vector3f normal = chooseFaceNormal(v0, v1, v2, null);
-        if (!bb.markFace(
-            new Vec3[]{v0.position(), v1.position(), v2.position(), v2.position()},
-            new float[]{v0.u(), v0.v(), v1.u(), v1.v(), v2.u(), v2.v(), v2.u(), v2.v()})) {
-            return;
-        }
         putObjVertex(bb, v0, normal);
         putObjVertex(bb, v1, normal);
         putObjVertex(bb, v2, normal);
@@ -1394,29 +1434,13 @@ public final class MqoModelLoader {
     /** OBJ の材質名 → テクスチャ元パス (resolveObjTexture と同じ優先順)。ディスクキャッシュ用。 */
     private static String resolveObjTexturePath(String materialName, Map<String, String> materialTextures,
                                                 Map<String, String> textureOverrides) {
-        String path = null;
-        if (materialName != null && textureOverrides.containsKey(materialName)) {
-            path = textureOverrides.get(materialName);
-        }
-        if ((path == null || path.isBlank()) && textureOverrides.containsKey("default")) {
-            path = textureOverrides.get("default");
-        }
-        // OBJ も MQO 同様、JSON overrides を mtl 由来のパスより優先する。
-        if ((path == null || path.isBlank()) && !textureOverrides.isEmpty()) {
-            path = textureOverrides.values().iterator().next();
-        }
-        if ((path == null || path.isBlank()) && materialName != null) {
-            path = materialTextures.get(materialName);
-        }
-        if ((path == null || path.isBlank()) && !materialTextures.isEmpty()) {
-            path = materialTextures.values().iterator().next();
-        }
-        return (path == null || path.isBlank()) ? "textures/misc/white.png" : path;
+        return jp.ngt.ngtlib.renderer.model.LegacyTextureLayout.resolve(materialName, textureOverrides);
     }
 
     private static TextureInfo resolveObjTexture(String materialName, Map<String, String> materialTextures,
                                                  Map<String, String> textureOverrides, TextureOpener opener) throws Exception {
         String path = resolveObjTexturePath(materialName, materialTextures, textureOverrides);
+        if (path == null) return new TextureInfo(net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation(), new ResourceLocation[0], false);
         TextureBinding binding = TextureBinding.parse(path);
         String cacheKey = opener.getPackKey() + "|" + binding.cacheKey();
         logModelLoadDetail("texture-resolve-obj", "materialName={} resolvedPath={} cacheKey={}", materialName, path, cacheKey);
@@ -1501,9 +1525,6 @@ public final class MqoModelLoader {
             }
             if (cnt > 0) avgY /= cnt;
         }
-        if (shouldSkipLegacyShadowPlaneFace(groupName, verts, vidx, vertexCount, faceMinY, faceMaxY)) {
-            return;
-        }
         // マテリアル col の a<1 = ガラス等の半透明。グループ名に依らず半透明描画し、その不透明度を適用する。
         boolean translucent = matAlpha < 0.99F
             || shouldTreatFaceAsTranslucent(textureInfo, groupName, uvs, vertexCount, avgY);
@@ -1532,70 +1553,10 @@ public final class MqoModelLoader {
             return b;
         });
 
-        if (vertexCount == 4) {
-            addQuad(verts, vidx, uvs, matId, bb, mirrorType);
-        } else {
-            addPolygonFan(verts, vidx, uvs, vertexCount, bb, mirrorType);
-        }
+        addPolygonFan(verts, vidx, uvs, vertexCount, bb, mirrorType);
     }
 
-    private static boolean shouldSkipLegacyShadowPlaneFace(String groupName, List<Vec3> verts, int[] vidx,
-                                                           int vertexCount, float faceMinY, float faceMaxY) {
-        if (groupName == null || verts == null || vidx == null) {
-            return false;
-        }
-        String lower = groupName.trim().toLowerCase(Locale.ROOT);
-        float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE;
-        float minZ = Float.MAX_VALUE, maxZ = -Float.MAX_VALUE;
-        int cnt = Math.min(vertexCount, vidx.length);
-        for (int i = 0; i < cnt; i++) {
-            try {
-                Vec3 v = verts.get(vidx[i]);
-                float x = (float) v.x;
-                float z = (float) v.z;
-                if (x < minX) minX = x;
-                if (x > maxX) maxX = x;
-                if (z < minZ) minZ = z;
-                if (z > maxZ) maxZ = z;
-            } catch (Exception ignored) {
-            }
-        }
-        if (cnt < 3 || minX == Float.MAX_VALUE || minZ == Float.MAX_VALUE) {
-            return false;
-        }
-        float dx = maxX - minX;
-        float dy = faceMaxY - faceMinY;
-        float dz = maxZ - minZ;
-        // MQO vertices are stored after the legacy 0.01 scale conversion. 旧RTM用パックの
-        // 車体下「影板」は元MQO上で y=-98 / z=±900 付近なので、ここでは -0.98 / ±9.0
-        // として判定する。
-        boolean underBody = faceMinY < -0.10F;
-        // 影板判定の高さ閾値。内装床を巻き込まない範囲に限定
-        boolean broadHorizontalPlate = faceMinY < -0.55F && dy < 0.035F && dx > 0.45F && dz > 1.20F;
-        boolean veryLowFlatPlate = faceMinY < -0.75F && dy < 0.05F && (dz > 0.45F || dx > 0.80F);
-        boolean lowUnderbodyPlate = faceMinY < -0.62F && dy < 0.012F && dx > 0.42F && dz > 0.62F;
-        boolean unnamedLegacyShadowPlate = faceMinY < -0.90F && dy < 0.008F && dx > 0.90F && dz > 2.0F;
-        if (unnamedLegacyShadowPlate) {
-            return true;
-        }
-        // 車体グループ内の偽影板(大きく平坦・車体下)だけを間引く
-        if ((veryLowFlatPlate || lowUnderbodyPlate || broadHorizontalPlate) && (lower.equals("obj1") || lower.equals("obj2") || lower.equals("obj3")
-                || lower.equals("body") || lower.startsWith("body_"))) {
-            return true;
-        }
-        if (lower.equals("alpha") || lower.startsWith("alpha_")) {
-            boolean e131UnderbodyShadowBox = faceMinY < -0.75F
-                && faceMaxY < 0.05F
-                && (dz > 18.0F || dx > 0.75F);
-            return veryLowFlatPlate || e131UnderbodyShadowBox;
-        }
-        if (!lower.contains("shadow") && !lower.endsWith("_ms")) {
-            return false;
-        }
-        boolean veryLong = dz > 12.0F || dx > 2.2F;
-        boolean slabLike = dy < 1.4F;
-        return veryLowFlatPlate || (underBody && veryLong && slabLike);
-    }
+
 
     private static void addQuad(List<Vec3> verts, int[] vidx, float[] uvs, byte matId, BatchBuilder bb, int mirrorType) {
         int[] ix = new int[4];
@@ -1618,28 +1579,24 @@ public final class MqoModelLoader {
                                   float u0, float v0, float u1, float v1,
                                   float u2, float v2, float u3, float v3,
                                   BatchBuilder bb, int mirrorType) {
-        if (!bb.markFace(new Vec3[]{p0, p1, p2, p3}, new float[]{u0, v0, u1, v1, u2, v2, u3, v3})) {
-            return;
-        }
         Vector3f e1 = new Vector3f((float) (p1.x - p0.x), (float) (p1.y - p0.y), (float) (p1.z - p0.z));
         Vector3f e2 = new Vector3f((float) (p2.x - p0.x), (float) (p2.y - p0.y), (float) (p2.z - p0.z));
         Vector3f n = e1.cross(e2);
         // ★大きさで捨てない。文字のような細かい三角形は |n|^2 が 1e-10 台になるので、
         // 閾値を置くと正常な面まで法線が真上へ差し替わる ([[FaceNormals]])。
-        FaceNormals.normalize(n);
+        if(bb.currentFaceNormal!=null)n.set(bb.currentFaceNormal);else FaceNormals.normalize(n);
+        bb.sourceQuads.set(bb.positions.size()/32);
         bb.put(p0, n, u0, v0);
         bb.put(p1, n, u1, v1);
         bb.put(p2, n, u2, v2);
         bb.put(p3, n, u3, v3);
-        if (mirrorType >= 0 && mirrorType <= 2 && !isFaceOnMirrorPlane(new Vec3[]{p0, p1, p2, p3}, mirrorType)) {
+        if (mirrorType >= 0 && mirrorType <= 2) {
             Vec3 mp0 = mirror(p0, mirrorType);
             Vec3 mp3 = mirror(p3, mirrorType);
             Vec3 mp2 = mirror(p2, mirrorType);
             Vec3 mp1 = mirror(p1, mirrorType);
-            if (!bb.markFace(new Vec3[]{mp0, mp3, mp2, mp1}, new float[]{u0, v0, u3, v3, u2, v2, u1, v1})) {
-                return;
-            }
-            Vector3f mn = mirrorN(n, mirrorType);
+                Vector3f mn = mirrorN(n, mirrorType);
+            bb.sourceQuads.set(bb.positions.size()/32);
             bb.put(mp0, mn, u0, v0);
             bb.put(mp3, mn, u3, v3);
             bb.put(mp2, mn, u2, v2);
@@ -1648,51 +1605,74 @@ public final class MqoModelLoader {
     }
 
     private static void addPolygonFan(List<Vec3> verts, int[] vidx, float[] uvs, int vertexCount, BatchBuilder bb, int mirrorType) {
-        Vec3[] p = new Vec3[vertexCount];
-        float[] localU = new float[vertexCount];
-        float[] localV = new float[vertexCount];
-        for (int i = 0; i < vertexCount; i++) {
-            int si = vertexCount - 1 - i;
-            p[si] = verts.get(vidx[i]);
-            if (uvs != null) {
-                localU[si] = uvs[i * 2];
-                localV[si] = uvs[i * 2 + 1];
-            }
+        int[] order = jp.ngt.ngtlib.renderer.model.LegacyPolygon.triangleIndices(vertexCount);
+        float[] triangles = new float[order.length * 3];
+        for (int i = 0; i < order.length; i++) {
+            Vec3 vertex = verts.get(vidx[order[i]]);
+            triangles[i * 3] = (float) vertex.x;
+            triangles[i * 3 + 1] = (float) vertex.y;
+            triangles[i * 3 + 2] = (float) vertex.z;
         }
-
-        for (int i = 1; i < vertexCount - 1; i++) {
-            emitTri(
-                p[0], p[i], p[i + 1],
-                uvs == null ? 0.0F : localU[0], uvs == null ? 0.0F : localV[0],
-                uvs == null ? 0.0F : localU[i], uvs == null ? 0.0F : localV[i],
-                uvs == null ? 0.0F : localU[i + 1], uvs == null ? 0.0F : localV[i + 1],
-                bb, mirrorType
-            );
+        float[] normal = jp.ngt.ngtlib.renderer.model.LegacyPolygon.faceNormal(triangles);
+        bb.currentFaceNormal = new Vector3f(normal[0], normal[1], normal[2]);
+        bb.currentLogicalFace = new Object();
+        bb.currentMirrorFace = new Object();
+        try {
+            if(vertexCount==4) {
+                int a=0,b=3,c=2,d=1;
+                emitQuad(verts.get(vidx[a]),verts.get(vidx[b]),verts.get(vidx[c]),verts.get(vidx[d]),
+                    uvs==null?0:uvs[a*2],uvs==null?0:uvs[a*2+1],uvs==null?0:uvs[b*2],uvs==null?0:uvs[b*2+1],
+                    uvs==null?0:uvs[c*2],uvs==null?0:uvs[c*2+1],uvs==null?0:uvs[d*2],uvs==null?0:uvs[d*2+1],bb,mirrorType);
+                return;
+            }
+            for (int i = 0; i < order.length; i += 3) {
+                int a = order[i], b = order[i + 1], c = order[i + 2];
+                emitTri(verts.get(vidx[a]), verts.get(vidx[b]), verts.get(vidx[c]),
+                        uvs == null ? 0 : uvs[a * 2], uvs == null ? 0 : uvs[a * 2 + 1],
+                        uvs == null ? 0 : uvs[b * 2], uvs == null ? 0 : uvs[b * 2 + 1],
+                        uvs == null ? 0 : uvs[c * 2], uvs == null ? 0 : uvs[c * 2 + 1], bb, -1);
+            }
+            if(mirrorType>=0 && mirrorType<=2) {
+                // Face.getMirror reverses the complete source face, not each triangle
+                // independently. Preserve that sequence for overlapping alpha faces.
+                bb.currentLogicalFace=bb.currentMirrorFace;
+                bb.currentFaceNormal=mirrorN(bb.currentFaceNormal,mirrorType);
+                for(int i=0;i<order.length;i+=3) {
+                    int a=order[i==0?0:order.length-i];
+                    int b=order[order.length-i-1],c=order[order.length-i-2];
+                    emitTri(mirror(verts.get(vidx[a]),mirrorType),mirror(verts.get(vidx[b]),mirrorType),
+                            mirror(verts.get(vidx[c]),mirrorType),
+                            uvs==null?0:uvs[a*2],uvs==null?0:uvs[a*2+1],
+                            uvs==null?0:uvs[b*2],uvs==null?0:uvs[b*2+1],
+                            uvs==null?0:uvs[c*2],uvs==null?0:uvs[c*2+1],bb,-1);
+                }
+            }
+        } finally {
+            bb.currentFaceNormal = null;
+            bb.currentLogicalFace = null;
+            bb.currentMirrorFace = null;
         }
     }
 
     private static void emitTri(Vec3 p0, Vec3 p1, Vec3 p2, float u0, float v0, float u1, float v1, float u2, float v2, BatchBuilder bb, int mirrorType) {
-        if (!bb.markFace(new Vec3[]{p0, p1, p2, p2}, new float[]{u0, v0, u1, v1, u2, v2, u2, v2})) {
-            return;
-        }
         Vector3f e1 = new Vector3f((float) (p1.x - p0.x), (float) (p1.y - p0.y), (float) (p1.z - p0.z));
         Vector3f e2 = new Vector3f((float) (p2.x - p0.x), (float) (p2.y - p0.y), (float) (p2.z - p0.z));
         Vector3f n = e1.cross(e2);
         // ★大きさで捨てない。文字のような細かい三角形は |n|^2 が 1e-10 台になるので、
         // 閾値を置くと正常な面まで法線が真上へ差し替わる ([[FaceNormals]])。
-        FaceNormals.normalize(n);
+        if (bb.currentFaceNormal != null) n.set(bb.currentFaceNormal);
+        else FaceNormals.normalize(n);
+        if (bb.currentLogicalFace != null) bb.logicalFaces.put(bb.positions.size() / 32, bb.currentLogicalFace);
         // QUADSモードは4頂点/面が必要 → 3頂点の三角形は縮退クワッドとして扱う (v0,v1,v2,v2)
         bb.put(p0, n, u0, v0);
         bb.put(p1, n, u1, v1);
         bb.put(p2, n, u2, v2);
         bb.put(p2, n, u2, v2);
-        if (mirrorType >= 0 && mirrorType <= 2 && !isFaceOnMirrorPlane(new Vec3[]{p0, p1, p2}, mirrorType)) {
+        if (mirrorType >= 0 && mirrorType <= 2) {
             Vec3 mp0 = mirror(p0, mirrorType);
             Vec3 mp2 = mirror(p2, mirrorType);
             Vec3 mp1 = mirror(p1, mirrorType);
-            if (!bb.markFace(new Vec3[]{mp0, mp2, mp1, mp1}, new float[]{u0, v0, u2, v2, u1, v1, u1, v1})) {
-                return;
-            }
+                if (bb.currentMirrorFace != null) bb.logicalFaces.put(bb.positions.size() / 32, bb.currentMirrorFace);
             Vector3f mn = mirrorN(n, mirrorType);
             bb.put(mp0, mn, u0, v0);
             bb.put(mp2, mn, u2, v2);
@@ -1746,47 +1726,19 @@ public final class MqoModelLoader {
     /** #resolveTexture と同じ順序でパスだけ決める (ログ用・読み込みはしない)。 */
     private static String resolveTexturePath(byte matId, List<String> materialOrder, List<String> materialTexPaths,
                                              Map<String, String> overrides) {
-        int idx = matId & 0xFF;
-        String matName = (idx < materialOrder.size()) ? materialOrder.get(idx) : null;
-        if (matName == null && !materialOrder.isEmpty()) matName = materialOrder.get(0);
-        String path = null;
-        if (matName != null) path = overrides.get(matName);
-        if (path == null) path = overrides.get(String.valueOf(idx));
-        if (path == null) path = overrides.get("default");
-        if (path == null && materialTexPaths != null && idx < materialTexPaths.size()) {
-            String embedded = materialTexPaths.get(idx);
-            if (embedded != null && !isWindowsAbsolutePath(embedded)) path = embedded;
-        }
-        return path == null ? "(白)" : path;
+        int index = matId & 255;
+        String name = index < materialOrder.size() ? materialOrder.get(index) : null;
+        return jp.ngt.ngtlib.renderer.model.LegacyTextureLayout.resolve(name, overrides);
     }
 
     private static TextureInfo resolveTexture(byte matId, List<String> materialOrder, List<String> materialTexPaths, Map<String, String> overrides, TextureOpener opener) throws Exception {
-        int idx = matId & 0xFF;
-        String matName = (idx < materialOrder.size()) ? materialOrder.get(idx) : null;
-        if (matName == null && !materialOrder.isEmpty()) matName = materialOrder.get(0);
-        String path = null;
-        // 1. material name lookup (e.g. "KQBody" -> "KQBody.png")
-        if (matName != null) path = overrides.get(matName);
-        // 2. numeric index lookup (e.g. "0" -> "texture.png")
-        if (path == null) path = overrides.get(String.valueOf(idx));
-        // 3. "default" 上書き — MQO埋め込みtexより優先
-        if (path == null) path = overrides.get("default");
-        // ★「どれでもいいから overrides の先頭」という代替はやらない (本家に無い)。
-        // `VehicleDefinition` の overrides は `Map.copyOf` の不変マップで、その反復順は
-        // JVM 起動ごとに変わる (ImmutableCollections の SALT)。
-        if (path == null && !overrides.isEmpty()) {
-            RealTrainModUnofficial.LOGGER.warn(
-                "[RTMU] 材質 {} (index {}) に対応するテクスチャ指定がありません。JSON にあるのは {}",
-                matName, idx, overrides.keySet());
+        int idx = matId & 255;
+        String matName = idx < materialOrder.size() ? materialOrder.get(idx) : null;
+        String path = resolveTexturePath(matId, materialOrder, materialTexPaths, overrides);
+        if (path == null) {
+            org.slf4j.LoggerFactory.getLogger(MqoModelLoader.class).warn("No configured texture for material {} (index {})", matName, idx);
+            return new TextureInfo(net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation(), new ResourceLocation[0], false);
         }
-        // 4. tex("...") embedded in MQO material line — skip Windows absolute paths (C:\...) that can't be resolved
-        if (path == null && materialTexPaths != null && idx < materialTexPaths.size()) {
-            String embedded = materialTexPaths.get(idx);
-            if (embedded != null && !isWindowsAbsolutePath(embedded)) {
-                path = embedded;
-            }
-        }
-        if (path == null) path = "textures/misc/white.png";
         final String resolvedPath = path;
         final String resolvedMatName = matName;
         TextureBinding binding = TextureBinding.parse(resolvedPath);
@@ -1876,7 +1828,7 @@ public final class MqoModelLoader {
                 }
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load standalone script {} from {}", scriptPath, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), e);
+            LOGGER.warn("Failed to load standalone script {} from {}", scriptPath, com.portofino.realtrainmodunofficial.util.LogPaths.safe(packPath), e);
         }
         return null;
     }
@@ -1941,7 +1893,7 @@ public final class MqoModelLoader {
                         replacement = preprocessScriptIncludes(includeSource.content(), includeSource.identifier(), resolver, visiting);
                     }
                 } catch (Exception e) {
-                    RealTrainModUnofficial.LOGGER.warn("Failed to resolve include '{}' in {}", includeTarget, scriptIdentifier, e);
+                    LOGGER.warn("Failed to resolve include '{}' in {}", includeTarget, scriptIdentifier, e);
                 }
                 matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement == null ? "" : replacement));
             }
@@ -2182,80 +2134,32 @@ public final class MqoModelLoader {
         return loc;
     }
 
-    /** pass0用: 完全不透明ピクセルのみ残す。 */
-    private static com.mojang.blaze3d.platform.NativeImage copyOpaqueOnlyAlpha(com.mojang.blaze3d.platform.NativeImage img) {
-        int w = img.getWidth(), h = img.getHeight();
-        com.mojang.blaze3d.platform.NativeImage dst = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int p = img.getPixelRGBA(x, y);            // 0xAABBGGRR (リトルエンディアン)
-                int a = (p >>> 24) & 0xFF;
-                // 本家 renderBodyNormal は glAlphaFunc(GL_EQUAL, 1.0) = alpha が完全に 1.0 (255)
-                // のピクセルだけを pass0 で描く。254 以下は全て pass1 (LESS 1.0 + blend) 側。
-                int na = a >= 0xFF ? 0xFF : 0x00;
-                dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
-            }
-        }
-        return dst;
-    }
-
-    /** pass1用: α<255のピクセルのみ残す。pass0と正確に相補。 */
-    private static com.mojang.blaze3d.platform.NativeImage copyNonOpaqueAlpha(com.mojang.blaze3d.platform.NativeImage img) {
-        int w = img.getWidth(), h = img.getHeight();
-        com.mojang.blaze3d.platform.NativeImage dst = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int p = img.getPixelRGBA(x, y);
-                int a = (p >>> 24) & 0xFF;
-                int na = (a > 0x00 && a < 0xFF) ? a : 0x00;
-                dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
-            }
-        }
-        return dst;
-    }
-
-    /** ガラス専用上限アルファ(0x73≈0.45)。これ以上の中間アルファ窓もここまで下げて確実に透かす。 */
-    private static final int GLASS_MAX_ALPHA = 0x73;
-
-    private static com.mojang.blaze3d.platform.NativeImage copyStainedGlassAlpha(com.mojang.blaze3d.platform.NativeImage img) {
-        int w = img.getWidth(), h = img.getHeight();
-        com.mojang.blaze3d.platform.NativeImage dst = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int p = img.getPixelRGBA(x, y);
-                int a = (p >>> 24) & 0xFF;
-                int na = (a > 0x00 && a < 0xF0) ? Math.min(a, GLASS_MAX_ALPHA) : 0x00;
-                dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
-            }
-        }
-        return dst;
-    }
-
-    /** ガラス安定方式用テクスチャ。車体=255/窓=上限付き中間α/穴=0。 */
-    private static com.mojang.blaze3d.platform.NativeImage copyGlassAlpha(com.mojang.blaze3d.platform.NativeImage img) {
-        int w = img.getWidth(), h = img.getHeight();
-        com.mojang.blaze3d.platform.NativeImage dst = new com.mojang.blaze3d.platform.NativeImage(w, h, false);
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < w; x++) {
-                int p = img.getPixelRGBA(x, y);
-                int a = (p >>> 24) & 0xFF;
-                int na = a >= 0xF0 ? 0xFF : (a >= 0x1A ? Math.min(a, GLASS_MAX_ALPHA) : 0x00);
-                dst.setPixelRGBA(x, y, (p & 0x00FFFFFF) | (na << 24));
-            }
-        }
-        return dst;
-    }
-
     /**
      * TextureManager への登録。描画スレッド以外から呼ばれたら描画スレッドへ回す。
      * TextureManager#register は内部の tickableTextures(List) を触るため、
      * 背景ロードから直接呼ぶと描画スレッドの tick と衝突して落ちる。
      * DynamicTexture のアップロード自体は元々 recordRenderCall で描画スレッドに回る。
      */
+    private static String textureResourceId(String key) {
+        try {
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(key.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static com.portofino.realtrainmodunofficial.client.render.LegacyTextureSampling textureSampling(String path,TextureOpener opener) {
+        try (InputStream metadata=opener.open(path+".mcmeta")) {
+            return com.portofino.realtrainmodunofficial.client.render.LegacyTextureSampling.read(metadata);
+        } catch (Exception malformed) {
+            LOGGER.warn("Invalid texture metadata for {}: {}",path,malformed.toString());
+            return com.portofino.realtrainmodunofficial.client.render.LegacyTextureSampling.DEFAULT;
+        }
+    }
+
     private static TextureInfo registerTextureFromZip(TextureBinding binding, TextureOpener opener) {
-        boolean alphaBlendOption = binding.options().contains("alphablend")
-            || binding.options().contains("translucent")
-            || binding.options().contains("glassalpha");
+        boolean alphaBlendOption = binding.options().contains("alphablend");
         try (InputStream in = opener.open(binding.path())) {
             if (in != null) {
                 byte[] data = in.readAllBytes();
@@ -2270,9 +2174,7 @@ public final class MqoModelLoader {
                 // cutout 用の二値アルファ(車体の穴)と区別し、本当の半透明だけ translucent 扱いにする。
                 boolean partialAlpha = hasPartialAlpha(img);
                 boolean glassBand = hasGlassBand(img);
-                boolean splitAlpha = alphaBlendOption || partialAlpha || glassBand;
-                com.mojang.blaze3d.platform.NativeImage opaqueImg = splitAlpha ? copyOpaqueOnlyAlpha(img) : null;
-                com.mojang.blaze3d.platform.NativeImage windowImg = splitAlpha ? copyNonOpaqueAlpha(img) : null;
+                boolean splitAlpha = alphaBlendOption;
                 // 発光解決はサブライトテクスチャがあるときのみ(無条件だと二重描画)
                 ResourceLocation[] legacyLights = resolveLegacyLightTextures(binding, opener, img);
                 // 割合判定 (3%/1.5%) は運転席窓のような小さなガラス領域を見逃すため、正確な全画素判定で上書き
@@ -2281,23 +2183,12 @@ public final class MqoModelLoader {
                 java.util.BitSet pass1Mask = buildPass1Mask(img);
 
                 // ここから登録 (描画スレッドへ回る)。以降この img は読まない。
-                int key = Math.abs(binding.cacheKey().hashCode());
+                String key = textureResourceId(opener.getPackKey() + "|" + binding.path());
                 ResourceLocation baseLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
-                    "dynamic/mqo/" + Integer.toHexString(key));
+                    "dynamic/mqo/" + key);
                 ResourceLocation opaqueLoc = baseLoc;
                 ResourceLocation windowLoc = baseLoc;
-                com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(baseLoc, img);
-                if (splitAlpha) {
-                    opaqueLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
-                        "dynamic/mqo/" + Integer.toHexString(key) + "_opq");
-                    com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(opaqueLoc, opaqueImg);
-                    // pass1用: 半透明ピクセルだけ残し、不透明部分の再描画を防ぐ
-                    windowLoc = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID,
-                        "dynamic/mqo/" + Integer.toHexString(key) + "_win");
-                    com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(windowLoc, windowImg);
-                    // スクリプト経路からも引けるようにする (opaqueVariantOf / windowVariantOf)
-                    TEXTURE_ALPHA_SPLIT.put(baseLoc, new ResourceLocation[]{opaqueLoc, windowLoc});
-                }
+                com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(baseLoc, img, textureSampling(binding.path(),opener));
                 TextureInfo info = new TextureInfo(baseLoc, legacyLights, splitAlpha, partialAlpha, glassBand, opaqueLoc, windowLoc);
                 info.lightOptionDeclared = binding.hasLightTextures();
                 info.noSubTextures = binding.noSubTextures();
@@ -2308,12 +2199,12 @@ public final class MqoModelLoader {
         } catch (Exception e) {
             // ★黙って握り潰さない。
             // 「均一な白い面」になる /の鼻先など)。
-            RealTrainModUnofficial.LOGGER.warn("[RTMU] テクスチャを読めませんでした (白で代替): {} ({})",
+            LOGGER.warn("[RTMU] テクスチャを読めませんでした (missing texture): {} ({})",
                 binding.path(), e.toString());
-            return new TextureInfo(fallbackTexture(), new ResourceLocation[0], false);
+            return new TextureInfo(net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation(), new ResourceLocation[0], false);
         }
-        RealTrainModUnofficial.LOGGER.warn("[RTMU] テクスチャが見つかりません (白で代替): {}", binding.path());
-        return new TextureInfo(fallbackTexture(), new ResourceLocation[0], false);
+        LOGGER.warn("[RTMU] テクスチャが見つかりません (missing texture): {}", binding.path());
+        return new TextureInfo(net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation(), new ResourceLocation[0], false);
     }
 
     private static ResourceLocation[] resolveLegacyLightTextures(TextureBinding binding, TextureOpener opener) {
@@ -2331,7 +2222,7 @@ public final class MqoModelLoader {
         // 例えば _light0 が無く _light1/_light2 だけある材質で添字が 1 つずつ手前へずれ、
         // 前照灯用テクスチャが室内灯パスに回っていた。
         List<String> explicitPaths = binding.lightTexturePaths();
-        int count = Math.max(3, explicitPaths.size());
+        int count = explicitPaths.isEmpty() ? 3 : explicitPaths.size();
         ResourceLocation[] slots = new ResourceLocation[count];
         for (int i = 0; i < count; i++) {
             String candidate = i < explicitPaths.size() ? explicitPaths.get(i) : deriveLegacyLightTexturePath(binding.path(), i);
@@ -2340,17 +2231,7 @@ public final class MqoModelLoader {
             }
             slots[i] = tryLoadOptionalTexture(candidate, opener, binding.cacheKey() + "#light" + i, baseImg);
         }
-        // 末尾が全部 null なら配列ごと縮める (「発光材質でない」判定を変えないため)
-        int last = -1;
-        for (int i = 0; i < count; i++) {
-            if (slots[i] != null) {
-                last = i;
-            }
-        }
-        if (last < 0) {
-            return new ResourceLocation[0];
-        }
-        return java.util.Arrays.copyOf(slots, last + 1);
+        return slots;
     }
 
     private static String deriveLegacyLightTexturePath(String basePath, int index) {
@@ -2371,12 +2252,11 @@ public final class MqoModelLoader {
             }
             byte[] data = in.readAllBytes();
             com.mojang.blaze3d.platform.NativeImage img = com.mojang.blaze3d.platform.NativeImage.read(new ByteArrayInputStream(data));
-            DynamicTexture tex = new DynamicTexture(img);
             ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
                 RealTrainModUnofficial.MODID,
-                "dynamic/mqo/" + Integer.toHexString(cacheKeySuffix.hashCode())
+                "dynamic/mqo/" + textureResourceId(opener.getPackKey() + "|" + path)
             );
-            Minecraft.getInstance().getTextureManager().register(loc, tex);
+            com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(loc, img, textureSampling(path,opener));
             return loc;
         } catch (Exception ignored) {
             return fallbackTexture();
@@ -2449,16 +2329,16 @@ public final class MqoModelLoader {
             }
             byte[] data = in.readAllBytes();
             com.mojang.blaze3d.platform.NativeImage img = com.mojang.blaze3d.platform.NativeImage.read(new ByteArrayInputStream(data));
-            DynamicTexture tex = new DynamicTexture(img);
             ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
                 RealTrainModUnofficial.MODID,
-                "dynamic/mqo/" + Integer.toHexString(cacheKeySuffix.hashCode())
+                "dynamic/mqo/" + textureResourceId(opener.getPackKey() + "|" + path)
             );
-            Minecraft.getInstance().getTextureManager().register(loc, tex);
+            // Inspect CPU image data before upload/ownership transfer.
             // ベースの不透明部分を覆えるなら pass0 を省略できる。
             if (baseImg != null && emissiveCoversBase(baseImg, img)) {
                 EMISSIVE_COVERS_BASE.add(loc);
             }
+            com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(loc, img, textureSampling(path,opener));
             return loc;
         } catch (Exception ignored) {
             return null;
@@ -2466,30 +2346,11 @@ public final class MqoModelLoader {
     }
 
 
-    /**
-     * 基本テクスチャ → {α==255 のみ, α<255 のみ} の貼り分け。
-     * 本家は 1 枚のテクスチャをアルファ関数でパスごとに切り分ける。
-     */
-    public static ResourceLocation opaqueVariantOf(ResourceLocation base) {
-        ResourceLocation[] pair = base == null ? null : TEXTURE_ALPHA_SPLIT.get(base);
-        return pair == null ? base : pair[0];
-    }
-
-    /** #opaqueVariantOf の pass1 側。分割が無い (= α<255 が無い) なら null。 */
-    public static ResourceLocation windowVariantOf(ResourceLocation base) {
-        ResourceLocation[] pair = base == null ? null : TEXTURE_ALPHA_SPLIT.get(base);
-        return pair == null ? null : pair[1];
-    }
-
-    /** 基本 → {不透明のみ, 半透明のみ}。分割を作ったテクスチャだけ入る。 */
-    private static final java.util.Map<ResourceLocation, ResourceLocation[]> TEXTURE_ALPHA_SPLIT =
-        new java.util.concurrent.ConcurrentHashMap<>();
-
     private static boolean shouldTreatFaceAsTranslucent(TextureInfo textureInfo, String groupName, float[] uvs, int vertexCount, float avgY) {
         if (textureInfo == null) {
             return false;
         }
-        if (textureInfo.isTranslucent || textureInfo.hasPartialAlpha || textureInfo.hasGlassBand) {
+        if (textureInfo.isTranslucent) {
             return true;
         }
         // RTM packs often mark full-body SL/rod textures as AlphaBlend for cutout holes.
@@ -2636,7 +2497,7 @@ public final class MqoModelLoader {
                 return new ScriptTextureData(List.of(frame), List.of(50), image != null ? image.getWidth() : 1, image != null ? image.getHeight() : 1, 20.0D);
             }
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("Could not load script texture {}:{}: {}", domain, path, e.getMessage());
+            LOGGER.warn("Could not load script texture {}:{}: {}", domain, path, e.getMessage());
             return ScriptTextureData.fallback(fallbackTexture());
         }
     }
@@ -2915,20 +2776,20 @@ public final class MqoModelLoader {
         }
         try {
             String base = "/assets/" + RealTrainModUnofficial.MODID + "/";
-            java.io.InputStream in = MqoModelLoader.class.getResourceAsStream(base + modelPath);
+            java.io.InputStream in = com.portofino.realtrainmodunofficial.util.BundledResourceStreams.open(MqoModelLoader.class,base + modelPath);
             if (in == null) {
-                RealTrainModUnofficial.LOGGER.warn("mod 内モデルが見つからない: {}", modelPath);
+                LOGGER.warn("mod 内モデルが見つからない: {}", modelPath);
                 return null;
             }
             String text;
             try (java.io.InputStream stream = in) {
-                text = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                text = PackTextDecoder.readText(stream);
             }
             TextureOpener opener = new TextureOpener() {
                 @Override
                 public InputStream open(String rel) {
                     //材質が何を指していても、指定した 1 枚を返す
-                    return MqoModelLoader.class.getResourceAsStream(base + texturePath);
+                    return com.portofino.realtrainmodunofficial.util.BundledResourceStreams.open(MqoModelLoader.class,base + texturePath);
                 }
                 @Override
                 public String getPackKey() {
@@ -2944,7 +2805,7 @@ public final class MqoModelLoader {
             }
             return model;
         } catch (Exception e) {
-            RealTrainModUnofficial.LOGGER.warn("mod 内モデルの読み込みに失敗: {}", modelPath, e);
+            LOGGER.warn("mod 内モデルの読み込みに失敗: {}", modelPath, e);
             return null;
         }
     }
@@ -3028,46 +2889,14 @@ public final class MqoModelLoader {
             if (metadata.isBlank()) {
                 return new TextureBinding(path, Set.of(), List.of());
             }
+            String[] tokens = metadata.split(",", -1);
+            String declared = tokens[0];
             Set<String> options = new LinkedHashSet<>();
-            List<String> lightTexturePaths = new ArrayList<>();
-            // ★オプション語は部分一致で拾うこと。
-            // texOption.contains("Light") / texOption.contains("OneTex") と、
-            // オプション文字列全体に対する部分一致で判定している。
-            StringBuilder optionText = new StringBuilder();
-            for (String token : metadata.split(",")) {
-                String trimmed = token.trim();
-                if (trimmed.isBlank()) {
-                    continue;
-                }
-                if (looksLikeTexturePath(trimmed)) {
-                    lightTexturePaths.add(trimmed);
-                } else {
-                    optionText.append(trimmed.toLowerCase(Locale.ROOT)).append(' ');
-                }
-            }
-            String optionLine = optionText.toString();
-            if (optionLine.contains("light")) {
-                options.add("light");
-            }
-            if (optionLine.contains("alphablend")) {
-                options.add("alphablend");
-            }
-            if (optionLine.contains("translucent")) {
-                options.add("translucent");
-            }
-            if (optionLine.contains("glassalpha")) {
-                options.add("glassalpha");
-            }
-            // ★本家 ModelObject:56-59 (1.12.2)
-            // boolean disableSubTex = texOption.contains("OneTex");
-            // int texSize = flagLight && !disableSubTex ? 3 : 0;
-            // OneTex = サブテクスチャを作らない (TextureSet.subTextures == null)。
-            // 捨ててしまうと「_light を引かない材質」と「_light を引けなかった材質」を
-            // 区別できなくなる。前者は素テクスチャで描き、後者は描かないのが本家。
-            if (optionLine.contains("onetex") || optionLine.contains("one_tex")) {
-                options.add("onetex");
-            }
-            return new TextureBinding(path, Set.copyOf(options), List.copyOf(lightTexturePaths));
+            if (declared.contains("Light")) options.add("light");
+            if (declared.contains("AlphaBlend")) options.add("alphablend");
+            List<String> lights = tokens.length <= 1 ? List.of()
+                    : java.util.Arrays.asList(java.util.Arrays.copyOfRange(tokens, 1, tokens.length));
+            return new TextureBinding(path, Set.copyOf(options), List.copyOf(lights));
         }
 
         /**
@@ -3086,7 +2915,7 @@ public final class MqoModelLoader {
         }
 
         boolean hasLightTextures() {
-            return options.contains("light");
+            return options.contains("light") || !lightTexturePaths.isEmpty();
         }
 
         /**
@@ -3095,16 +2924,17 @@ public final class MqoModelLoader {
          * texSize をそちらで上書きするので、その場合は subTextures を持つ。
          */
         boolean noSubTextures() {
-            return options.contains("onetex") && lightTexturePaths.isEmpty();
+            return !hasLightTextures();
         }
 
         String cacheKey() {
             if (options.isEmpty() && lightTexturePaths.isEmpty()) {
                 return path;
             }
-            List<String> metadata = new ArrayList<>(options);
-            metadata.addAll(lightTexturePaths);
-            return path + TEXTURE_META_SEPARATOR + String.join(",", metadata);
+            String flags = (options.contains("light") ? "Light" : "")
+                    + (options.contains("alphablend") ? "AlphaBlend" : "");
+            return path + TEXTURE_META_SEPARATOR + flags
+                    + (lightTexturePaths.isEmpty() ? "" : "," + String.join(",", lightTexturePaths));
         }
     }
 
@@ -3118,6 +2948,7 @@ public final class MqoModelLoader {
     @FunctionalInterface
     public interface GroupTransform {
         void apply(PoseStack poseStack, String groupName);
+        default int drawOrder(String groupName) { return 0; }
         /** 変換しないグループでpush/popを省くための早期判定。 */
         default boolean mayModify(String groupName) {
             return true;
@@ -3143,7 +2974,7 @@ public final class MqoModelLoader {
     }
 
     /** 1 面 (連続4頂点チャンク)。normal は構築時に入れた面法線のスナップショット。 */
-    private record SmoothFace(BatchBuilder builder, int firstVertex, Vector3f normal) {}
+    private record SmoothFace(BatchBuilder builder, int firstVertex, Vector3f normal, Object logicalFace) {}
 
     /** 本家の頂点法線計算の忠実移植。面単位で隣接を数え、facet角以下の面法線を加算して正規化。 */
     private static void applySmoothNormalsAcrossBatches(Collection<BatchBuilder> builders, boolean smoothing) {
@@ -3172,7 +3003,7 @@ public final class MqoModelLoader {
                 } else {
                     normal.set(0.0F, 1.0F, 0.0F);
                 }
-                SmoothFace face = new SmoothFace(builder, first, normal);
+                SmoothFace face = new SmoothFace(builder, first, normal, builder.logicalFaces.getOrDefault(first / 4, new Object()));
                 faces.add(face);
                 for (int k = 0; k < 4; k++) {
                     int offset = (first + k) * 8;
@@ -3198,8 +3029,10 @@ public final class MqoModelLoader {
                 Vector3f bias = new Vector3f(face.normal);
                 List<SmoothFace> exact = byExactPosition.get(exactPositionKey(face.builder.positions, o));
                 if (exact != null && smoothing) {
+                    Set<Object> counted = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+                    counted.add(face.logicalFace);
                     for (SmoothFace other : exact) {
-                        if (other != face && face.normal.dot(other.normal) >= cosThreshold) {
+                        if (counted.add(other.logicalFace) && face.normal.dot(other.normal) >= cosThreshold) {
                             shade.add(other.normal);
                         }
                     }
@@ -3277,6 +3110,10 @@ public final class MqoModelLoader {
     }
 
     private static final class BatchBuilder {
+        final java.util.BitSet sourceQuads=new java.util.BitSet();
+        final Map<Integer, Object> logicalFaces = new HashMap<>();
+        Object currentLogicalFace, currentMirrorFace;
+        Vector3f currentFaceNormal;
         final int order;
         final String groupName;
         final ResourceLocation texture;
@@ -3367,6 +3204,7 @@ public final class MqoModelLoader {
             float safeMinV = Float.isFinite(minV) ? minV : 0.0F;
             float safeMaxV = Float.isFinite(maxV) ? maxV : 1.0F;
             Batch built = new Batch(order, groupName, texture, emissiveTextures, data, data.length / 8, materialId, translucent, safeMinU, safeMaxU, safeMinV, safeMaxV);
+            built.sourceQuads=(java.util.BitSet)this.sourceQuads.clone();
             built.lightOptionDeclared = this.lightOptionDeclared;
             built.noSubTextures = this.noSubTextures;
             built.textureSourcePath = this.textureSourcePath;
@@ -3405,7 +3243,7 @@ public final class MqoModelLoader {
 
     private static final class DiskCache {
         private static final int MAGIC = 0x52544D43; // "RTMC"
-        private static final int VERSION = 1;
+        private static final int VERSION = 6;
         private static Path cacheDir;
         private static boolean cacheDirResolved;
 
@@ -3541,6 +3379,7 @@ public final class MqoModelLoader {
             out.writeUTF(b.textureSourcePath == null ? "" : b.textureSourcePath);
             // 元パスが無いモデル (NGTO のブロックアトラス等) は ResourceLocation をそのまま復元する。
             out.writeUTF(b.texture == null ? "" : b.texture.toString());
+            byte[] topology=b.sourceQuads.toByteArray();out.writeInt(topology.length);out.write(topology);
             out.writeInt(b.materialId);
             out.writeBoolean(b.translucent);
             out.writeFloat(b.baseAlpha);
@@ -3583,6 +3422,8 @@ public final class MqoModelLoader {
             String groupName = in.readUTF();
             String texPath = in.readUTF();
             String texLoc = in.readUTF();
+            int topologyBytes=in.readInt();if(topologyBytes<0||topologyBytes>(1<<24))return null;
+            java.util.BitSet sourceQuads=java.util.BitSet.valueOf(in.readNBytes(topologyBytes));
             int materialId = in.readInt();
             boolean translucent = in.readBoolean();
             float baseAlpha = in.readFloat();
@@ -3651,6 +3492,7 @@ public final class MqoModelLoader {
             b.lightOptionDeclared = lightOpt;
             b.noSubTextures = noSub;
             b.textureSourcePath = texPath;
+            b.sourceQuads=sourceQuads;
             b.baseAlpha = baseAlpha;
             b.baseColorR = cr;
             b.baseColorG = cg;
@@ -3885,7 +3727,7 @@ public final class MqoModelLoader {
 
         private static void capVertexBuf(VertexConsumer vc, Matrix4f mat, float x, float y, float z,
                                           int gray, int packedLight, int overlay, float nx, float ny, float nz) {
-            vc.addVertex(mat, x, y, z)
+            VertexWriter.addVertex(vc, mat, x, y, z)
                 .setColor(gray, gray, gray, 255)
                 .setUv(0.5F, 0.5F)
                 .setOverlay(overlay)
@@ -4173,52 +4015,6 @@ public final class MqoModelLoader {
                 scriptRenderer, null);
         }
 
-        /** 通常表示で描かないヘルパーグループか。 */
-        /** 常に非表示のヘルパーか(影/ガイドのみ。角度異体は含めない)。 */
-        static boolean isShadowHelperGroup(String n) {
-            if (n == null || n.isBlank()) {
-                return false;
-            }
-            if (n.contains("影") || n.contains("shadow")) {
-                return true;
-            }
-            // _msは実グループに使われるため除去しない。影は shadow/影/_kage のみ
-            if (n.endsWith("_kage") || n.contains("_kage_")) {
-                return true;
-            }
-            return n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari");
-        }
-
-        static boolean isNonRenderingHelperGroup(String n) {
-            if (n == null || n.isBlank()) {
-                return false;
-            }
-            if (n.contains("影") || n.contains("shadow")) {
-                return true;
-            }
-            if (n.endsWith("_ms") || n.endsWith("_kage") || n.contains("_ms_") || n.contains("_kage_")) {
-                return true;
-            }
-            if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) {
-                return true;
-            }
-            String s = n.endsWith("(mx)") ? n.substring(0, n.length() - 4) : n;
-            int dash = s.lastIndexOf('-');
-            if (dash <= 0 || dash == s.length() - 1) {
-                return false;
-            }
-            for (int i = dash + 1; i < s.length(); i++) {
-                if (!Character.isDigit(s.charAt(i))) {
-                    return false;
-                }
-            }
-            try {
-                return Integer.parseInt(s.substring(dash + 1)) >= 10;
-            } catch (NumberFormatException e) {
-                return false;
-            }
-        }
-
         /**
          * RTM 標準スクリプトはドアの開閉をこれで表現する
          * (開いた側の扉パーツを除外リストに入れて消す)。null/空なら除外なし。
@@ -4236,10 +4032,6 @@ public final class MqoModelLoader {
             if (ordered == null) {
                 Set<Batch> selected = new LinkedHashSet<>();
                 for (String name : normalizedGroupNames) {
-                    // ヘルパー除外は影のみ(角度異体まで消すと本体を巻き込む)
-                    if (isShadowHelperGroup(name)) {
-                        continue;
-                    }
                     List<Batch> batches = batchesByNormalizedGroup.get(name);
                     if (batches != null && !batches.isEmpty()) {
                         selected.addAll(batches);
@@ -4336,6 +4128,9 @@ public final class MqoModelLoader {
             float alpha = isLightON ? 0.8F : 1.0F;
             boolean cullFaces = shouldCullModelFaces(null);
             float[] normalOut = new float[3];
+            java.util.SortedSet<Integer> materials = new java.util.TreeSet<>();
+            for (Batch batch : batches) materials.add(batch.materialId);
+            for (int materialId : materials) {
             for (String name : normalizedGroupNames) {
                 List<Batch> groupBatches = batchesByNormalizedGroup.get(name);
                 if (groupBatches == null || groupBatches.isEmpty()) {
@@ -4353,6 +4148,7 @@ public final class MqoModelLoader {
                 Matrix4f mat = pose.pose();
                 Matrix3f norm = pose.normal();
                 for (Batch batch : groupBatches) {
+                    if (batch.materialId != materialId) continue;
                     // ★本家 ModelObject.renderWithTexture (1.12.2 jp/ngt/rtm/render/ModelObject.java:216-227)
                     // の忠実移植。
                     // if (!textures[i].doLighting) continue;                  // Light 指定の無い材質は飛ばす
@@ -4380,29 +4176,23 @@ public final class MqoModelLoader {
                             continue;
                         }
                     }
-                    // ★本家 RenderVehicleBase.renderBodyLight の忠実移植。
-                    // isLightON = (i > 0) のときだけ disableLighting + glEnable(GL_BLEND)
-                    // + glColor4f(1,1,1,0.8) + setLightmapMaxBrightness を掛ける。
-                    // ★前照灯/尾灯 (i>0) はポリゴンオフセット付き。
-                    VertexConsumer vc = isLightON
-                        ? buffer.getBuffer(com.portofino.realtrainmodunofficial.client.render
-                            .RtmuRenderTypes.emissiveBlendLayered(tex, legacyPass, cullFaces))
-                        // 室内灯パスも本体と同一平面なので、深度だけずらしてちらつきを止める
-                        // (本家は即時描画で「後勝ち」が保証されるため不要な処理)。
-                        : buffer.getBuffer(com.portofino.realtrainmodunofficial.client.render
-                            .RtmuRenderTypes.emissiveCutoutLayered(tex, cullFaces));
-                    for (int i = 0; i < batch.vertexCount; i++) {
+                    boolean quads = !LegacyIrisGeometry.useTriangles(com.portofino.realtrainmodunofficial.client.ShaderCompat.active(), batch.hasVaryingNormals());
+                    RenderType emissiveType = com.portofino.realtrainmodunofficial.client.render.LegacyRenderTypes
+                            .modelLight(tex,isLightON,cullFaces, quads ? VertexFormat.Mode.QUADS : VertexFormat.Mode.TRIANGLES);
+                    VertexConsumer vc = com.portofino.realtrainmodunofficial.client.render.LegacyShaderAttributes.wrap(buffer.getBuffer(emissiveType));
+                    int[] indices=batch.triangleIndices();
+                    for(int submitted=0;submitted<(quads?batch.vertexCount:indices.length);submitted++) {
+                        int i=quads?submitted:indices[submitted];
                         int o = i * 8;
                         float x = batch.data[o], y = batch.data[o + 1], z = batch.data[o + 2];
                         float nx = batch.data[o + 3], ny = batch.data[o + 4], nz = batch.data[o + 5];
                         float u = batch.data[o + 6], v = batch.data[o + 7];
-                        // ★本家は発光パスで頂点を押し出さない。手前に出す必要は
-                        // ポリゴンオフセット (RenderType 側) で満たしている。
+                        // All body passes submit identical coordinates without depth offsets.
                         float tnx = norm.m00() * nx + norm.m10() * ny + norm.m20() * nz;
                         float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
                         float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
                         normalizeNormal(tnx, tny, tnz, normalOut);
-                        vc.addVertex(mat, x, y, z)
+                        VertexWriter.addVertex(vc, mat, x, y, z)
                             .setColor(1.0F, 1.0F, 1.0F, alpha)
                             .setUv(u, v)
                             .setOverlay(overlay)
@@ -4415,6 +4205,7 @@ public final class MqoModelLoader {
                         poseStack.popPose();
                     }
                 }
+            }
             }
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GROUPS, secStart);
@@ -4470,7 +4261,7 @@ public final class MqoModelLoader {
                     float tny = norm.m01() * nx + norm.m11() * ny + norm.m21() * nz;
                     float tnz = norm.m02() * nx + norm.m12() * ny + norm.m22() * nz;
                     normalizeNormal(tnx, tny, tnz, normalOut);
-                    vc.addVertex(mat, x, y, z)
+                    VertexWriter.addVertex(vc, mat, x, y, z)
                         .setColor(1.0F, 1.0F, 1.0F, alpha)
                         .setUv(batch.data[o + 6], batch.data[o + 7])
                         .setOverlay(overlay)
@@ -4660,11 +4451,11 @@ public final class MqoModelLoader {
                     if (scriptRenderer != null) {
                         scriptRenderer.clearScriptRegisteredGroups();
                     }
-                    RealTrainModUnofficial.LOGGER.warn(
+                    LOGGER.warn(
                         "Legacy model script failed on pass {} three times; disabling script and using baked render for this model.",
                         pass, e);
                 } else {
-                    RealTrainModUnofficial.LOGGER.warn(
+                    LOGGER.warn(
                         "Legacy model script failed on pass {} ({}/3 before disabling).",
                         pass, legacyScriptFailureCount, e);
                 }
@@ -4695,6 +4486,13 @@ public final class MqoModelLoader {
         private void renderInternal(PoseStack poseStack, MultiBufferSource buffer, int packedLight, int overlay,
                                     boolean translucent, GroupPredicate groupFilter, GroupTransform groupTransform,
                                     TrainScriptSystem.ScriptModelRenderer scriptRenderer, Object entity) {
+            Object renderEntity = entity != null ? entity
+                    : com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.currentVehicle();
+            if (translucent && scriptEngine == null
+                    && (renderEntity instanceof TrainEntity || renderEntity instanceof jp.ngt.rtm.entity.train.EntityTrainBase)
+                    && com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.deferBakedAlpha(
+                        poseStack, (savedPose, target) -> renderSelectedBatches(this.batches, savedPose, target,
+                            packedLight, overlay, true, groupFilter, groupTransform, scriptRenderer, renderEntity))) return;
             renderSelectedBatches(this.batches, poseStack, buffer, packedLight, overlay, translucent, groupFilter, groupTransform, scriptRenderer, entity);
         }
 
@@ -4709,6 +4507,11 @@ public final class MqoModelLoader {
             // ★以前ここには「フラットな直接 GL 経路 (fullbright)」があり、影 mod のときだけ
             // バッファ経路へ切り替えていた。その経路は呼び出し元が全て false で
             // 到達不能なまま残っていたので撤去した。今はバッファ経路の 1 本だけ。
+            if(scriptEngine==null) {
+                selectedBatches=new ArrayList<>(selectedBatches);
+                selectedBatches.sort(java.util.Comparator.<Batch>comparingInt(b->b.materialId)
+                        .thenComparingInt(b->groupTransform==null?b.order:groupTransform.drawOrder(b.groupName)).thenComparingInt(b->b.order));
+            }
             long secLoop = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
             // ループ全体で保持する直近値。再設定を skip するため。
             int gr = scriptRenderer != null ? scriptRenderer.getColorRed255()   : 255;
@@ -4719,13 +4522,7 @@ public final class MqoModelLoader {
             int lastCullMode = -1;  // 0=両面(cull無効), 1=片面(cull有効)。batch ごとに切替。
             boolean useCull = shouldCullModelFaces(entity);
             for (Batch batch : selectedBatches) {
-                if (scriptRenderer != null && shouldSkipLegacyPlaceholderGroup(batch.groupName)) {
-                    continue;
-                }
                 if (groupFilter != null && !groupFilter.shouldRender(batch.groupName)) {
-                    continue;
-                }
-                if (shouldSuppressPackSpecificShadowArtifact(entity, batch.groupNameLower)) {
                     continue;
                 }
                 int scriptPassNow = scriptRenderer != null ? scriptRenderer.getCurrentPass() : 0;
@@ -4757,46 +4554,23 @@ public final class MqoModelLoader {
                         continue;
                     }
                     String lowerGroupName = batch.groupNameLower;
-                    // ★本家 jp.ngt.rtm.entity.vehicle.RenderVehicleBase (1.12.2) の忠実移植。
-                    // renderBodyNormal      : glAlphaFunc(GL_EQUAL, 1.0) → α==1.0 のピクセルだけ
-                    // renderBodyTransparent : glAlphaFunc(GL_LESS,  1.0) → α<1.0 のピクセルだけ + ブレンド
-                    // (どちらも終了時に glAlphaFunc(GL_GEQUAL, 0.1) へ戻す)
-                    // つまり pass0 と pass1 はアルファで正確に相補に分割される。
+                    // KaizPatchX 1.7.10 RenderVehicleBase.doRender のアルファ判定。
+                    // normal body pass: glAlphaFunc(GL_EQUAL, 1.0) → α==1.0 のピクセルだけ
+                    // alpha body pass: glAlphaFunc(GL_LESS, 1.0) → α<1.0 のピクセルだけ + ブレンド
+                    // 本家はその後 glAlphaFunc(GL_GREATER, 0.1) へ戻す。
+                    // Keep original pixels; the vehicle shader performs the pass alpha test.
+                    // Non-vehicle models keep their original cutout threshold as well.
                     ResourceLocation texture = scriptTexture
                         ? scriptRenderer.getBoundTexture()
                         : (emissiveTexture != null ? emissiveTexture
-                            : firstNonNull(translucent ? batch.windowTexture : batch.opaqueTexture, batch.texture));
+                            : batch.texture);
 
-                    boolean forceCutout;
-                    float depthBias;
-                    if (scriptTexture) {
-                        forceCutout = shouldForceLegacyAlphaCutout(batch, lowerGroupName, true)
-                            || shouldForceCabCutout(batch, lowerGroupName, true)
-                            || shouldForceDisplayCutout(batch, lowerGroupName, true)
-                            || shouldForceShaderSafeCutout(entity, batch, lowerGroupName, true);
-                        depthBias = getDepthBias(batch, lowerGroupName, true);
-                    } else {
-                        // scriptTexture=false の結果はバッチ構築時に 1 度計算してキャッシュ。
-                        // SL のように毎フレーム数百回呼ばれる shouldForce*/getDepthBias の
-                        // 文字列 contains/startsWith を完全に省ける。
-                        if (!batch.cachedComputed) {
-                            batch.cachedForceCutoutNoScriptTex =
-                                shouldForceLegacyAlphaCutout(batch, lowerGroupName, false)
-                                || shouldForceCabCutout(batch, lowerGroupName, false)
-                                || shouldForceDisplayCutout(batch, lowerGroupName, false);
-                            batch.cachedDepthBiasNoScriptTex = getDepthBias(batch, lowerGroupName, false);
-                            batch.cachedComputed = true;
-                        }
-                        forceCutout = batch.cachedForceCutoutNoScriptTex
-                            || shouldForceShaderSafeCutout(entity, batch, lowerGroupName, false);
-                        depthBias = batch.cachedDepthBiasNoScriptTex;
-                    }
+                    float depthBias = 0.0F;
                     // 調査用: /rtm hidegroup で隠した部品は描かない
                     if (com.portofino.realtrainmodunofficial.client.DebugHiddenGroups.isHidden(batch.groupName)) {
                         continue;
                     }
-                    boolean needsBlend = (translucent && batch.translucent)
-                        || (!forceCutout && (scriptTexture || scriptPassNow >= 2));
+                    boolean needsBlend = translucent || scriptPassNow >= 2;
 
                     int scriptRed   = scriptRenderer != null ? scriptRenderer.getColorRed255()   : 255;
                     int scriptGreen = scriptRenderer != null ? scriptRenderer.getColorGreen255() : 255;
@@ -4818,19 +4592,15 @@ public final class MqoModelLoader {
                     // 本家厳密移植 (ユーザー選択): カリングは doCulling 一括 (不透明も半透明も同じ)。
                     // doCulling=false で両面、true で片面。「半透明だけ両面」は本家に無い。
                     boolean cullThisBatch = useCull;
-                    // pass1 も深度は書く (本家 depthMask 既定 ON)。書かないと後で描くレールが透ける。
+                    // 車両 pass1 は Forge の depthMask(false) を継承する。下の vehicle() が適用する。
                     RenderType renderType;
-                    // ★シェーダーパック使用中は不透明を三角形で送る。
-                    // Iris の MixinBufferBuilder.fillExtendedData は、四角形かつワールド描画中のとき
-                    // 面法線を計算して全頂点の法線に memPutInt で書き戻す。
-                    boolean useTriangles = !needsBlend
-                        && com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
+                    // Original ModelObject loads GL_TRIANGLES for normal and alpha passes.
+                    boolean useTriangles = LegacyIrisGeometry.useTriangles(com.portofino.realtrainmodunofficial.client.ShaderCompat.active(), batch.hasVaryingNormals());
                     if (needsBlend) {
                         // ★半透明は深度を書かない (シェーダーの有無に関わらず)。
                         // 以前はシェーダー使用時だけ深度を書かないようにしていた。
-                        renderType = cullThisBatch
-                            ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWriteCull(texture)
-                            : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.glassNoDepthWrite(texture);
+                        renderType = com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
+                                .legacyAlphaBlend(texture, cullThisBatch);
                     } else if (useTriangles) {
                         renderType = cullThisBatch
                             ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes.entityCutoutTriangles(texture)
@@ -4838,6 +4608,14 @@ public final class MqoModelLoader {
                     } else {
                         renderType = cullThisBatch ? RenderType.entityCutout(texture)
                             : RenderType.entityCutoutNoCull(texture);
+                    }
+                    Object renderEntity=entity!=null?entity:com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.currentVehicle();
+                    if(scriptPassNow<2 && (renderEntity instanceof TrainEntity || renderEntity instanceof jp.ngt.rtm.entity.train.EntityTrainBase)) {
+                        renderType=com.portofino.realtrainmodunofficial.client.render.LegacyRenderTypes.vehicle(
+                                renderType,texture,needsBlend,cullThisBatch,true,useTriangles?VertexFormat.Mode.TRIANGLES:VertexFormat.Mode.QUADS,com.portofino.realtrainmodunofficial.client.render.LegacyColorBuffer.alpha(buffer,scriptAlpha)/255F);
+                    } else {
+                        renderType=com.portofino.realtrainmodunofficial.client.render.LegacyRenderTypes.select(
+                                renderType,texture,needsBlend,cullThisBatch,true,useTriangles?VertexFormat.Mode.TRIANGLES:VertexFormat.Mode.QUADS);
                     }
                     // 静的VBO高速経路。落ちたゲートを記録する(F8のVBO行)
                     int vboReason;
@@ -4905,7 +4683,7 @@ public final class MqoModelLoader {
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countSlowBatchIdentity(
                         batch.groupName, vboReason, System.identityHashCode(batch));
                     long secBuf = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
-                    VertexConsumer consumer = targetBuffer.getBuffer(renderType);
+                    VertexConsumer consumer = com.portofino.realtrainmodunofficial.client.render.LegacyShaderAttributes.wrap(targetBuffer.getBuffer(renderType));
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
                         com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_GETBUF, secBuf);
                     // 計測: CPU が毎フレーム流している頂点数 (F8 オーバーレイに出す)
@@ -4915,13 +4693,9 @@ public final class MqoModelLoader {
                     Matrix4f mat = pose.pose();
                     Matrix3f norm = pose.normal();
                     float[] normalOut = new float[3];
-                    // 三角形で送るときは四角形 4 頂点を 6 頂点へ並べ替える (中身は同じ)。
-                    int submitCount = useTriangles ? (vCount / 4) * 6 : vCount;
-                    for (int vi = 0; vi < submitCount; vi++) {
-                        int i = useTriangles
-                            ? (vi / 6) * 4 + com.portofino.realtrainmodunofficial.client.render
-                                .RtmuRenderTypes.TRI_ORDER[vi % 6]
-                            : vi;
+                    int[] triangleIndices = batch.triangleIndices();
+                    for (int submitted=0;submitted<(useTriangles?triangleIndices.length:batch.vertexCount);submitted++) {
+                        int i=useTriangles?triangleIndices[submitted]:submitted;
                         int o = i * 8;
                         float x = vData[o], y = vData[o + 1], z = vData[o + 2];
                         float nx = vData[o + 3], ny = vData[o + 4], nz = vData[o + 5];
@@ -5395,41 +5169,7 @@ public final class MqoModelLoader {
                 || lowerGroupName.contains("wind");
         }
 
-        private static boolean shouldSuppressPackSpecificShadowArtifact(Object entity, String lowerGroupName) {
-            if (!(entity instanceof TrainEntity train) || lowerGroupName == null) {
-                return false;
-            }
-            String vehicleId = train.getVehicleId();
-            if (vehicleId == null) {
-                return false;
-            }
-            String lowerId = vehicleId.toLowerCase(Locale.ROOT);
-            VehicleDefinition def = VehicleRegistry.getById(vehicleId);
-            String lowerModelFile = def == null || def.getModelFile() == null
-                ? ""
-                : def.getModelFile().replace('\\', '/').toLowerCase(Locale.ROOT);
-            // T-ONREC E131 パックは alpha / alpha_ グループの中に、窓ガラスではなく
-            // 車体下へ大きく伸びる補助板が入っている。移植版ではこれが黒い「影板」として
-            // 出てしまう。面単位の除外は bake 時に行い、ここでは丸ごと消さない。
-            if (lowerId.startsWith("t-on_e131")
-                    || lowerModelFile.startsWith("t-onrec/e131/")
-                    || lowerModelFile.contains("/t-onrec/e131/")) {
-                return false;
-            }
-            if (lowerId.startsWith("baru_keikyu")
-                    || lowerId.contains("keikyu")
-                    || lowerModelFile.startsWith("baru_keikyu_")
-                    || lowerModelFile.contains("/baru_keikyu_")) {
-                return lowerGroupName.equals("shadow")
-                    || lowerGroupName.startsWith("shadow_")
-                    || lowerGroupName.endsWith("_shadow");
-            }
-            if ((lowerId.startsWith("d51-498") || lowerModelFile.startsWith("d51-498"))
-                    && lowerGroupName.equals("fl")) {
-                return true;
-            }
-            return false;
-        }
+
 
         private static boolean isInteriorGroup(String lowerGroupName) {
             return lowerGroupName.contains("seat")
@@ -5563,23 +5303,7 @@ public final class MqoModelLoader {
             return Math.min(maxAlpha, Math.max(0, Math.round(alpha * 255.0F)));
         }
 
-        private boolean shouldSkipLegacyPlaceholderGroup(String groupName) {
-            if (groupName == null || groupName.isBlank()) {
-                return false;
-            }
-            String lower = groupName.trim().toLowerCase(Locale.ROOT);
-            if (lower.equals("dest") && hasGroupNamed("dest0")) {
-                return true;
-            }
-            if (lower.equals("type") && hasGroupNamed("type0")) {
-                return true;
-            }
-            return lower.equals("lever") && (
-                hasGroupNamed("L_F")
-                    || hasGroupNamed("L_M")
-                    || hasGroupNamed("L_B")
-            );
-        }
+
     }
 
     public static void renderModel(MqoModel model, PoseStack poseStack, MultiBufferSource buffer, int packedLight, GroupPredicate groupFilter) {
@@ -5647,6 +5371,19 @@ public final class MqoModelLoader {
         long lastOpaqueDrawFrame = -1L;
         final float[] data;
         final int vertexCount;
+        private java.util.BitSet sourceQuads=new java.util.BitSet();
+        private int[] submittedTriangles;
+        private Boolean varyingNormals;
+        boolean hasVaryingNormals() {
+            if (varyingNormals == null) varyingNormals = LegacyIrisGeometry.hasVaryingNormals(data);
+            return varyingNormals;
+        }
+        int[] triangleIndices() {
+            if(submittedTriangles==null) {
+                submittedTriangles=LegacyTriangleSubmission.indices(data,sourceQuads);
+            }
+            return submittedTriangles;
+        }
         // scriptTexture=false 時の事前計算結果。SL/通常列車は大半の batch で
         // scriptTexture=false なので毎フレームの string 操作 (contains/startsWith)
         // を 1 度の構築時計算に置換できる。
@@ -5827,9 +5564,9 @@ public final class MqoModelLoader {
             }
             try {
                 com.mojang.blaze3d.vertex.BufferBuilder bb = com.mojang.blaze3d.vertex.Tesselator.getInstance().begin(
-                    com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
+                    com.mojang.blaze3d.vertex.VertexFormat.Mode.TRIANGLES,
                     com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY);
-                for (int i = 0; i < vertexCount; i++) {
+                for (int i : triangleIndices()) {
                     int o = i * 8;
                     bb.addVertex(data[o], data[o + 1], data[o + 2])
                         .setColor(255, 255, 255, 255)

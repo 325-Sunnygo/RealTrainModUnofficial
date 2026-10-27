@@ -230,7 +230,10 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             // 名前に "door" を含むか等の推測はしない (本家に無いし、扉/panel 等の命名で外れる)。
             java.util.Map<String, java.util.List<PartsStep>> leftChains = partsChains(def.getLeftDoors());
             java.util.Map<String, java.util.List<PartsStep>> rightChains = partsChains(def.getRightDoors());
+            var partDrawOrder = com.portofino.realtrainmodunofficial.client.model.LegacyVehiclePartOrder.create(
+                    def.getLeftDoors(),def.getRightDoors());
             MqoModelLoader.GroupTransform doorTransform = new MqoModelLoader.GroupTransform() {
+                @Override public int drawOrder(String groupName) { return partDrawOrder.getOrDefault(groupName,0); }
                 @Override public void apply(PoseStack stack, String groupName) {
                     applyRunningGearTransform(stack, entity, def, model, groupName, renderYaw, partialTicks);
                     if (leftChains.isEmpty() && rightChains.isEmpty()) {
@@ -605,105 +608,11 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             .setNormal(nx, ny, nz);
     }
 
-    /**
-     * 連結曲げ用の角度バリアント (末尾 "-NN" で NN>=10、(mx)鏡像サフィックスは先に剥がす) か。
-     * 例: body-90, body-180(mx), bogie1-90, type_1-90。NN<10 (body-1 等のセクション分割) は対象外。
-     */
-    private static boolean isAngleBendVariant(String normalized) {
-        String s = normalized.endsWith("(mx)") ? normalized.substring(0, normalized.length() - 4) : normalized;
-        int dash = s.lastIndexOf('-');
-        if (dash <= 0 || dash == s.length() - 1) return false;
-        for (int i = dash + 1; i < s.length(); i++) {
-            if (!Character.isDigit(s.charAt(i))) return false;
-        }
-        try {
-            return Integer.parseInt(s.substring(dash + 1)) >= 10;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
     private static boolean shouldRenderTrainGroup(String groupName, boolean renderInterior,
                                                   boolean aggressiveDistanceCulling, boolean compatibilityHeavy,
                                                   VehicleDefinition def, boolean hasScript, boolean scriptActuallyRunning) {
-        if (groupName == null || groupName.isBlank()) {
-            return true;
-        }
-        String normalized = groupName.toLowerCase(java.util.Locale.ROOT);
-        // 連結曲げ用の角度バリアントメッシュ (body-90 / body-80(mx) / bogie1-90 等、末尾"-NN"でNN>=10)
-        // は RTM が曲げ角に応じ1つだけ描く代替メッシュ。
-        // 描くと翼のように散乱する。
-        if (isAngleBendVariant(normalized)) {
-            return false;
-        }
-        // ★台車/車輪グループは隠さない。
-        // 出し分けない (台車は EntityBogie 側で別途描かれるだけ)。
-        if (normalized.contains("shadow")) {
-            return false;
-        }
-        // _ms / _kage - RTMパックの地面投影シャドウメッシュ (例: body_a_ms, 影ms)
-        if (normalized.endsWith("_ms") || normalized.endsWith("_kage")
-                || normalized.contains("_ms_") || normalized.contains("_kage_")) {
-            return false;
-        }
-        if (normalized.endsWith("_guide") || normalized.endsWith("[obj]")
-                || normalized.endsWith("_atari") || normalized.endsWith(" atari")) {
-            return false;
-        }
-        if (!renderInterior) {
-            if (normalized.contains("seat")
-                || normalized.contains("chair")
-                || normalized.contains("interior")
-                || normalized.contains("inside")
-                || normalized.contains("floor")
-                || normalized.contains("ceiling")
-                || normalized.contains("handrail")
-                || normalized.contains("strap")
-                || normalized.contains("shelf")
-                || normalized.contains("cab")
-                || normalized.contains("desk")
-                || normalized.contains("instrument")
-                || normalized.contains("panel")) {
-                return false;
-            }
-        }
-        // 台車/車輪グループは常に描画する。
-        // 多発するため、確実に見えるようベイクド側からも描画する。
-        if (def.hasScript() && !scriptActuallyRunning
-                && def.getHeadLights().isEmpty() && def.getTailLights().isEmpty()) {
-            // "light" (exact): SL front headlight ( etc.)
-            // "lightf" / "lightb" / "lightr" / "lightl": EMU-style per-direction headlights
-            boolean isLightGroup = normalized.equals("light") || normalized.equals("lightf") || normalized.equals("lightb")
-                    || normalized.equals("lightr") || normalized.equals("lightl")
-                    || normalized.startsWith("light_f") || normalized.startsWith("light_b")
-                    || normalized.startsWith("lightf_") || normalized.startsWith("lightb_")
-                    || normalized.endsWith("_light") || normalized.endsWith("-light");
-            if (isLightGroup) {
-                // Keep the group hidden only when there is no light mode context (def has no way
-                // to know mode here). We allow it to pass and rely on isEmissiveGroup / light-mode
-                // gating inside renderParts to control visibility per-frame.
-                // Only suppress the "shadow"-level legacy groups that truly break when unscripted:
-            }
-        }
-        if (aggressiveDistanceCulling) {
-            if (normalized.contains("wiper")
-                || normalized.contains("coupler")
-                || normalized.contains("connector")
-                || normalized.contains("hoses")
-                || normalized.contains("step")
-                || normalized.contains("pantograph")
-                || normalized.contains("under")
-                || normalized.contains("detail")) {
-                return false;
-            }
-        }
-        if (compatibilityHeavy) {
-            if (aggressiveDistanceCulling && (normalized.contains("cooler")
-                || normalized.contains("fan")
-                || normalized.contains("antenna"))) {
-                return false;
-            }
-        }
+        // The original delegates selection to registered Parts and ResourceState.
+        // Names, distance and a model's size do not implicitly hide authored meshes.
         return true;
     }
 

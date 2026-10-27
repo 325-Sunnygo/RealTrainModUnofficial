@@ -11,6 +11,7 @@ import jp.ngt.ngtlib.renderer.GLRecorder;
  * 描画を renderWireStatic / renderWireDynamic に書く。
  */
 public class WirePartsRenderer extends TileEntityPartsRenderer {
+    private boolean useScript = true;
 
     /**
      * 定義 (ModelWire_*.json) の値。本家は ModelSetWire/WireConfig から引くが、
@@ -28,6 +29,49 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
         super(par1);
     }
 
+    public WirePartsRenderer(boolean useScript, String... args) {
+        super(args);
+        this.useScript = useScript;
+    }
+
+    public void renderWire(Object tile, Object connection, Object vec, float partialTicks, RenderPass pass) {
+        this.renderWire(tile, connection, vec, partialTicks, pass.id);
+    }
+
+    @Deprecated
+    public void renderWireDeflection2(Object tile, Object connection, Object vector, float partialTicks, int pass) {
+        GLRecorder rec = GLRecorder.active();
+        Vec3 target = toVec3(vector);
+        if (rec == null || target == null || this.sectionLength <= 0.0F) return;
+        double lx = Math.sqrt(target.getX() * target.getX() + target.getZ() * target.getZ());
+        if (lx == 0.0D) {
+            this.renderWireStraight(tile, connection, vector, partialTicks, pass, null);
+            return;
+        }
+        double alpha = this.deflectionCoefficient * NGTMath.cos(target.getPitch())
+                / Math.pow(1.0F + this.lengthCoefficient, lx);
+        if (alpha == 0.0D) {
+            this.renderWireStraight(tile, connection, vector, partialTicks, pass, null);
+            return;
+        }
+        double a = (lx - target.getY() / (alpha * lx)) / 2.0D;
+        rec.push();
+        rec.rotate(target.getYaw(), 0.0F, 1.0F, 0.0F);
+        for (double x = 0.0D; x < lx;) {
+            double y = alpha * (x * x - 2.0D * a * x);
+            double angle = Math.atan(2.0D * alpha * (x - a));
+            rec.push();
+            rec.translate(0.0F, (float) y, (float) x);
+            rec.rotate((float) -Math.toDegrees(angle) + 90.0F, 1.0F, 0.0F, 0.0F);
+            this.renderPartsOrModel(null);
+            rec.pop();
+            double step = Math.cos(angle) * this.sectionLength;
+            if (!(step > 0.0D) || !Double.isFinite(step)) break;
+            x += step;
+        }
+        rec.pop();
+    }
+
     /** 本家 renderWire: static → dynamic の順に呼ぶ。 */
     public void renderWire(Object tile, Object connection, Object vec, float partialTicks, int pass) {
         this.renderWireStatic(tile, connection, vec, partialTicks, pass);
@@ -35,7 +79,7 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
     }
 
     public void renderWireStatic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
-        callWireScript("renderWireStatic", tile, connection, vec, partialTicks, pass);
+        if (this.useScript) callWireScript("renderWireStatic", tile, connection, vec, partialTicks, pass);
     }
 
     /**
@@ -44,7 +88,7 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
      * (レンダラ側に別経路を持たせない)。pass0 でのみ描くのは発光防止。
      */
     public void renderWireDynamic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
-        if (this.script != null) {
+        if (this.useScript && this.script != null) {
             callWireScript("renderWireDynamic", tile, connection, vec, partialTicks, pass);
         } else if (pass == RenderPass.NORMAL.id) {
             if (this.deflectionCoefficient > 0.0F) {

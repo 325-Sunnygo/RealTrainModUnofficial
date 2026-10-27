@@ -60,20 +60,33 @@ public final class VehicleScriptRenderers {
         if (def == null || !def.hasScript()) {
             return null;
         }
-        Scripted s = CACHE.computeIfAbsent(def.getId(), id -> create(def));
-        return s == INVALID ? null : s;
+        Scripted cached=CACHE.get(def.getId());
+        if(cached!=null)return cached==INVALID?null:cached;
+        String key="vehicle-render|"+def.getId();
+        var compilation=com.portofino.realtrainmodunofficial.script.AsyncScriptCompiler.requestPrepared(key,def.getScriptPath(),() -> {
+            RealTrainModUnofficial.LOGGER.info("[RTMU] preparing vehicle script: {} ({})",def.getId(),def.getScriptPath());
+            String source=VehiclePackLoader.readScriptContent(def);
+            if(source==null || source.isBlank())throw new IllegalArgumentException("Vehicle script not readable: "+def.getScriptPath());
+            return com.portofino.realtrainmodunofficial.script.LegacyExecutionIncludes.prepare(source,def.getScriptPath(),jp.ngt.ngtlib.io.NGTFileLoader::findAsset,PRELUDE);
+        });
+        if(!compilation.isDone())return null;
+        Scripted result;
+        try {result=CACHE.computeIfAbsent(def.getId(),id -> create(def,compilation.join()));}
+        catch(java.util.concurrent.CompletionException failure) {
+            RealTrainModUnofficial.LOGGER.warn("Failed to compile vehicle script {} ({})",def.getId(),def.getScriptPath(),failure);
+            CACHE.put(def.getId(),INVALID);result=INVALID;
+        } finally {com.portofino.realtrainmodunofficial.script.AsyncScriptCompiler.release(key);}
+        return result==INVALID?null:result;
     }
 
-    private static Scripted create(VehicleDefinition def) {
-        try {
-            String source = VehiclePackLoader.readScriptContent(def);
-            if (source == null || source.isBlank()) {
-                RealTrainModUnofficial.LOGGER.warn("Vehicle script not readable for {} ({})", def.getId(), def.getScriptPath());
-                return INVALID;
-            }
-            source = com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, def.getScriptPath());
+    public static boolean isLoading(VehicleDefinition def) {
+        return def!=null && !CACHE.containsKey(def.getId()) && com.portofino.realtrainmodunofficial.script.AsyncScriptCompiler.isPending("vehicle-render|"+def.getId());
+    }
 
-            ScriptEngine se = ScriptUtil.doScript(PRELUDE + source);
+    private static Scripted create(VehicleDefinition def,javax.script.CompiledScript compiled) {
+        try {
+            // Run top-level code and renderer.init on the render thread, after compilation finishes.
+            ScriptEngine se=compiled.getEngine();compiled.eval();
             Object rcName = se.get("renderClass");
             if (rcName == null) {
                 RealTrainModUnofficial.LOGGER.warn("Vehicle script has no renderClass: {}", def.getId());
@@ -94,9 +107,9 @@ public final class VehicleScriptRenderers {
             ModelObject modelObject = buildModelObject(def);
             RealTrainModUnofficial.LOGGER.debug("[RTMU] vehicle model graph built: {} groups={}", def.getId(),
                     modelObject != null && modelObject.model != null ? modelObject.model.groupObjects.size() : -1);
-            jp.ngt.rtm.modelpack.modelset.ModelSetCompat modelSet =
-                    new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(
-                            jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.get(def.getId()));
+            jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> modelSet = def.isCarType()
+                    ? new jp.ngt.rtm.modelpack.modelset.ModelSetVehicle(jp.ngt.rtm.modelpack.cfg.VehicleConfigAdapter.get(def))
+                    : new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.get(def.getId()));
             // init 内の一部機能 (モニタ等) が失敗しても登録済み Parts で描画を続行する
             renderer.init(modelSet, modelObject);
             RealTrainModUnofficial.LOGGER.info("[RTMU] vehicle script init done: {}", def.getId());
@@ -136,6 +149,26 @@ public final class VehicleScriptRenderers {
      */
     private static boolean levelRenderActive;
 
+    private record BakedAlpha(Matrix4f modelView, PoseStack pose,
+            java.util.function.BiConsumer<PoseStack,MultiBufferSource> draw,
+            jp.ngt.ngtlib.renderer.LegacyRenderState.Snapshot state, Vector3f[] lights,
+            InteriorLighting.Snapshot interior) {}
+    private static final java.util.List<BakedAlpha> BAKED_ALPHA_QUEUE = new java.util.ArrayList<>();
+
+    /** Unscripted vehicles need the same terrain-before-alpha ordering as scripted ones. */
+    public static boolean deferBakedAlpha(PoseStack pose,
+            java.util.function.BiConsumer<PoseStack,MultiBufferSource> draw) {
+        if (!levelRenderActive || com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) return false;
+        PoseStack copy=new PoseStack();
+        copy.last().pose().set(pose.last().pose());
+        copy.last().normal().set(pose.last().normal());
+        BAKED_ALPHA_QUEUE.add(new BakedAlpha(new Matrix4f(
+                com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix()),copy,draw,
+                jp.ngt.ngtlib.renderer.LegacyRenderState.playback(),RailDrawQueue.currentShaderLights(),
+                InteriorLighting.snapshot()));
+        return true;
+    }
+
     /** ワールド描画の開始 (RailDrawQueue が早い段階のフックで呼ぶ)。 */
     static void beginLevelRender() {
         levelRenderActive = true;
@@ -173,12 +206,33 @@ public final class VehicleScriptRenderers {
      */
     static void flushDeferredTranslucent() {
         levelRenderActive = false;
-        if (TRANSLUCENT_QUEUE.isEmpty()) {
+        if (TRANSLUCENT_QUEUE.isEmpty() && BAKED_ALPHA_QUEUE.isEmpty()) {
             return;
         }
         net.minecraft.client.renderer.MultiBufferSource.BufferSource buffer =
             net.minecraft.client.Minecraft.getInstance().renderBuffers().bufferSource();
         try {
+            // Flush each draw before restoring its captured global matrix. LocalSpaceBatch
+            // may have put the entire vehicle transform there, leaving pose as identity.
+            for (BakedAlpha d : BAKED_ALPHA_QUEUE) {
+                var mv=com.mojang.blaze3d.systems.RenderSystem.getModelViewStack();
+                Vector3f[] savedLights=RailDrawQueue.currentShaderLights();
+                var savedInterior=InteriorLighting.snapshot();
+                mv.pushMatrix();
+                mv.set(d.modelView());
+                com.mojang.blaze3d.systems.RenderSystem.applyModelViewMatrix();
+                try(var scope=jp.ngt.ngtlib.renderer.LegacyRenderState.use(d.state())) {
+                    if(d.lights()!=null) com.mojang.blaze3d.systems.RenderSystem.setShaderLights(d.lights()[0],d.lights()[1]);
+                    InteriorLighting.restore(d.interior());
+                    d.draw().accept(d.pose(),buffer);
+                    buffer.endBatch();
+                } finally {
+                    InteriorLighting.restore(savedInterior);
+                    if(savedLights!=null) com.mojang.blaze3d.systems.RenderSystem.setShaderLights(savedLights[0],savedLights[1]);
+                    mv.popMatrix();
+                    com.mojang.blaze3d.systems.RenderSystem.applyModelViewMatrix();
+                }
+            }
             for (DeferredTranslucent d : TRANSLUCENT_QUEUE) {
                 // ★積んだ時点と再生時でグローバルの ModelView が違うと、その差だけ位置がずれる。
                 // 最終的な変換は (再生時の MV) × pose なので、pose を
@@ -212,6 +266,7 @@ public final class VehicleScriptRenderers {
             RealTrainModUnofficial.LOGGER.warn("Deferred vehicle translucent draw failed", t);
         } finally {
             TRANSLUCENT_QUEUE.clear();
+            BAKED_ALPHA_QUEUE.clear();
         }
     }
 
@@ -230,21 +285,7 @@ public final class VehicleScriptRenderers {
     }
 
     private static ModelObject buildModelObject(VehicleDefinition def) {
-        List<TextureSet> sets = new ArrayList<>();
-        Map<String, String> texMap = def.getTextureOverrides();
-        if (texMap != null) {
-            for (String path : texMap.values()) {
-                // ローダ内部メタ ("|ptmeta=alphablend" 等) を除去 — スクリプトは
-                // このパスから "_headLight.png" 等の発光テクスチャ名を合成する
-                int meta = path.indexOf("|ptmeta=");
-                String clean = meta >= 0 ? path.substring(0, meta) : path;
-                sets.add(new TextureSet(new Material(new jp.ngt.mccompat.ResourceLocation("minecraft", clean))));
-            }
-        }
-        if (sets.isEmpty()) {
-            sets.add(new TextureSet(new Material(null)));
-        }
-        ModelObject mo = new ModelObject(sets.toArray(new TextureSet[0]));
+        ModelObject mo = new ModelObject(new TextureSet[0]);
         // 車体モデルグラフ (CustomAnimator の setFacesFromParts 等が面を参照)
         try {
             String modelFile = def.getModelFile();
@@ -254,7 +295,7 @@ public final class VehicleScriptRenderers {
                     bytes = NGTFileLoader.findAsset(modelFile);
                 }
                 if (bytes != null) {
-                    mo.model = ModelLoader.parse(bytes, modelFile);
+                    mo.model = ModelLoader.parse(bytes, modelFile,def.getModelAccuracy(),4);
                 }
             }
         } catch (Exception e) {
@@ -262,6 +303,7 @@ public final class VehicleScriptRenderers {
         if (mo.model == null) {
             mo.model = new PolygonModel();
         }
+        mo.setTextures(jp.ngt.ngtlib.renderer.model.LegacyTextureLayout.create(mo.model, def.getTextureOverrides()));
         return mo;
     }
 
@@ -375,6 +417,7 @@ public final class VehicleScriptRenderers {
                         || Float.floatToIntBits(x.c) != Float.floatToIntBits(y.c)
                         || Float.floatToIntBits(x.d) != Float.floatToIntBits(y.d)
                         || !java.util.Objects.equals(x.name, y.name)
+                        || !java.util.Objects.equals(x.state, y.state)
                         || !payloadIdentical(x.payload, y.payload)) {
                     return false;
                 }
@@ -391,7 +434,8 @@ public final class VehicleScriptRenderers {
             }
             if (p instanceof GLRecorder.TessDraw tp) {
                 return q instanceof GLRecorder.TessDraw tq
-                        && tp.mode == tq.mode && java.util.Arrays.equals(tp.verts, tq.verts);
+                        && tp.mode == tq.mode && java.util.Arrays.equals(tp.verts, tq.verts)
+                        && java.util.Arrays.equals(tp.normals,tq.normals) && tp.additive==tq.additive && tp.cullFront==tq.cullFront && tp.useCurrentColor==tq.useCurrentColor;
             }
             // Quaternionf / Set<String> / ResourceLocation / BlockState は equals で比較。
             // PolygonModel は equals 非オーバーライド = 同一インスタンスのみ一致だが、
@@ -404,6 +448,18 @@ public final class VehicleScriptRenderers {
          * sink が非 null のとき、再生した各パスの記録を追加してキャッシュに残す。
          */
         private boolean renderReal(Object entity, float partialTick, PoseStack poseStack,
+                                   MultiBufferSource buffer, int packedLight, int packedOverlay,
+                                   MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
+            var window=net.minecraft.client.Minecraft.getInstance().getWindow();
+            var modelView=new Matrix4f(com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix()).mul(poseStack.last().pose());
+            try(var selection=jp.ngt.ngtlib.renderer.LegacySelection.context(modelView,
+                    com.mojang.blaze3d.systems.RenderSystem.getProjectionMatrix(),this.renderer.getPolygonModel(),
+                    window==null?1:window.getWidth(),window==null?1:window.getHeight())) {
+                return renderRealWithSelection(entity,partialTick,poseStack,buffer,packedLight,packedOverlay,bodyModel,sink);
+            }
+        }
+
+        private boolean renderRealWithSelection(Object entity, float partialTick, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight, int packedOverlay,
                                    MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
             // ActionParts 対話用: モデルローカル→カメラの行列を記録する (本家 PICK パスの代替)。
@@ -758,6 +814,11 @@ public final class VehicleScriptRenderers {
                                        GLRecorder target) {
             long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
             target.clear();
+            target.state().baseline(jp.ngt.ngtlib.renderer.GL11Facade.GL_BLEND,pass!=0);
+            target.state().alpha(pass==0?514:pass==1?513:516,pass<2?1.0F:0.1F);
+            target.state().depthWrite(pass!=1);
+            target.state().baseline(jp.ngt.ngtlib.renderer.GL11Facade.GL_LIGHTING,pass<2);
+            target.state().baseline(jp.ngt.ngtlib.renderer.GL11Facade.GL_CULL_FACE,MqoModelLoader.shouldCullModelFaces(entity));
             GLRecorder.activate(target);
             try {
                 this.renderer.currentMatId = matId;
@@ -904,9 +965,12 @@ public final class VehicleScriptRenderers {
         long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
         final int fullBright = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
         int light = fullBright;
+        float colR=1,colG=1,colB=1,colA=1;
         ResourceLocation tex = defaultTex;
         int depth = 0;
+        try(var matrices=new LegacyMatrixPlayback(poseStack,buffer)) {
         for (GLRecorder.Cmd cmd : rec.getCommands()) {
+            try (var glState = jp.ngt.ngtlib.renderer.LegacyRenderState.use(cmd.state)) {
             switch (cmd.op) {
                 case PUSH -> {
                     poseStack.pushPose();
@@ -925,10 +989,19 @@ public final class VehicleScriptRenderers {
                     }
                 }
                 case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
+                case COLOR_MASK -> matrices.colorMask(cmd.a!=0,cmd.b!=0,cmd.c!=0,cmd.d!=0);
+                case LOAD_MATRIX -> {if(cmd.payload instanceof float[] matrix)matrices.load(matrix);}
+                case PROJECTION -> {if(cmd.payload instanceof float[] matrix)matrices.projection(matrix);}
+                case DRAW_TEXT -> {
+                    if(cmd.payload instanceof GLRecorder.TextDraw text) {
+                        var font=net.minecraft.client.Minecraft.getInstance().font;
+                        font.drawInBatch(text.text(),text.x(),text.y(),text.color(),text.shadow(),poseStack.last().pose(),buffer,net.minecraft.client.gui.Font.DisplayMode.NORMAL,0,net.minecraft.client.renderer.LightTexture.FULL_BRIGHT);
+                    }
+                }
                 case MULT_MATRIX -> {
                     // glMultMatrix: 列優先 16 要素。JOML も列優先なのでそのまま流し込める。
                     if (cmd.payload instanceof float[] m && m.length >= 16) {
-                        poseStack.last().pose().mul(new Matrix4f().set(m));
+                        poseStack.mulPose(new Matrix4f().set(m));
                     }
                 }
                 case BRIGHTNESS -> light = cmd.a < 0 ? fullBright : (int) cmd.a;
@@ -939,15 +1012,18 @@ public final class VehicleScriptRenderers {
                         tex = cmd.payload instanceof ResourceLocation rl ? rl : defaultTex;
                     }
                 }
+                case COLOR -> { colR=cmd.a; colG=cmd.b; colB=cmd.c; colA=cmd.d; }
                 case DRAW_TESS -> {
                     if (cmd.payload instanceof GLRecorder.TessDraw draw) {
-                        drawTess(draw, poseStack, buffer, light, packedOverlay, tex);
+                        drawTess(draw, poseStack, draw.useCurrentColor ? LegacyColorBuffer.tint(buffer,colR,colG,colB,colA) : buffer, light, packedOverlay, tex);
                     }
                 }
                 default -> {
                     // RENDER_GROUPS/RENDER_PARTS/DRAW_MODEL_GROUP/COLOR は本体描画なので無視
                 }
             }
+            }
+        }
         }
         while (depth > 0) {
             poseStack.popPose();
@@ -993,7 +1069,9 @@ public final class VehicleScriptRenderers {
         // スクリプトの glColor4f (発光オーバーレイの強度等に使用)
         float colR = 1.0F, colG = 1.0F, colB = 1.0F, colA = 1.0F;
         int depth = 0;
+        try(var matrices=new LegacyMatrixPlayback(poseStack,buffer)) {
         for (GLRecorder.Cmd cmd : rec.getCommands()) {
+            try (var glState = jp.ngt.ngtlib.renderer.LegacyRenderState.use(cmd.state)) {
             switch (cmd.op) {
                 case PUSH -> {
                     poseStack.pushPose();
@@ -1012,6 +1090,32 @@ public final class VehicleScriptRenderers {
                     }
                 }
                 case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
+                case COLOR_MASK -> matrices.colorMask(cmd.a!=0,cmd.b!=0,cmd.c!=0,cmd.d!=0);
+                case LOAD_MATRIX -> {if(cmd.payload instanceof float[] matrix)matrices.load(matrix);}
+                case PROJECTION -> {if(cmd.payload instanceof float[] matrix)matrices.projection(matrix);}
+                case DRAW_TEXT -> {
+                    if(cmd.payload instanceof GLRecorder.TextDraw text) {
+                        var font=net.minecraft.client.Minecraft.getInstance().font;
+                        font.drawInBatch(text.text(),text.x(),text.y(),text.color(),text.shadow(),poseStack.last().pose(),buffer,net.minecraft.client.gui.Font.DisplayMode.NORMAL,0,net.minecraft.client.renderer.LightTexture.FULL_BRIGHT);
+                    }
+                }
+                case MULT_MATRIX -> {
+                    if(cmd.payload instanceof float[] matrix && matrix.length>=16) {
+                        org.joml.Matrix4f transform=new org.joml.Matrix4f().set(matrix);
+                        poseStack.mulPose(transform);
+                    }
+                }
+                case RENDER_GUI_ITEM -> {
+                    if(cmd.payload instanceof GLRecorder.GuiItemDraw item) jp.ngt.ngtlib.renderer.LegacyItemRenderer.replayGui(item,poseStack,buffer);
+                }
+                case LOAD_NAME -> {}
+                case RENDER_ITEM -> {
+                    if(cmd.payload instanceof GLRecorder.ItemDraw item) {
+                        var minecraft=net.minecraft.client.Minecraft.getInstance();
+                        minecraft.getItemRenderer().renderStatic(item.stack(),net.minecraft.world.item.ItemDisplayContext.FIXED,
+                                light,packedOverlay,poseStack,buffer,minecraft.level,item.seed());
+                    }
+                }
                 // 負値 = 元の環境光へ戻す (スクリプトの車内発光ブロック終端)
                 case BRIGHTNESS -> light = cmd.a < 0 ? packedLight : (int) cmd.a;
                 case COLOR -> {
@@ -1055,13 +1159,13 @@ public final class VehicleScriptRenderers {
                         } else if (model != null && legacyPass >= RenderPass.LIGHT.id) {
                             // 発光パス: Light マテリアルの面だけを ***_light0/1/2.png で描き直す
                             // (本家 ModelObject.renderWithTexture と同じ。グループ名は見ない)
-                            model.renderNamedGroupsEmissive(poseStack, buffer, light, packedOverlay,
+                            model.renderNamedGroupsEmissive(poseStack, LegacyColorBuffer.tint(buffer,colR,colG,colB,colA), light, packedOverlay,
                                     (Set<String>) names, legacyPass);
                         } else if (model != null) {
                             // 本家 RenderVehicleBase と同じく pass で不透明/半透明を切り替える。
                             // pass0(NORMAL)=不透明テクスチャ、pass1(TRANSPARENT)=window テクスチャ+ブレンド。
                             boolean translucentPass = legacyPass == RenderPass.TRANSPARENT.id;
-                            model.renderNamedGroups(poseStack, buffer, light, packedOverlay, translucentPass,
+                            model.renderNamedGroups(poseStack, LegacyColorBuffer.tint(buffer,colR,colG,colB,colA), light, packedOverlay, translucentPass,
                                     (Set<String>) names, null, excluded);
                         }
                     }
@@ -1070,7 +1174,7 @@ public final class VehicleScriptRenderers {
                     if (cmd.payload instanceof GLRecorder.TessDraw draw) {
                         // スクリプトが bind していなければモデル定義の default テクスチャで描く
                         // (架線スクリプトは bind せず UV だけ指定するため、ここが無いと白板になる)。
-                        drawTess(draw, poseStack, buffer, light, packedOverlay,
+                        drawTess(draw, poseStack, draw.useCurrentColor ? LegacyColorBuffer.tint(buffer,colR,colG,colB,colA) : buffer, light, packedOverlay,
                                 overrideTex != null ? overrideTex : defaultTessTex);
                     }
                 }
@@ -1094,6 +1198,8 @@ public final class VehicleScriptRenderers {
                     }
                 }
             }
+            }
+        }
         }
         while (depth > 0) {
             poseStack.popPose();
@@ -1151,6 +1257,8 @@ public final class VehicleScriptRenderers {
             .setWriteMaskState(net.minecraft.client.renderer.RenderStateShard.COLOR_WRITE)
             .createCompositeState(false));
 
+    private static final ThreadLocal<float[]> TESS_NORMALS = new ThreadLocal<>();
+
     private static void drawTess(GLRecorder.TessDraw draw, PoseStack poseStack, MultiBufferSource buffer,
                                  int light, int overlay, ResourceLocation texture) {
         long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
@@ -1163,11 +1271,34 @@ public final class VehicleScriptRenderers {
             com.mojang.blaze3d.systems.RenderSystem.enableCull();
             org.lwjgl.opengl.GL11.glCullFace(org.lwjgl.opengl.GL11.GL_FRONT);
         }
-        VertexConsumer vc = buffer.getBuffer(draw.cullFront ? OUTLINE_TESS
-                : (draw.additive ? ADDITIVE_TESS : RenderType.entityTranslucent(tex)));
+        RenderType tessType = draw.cullFront ? OUTLINE_TESS : draw.additive ? ADDITIVE_TESS : RenderType.entityTranslucent(tex);
+        boolean lineMode=draw.mode>=1 && draw.mode<=3;
+        tessType = LegacyRenderTypes.select(tessType,tex,true,draw.cullFront,!draw.additive,
+                lineMode ? com.mojang.blaze3d.vertex.VertexFormat.Mode.DEBUG_LINES : com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS,
+                770,draw.additive ? 1 : 771);
+        if(draw.mode==0) tessType=LegacyRenderTypes.points(tex,draw.additive);
+        VertexConsumer vc = buffer.getBuffer(tessType);
         int stride = 9;
         int count = draw.verts.length / stride;
+        float[] previousNormals = TESS_NORMALS.get();
+        TESS_NORMALS.set(draw.normals);
+        try {
         switch (draw.mode) {
+            case 0 -> {
+                Vector3f normal=new Vector3f(0,0,1);
+                for(int index=0;index<count;index++) for(int corner=0;corner<4;corner++)
+                    emitVertex(vc,poseStack.last(),draw.verts,index,normal,light,overlay);
+            }
+            case 1,2,3 -> {
+                int edges=draw.mode==1 ? count/2 : draw.mode==2 ? count : Math.max(0,count-1);
+                Vector3f normal=new Vector3f(0,0,1);
+                for(int edge=0;edge<edges;edge++) {
+                    int first=draw.mode==1 ? edge*2 : edge;
+                    int second=draw.mode==2 ? (edge+1)%count : first+1;
+                    emitVertex(vc,poseStack.last(),draw.verts,first,normal,light,overlay);
+                    emitVertex(vc,poseStack.last(),draw.verts,second,normal,light,overlay);
+                }
+            }
             case GL_QUADS -> {
                 for (int q = 0; q + 4 <= count; q += 4) {
                     emitQuad(vc, poseStack, draw.verts, q, q + 1, q + 2, q + 3, light, overlay);
@@ -1178,14 +1309,26 @@ public final class VehicleScriptRenderers {
                     emitQuad(vc, poseStack, draw.verts, t, t + 1, t + 2, t + 2, light, overlay);
                 }
             }
-            case GL_TRIANGLE_FAN -> {
+            case 5 -> {
+                for (int t=0;t+2<count;t++) {
+                    int a=(t&1)==0 ? t : t+1, b=(t&1)==0 ? t+1 : t;
+                    emitQuad(vc,poseStack,draw.verts,a,b,t+2,t+2,light,overlay);
+                }
+            }
+            case 8 -> {
+                for(int t=0;t+3<count;t+=2) emitQuad(vc,poseStack,draw.verts,t,t+1,t+3,t+2,light,overlay);
+            }
+            case 9, GL_TRIANGLE_FAN -> {
                 for (int t = 1; t + 2 <= count; t++) {
                     emitQuad(vc, poseStack, draw.verts, 0, t, t + 1, t + 1, light, overlay);
                 }
             }
             default -> {
-                // LINES 等は未対応
+                // Unsupported primitive modes do not produce triangles.
             }
+        }
+        } finally {
+            if(previousNormals==null) TESS_NORMALS.remove(); else TESS_NORMALS.set(previousNormals);
         }
         if (draw.cullFront) {
             // 前面カリングは flush 時の GL 状態で決まる。ここで即時 flush しないと
@@ -1231,7 +1374,10 @@ public final class VehicleScriptRenderers {
                 .setUv(v[o + 3], v[o + 4])
                 .setOverlay(overlay)
                 .setLight(light);
-        VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z);
+        float[] normals = TESS_NORMALS.get();
+        if(normals!=null && index*3+2<normals.length) {
+            VertexWriter.setNormal(written,pose,normals[index*3],normals[index*3+1],normals[index*3+2]);
+        } else VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z);
     }
 
     /**
@@ -1248,73 +1394,18 @@ public final class VehicleScriptRenderers {
         // 平滑あり/なしで法線が変わるのでキーを分ける
         String key = (smoothing ? "s|" : "f|")
                 + (groupName == null ? "" : groupName.toLowerCase(java.util.Locale.ROOT));
-        float[] flat = byName.get(key);
-        if (flat == null) {
-            GroupObject group = null;
-            for (GroupObject g : pm.groupObjects) {
-                if (g.name.equalsIgnoreCase(groupName)) {
-                    group = g;
-                    break;
-                }
-            }
-            flat = buildFlatGroup(group, smoothing);
-            byName.put(key, flat);
+        GroupObject group=null;
+        for(GroupObject candidate:pm.groupObjects) if(candidate.name.equalsIgnoreCase(groupName)) {group=candidate;break;}
+        float[] flat=byName.get(key);
+        if(!com.portofino.realtrainmodunofficial.client.model.LegacyModelGeometry.matches(group,smoothing,flat)) {
+            flat=buildFlatGroup(group,smoothing);byName.put(key,flat);
         }
         return flat;
     }
 
     /** 旧 drawModelGroup の展開ロジックそのまま (四角形はそのまま/三角形は縮退クアッド/5角以上は扇状分割)。 */
     private static float[] buildFlatGroup(GroupObject group, boolean smoothing) {
-        if (group == null || group.faces.isEmpty()) {
-            return FLAT_EMPTY;
-        }
-        int quadVerts = 0;
-        for (Face face : group.faces) {
-            int n = face.vertices.length;
-            if (n >= 3) {
-                quadVerts += (n == 4 ? 1 : n - 2) * 4;
-            }
-        }
-        float[] flat = new float[quadVerts * 8];
-        int w = 0;
-        for (Face face : group.faces) {
-            int n = face.vertices.length;
-            if (n < 3) {
-                continue;
-            }
-            for (int t = 0; t < (n == 4 ? 1 : n - 2); t++) {
-                int[] idx = n == 4 ? new int[]{0, 1, 2, 3} : new int[]{0, t + 1, t + 2, t + 2};
-                Vector3f normal = faceNormal(face, idx);
-                // ★頂点法線があればそちらを使う (本家 NGTRenderHelper.addFace の smoothing=true 側)。
-                // 無い場合だけ面法線 = フラット陰影。
-                Vertex[] vertexNormals = smoothing ? face.vertexNormals : null;
-                for (int k = 0; k < 4; k++) {
-                    Vertex vert = face.vertices[idx[k]];
-                    Vector3f vn = normal;
-                    if (vertexNormals != null && idx[k] < vertexNormals.length && vertexNormals[idx[k]] != null) {
-                        Vertex n0 = vertexNormals[idx[k]];
-                        vn = new Vector3f(n0.getX(), n0.getY(), n0.getZ());
-                        if (vn.lengthSquared() < 1.0e-8F) {
-                            vn = normal;
-                        }
-                    }
-                    float u = 0.0F, vv = 0.0F;
-                    if (face.uvs != null && idx[k] * 2 + 1 < face.uvs.length) {
-                        u = face.uvs[idx[k] * 2];
-                        vv = face.uvs[idx[k] * 2 + 1];
-                    }
-                    flat[w++] = vert.x;
-                    flat[w++] = vert.y;
-                    flat[w++] = vert.z;
-                    flat[w++] = u;
-                    flat[w++] = vv;
-                    flat[w++] = vn.x;
-                    flat[w++] = vn.y;
-                    flat[w++] = vn.z;
-                }
-            }
-        }
-        return flat;
+        return com.portofino.realtrainmodunofficial.client.model.LegacyModelGeometry.flatten(group, smoothing);
     }
 
     private static void drawModelGroup(PolygonModel pm, String groupName, PoseStack poseStack,
@@ -1343,56 +1434,20 @@ public final class VehicleScriptRenderers {
         }
         ResourceLocation tex = texture != null ? texture
                 : ResourceLocation.withDefaultNamespace("textures/misc/white.png");
-        // 発光テクスチャ (***_light*.png) は黒地=非発光なので加算合成+フルブライトで重ねる
-        // (通常ブレンドだと黒地が不透明に描かれて方向幕等が黒く潰れる)
-        boolean lightOverlay = NGTFileLoader.isLightOverlayTexture(tex);
-        if (lightOverlay) {
-            light = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
-        }
-        // 本家はブレンド有効の即時描画 (モニタ/発光パーツ)
-        // ★シェーダーパック使用中だけ、不透明パスの不透明な描画を entityCutout へ回す。
-        // ★本家と同じアルファの切り分けをする。
+        // ModelObject binds the original image for every pass. Texture names do
+        // not select additive blending, and transparent texels are never rewritten.
         boolean normalPass = legacyPass == RenderPass.NORMAL.id;
-        if (!lightOverlay) {
-            ResourceLocation split = normalPass
-                ? MqoModelLoader.opaqueVariantOf(tex)
-                : MqoModelLoader.windowVariantOf(tex);
-            if (!normalPass && split == null) {
-                // α<255 の画素が無いテクスチャ = pass1 で描く物が無い (本家も同じ)
-                com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
-                    com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_MODELGRP, secStart);
-                return;
-            }
-            if (split != null) {
-                tex = split;
-            }
-        }
-        // pass0 は不透明として描く。α==255 だけ残したテクスチャなので cutout で正しく抜ける。
-        boolean opaqueDraw = normalPass && colA >= 1.0F && !lightOverlay;
-        // シェーダー使用時は三角形で送る必要があるので経路を分ける (下の説明を参照)
-        boolean opaqueForShader = opaqueDraw
-                && com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
-        // ★シェーダー時は三角形で送る。
-        // スムージングが消える (RtmuRenderTypes.entityCutoutTriangles の説明を参照)。
-        // ★本家の doCulling に従う。
         boolean cull = MqoModelLoader.shouldCullModelFaces(null);
-        RenderType groupType = lightOverlay ? RenderType.eyes(tex)
-                : opaqueForShader
-                    ? (cull
-                        ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
-                            .entityCutoutTriangles(tex)
-                        : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
-                            .entityCutoutNoCullTriangles(tex))
-                : opaqueDraw
-                    ? (cull ? RenderType.entityCutout(tex) : RenderType.entityCutoutNoCull(tex))
-                // ★半透明は深度を書かない。書くと後から描く台車やレールが落ちて消える
-                // (MqoModelLoader 側の同じ判断と揃える)。
-                : (cull
-                    ? com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
-                        .glassNoDepthWriteCull(tex)
-                    : com.portofino.realtrainmodunofficial.client.render.RtmuRenderTypes
-                        .glassNoDepthWrite(tex));
-        VertexConsumer vc = buffer.getBuffer(groupType);
+        boolean blend = !normalPass;
+        var mode=com.portofino.realtrainmodunofficial.client.model.LegacyIrisGeometry.useTriangles(com.portofino.realtrainmodunofficial.client.ShaderCompat.active(), smoothing) ? com.mojang.blaze3d.vertex.VertexFormat.Mode.TRIANGLES : com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS;
+        RenderType groupType = LegacyRenderTypes.select(
+            cull ? RtmuRenderTypes.entityCutoutTriangles(tex) : RtmuRenderTypes.entityCutoutNoCullTriangles(tex),
+            tex,blend,cull,true,mode);
+        if (legacyPass < 2 && com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.currentVehicle() != null) {
+            groupType = LegacyRenderTypes.vehicle(groupType,tex,blend,cull,true,
+                mode,LegacyColorBuffer.alpha(buffer,(int)(colA*255))/255F);
+        }
+        VertexConsumer vc = LegacyShaderAttributes.wrap(buffer.getBuffer(groupType));
         PoseStack.Pose pose = poseStack.last();
         Matrix4f mat = pose.pose();
         org.joml.Matrix3f nm = pose.normal();
@@ -1404,23 +1459,11 @@ public final class VehicleScriptRenderers {
         // ★法線の行列変換は頂点ごと。
         // 面ごと 1 回で済ませていたが、buildFlatGroup がスムージング済みの頂点法線を書くように
         // なったので 4 頂点は別々の値を持つ。
-        if (opaqueForShader) {
-            // 四角形 1 枚 = 三角形 2 枚 (0,1,2 / 0,2,3)。頂点の中身は四角形のときと同じもの。
-            for (int q = 0; q + 32 <= flat.length; q += 32) {
-                emitVertex(vc, mat, nm, flat, q, cr, cg, cb, ca, overlay, light);
-                emitVertex(vc, mat, nm, flat, q + 8, cr, cg, cb, ca, overlay, light);
-                emitVertex(vc, mat, nm, flat, q + 16, cr, cg, cb, ca, overlay, light);
-                emitVertex(vc, mat, nm, flat, q, cr, cg, cb, ca, overlay, light);
-                emitVertex(vc, mat, nm, flat, q + 16, cr, cg, cb, ca, overlay, light);
-                emitVertex(vc, mat, nm, flat, q + 24, cr, cg, cb, ca, overlay, light);
-            }
-        } else {
-            for (int p = 0; p < flat.length; p += 8) {
-                emitVertex(vc, mat, nm, flat, p, cr, cg, cb, ca, overlay, light);
-            }
+        int[] indices=com.portofino.realtrainmodunofficial.client.model.LegacyTriangleSubmission.indices(flat);
+        for(int submitted=0;submitted<(mode==com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS?flat.length/8:indices.length);submitted++) {
+            int index=mode==com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS?submitted:indices[submitted];
+            emitVertex(vc, mat, nm, flat, index * 8, cr, cg, cb, ca, overlay, light);
         }
-        com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
-            com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_MODELGRP, secStart);
     }
 
     /** flat 配列の 1 頂点を提出する (四角形/三角形どちらの経路からも同じものを出す)。 */

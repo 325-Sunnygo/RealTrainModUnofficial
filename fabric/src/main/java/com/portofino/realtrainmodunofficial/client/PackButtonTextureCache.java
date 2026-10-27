@@ -53,6 +53,20 @@ public final class PackButtonTextureCache {
     }
 
     private static ButtonTextureInfo load(String packName, String texturePath) {
+        //同梱アセット (assets/minecraft/...)。旗などパック外の既定素材はここで解決する。
+        try {
+            //ResourceLocation は大文字不可 → 同梱側はファイル名ごと小文字化してある
+            ResourceLocation direct = ResourceLocation.withDefaultNamespace(
+                texturePath.toLowerCase(java.util.Locale.ROOT));
+            var res = Minecraft.getInstance().getResourceManager().getResource(direct);
+            if (res.isPresent()) {
+                try (InputStream in = res.get().open()) {
+                    NativeImage image = NativeImage.read(in);
+                    return registerDynamicTexture(packName, texturePath, image);
+                }
+            }
+        } catch (Exception ignored) {
+        }
         Path packPath = RailPackLoader.resolvePackPath(packName);
         if (packPath == null) {
             try {
@@ -118,8 +132,7 @@ public final class PackButtonTextureCache {
                     RealTrainModUnofficial.MODID,
                     "dynamic/button_crisp/" + sanitize(packName) + "/" + sanitize(texturePath)
                         + "/" + targetW + "x" + targetH);
-                DynamicTexture tex = new DynamicTexture(out);
-                Minecraft.getInstance().getTextureManager().register(loc, tex);
+                com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(loc, out);
                 result = loc;
             }
         } catch (Exception ignored) {
@@ -156,8 +169,7 @@ public final class PackButtonTextureCache {
                     RealTrainModUnofficial.MODID,
                     "dynamic/button_full/" + sanitize(packName) + "/" + sanitize(texturePath)
                         + "/" + targetW + "x" + targetH);
-                DynamicTexture tex = new DynamicTexture(out);
-                Minecraft.getInstance().getTextureManager().register(loc, tex);
+                com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(loc, out);
                 result = loc;
             }
         } catch (Exception ignored) {
@@ -181,19 +193,26 @@ public final class PackButtonTextureCache {
         return out;
     }
 
-    /** RTM 256-UV のボタンソース矩形 (正方キャンバスの左上 62.5%×12.5%)。 */
+    /**
+     * 本家 RTM のボタンソース矩形。
+     *
+     * <p>本家は {@code drawTexturedModalRect(x, y, 0, 0, 160, 32)} で描く。1.7.10/1.12.2 の
+     * この API は UV を <b>256px 固定</b>で割るため、実際にサンプルされるのは
+     * テクスチャ左上の <b>160/256 × 32/256 の割合</b> (62.5% × 12.5%) になる。
+     * 解像度 (256/512/…) に依らずこの割合で切るのが本家と同じ。
+     *
+     * <p>★以前は「160×128 以上なら割合、それ以外は 160×32 固定」という RTMU 独自の
+     * 分岐があり、解像度がデフォルトと違うボタンで切り出しがずれて縮小/見切れしていた。
+     */
     private static int[] computeSourceRegion(int width, int height) {
-        if (width >= 160 && height >= 128) {
-            return new int[]{
-                Math.min(width, Math.round(width * 160.0F / 256.0F)),
-                Math.min(height, Math.round(height * 32.0F / 256.0F))
-            };
-        }
-        return new int[]{Math.min(width, 160), Math.min(height, 32)};
+        return new int[]{
+            Math.max(1, Math.min(width, Math.round(width * 160.0F / 256.0F))),
+            Math.max(1, Math.min(height, Math.round(height * 32.0F / 256.0F)))
+        };
     }
 
     /** パックから buttonTexture の NativeImage を読み込む (登録しない)。呼び出し側で close する。 */
-    private static NativeImage readImage(String packName, String texturePath) throws Exception {
+    public static NativeImage readImage(String packName, String texturePath) throws Exception {
         Path packPath = RailPackLoader.resolvePackPath(packName);
         NativeImage image = null;
         if (packPath != null) {
@@ -214,25 +233,19 @@ public final class PackButtonTextureCache {
         );
         int width = image.getWidth();
         int height = image.getHeight();
-        // RTM 本家のボタン UV は 256px 空間で (0,0)-(160,32) を 固定倍率 f=1/256 で描く。
-        // = テクスチャ左上の 62.5% × 12.5% をサンプルする (解像度に依らずこの割合)。
-        int srcW;
-        int srcH;
-        if (width >= 160 && height >= 128) {
-            // 256 以上の(ほぼ)正方ボタンキャンバス: 左上 160/256 × 32/256。
-            srcW = Math.min(width, Math.round(width * 160.0F / 256.0F));
-            srcH = Math.min(height, Math.round(height * 32.0F / 256.0F));
-        } else {
-            // 想定外 (小さい/横長) のファイルは従来どおり左上 160×32 (無ければ全体)。
-            srcW = Math.min(width, 160);
-            srcH = Math.min(height, 32);
-        }
-        DynamicTexture dynamicTexture = new DynamicTexture(image);
+        // 本家と同じく 256px 空間の UV (0,0)-(160,32) = 左上 62.5% × 12.5% をサンプルする。
+        // 解像度に依らずこの割合 (RTMU 独自の「160×32 固定」分岐は撤去)。
+        int[] region = computeSourceRegion(width, height);
+        int srcW = region[0];
+        int srcH = region[1];
         // GUI ボタンはピクセル等倍で鮮明に見せたい。
         // 拡大縮小時ににじむ (ユーザー報告「ボタンがぼやける」)。最近傍・ミップマップ無しに固定する。
-        Minecraft.getInstance().getTextureManager().register(location, dynamicTexture);
-        dynamicTexture.setFilter(false, false);
-        forceNearestFilter(dynamicTexture);
+        DynamicTexture dynamicTexture =
+            com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(location, image);
+        if (dynamicTexture != null) {
+            dynamicTexture.setFilter(false, false);
+            forceNearestFilter(dynamicTexture);
+        }
         return new ButtonTextureInfo(location, width, height, 0, 0, srcW, srcH);
     }
 

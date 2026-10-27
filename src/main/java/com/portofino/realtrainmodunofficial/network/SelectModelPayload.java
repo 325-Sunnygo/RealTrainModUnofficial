@@ -18,7 +18,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
  * モデル選択画面 → サーバーの確定。
  * カスタム名 (State.Name) と色 (State.Color) も運ぶ。
  */
-public record SelectModelPayload(String modelId, String dataMapValue, String customName, int color)
+public record SelectModelPayload(String modelId, String dataMapValue, String customName, int color,boolean autoSplit)
         implements CustomPacketPayload {
     public static final Type<SelectModelPayload> TYPE = new Type<>(
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "select_model")
@@ -32,8 +32,12 @@ public record SelectModelPayload(String modelId, String dataMapValue, String cus
         SelectModelPayload::customName,
         ByteBufCodecs.INT,
         SelectModelPayload::color,
+        ByteBufCodecs.BOOL,
+        SelectModelPayload::autoSplit,
         SelectModelPayload::new
     );
+
+    public SelectModelPayload(String modelId,String dataMapValue,String customName,int color) {this(modelId,dataMapValue,customName,color,true);}
 
     public SelectModelPayload(String modelId) {
         this(modelId, "", "", 0xFFFFFF);
@@ -62,20 +66,15 @@ public record SelectModelPayload(String modelId, String dataMapValue, String cus
 
             for (InteractionHand hand : InteractionHand.values()) {
                 ItemStack stack = player.getItemInHand(hand);
-                if (stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.TrainVehicleItem) {
-                    LegacyItemStackBridge.setSelectedModelData(stack, safeModelId, safeDataMap, safeName, color);
-                    player.sendSystemMessage(net.minecraft.network.chat.Component.literal("Selected model: " + safeModelId + ". Now right-click on rail to spawn."));
-                    break;
-                }
-            }
-
-            for (InteractionHand hand : InteractionHand.values()) {
-                ItemStack stack = player.getItemInHand(hand);
                 if (stack.getItem() instanceof RailItem
                     || stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.TrainItem
                     || stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.CarItem
                     || stack.getItem() instanceof ModelSelectableItem) {
                     LegacyItemStackBridge.setSelectedModelData(stack, safeModelId, safeDataMap, safeName, color);
+                    if(stack.getItem() instanceof RailItem) {
+                        var property=jp.ngt.rtm.item.ItemRail.getProperty(stack);if(property==null)property=jp.ngt.rtm.item.ItemRail.getDefaultProperty();
+                        jp.ngt.rtm.item.ItemRail.writePropToItem(new jp.ngt.rtm.rail.util.RailProperty(safeModelId,property.block,property.blockMetadata,property.blockHeight,payload.autoSplit()),stack);
+                    }
                     break;
                 }
             }

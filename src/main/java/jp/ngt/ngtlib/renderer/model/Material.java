@@ -5,9 +5,15 @@ package jp.ngt.ngtlib.renderer.model;
  * スクリプトは material.texture を bindTexture に渡す。
  */
 public class Material {
+    public final byte id;
     public Object texture;
 
     public Material(Object texture) {
+        this((byte) 0, texture);
+    }
+
+    public Material(byte id, Object texture) {
+        this.id = id;
         this.texture = texture;
     }
 }

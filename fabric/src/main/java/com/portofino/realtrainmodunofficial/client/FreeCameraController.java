@@ -72,6 +72,7 @@ public final class FreeCameraController {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
+        if (mc.player!=null && mc.player.getMainHandItem().getItem() instanceof com.portofino.realtrainmodunofficial.item.CameraItem) return;
         if (mc.player == null || mc.screen != null) {
             return;
         }
@@ -117,6 +118,9 @@ public final class FreeCameraController {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
+        if(mc.player!=null && mc.player.getMainHandItem().getItem() instanceof com.portofino.realtrainmodunofficial.item.CameraItem) {
+            toggle(mc);return;
+        }
         // 降車・ログアウトしたら自動解除
         if (mc.player == null || mc.player.getVehicle() == null) {
             if (mc.player != null) {

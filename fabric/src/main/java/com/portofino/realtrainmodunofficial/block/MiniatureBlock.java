@@ -71,7 +71,6 @@ public class MiniatureBlock extends BaseEntityBlock {
         return true;
     }
 
-    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public int getLightEmission(BlockState state, BlockGetter level, BlockPos pos) {
         if (level.getBlockEntity(pos) instanceof MiniatureBlockEntity be) {
             return Math.max(0, Math.min(15, be.getLightValue()));

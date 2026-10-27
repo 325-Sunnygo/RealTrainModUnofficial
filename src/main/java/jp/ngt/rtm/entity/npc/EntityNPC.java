@@ -117,6 +117,11 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
         this.roleDirty = true;
     }
 
+    public javax.script.ScriptEngine getServerScriptEngine() {
+        if (this.level().isClientSide()) return null;
+        return com.portofino.realtrainmodunofficial.script.NpcServerScripts.getEngine(this.getDefinition());
+    }
+
     public NpcDefinition getDefinition() {
         NpcDefinition def = NpcRegistry.getById(this.getModelId());
         return def != null ? def : NpcRegistry.getDefault();

@@ -12,6 +12,23 @@ public final class NGTText {
     private NGTText() {
     }
 
+    /** KaizPatchX keeps the encoding parameter for source compatibility. */
+    public static List<String> readText(Object resource, String encoding) {
+        if (resource instanceof java.io.File file) {
+            try {
+                String text = decodeText(java.nio.file.Files.readAllBytes(file.toPath()));
+                return new ArrayList<>(java.util.Arrays.asList(text.split(LINE_SEPARATOR_PATTERN)));
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        }
+        return readTextLines(resource);
+    }
+
+    public static String readText(java.io.File file, boolean indention, String encoding) {
+        return append(readText(file, encoding), indention);
+    }
+
     public static List<String> readText(Object resource) {
         return readTextLines(resource);
     }
@@ -26,8 +43,9 @@ public final class NGTText {
             if (in == null) {
                 return lines;
             }
-            String text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-            for (String line : text.split("\n", -1)) {
+            String text = decodeText(in.readAllBytes());
+            // 本家 readTextList: indention=true で読んだ結果を行へ分解する (改行種別は問わない)。
+            for (String line : text.split(LINE_SEPARATOR_PATTERN, -1)) {
                 lines.add(line);
             }
         } catch (Exception ignored) {
@@ -35,6 +53,26 @@ public final class NGTText {
         }
         return lines;
     }
+
+    /**
+     * 本家 jp.kaiz.kaizpatch.util.MCFileUtil.readText 完全移植。
+     * 既定文字コードで読み、置換文字 (U+FFFD) が出たときだけ MS932 (Shift_JIS) で読み直す。
+     * 1.7.10 時代のパックは Shift_JIS の .js を持つものが多く、
+     * これをやらないと日本語コメント/文字列が壊れて構文エラーになる。
+     */
+    public static String decodeText(byte[] bytes) {
+        String utf8 = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+        if (utf8.indexOf('\ufffd') >= 0) {
+            try {
+                return new String(bytes, java.nio.charset.Charset.forName("MS932"));
+            } catch (Exception ignored) {
+                return utf8;
+            }
+        }
+        return utf8;
+    }
+
+    private static final String LINE_SEPARATOR_PATTERN = "\r\n|[\n\r\u2028\u2029\u0085]";
 
     public static String loadText(Object resource) {
         return "";
@@ -66,9 +104,22 @@ public final class NGTText {
         return sb.toString();
     }
 
-    /** 本家getText: リソースのテキスト全文。 */
+    /**
+     * 本家 NGTText.getText(ResourceLocation, boolean) 完全移植。
+     * 全文を読み、改行を indention=true なら \n、false なら除去して連結する。
+     * (本家 ModelPackManager.loadScript は indention=true で読み、//include を行単位で置換する。
+     *  indention=false のときは改行が消え、"//" 以降がコメントとして残りを飲み込む。)
+     */
     public static String getText(Object resource, boolean indention) {
-        return append(readText(resource), indention);
+        try (java.io.InputStream in = NGTFileLoader.getInputStream(resource)) {
+            if (in == null) {
+                return "";
+            }
+            return decodeText(in.readAllBytes())
+                    .replaceAll(LINE_SEPARATOR_PATTERN, indention ? "\n" : "");
+        } catch (Exception ignored) {
+            return "";
+        }
     }
 
     /** 本家readTextL: InputStreamから行リスト。 */

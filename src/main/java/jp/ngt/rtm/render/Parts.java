@@ -9,6 +9,7 @@ import java.util.Set;
  * スクリプト用法:
  */
 public class Parts {
+    public final String[] objNames;
     private final String[] names;
     private final Set<String> nameSet;
     // 正規化済み (小文字) 名前 Set。GLRecorder 再生側の IdentityHashMap キャッシュに
@@ -25,6 +26,7 @@ public class Parts {
 
     public Parts(String... names) {
         this.names = names != null ? names : new String[0];
+        this.objNames = this.names;
         this.nameSet = new LinkedHashSet<>(Arrays.asList(this.names));
         Set<String> normalized = new LinkedHashSet<>();
         for (String name : this.names) {
@@ -51,16 +53,10 @@ public class Parts {
     public jp.ngt.ngtlib.renderer.model.GroupObject[] getObjects(Object model) {
         if (this.objs == null) {
             if (model instanceof jp.ngt.ngtlib.renderer.model.PolygonModel pm) {
-                java.util.List<jp.ngt.ngtlib.renderer.model.GroupObject> found = new java.util.ArrayList<>();
-                for (String name : this.names) {
-                    for (jp.ngt.ngtlib.renderer.model.GroupObject obj : pm.groupObjects) {
-                        if (name.equals(obj.name)) {
-                            found.add(obj);
-                            break;
-                        }
-                    }
+                this.objs=new jp.ngt.ngtlib.renderer.model.GroupObject[this.names.length];
+                for(int i=0;i<this.names.length;i++) {
+                    for(var group:pm.getGroupObjects()) if(this.names[i].equals(group.name)) { this.objs[i]=group; break; }
                 }
-                this.objs = found.toArray(new jp.ngt.ngtlib.renderer.model.GroupObject[0]);
             } else {
                 this.objs = new jp.ngt.ngtlib.renderer.model.GroupObject[0];
             }

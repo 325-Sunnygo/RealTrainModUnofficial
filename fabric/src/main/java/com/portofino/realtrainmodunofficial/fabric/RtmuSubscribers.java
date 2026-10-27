@@ -12,9 +12,7 @@ public final class RtmuSubscribers {
     /** 共通 (サーバーでも読む)。 */
     private static final String[] COMMON = {
         "com.portofino.realtrainmodunofficial.TrainCommands",
-        "com.portofino.realtrainmodunofficial.convert.ConvertEvents$Game",
         "com.portofino.realtrainmodunofficial.entity.SeatCleanup",
-        "com.portofino.realtrainmodunofficial.remote.RemoteRedstoneHandler",
         "jp.ngt.rtm.entity.RTMEntityAttributes",
     };
 
@@ -22,25 +20,19 @@ public final class RtmuSubscribers {
     private static final String[] CLIENT = {
         "com.portofino.realtrainmodunofficial.RealTrainModUnofficialClient",
         "com.portofino.realtrainmodunofficial.RealTrainModUnofficialClientModEvents",
+        "com.portofino.realtrainmodunofficial.client.ActionPartsPicker",
         "com.portofino.realtrainmodunofficial.client.ClientRenderProfiler",
-        "com.portofino.realtrainmodunofficial.client.EditorKeys",
-        "com.portofino.realtrainmodunofficial.client.EditorKeys$Registration",
         "com.portofino.realtrainmodunofficial.client.FreeCameraController",
-        "com.portofino.realtrainmodunofficial.client.RailPreviewRenderer",
         "com.portofino.realtrainmodunofficial.client.RideCameraEvents",
         "com.portofino.realtrainmodunofficial.client.RiderViewSmoother",
-        "com.portofino.realtrainmodunofficial.client.RtmuPauseMenuButton",
         "com.portofino.realtrainmodunofficial.client.SelectScreenHudHider",
-        "com.portofino.realtrainmodunofficial.client.SelectionHud",
         "com.portofino.realtrainmodunofficial.client.TitleScreenWarningOverlay",
         "com.portofino.realtrainmodunofficial.client.TrainControlKeyHandler",
         "com.portofino.realtrainmodunofficial.client.TrainHudOverlay",
         "com.portofino.realtrainmodunofficial.client.camera.CameraClientEvents",
+        "com.portofino.realtrainmodunofficial.client.render.BallastModelHook",
         "com.portofino.realtrainmodunofficial.client.render.RailDrawQueue",
-        "com.portofino.realtrainmodunofficial.client.render.SelectionRenderer",
-        "com.portofino.realtrainmodunofficial.convert.ConvertEvents$Setup",
         "com.portofino.realtrainmodunofficial.online.OnlineClientHooks",
-        "com.portofino.rtmupassenger.client.PassengerClientEvents",
     };
 
     private RtmuSubscribers() {
@@ -52,6 +44,7 @@ public final class RtmuSubscribers {
 
     public static void registerClient() {
         register(CLIENT);
+        RtmuFabricInit.MOD_BUS.register(com.portofino.realtrainmodunofficial.RealTrainModUnofficialClient.class);
     }
 
     /**

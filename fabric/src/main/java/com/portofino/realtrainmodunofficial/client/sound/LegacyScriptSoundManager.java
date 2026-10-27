@@ -465,6 +465,8 @@ public final class LegacyScriptSoundManager {
         }
     }
 
+    public static ResourceLocation resolveLegacySoundId(String soundId) { return toSoundIdFromLegacyString(soundId); }
+
     private static ResourceLocation toSoundIdFromLegacyString(String legacySoundId) {
         if (legacySoundId == null || legacySoundId.isBlank()) {
             return null;

@@ -1,0 +1,39 @@
+{
+  "firearmName": "Phalanx",
+  "model": {
+      "modelFile": "ciws.mqo",
+      "textures": [["default", "textures/firearm/ciws.png", ""]],
+      "rendererPath": "scripts/RenderPhalanx.js"
+  },
+  "buttonTexture": "textures/firearm/button_Phalanx.png",
+  "modelPartsN": {
+    "objects": [],
+    "pos": [0.0, 0.0, 0.0]
+  },
+  "modelPartsY": {
+    "objects": [],
+    "pos": [0.0, 0.0, 0.0]
+  },
+  "modelPartsX": {
+    "objects": [],
+    "pos": [0.0, 2.5, 0.0]
+  },
+  "modelPartsBarrel": {
+    "objects": [],
+    "pos": [0.0, 2.5, 0.0]
+  },
+  "muzzlePos": [0.0, 2.5, 1.98],
+  "playerPos": [0.0, 2.5, 0.0],
+  "yaw": [180.0, -180.0],
+  "pitch": [80.0, -20.0],
+  "rotationSpeedY": 1.0,
+  "rotationSpeedX": 1.0,
+  "recoil": 0.0,
+  "ammoType": 4,
+  "rateOfFire": 2,
+  "magazineSize": 300,
+  "fpvMode": true,
+  "smoothing": true,
+  "doCulling": true,
+  "tags": "ngt5479"
+}

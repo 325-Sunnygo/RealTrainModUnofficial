@@ -123,7 +123,6 @@ item.rtm:autoloading_rifle.name=自動小銃
 item.rtm:sniper_rifle.name=狙撃銃
 item.rtm:smg.name=短機関銃
 item.rtm:amr.name=対物ライフル
-item.rtm:razer_gun.name=レーザー銃
 item.rtm:magazine_handgun.name=弾倉(拳銃)
 item.rtm:magazine_rifle.name=弾倉(ライフル)
 item.rtm:magazine_alr.name=弾倉(自動小銃)

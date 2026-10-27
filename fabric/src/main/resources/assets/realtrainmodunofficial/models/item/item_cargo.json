@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "realtrainmodunofficial:item/item_container"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 0
+      },
+      "model": "realtrainmodunofficial:item/item_cargo_0"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 1
+      },
+      "model": "realtrainmodunofficial:item/item_cargo_1"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 2
+      },
+      "model": "realtrainmodunofficial:item/item_cargo_2"
+    }
+  ]
+}

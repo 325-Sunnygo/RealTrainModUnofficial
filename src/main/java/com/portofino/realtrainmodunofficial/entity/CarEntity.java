@@ -122,6 +122,7 @@ public final class CarEntity extends Entity {
 
     public CarEntity(EntityType<? extends CarEntity> entityType, Level level) {
         super(entityType, level);
+        this.field_70170_p=new jp.ngt.mccompat.WorldCompat(level);
         // 本家 EntityVehicleBase:85 の ignoreFrustumCheck = true 相当。
         // SRB / NGTO Builder の描画スクリプトはワールド座標にマーカーや補助線を描くが、
         // 描画されるのは「車が視錐台に入っているとき」だけ。
@@ -167,6 +168,17 @@ public final class CarEntity extends Entity {
     private static final EntityDataAccessor<Float> DATA_SPEED =
         SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.FLOAT);
 
+    public String getModelName() {return getScriptResourceName();}
+    public String getModelType() {return "ModelVehicle";}
+    public jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getModelSet() {
+        return jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getModelSet("ModelVehicle",getVehicleId());
+    }
+    public void setModelName(String model) {
+        var definition=VehicleRegistry.getById(model);
+        if(definition==null)for(var candidate:VehicleRegistry.getAll())if(candidate.getDisplayName().equals(model)) {definition=candidate;break;}
+        if(definition!=null) {setVehicleId(definition.getId());attemptedServerScriptLoad=false;serverScript=null;}
+    }
+
     public String getVehicleId() {
         return this.entityData.get(DATA_VEHICLE_ID);
     }
@@ -210,6 +222,7 @@ public final class CarEntity extends Entity {
         try {
             // 本家と同じ Nashorn (jp.ngt 実クラス) でサーバースクリプトを実行
             serverScript = com.portofino.realtrainmodunofficial.script.CarServerScripts.get(def);
+            attemptedServerScriptLoad = !com.portofino.realtrainmodunofficial.script.CarServerScripts.isLoading(def);
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to load server script for {}: {}", id, t.toString());
         }
@@ -227,7 +240,7 @@ public final class CarEntity extends Entity {
      * 本家と同じく {@code state.dataMap.setXxx(key, value, syncFlag)} がそのまま使える。
      */
     private final jp.ngt.rtm.modelpack.state.ResourceState resourceState =
-        new jp.ngt.rtm.modelpack.state.ResourceState(this::getScriptResourceName, null, new ScriptDataMap(this));
+        new jp.ngt.rtm.modelpack.state.ResourceState(this::getScriptResourceName, this::getModelSet, new ScriptDataMap(this));
 
     public jp.ngt.rtm.modelpack.state.ResourceState getResourceState() {
         return this.resourceState;

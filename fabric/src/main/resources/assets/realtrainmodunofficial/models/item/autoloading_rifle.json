@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/bow",
+  "textures": {
+    "layer0": "realtrainmodunofficial:item/autoloading_rifle"
+  }
+}

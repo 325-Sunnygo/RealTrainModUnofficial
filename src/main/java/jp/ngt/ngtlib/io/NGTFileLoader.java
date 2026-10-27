@@ -61,14 +61,14 @@ public final class NGTFileLoader {
         }
         Map<String, AssetRef> idx = getIndex();
         AssetRef ref = idx.get(key);
-        if (ref == null) {
+        if (ref == null && !key.startsWith("assets/")) {
             // サフィックス一致 (パス表記ゆれ対策)。
             // (見つからない要求を毎回走査すると、スクリプトが欠落アセットを繰り返し要求したとき
             // 索引サイズ×要求回数の走査になり描画が止まる)。
             // ★ファイル名だけの一致は取らない (本家は完全パスでしか引かない)。
             String suffix = "/" + key;
             for (Map.Entry<String, AssetRef> e : idx.entrySet()) {
-                if (e.getKey().endsWith(suffix)) {
+                if (!e.getKey().startsWith("assets/") && e.getKey().endsWith(suffix)) {
                     ref = e.getValue();
                     break;
                 }
@@ -125,13 +125,19 @@ public final class NGTFileLoader {
 
     /** mod jar (= クラスパス) に同梱しているアセットを探す。 */
     private static byte[] findBundledAsset(String key) {
+        if(key.startsWith("assets/")) {
+            try(var stream=com.portofino.realtrainmodunofficial.util.BundledResourceStreams.open(NGTFileLoader.class,"/"+key)) {
+                return stream==null?null:stream.readAllBytes();
+            } catch(IOException failure) {return null;}
+        }
+
         String[] candidates = {
             "/assets/minecraft/" + key,
             "/assets/realtrainmodunofficial/" + key,
             "/" + key,
         };
         for (String candidate : candidates) {
-            try (java.io.InputStream in = NGTFileLoader.class.getResourceAsStream(candidate)) {
+            try (java.io.InputStream in = com.portofino.realtrainmodunofficial.util.BundledResourceStreams.open(NGTFileLoader.class,candidate)) {
                 if (in != null) {
                     return in.readAllBytes();
                 }
@@ -175,36 +181,27 @@ public final class NGTFileLoader {
         }
         try {
             var img = com.mojang.blaze3d.platform.NativeImage.read(new ByteArrayInputStream(bytes));
-            var rl = net.minecraft.client.Minecraft.getInstance().getTextureManager()
-                    .register("rtmu_pack_tex", new net.minecraft.client.renderer.texture.DynamicTexture(img));
+            var rl = net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("realtrainmodunofficial",
+                    "dynamic/pack/"+java.util.UUID.nameUUIDFromBytes(key.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            var sampling=com.portofino.realtrainmodunofficial.client.render.LegacyTextureSampling.DEFAULT;
+            byte[] metadata=findAsset(key+".mcmeta");
+            if(metadata!=null) try {
+                sampling=com.portofino.realtrainmodunofficial.client.render.LegacyTextureSampling.read(new ByteArrayInputStream(metadata));
+            } catch(Exception malformed) { NGTLog.debug("Invalid texture metadata: %s",key); }
+            com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(rl,img,sampling);
             TEXTURE_CACHE.put(key, rl);
-            // 発光テクスチャ (***_light*.png): 黒地=非発光として加算合成で描くための印
-            if (key.toLowerCase(java.util.Locale.ROOT).contains("_light")) {
-                LIGHT_OVERLAY_TEXTURES.add(rl);
-            }
             return rl;
         } catch (IOException e) {
             return null;
         }
     }
 
-    private static final java.util.Set<net.minecraft.resources.ResourceLocation> LIGHT_OVERLAY_TEXTURES =
-            java.util.concurrent.ConcurrentHashMap.newKeySet();
-
-    /**
-     * resolvePackTexture で登録した発光系テクスチャ (パスに _light を含む) か。
-     * 描画側はこれを加算合成 (黒=寄与なし) + フルブライトで描く。
-     */
-    public static boolean isLightOverlayTexture(net.minecraft.resources.ResourceLocation rl) {
-        return rl != null && LIGHT_OVERLAY_TEXTURES.contains(rl);
-    }
-
     private static String pathOf(Object resource) {
         if (resource instanceof jp.ngt.mccompat.ResourceLocation compat) {
-            return compat.func_110623_a();
+            return compat.toString();
         }
         if (resource instanceof net.minecraft.resources.ResourceLocation rl) {
-            return rl.getPath();
+            return rl.toString();
         }
         return resource != null ? resource.toString() : null;
     }
@@ -213,6 +210,11 @@ public final class NGTFileLoader {
         String p = path.replace('\\', '/').toLowerCase(Locale.ROOT);
         while (p.startsWith("/")) {
             p = p.substring(1);
+        }
+        int colon=p.indexOf(':');
+        if(colon>=0) {
+            String domain=p.substring(0,colon),resource=p.substring(colon+1);
+            p=domain.equals("minecraft")?resource:"assets/"+domain+"/"+resource;
         }
         if (p.startsWith("assets/minecraft/")) {
             p = p.substring("assets/minecraft/".length());

@@ -3,9 +3,7 @@ package com.portofino.realtrainmodunofficial.script;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import jp.ngt.ngtlib.io.NGTFileLoader;
 
-import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -27,12 +25,16 @@ public final class PackScriptSource {
      * ここで上書きしてはいけない。そのため GL 以外の束縛を #PRELUDE_NO_GL として切り出す。
      */
     public static final String PRELUDE_GL =
-            "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n" +
-            "var GL12 = GL11;\n" +
+            // GL11/GL12/BufferUtils/OpenGlHelper は描画の根幹だが、素の Java.type にすると
+            // クラス初期化失敗でプリリュード全体が中止する。安全束縛して未定義に留める。
+            bindOpt("GL11", "jp.ngt.ngtlib.renderer.GL11Facade")
+            + "var GL12 = GL11;\n"
+            + bindOpt("GL13", "jp.ngt.ngtlib.renderer.GL13Facade")
+            + bindOpt("GL14", "jp.ngt.ngtlib.renderer.GL14Facade")
             // LWJGL2 の BufferUtils / 1.12 の OpenGlHelper (NGTO Builder 2 が行列バッファと
             // ブレンド指定に使う)。未定義だとそこでスクリプトが止まる。
-            "var BufferUtils = Java.type('jp.ngt.ngtlib.renderer.BufferUtilsCompat');\n" +
-            "var OpenGlHelper = Java.type('jp.ngt.ngtlib.renderer.OpenGlHelperCompat');\n"
+            + bindOpt("BufferUtils", "jp.ngt.ngtlib.renderer.BufferUtilsCompat")
+            + bindOpt("OpenGlHelper", "jp.ngt.ngtlib.renderer.OpenGlHelperCompat")
             // Parts も描画機構に依存する。実 jp.ngt.rtm.render.Parts は GLRecorder へ描くので、
             // OpList 経路 (ScriptModelRenderer) が自前で用意した renderer 対応の Parts を
             // 上書きしてはいけない (上書きすると parts.render が全て空振りする)。
@@ -45,38 +47,41 @@ public final class PackScriptSource {
             // を先頭に置き、その後の loader 内で各ターゲット (kaizpatch/mc1710/mc1122) の
             // IIFE が RTMX_COMPAT_TARGETS.<target> = ... を代入する設計。
             "var RTMX_COMPAT_TARGETS = (typeof RTMX_COMPAT_TARGETS !== 'undefined' && RTMX_COMPAT_TARGETS) ? RTMX_COMPAT_TARGETS : {};\n" +
-            "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n" +
+            // ★ここは全て bindOpt (安全束縛)。素の Java.type だと 1 クラスの初期化失敗
+            //   (レジストリ未起動・任意 mod 不在など) でプリリュード全体が中止し、
+            //   スクリプトが 1 行も走らなくなる。
+            bindOpt("MathHelper", "jp.ngt.mccompat.MathHelper")
             // importPackage(net.minecraft.util) 経由の裸 ResourceLocation を互換クラスへ束縛
             // (net.minecraft.util に実クラスを置くとバニラと split package でモジュール解決が落ちる)
-            "var ResourceLocation = Java.type('jp.ngt.mccompat.ResourceLocation');\n" +
+            + bindOpt("ResourceLocation", "jp.ngt.mccompat.ResourceLocation")
             // LWJGL2 入力 (SRB3/NGTO Builder)
-            "var Keyboard = Java.type('jp.ngt.mccompat.input.Keyboard');\n" +
-            "var Mouse = Java.type('jp.ngt.mccompat.input.Mouse');\n" +
+            + bindOpt("Keyboard", "jp.ngt.mccompat.input.Keyboard")
+            + bindOpt("Mouse", "jp.ngt.mccompat.input.Mouse")
             // 1.7.10 net.minecraft.init.Blocks
-            "var Blocks = Java.type('jp.ngt.mccompat.init.Blocks');\n" +
+            + bindOpt("Blocks", "jp.ngt.mccompat.init.Blocks")
             // 1.7.10 ブロッククラス名 → 1.21 実クラス (instanceof 用)
-            "var BlockStairs = Java.type('" + net.minecraft.world.level.block.StairBlock.class.getName() + "');\n" +
-            "var BlockDoor = Java.type('" + net.minecraft.world.level.block.DoorBlock.class.getName() + "');\n" +
-            "var BlockFenceGate = Java.type('" + net.minecraft.world.level.block.FenceGateBlock.class.getName() + "');\n" +
-            "var BlockLog = Java.type('" + net.minecraft.world.level.block.RotatedPillarBlock.class.getName() + "');\n" +
-            "var BlockOldLog = BlockLog;\n" +
-            "var BlockNewLog = BlockLog;\n" +
-            "var BlockLadder = Java.type('" + net.minecraft.world.level.block.LadderBlock.class.getName() + "');\n" +
-            "var BlockButton = Java.type('" + net.minecraft.world.level.block.ButtonBlock.class.getName() + "');\n" +
-            "var BlockSlab = Java.type('" + net.minecraft.world.level.block.SlabBlock.class.getName() + "');\n" +
-            "var Block = Java.type('" + net.minecraft.world.level.block.Block.class.getName() + "');\n" +
-            "var ITileEntityProvider = Java.type('" + net.minecraft.world.level.block.EntityBlock.class.getName() + "');\n" +
+            + bindOpt("BlockStairs", net.minecraft.world.level.block.StairBlock.class)
+            + bindOpt("BlockDoor", net.minecraft.world.level.block.DoorBlock.class)
+            + bindOpt("BlockFenceGate", net.minecraft.world.level.block.FenceGateBlock.class)
+            + bindOpt("BlockLog", net.minecraft.world.level.block.RotatedPillarBlock.class)
+            + "var BlockOldLog = BlockLog;\n"
+            + "var BlockNewLog = BlockLog;\n"
+            + bindOpt("BlockLadder", net.minecraft.world.level.block.LadderBlock.class)
+            + bindOpt("BlockButton", net.minecraft.world.level.block.ButtonBlock.class)
+            + bindOpt("BlockSlab", net.minecraft.world.level.block.SlabBlock.class)
+            + bindOpt("Block", net.minecraft.world.level.block.Block.class)
+            + bindOpt("ITileEntityProvider", net.minecraft.world.level.block.EntityBlock.class)
             // 1.7.10 TextureMap (ブロックアトラス)。NGTO Builder のプレビューが field_110575_b を参照
-            "var TextureMap = Java.type('jp.ngt.mccompat.TextureMap');\n" +
-            "var ItemBlock = Java.type('" + net.minecraft.world.item.BlockItem.class.getName() + "');\n" +
+            + bindOpt("TextureMap", "jp.ngt.mccompat.TextureMap")
+            + bindOpt("ItemBlock", net.minecraft.world.item.BlockItem.class)
             // 1.7.10 NBT
-            "var NBTTagCompound = Java.type('jp.ngt.mccompat.nbt.NBTTagCompound');\n" +
-            "var NBTTagList = Java.type('jp.ngt.mccompat.nbt.NBTTagList');\n" +
+            + bindOpt("NBTTagCompound", "jp.ngt.mccompat.nbt.NBTTagCompound")
+            + bindOpt("NBTTagList", "jp.ngt.mccompat.nbt.NBTTagList")
             // jp.ngt 系の確定バインド — importPackage 経由の遅延解決が実行時に
             // "is not defined" になるケース (SRB3 の RTMItem 等) があるため、
             // スクリプトが未修飾名で使うクラスはここで直接束縛する。
             // (存在しないクラスでエンジンごと死なないよう個別 try)
-            bindOpt("RTMCore", "jp.ngt.rtm.RTMCore") +
+            + bindOpt("RTMCore", "jp.ngt.rtm.RTMCore") +
             bindOpt("RTMItem", "jp.ngt.rtm.RTMItem") +
             bindOpt("RTMBlock", "jp.ngt.rtm.RTMBlock") +
             bindOpt("RTMRail", "jp.ngt.rtm.RTMRail") +
@@ -90,6 +95,10 @@ public final class PackScriptSource {
             bindOpt("NGTLog", "jp.ngt.ngtlib.io.NGTLog") +
             // SL パックが蒸気/煙で使う (importPackage は no-op なので未修飾名を直接束縛)
             bindOpt("EnumParticleTypes", "jp.ngt.mccompat.EnumParticleTypes") +
+            bindOpt("PerlinNoise", "jp.ngt.ngtlib.math.PerlinNoise") +
+            bindOpt("ColorUtil", "jp.ngt.ngtlib.util.ColorUtil") +
+            bindOpt("__rtmuScaffold", "jp.ngt.rtm.block.tileentity.TileEntityScaffold") +
+            "var TileEntityScaffold = __rtmuScaffold === null ? null : __rtmuScaffold.TYPE;\n" +
             bindOpt("NGTMath", "jp.ngt.ngtlib.math.NGTMath") +
             bindOpt("Vec3", "jp.ngt.ngtlib.math.Vec3") +
             // 本家 RenderMotor / RenderClutch / RenderReversGear が
@@ -189,51 +198,23 @@ public final class PackScriptSource {
 
     /** GL 束縛込みの完全版 (描画を GLRecorder に記録する通常経路用)。 */
     /**
-     * ES6 以降の組み込み関数の補完。
-     * Nashorn は構文としては ES6 まで見るが、標準ライブラリは ES5 のままで
-     * Object.assign や Array.from すら無い (実測)。
+     * ★ES6 組み込み関数のポリフィル (Object.assign / Array.from 等) は撤去した。
+     * 本家 KaizPatchX には存在せず、同梱スクリプトも一つも使っていない。
+     * 本家と同じく「Nashorn が標準で持つ範囲」だけを使う (挙動を本家に一致させる)。
      */
-    public static final String POLYFILL =
-        "if (!Object.assign) Object.assign = function (t) { for (var i = 1; i < arguments.length; i++) "
-        + "{ var s = arguments[i]; if (s) for (var k in s) if (Object.prototype.hasOwnProperty.call(s, k)) t[k] = s[k]; } return t; };\n"
-        + "if (!Object.values) Object.values = function (o) { var r = []; for (var k in o) "
-        + "if (Object.prototype.hasOwnProperty.call(o, k)) r.push(o[k]); return r; };\n"
-        + "if (!Object.entries) Object.entries = function (o) { var r = []; for (var k in o) "
-        + "if (Object.prototype.hasOwnProperty.call(o, k)) r.push([k, o[k]]); return r; };\n"
-        + "if (!Array.from) Array.from = function (a, f) { var r = [], n = a.length === undefined ? 0 : a.length; "
-        + "for (var i = 0; i < n; i++) r.push(f ? f(a[i], i) : a[i]); return r; };\n"
-        + "if (!Array.of) Array.of = function () { return Array.prototype.slice.call(arguments); };\n"
-        + "if (!Array.prototype.includes) Array.prototype.includes = function (v) { return this.indexOf(v) >= 0; };\n"
-        + "if (!Array.prototype.find) Array.prototype.find = function (f, t) { for (var i = 0; i < this.length; i++) "
-        + "if (f.call(t, this[i], i, this)) return this[i]; return undefined; };\n"
-        + "if (!Array.prototype.findIndex) Array.prototype.findIndex = function (f, t) { for (var i = 0; i < this.length; i++) "
-        + "if (f.call(t, this[i], i, this)) return i; return -1; };\n"
-        + "if (!Array.prototype.fill) Array.prototype.fill = function (v, s, e) { s = s || 0; "
-        + "e = e === undefined ? this.length : e; for (var i = s; i < e; i++) this[i] = v; return this; };\n"
-        + "if (!String.prototype.includes) String.prototype.includes = function (v) { return this.indexOf(v) >= 0; };\n"
-        + "if (!String.prototype.startsWith) String.prototype.startsWith = function (v, p) { return this.substr(p || 0, v.length) === v; };\n"
-        + "if (!String.prototype.endsWith) String.prototype.endsWith = function (v, l) { l = l === undefined ? this.length : l; "
-        + "return this.substring(l - v.length, l) === v; };\n"
-        + "if (!String.prototype.repeat) String.prototype.repeat = function (n) { var r = ''; for (var i = 0; i < n; i++) r += this; return r; };\n"
-        + "if (!String.prototype.padStart) String.prototype.padStart = function (n, p) { p = p === undefined ? ' ' : p; "
-        + "var s = String(this); while (s.length < n) s = p + s; return s.length > n ? s.slice(s.length - n) : s; };\n"
-        + "if (!String.prototype.padEnd) String.prototype.padEnd = function (n, p) { p = p === undefined ? ' ' : p; "
-        + "var s = String(this); while (s.length < n) s += p; return s.slice(0, Math.max(n, String(this).length)); };\n"
-        + "if (!String.prototype.trimStart) String.prototype.trimStart = function () { return String(this).replace(/^\\s+/, ''); };\n"
-        + "if (!String.prototype.trimEnd) String.prototype.trimEnd = function () { return String(this).replace(/\\s+$/, ''); };\n"
-        + "if (!Number.isInteger) Number.isInteger = function (v) { return typeof v === 'number' && isFinite(v) && Math.floor(v) === v; };\n"
-        + "if (!Number.isFinite) Number.isFinite = function (v) { return typeof v === 'number' && isFinite(v); };\n"
-        + "if (!Number.isNaN) Number.isNaN = function (v) { return v !== v; };\n"
-        + "if (!Number.parseFloat) Number.parseFloat = parseFloat;\n"
-        + "if (!Number.parseInt) Number.parseInt = parseInt;\n"
-        + "if (!Math.trunc) Math.trunc = function (v) { return v < 0 ? Math.ceil(v) : Math.floor(v); };\n"
-        + "if (!Math.sign) Math.sign = function (v) { return v > 0 ? 1 : (v < 0 ? -1 : 0); };\n"
-        + "if (!Math.hypot) Math.hypot = function (a, b) { return Math.sqrt(a * a + b * b); };\n"
-        + "if (!Math.cbrt) Math.cbrt = function (v) { return v < 0 ? -Math.pow(-v, 1 / 3) : Math.pow(v, 1 / 3); };\n"
-        + "if (!Math.log2) Math.log2 = function (v) { return Math.log(v) / Math.LN2; };\n"
-        + "if (!Math.log10) Math.log10 = function (v) { return Math.log(v) / Math.LN10; };\n";
+    /**
+     * 未定義クラスでプリリュード全体を止めないための安全な {@code Java.type} ラッパ。
+     * ★素の java.lang.Class を返す汎用バインダ (Class.forName) で代用すると Nashorn の
+     * StaticClass 挙動 (静的メソッド呼び出し・new) が失われ、GL11.glPushMatrix() や
+     * new Parts(...) が壊れる。必ず {@code Java.type} を通すこと。
+     */
+    private static final String BIND_HELPER =
+        "function __rtmBind(fqn) { try { return Java.type(fqn); } catch (e) { return null; } }\n";
 
-    public static final String PRELUDE = PRELUDE_GL + PRELUDE_NO_GL + POLYFILL;
+    public static final String PRELUDE = BIND_HELPER + PRELUDE_GL + PRELUDE_NO_GL;
+    /** Server scripts do not initialize optional client render/sound classes. */
+    public static final String SERVER_PRELUDE = PRELUDE.replaceAll(
+        "(?m)^var (NGTUtilClient|MCWrapperClient|Minecraft|SoundUpdaterTrain|PartsRenderer|VehiclePartsRenderer|RailPartsRenderer|MachinePartsRenderer|SignalPartsRenderer|WirePartsRenderer|OrnamentPartsRenderer|TileEntityPartsRenderer|EntityPartsRenderer|NGTObjectRenderer|NGTRenderer|NGTRenderHelper) = __rtmBind[^\\n]*\\n", "var $1 = null;\n");
 
     /**
      * ★バニラのクラスはこちら (class リテラル版) を使うこと。
@@ -244,24 +225,42 @@ public final class PackScriptSource {
     }
 
     private static String bindOpt(String name, String fqn) {
-        // 失敗したクラス名は __bindFails に集約 (ScriptUtil.doScript がログに出す)
-        return "try { var " + name + " = Java.type('" + fqn + "'); } catch (__e) { "
+        // 失敗したクラス名は __bindFails に集約 (ScriptUtil.doScript がログに出す)。
+        return "var " + name + " = __rtmBind('" + fqn + "'); "
+                + "if (" + name + " === null) { "
                 + "if (typeof __bindFails === 'undefined') { __bindFails = ''; } "
                 + "__bindFails += '" + name + " '; }\n";
     }
 
-    private static final Pattern INCLUDE_PATTERN = Pattern.compile("^\\s*//include\\s*<([^>]+)>", Pattern.MULTILINE);
-
     private static final String[][] FQN_REMAP = {
+            {"Packages.net.minecraft.world.gen.structure.MapGenStructureData", "Packages.jp.ngt.mccompat.world.MapGenStructureData"},
+            {"Packages.net.minecraft.client.gui.Gui", "Packages.jp.ngt.mccompat.Gui"},
+            {"Packages.jp.ngt.rtm.block.tileentity.TileEntityScaffold", "Packages.jp.ngt.rtm.block.tileentity.TileEntityScaffold.TYPE"},
+            {"Packages.net.minecraft.util.ChunkCoordinates", "Packages.jp.ngt.mccompat.ChunkCoordinates"},
+            {"Packages.net.minecraft.nbt.NBTTagList", "Packages.jp.ngt.mccompat.nbt.NBTTagList"},
+            {"Packages.net.minecraft.util.AxisAlignedBB", "Packages.jp.ngt.mccompat.AxisAlignedBB"},
+            {"Packages.net.minecraft.block.BlockOldLog", "Packages." + net.minecraft.world.level.block.RotatedPillarBlock.class.getName()},
+            {"Packages.net.minecraft.block.BlockNewLog", "Packages." + net.minecraft.world.level.block.RotatedPillarBlock.class.getName()},
+            {"Packages.net.minecraft.block.BlockSlab", "Packages." + net.minecraft.world.level.block.SlabBlock.class.getName()},
+            {"Packages.net.minecraft.entity.Entity", "Packages." + net.minecraft.world.entity.Entity.class.getName()},
+            {"Packages.net.minecraft.entity.EntityLivingBase", "Packages." + net.minecraft.world.entity.LivingEntity.class.getName()},
+            {"Packages.net.minecraft.world.World", "Packages." + net.minecraft.world.level.Level.class.getName()},
+            {"Packages.net.minecraft.tileentity.TileEntity", "Packages." + net.minecraft.world.level.block.entity.BlockEntity.class.getName()},
+
             // LWJGL直束縛 (var GL11 = Packages.org.lwjgl.opengl.GL11 等) を互換クラスへ。
             // LWJGL3の実GL11に解決されると、固定機能関数(glPushMatrix等)は関数ポインタNULLで
             // jni_FatalError→プロセスabort (200が設置直後に落ちていた原因)。
             {"Packages.org.lwjgl.opengl.GL11", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
+            {"Packages.org.lwjgl.opengl.GL13", "Packages.jp.ngt.ngtlib.renderer.GL13Facade"},
+            {"Packages.org.lwjgl.opengl.GL14", "Packages.jp.ngt.ngtlib.renderer.GL14Facade"},
             {"Packages.org.lwjgl.opengl.GL12", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
             {"Packages.org.lwjgl.BufferUtils", "Packages.jp.ngt.ngtlib.renderer.BufferUtilsCompat"},
+            // 1.7.10 net.minecraft.util.Vec3 を本家 Vec3 へ (func_72443_a / createVectorHelper を提供)
+            {"Packages.net.minecraft.util.Vec3", "Packages.jp.ngt.ngtlib.math.Vec3"},
             {"Packages.net.minecraft.client.renderer.OpenGlHelper", "Packages.jp.ngt.ngtlib.renderer.OpenGlHelperCompat"},
             {"Packages.org.lwjgl.input.Keyboard", "Packages.jp.ngt.mccompat.input.Keyboard"},
             {"Packages.org.lwjgl.input.Mouse", "Packages.jp.ngt.mccompat.input.Mouse"},
+            {"Packages.net.minecraftforge.client.model.ModelFormatException", "Packages.jp.ngt.ngtlib.renderer.model.ModelFormatException"},
             {"Packages.net.minecraft.util.ResourceLocation", "Packages.jp.ngt.mccompat.ResourceLocation"},
             {"Packages.net.minecraft.client.renderer.texture.TextureUtil", "Packages.jp.ngt.mccompat.TextureUtil"},
             {"Packages.net.minecraft.client.renderer.texture.DynamicTexture", "Packages.jp.ngt.mccompat.DynamicTexture"},
@@ -280,7 +279,17 @@ public final class PackScriptSource {
             {"Packages.net.minecraft.block.BlockStairs", "Packages." + net.minecraft.world.level.block.StairBlock.class.getName()},
             {"Packages.net.minecraft.block.BlockDoor", "Packages." + net.minecraft.world.level.block.DoorBlock.class.getName()},
             {"Packages.net.minecraft.block.BlockLog", "Packages." + net.minecraft.world.level.block.RotatedPillarBlock.class.getName()},
+            // ★EntityPlayer より先に置く (単純 replace のため EntityPlayerMP が
+            //   <Player の置換結果>MP に化けるのを防ぐ)。
+            //   NGTO Builder2 は player instanceof EntityPlayerMP と player.field_71135_a を使う。
+            {"Packages.net.minecraft.entity.player.EntityPlayerMP", "Packages.jp.ngt.mccompat.PlayerCompat"},
             {"Packages.net.minecraft.entity.player.EntityPlayer", "Packages." + net.minecraft.world.entity.player.Player.class.getName()},
+            // 1.7.10 バイオーム (NGTO Builder2 Snowfall ブラシ)
+            {"Packages.net.minecraft.world.biome.BiomeGenBase", "Packages.jp.ngt.mccompat.BiomeGenBase"},
+            // 1.7.10 Forge Loader (NGTO Builder2 の isModLoaded)
+            {"Packages.cpw.mods.fml.common.Loader", "Packages.jp.ngt.mccompat.FmlLoader"},
+            // 1.7.10 S21PacketChunkData (Snowfall ブラシのチャンク同期。中身は使われない)
+            {"Packages.net.minecraft.network.play.server.S21PacketChunkData", "Packages.jp.ngt.mccompat.network.PacketChunkDataCompat"},
             {"Packages.net.minecraft.nbt.NBTTagCompound", "Packages.jp.ngt.mccompat.nbt.NBTTagCompound"},
             {"Packages.net.minecraft.init.Blocks", "Packages.jp.ngt.mccompat.init.Blocks"},
             {"Packages.net.minecraft.client.renderer.texture.TextureMap", "Packages.jp.ngt.mccompat.TextureMap"},
@@ -341,6 +350,11 @@ public final class PackScriptSource {
      * @param path 元のファイルのパス。.ts のときだけ TypeScript として
      */
     public static String prepare(String source, String path) {
+        return prepare(source, path, NGTFileLoader::findAsset);
+    }
+
+    /** Allows development tools to resolve includes without a running game directory. */
+    public static String prepare(String source, String path, java.util.function.Function<String, byte[]> loader) {
         if (TypeScriptTranspiler.isTypeScript(path)) {
             String problem = TypeScriptTranspiler.diagnose(source);
             if (problem != null) {
@@ -349,12 +363,63 @@ public final class PackScriptSource {
             }
             source = TypeScriptTranspiler.toJavaScript(source);
         }
-        String out = resolveIncludes(source, new HashSet<>());
-        out = remapLegacyClasses(out);
-        out = SELF_ASSIGN_DECL.matcher(out).replaceAll("");
-        out = remapVanillaOnlyMethods(out);
-        return remapFieldAccess(out);
+        String out = resolveIncludes(source, new HashSet<>(), loader);
+        // ★widenLegacyWorldHeight (y<0||y>=256 を -64||320 へ置換) は撤去した。
+        //   本家に無く、スクリプト本文のリテラルを勝手に書き換えるため挙動が変わる。
+        return remapExecutionSource(out);
     }
+
+    static String remapExecutionSource(String source) {
+        String out=remapLegacyClasses(source);
+        return LegacySourceMask.transform(out, code -> {
+            code = remapVanillaOnlyMethods(code);
+            code = remapNbtCalls(code);
+            return remapFieldAccess(code);
+        });
+    }
+
+    /**
+     * NBT の SRG メソッドを、レシーバを引数に取る静的版へ回す。
+     *
+     * <p>スクリプトが受け取る NBT はシムとは限らない。
+     * {@code jp.ngt.ngtlib.block.BlockSet.nbt} は Java 側の都合で実バニラの CompoundTag で、
+     * 実バニラ型には 1.7.10 の SRG 名を生やせない。
+     * NGTO Builder2 はこれに対して {@code nbt.func_74737_b()} (copy) を呼ぶので
+     * 「is not a function」で落ち、しかもパックが例外を捨てるため無音で失敗していた。
+     *
+     * <p>レシーバがシムの場合も {@code NBTCompat} が素通しするので、既存の動作は変わらない。
+     */
+    private static String remapNbtCalls(String src) {
+        Matcher m = NBT_CALL.matcher(src);
+        StringBuilder out = new StringBuilder(src.length() + 64);
+        while (m.find()) {
+            String receiver = m.group(1);
+            String method = m.group(2);
+            String args = m.group(3).trim();
+            String replacement;
+            if (receiver.endsWith("NBTCompat")) {
+                replacement = m.group();
+            } else {
+                replacement = "Packages.jp.ngt.mccompat.nbt.NBTCompat." + method
+                    + "(" + receiver + (args.isEmpty() ? "" : ", " + args) + ")";
+            }
+            m.appendReplacement(out, Matcher.quoteReplacement(replacement));
+        }
+        m.appendTail(out);
+        return out.toString();
+    }
+
+    /**
+     * {@code <式>.func_XXXX(引数)} の NBT 版。引数の入れ子は 1 段まで見る
+     * ({@code a.func_74776_a("k", f(x))} が拾えるように)。
+     */
+    private static final Pattern NBT_CALL = Pattern.compile(
+        "([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\."
+        + "(func_74737_b|func_74760_g|func_74776_a|func_74764_b|func_74775_l|func_74782_a"
+        + "|func_74778_a|func_74779_i|func_74768_a|func_74762_e|func_74757_a|func_74767_n"
+        + "|func_74780_a|func_74769_h|func_150295_c)"
+        + "\\(((?:[^()]|\\([^()]*\\))*)\\)");
+
 
     /**
      * レシーバがバニラのインスタンスで、シムで包むことも継承することもできない
@@ -381,8 +446,26 @@ public final class PackScriptSource {
             .replaceAll("Packages.jp.ngt.mccompat.VanillaCompat.func_179223_d($1)");
         out = VANILLA_TILE_SET_POS.matcher(out)
             .replaceAll("Packages.jp.ngt.mccompat.VanillaCompat.func_174878_a($1, $2)");
+        out = BLOCK_CAN_PLACE_AT.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.block.Block.func_149742_c($1, $2)");
+        out = BLOCK_GET_ICON.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.client.BlockClientCompat.func_149691_a($1, $2)");
+        out = BLOCK_IS_LEAVES.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.block.Block.isLeaves($1, $2)");
         return out;
     }
+
+    /** <式>.isLeaves(world,x,y,z) = Block.isLeaves (1.7.10 MCP 名。1.21 に無い)。 */
+    private static final Pattern BLOCK_IS_LEAVES =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.isLeaves\\(((?:[^()]|\\([^()]*\\))*)\\)");
+
+    /** <式>.func_149742_c(world,x,y,z) = Block.canPlaceBlockAt (レシーバは実バニラ Block)。 */
+    private static final Pattern BLOCK_CAN_PLACE_AT =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_149742_c\\(((?:[^()]|\\([^()]*\\))*)\\)");
+
+    /** <式>.func_149691_a(side, meta) = Block.getIcon (クライアント専用)。 */
+    private static final Pattern BLOCK_GET_ICON =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.func_149691_a\\(((?:[^()]|\\([^()]*\\))*)\\)");
 
     /** <式>.func_177967_a(facing, n) = BlockPos.offset。BlockPos は実バニラ型で拡張できない。 */
     private static final Pattern VANILLA_BLOCKPOS_OFFSET =
@@ -431,18 +514,36 @@ public final class PackScriptSource {
         // フィールドを足せないため、静的ヘルパーへ回す。
         out = TILE_WORLD_FIELD.matcher(out)
             .replaceAll("Packages.jp.ngt.mccompat.tileentity.TileEntityCompat.field_145850_b($1)");
+        // tileEntity.field_145851_c/d/e = xCoord/yCoord/zCoord。同じく静的ヘルパーへ回す。
+        out = TILE_X_FIELD.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.tileentity.TileEntityCompat.field_145851_c($1)");
+        out = TILE_Y_FIELD.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.tileentity.TileEntityCompat.field_145848_d($1)");
+        out = TILE_Z_FIELD.matcher(out)
+            .replaceAll("Packages.jp.ngt.mccompat.tileentity.TileEntityCompat.field_145849_e($1)");
         return out;
     }
 
+    // ★代入の左辺 (X.field_... = ...) は書き換えない。書き換えると
+    //   `method(args) = x` となり Nashorn が "Invalid left hand side for assignment" で落ちる
+    //   (NGTO Builder2 が tileEntity.field_145851_c = x として代入する)。
+    private static final Pattern TILE_X_FIELD =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.field_145851_c\\b(?!\\s*\\()(?!\\s*=(?!=))");
+    private static final Pattern TILE_Y_FIELD =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.field_145848_d\\b(?!\\s*\\()(?!\\s*=(?!=))");
+    private static final Pattern TILE_Z_FIELD =
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.field_145849_e\\b(?!\\s*\\()(?!\\s*=(?!=))");
+
     /** <式>.field_145850_b = TileEntity.worldObj。 */
     private static final Pattern TILE_WORLD_FIELD =
-        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.field_145850_b\\b(?!\\s*\\()");
+        Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.field_145850_b\\b(?!\\s*\\()(?!\\s*=(?!=))");
 
     public static String remapLegacyClasses(String source) {
-        String out = source;
-        for (String[] pair : FQN_REMAP) {
-            out = out.replace(pair[0], pair[1]);
-        }
+        String out = LegacyClassReferences.remap(source, FQN_REMAP);
+        return LegacySourceMask.transform(out, PackScriptSource::remapLegacyCode);
+    }
+
+    private static String remapLegacyCode(String out) {
         // Packages.net.minecraft.block.Block.func_xxx → 互換 static (先に FQN を素の形に落とす)
         out = out.replace("Packages.net.minecraft.block.Block.", "Block.");
         // ItemBlock.field_150939_a (内包する Block)。1.21 の BlockItem に SRG フィールドは無いが
@@ -450,8 +551,8 @@ public final class PackScriptSource {
         out = out.replace(".field_150939_a", ".getBlock()");
         // NGTO Builder の hasTileEntity は 1.12 idiom: block.hasTileEntity(block.func_176203_a(meta))。
         // 1.21 の Block にこれらメソッドは無く、毎ブロック TypeError→catch で大量ログになる。
-        out = out.replace("block.hasTileEntity(block.func_176203_a(blockSet.metadata))", "false");
-        out = out.replace("block.hasTileEntity(blockSet.metadata)", "false");
+        out = out.replace("block.hasTileEntity(block.func_176203_a(blockSet.metadata))", "Packages.jp.ngt.mccompat.init.Blocks.func_149716_u(block)");
+        out = out.replace("block.hasTileEntity(blockSet.metadata)", "Packages.jp.ngt.mccompat.init.Blocks.func_149716_u(block)");
         for (int i = 0; i < BLOCK_STATIC_PATTERNS.length; i++) {
             out = BLOCK_STATIC_PATTERNS[i].matcher(out).replaceAll(
                     Matcher.quoteReplacement(BLOCK_STATIC_REPLACEMENTS[i]));
@@ -467,33 +568,36 @@ public final class PackScriptSource {
     }
 
     public static String resolveIncludes(String source, Set<String> visited) {
-        Matcher m = INCLUDE_PATTERN.matcher(source);
-        StringBuilder includes = new StringBuilder();
-        while (m.find()) {
-            String path = m.group(1).trim();
-            if (!visited.add(path.toLowerCase(Locale.ROOT))) {
-                continue;
-            }
-            byte[] bytes = NGTFileLoader.findAsset(path);
+        return resolveIncludes(source, visited, NGTFileLoader::findAsset);
+    }
+
+    public static String resolveIncludes(String source, Set<String> visited,
+                                         java.util.function.Function<String, byte[]> loader) {
+        return LegacyScriptIncludes.expand(source, visited, path -> {
+            byte[] bytes = loader.apply(path);
             if (bytes == null) {
-                RealTrainModUnofficial.LOGGER.warn("Script include not found: {}", path);
-                continue;
+                return null;
             }
             String text = decode(bytes);
-            // //include で読んだ側も .ts なら型を落とす (混在してよい)
-            if (TypeScriptTranspiler.isTypeScript(path)) {
-                text = TypeScriptTranspiler.toJavaScript(text);
-            }
-            includes.append(resolveIncludes(text, visited)).append('\n');
-        }
-        return includes + source;
+            return TypeScriptTranspiler.isTypeScript(path)
+                    ? TypeScriptTranspiler.toJavaScript(text) : text;
+        });
     }
 
     public static String decode(byte[] bytes) {
-        String utf8 = new String(bytes, StandardCharsets.UTF_8);
-        if (utf8.indexOf('�') >= 0) {
-            return new String(bytes, java.nio.charset.Charset.forName("Shift_JIS"));
-        }
-        return utf8;
+        String text = jp.ngt.ngtlib.io.NGTText.decodeText(bytes);
+        return text.startsWith("\ufeff") ? text.substring(1) : text;
     }
+
+    /**
+     * 1.7.10 時代のパックが持つ「Y は 0〜255」という前提を 1.21 の範囲へ広げる。
+     *
+     * <p>1.21 のワールドは Y=-64 から始まるので、地下 (Y<0) に建てると
+     * {@code if (y < 0 || y >= 256) return;} のような番兵に引っかかって
+     * <b>何も置かれずに黙って終わる</b>。
+     * 実測: NGTO Builder2 で Y=-47 に架線を張ると
+     * "Skip TileEntity NBT: invalid y=-47" だけが出てビームが出なかった。
+     *
+     * <p>置き換えるのは<b>この形の範囲チェックだけ</b>。他の比較には触らない。
+     */
 }

@@ -36,11 +36,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         // (rtm_src RailPartsRendererBase.java:305 / :123)
         // RTMU は Math.ceil にしていたため、長さ 10.7 なら本家 21 に対して 22 となり、
         // 枕木が 1 本多く入って間隔が本家とずれていた。切り捨てに揃える。
-        int split = (int) (length * 2.0D);
-        // 0 だと以降の割り算が壊れるので 1 は確保する (本家はループ回数 1 で成立する形)
-        int samples = Math.max(1, split);
-        // 暴走よけの上限。本家には無いが、極端に長いレールで描画が破綻しないように残す。
-        return Math.min(samples, 768);
+        return Math.max(1,jp.ngt.rtm.render.LegacyRailSampling.split(length,0));
     }
 
 /**
@@ -48,7 +44,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
  * 曲線ではベジェと整合したサンプル間隔のためオフセットしない。
  */
     private static float depthJitter(int pos) {
-        return ((pos & 15) - 7.5f) * 1.2e-6f;
+        return 0.0F;
     }
 
 
@@ -268,14 +264,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     return;
                 }
                 // フォールバック(Point 情報やパーツが無い): 本家 createRailPos 同様、全 RailMap を全描画。
-                // trimEnds=true: 端のサンプルを半ピース内側に寄せ、レール端からモデルが
-                // 飛び出さないようにする (AR 系パックのダブルクロッシング対策)。
+                // Sample the authored endpoints unchanged; the reference selects end faces separately.
                 for (int mapIndex = 0; mapIndex < maps.length; mapIndex++) {
                     RailMap map = maps[mapIndex];
                     if (map != null) {
                         renderRailMap(be, map, mapIndex, layout, activeIndex, previousIndex, switchProgress,
                             poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def,
-                            null, true);
+                            null, false);
                     }
                 }
                 return;
@@ -867,9 +862,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
      * sleeper_point を常に隠す、end/cap は端だけ… など)。
      */
     private static boolean shouldRenderObject(TileEntityLargeRailCore be, String groupName, int max, int pos) {
-        if (groupName == null || groupName.isBlank()) {
-            return true;
-        }
+        if (groupName == null || groupName.isBlank()) return true;
+        if(!jp.ngt.rtm.render.LegacyRailSampling.crossSection(groupName,pos,max+1,be.shouldRenderRailStartCap(),be.shouldRenderRailEndCap())) return false;
         try {
             com.portofino.realtrainmodunofficial.rail.RailDefinition def =
                 com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(be.getRailDefinitionId());
@@ -877,7 +871,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
                     com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
                 if (scripted != null && scripted.renderer() != null) {
-                    return scripted.renderer().shouldRenderObject(be, groupName, max, pos);
+                    return scripted.renderer().shouldRenderObject(be, groupName, max+1, pos);
                 }
             }
         } catch (Throwable ignored) {

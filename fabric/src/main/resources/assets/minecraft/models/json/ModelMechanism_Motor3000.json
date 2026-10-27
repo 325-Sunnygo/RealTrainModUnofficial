@@ -1,0 +1,19 @@
+{
+	"name": "motor_3000",
+	"model": {
+		"modelFile": "motor.mqoz",
+		"textures": [["default", "textures/mechanism/motor.png", ""]],
+		"rendererPath": "scripts/RenderMotor.js"
+	},
+	"buttonTexture": "textures/mechanism/button_motor_3000.png",
+	"type": "POWER",
+	"transmissionRatioON": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"transmissionRatioOFF": [0.0, 0.0, 0.0, 0.0, 0.0],
+	"maxSpeed": 3000.0,
+	"acceleration": 15.0,
+	"radius": 0.0,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479"
+}

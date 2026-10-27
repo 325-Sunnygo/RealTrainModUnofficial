@@ -9,6 +9,46 @@ import jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore;
  * レールスクリプトの renderRailStatic/renderRailDynamic/shouldRenderObject を仲介する。
  */
 public class RailPartsRenderer extends PartsRenderer {
+    public RailPartsRenderer() { this(new String[0]); }
+    public RailPartsRenderer(String... args) {
+        super(args);
+    }
+
+    public void renderRail(TileEntityLargeRailCore tile, double x, double y, double z,
+                           float partialTicks, RenderPass pass) {
+        this.currentPass = pass.id;
+        if (pass == RenderPass.NORMAL) {
+            this.renderRailStatic(tile, x, y, z, partialTicks, pass.id);
+        }
+        this.renderRailDynamic(tile, x, y, z, partialTicks, pass.id);
+    }
+
+    public void renderRailStatic(TileEntityLargeRailCore tile, double x, double y, double z, float partialTicks) {
+        this.renderRailStatic(tile, x, y, z, partialTicks, this.currentPass);
+    }
+
+    public void renderRailDynamic(TileEntityLargeRailCore tile, double x, double y, double z, float partialTicks) {
+        this.renderRailDynamic(tile, x, y, z, partialTicks, this.currentPass);
+    }
+
+    public double[] getRailWorldRenderOrigin(TileEntityLargeRailCore tile) {
+        jp.ngt.rtm.rail.util.RailPosition rp = tile.getRailPositions()[0];
+        return new double[]{tile.getBlockPos().getX() + rp.posX - rp.blockX,
+                tile.getBlockPos().getZ() + rp.posZ - rp.blockZ};
+    }
+
+    public int getBrightness(net.minecraft.world.level.Level level, int x, int y, int z) {
+        return level == null ? 0 : brightnessAt(level, x, y, z);
+    }
+
+    public void setBrightness(int brightness) {
+        jp.ngt.ngtlib.renderer.GLHelper.setBrightness(brightness);
+    }
+
+    public int[] getRailBrightness(net.minecraft.world.level.Level level, int x, int y, int z, float[][] positions) {
+        return getRailBrightness(level, new net.minecraft.core.BlockPos(x, y, z), positions);
+    }
+
     /** 現在描画中のレール index (0=メイン, 1..=subRails)。スクリプトがリフレクション参照。 */
     public int currentRailIndex;
 
@@ -167,15 +207,13 @@ public class RailPartsRenderer extends PartsRenderer {
             if (rm == null) {
                 continue;
             }
-            int max = (int) (rm.getLength() * 2.0D);
-            if (max < 1) {
-                max = 1;
-            }
+            int max=LegacyRailSampling.split(rm.getLength(),tile.getRailRenderMinimumSplit());
+            if(max<1) continue;
             double[] stPoint = rm.getRailPos(max, 0);
             double startH = rm.getStartRP().posY;
             float moveX = (float) (stPoint[1] - ((double) start[0] + 0.5D + (double) rev[0]));
             float moveZ = (float) (stPoint[0] - ((double) start[2] + 0.5D + (double) rev[1]));
-            for (int i = 0; i <= max; ++i) {
+            for (int i = 0; i <= LegacyRailSampling.lastIndex(max,tile.getRailRenderEndOffset()); ++i) {
                 double[] cur = rm.getRailPos(max, i);
                 list.add(new float[]{
                     moveX + (float) (cur[1] - stPoint[1]),
@@ -252,19 +290,24 @@ public class RailPartsRenderer extends PartsRenderer {
             }
         }
         net.minecraft.core.BlockPos origin = tile.getBlockPos();
+        int logicalCount=0;
+        for(var map:maps) if(map!=null) {
+            int split=LegacyRailSampling.split(map.getLength(),tile.getRailRenderMinimumSplit());
+            if(split>0) logicalCount+=LegacyRailSampling.lastIndex(split,tile.getRailRenderEndOffset())+1;
+        }
+        int logicalIndex=0;
         for (jp.ngt.rtm.rail.util.RailMap map : maps) {
         if (map == null) {
             continue;
         }
         double length = map.getLength();
-        int max = (int) Math.floor(length * 2.0D);
-        if (max < 1) {
-            max = 1;
-        }
-        for (int i = 0; i <= max; i++) {
+        int max=LegacyRailSampling.split(length,tile.getRailRenderMinimumSplit());
+        if(max<1) continue;
+        for (int i=0;i<=LegacyRailSampling.lastIndex(max,tile.getRailRenderEndOffset());i++,logicalIndex++) {
             java.util.Set<String> allowed = new java.util.LinkedHashSet<>();
             for (String name : this.modelGroupNames) {
-                if (this.shouldRenderObject(tile, name, max, i)) {
+                if (LegacyRailSampling.crossSection(name,logicalIndex,logicalCount,tile.shouldRenderRailStartCap(),tile.shouldRenderRailEndCap())
+                        && this.shouldRenderObject(tile,name,logicalCount,logicalIndex)) {
                     allowed.add(name.trim().toLowerCase(java.util.Locale.ROOT));
                 }
             }

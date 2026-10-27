@@ -115,7 +115,6 @@ item.rtm:autoloading_rifle.name=自動步槍
 item.rtm:sniper_rifle.name=狙擊槍
 item.rtm:smg.name=衝鋒槍
 item.rtm:amr.name=反物資槍
-item.rtm:razer_gun.name=激光槍
 item.rtm:magazine_handgun.name=彈匣(手槍)
 item.rtm:magazine_rifle.name=彈匣(步槍)
 item.rtm:magazine_alr.name=彈匣(自動步槍)

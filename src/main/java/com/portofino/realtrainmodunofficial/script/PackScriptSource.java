@@ -3,9 +3,7 @@ package com.portofino.realtrainmodunofficial.script;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 import jp.ngt.ngtlib.io.NGTFileLoader;
 
-import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -31,6 +29,8 @@ public final class PackScriptSource {
             // クラス初期化失敗でプリリュード全体が中止する。安全束縛して未定義に留める。
             bindOpt("GL11", "jp.ngt.ngtlib.renderer.GL11Facade")
             + "var GL12 = GL11;\n"
+            + bindOpt("GL13", "jp.ngt.ngtlib.renderer.GL13Facade")
+            + bindOpt("GL14", "jp.ngt.ngtlib.renderer.GL14Facade")
             // LWJGL2 の BufferUtils / 1.12 の OpenGlHelper (NGTO Builder 2 が行列バッファと
             // ブレンド指定に使う)。未定義だとそこでスクリプトが止まる。
             + bindOpt("BufferUtils", "jp.ngt.ngtlib.renderer.BufferUtilsCompat")
@@ -95,6 +95,10 @@ public final class PackScriptSource {
             bindOpt("NGTLog", "jp.ngt.ngtlib.io.NGTLog") +
             // SL パックが蒸気/煙で使う (importPackage は no-op なので未修飾名を直接束縛)
             bindOpt("EnumParticleTypes", "jp.ngt.mccompat.EnumParticleTypes") +
+            bindOpt("PerlinNoise", "jp.ngt.ngtlib.math.PerlinNoise") +
+            bindOpt("ColorUtil", "jp.ngt.ngtlib.util.ColorUtil") +
+            bindOpt("__rtmuScaffold", "jp.ngt.rtm.block.tileentity.TileEntityScaffold") +
+            "var TileEntityScaffold = __rtmuScaffold === null ? null : __rtmuScaffold.TYPE;\n" +
             bindOpt("NGTMath", "jp.ngt.ngtlib.math.NGTMath") +
             bindOpt("Vec3", "jp.ngt.ngtlib.math.Vec3") +
             // 本家 RenderMotor / RenderClutch / RenderReversGear が
@@ -208,6 +212,9 @@ public final class PackScriptSource {
         "function __rtmBind(fqn) { try { return Java.type(fqn); } catch (e) { return null; } }\n";
 
     public static final String PRELUDE = BIND_HELPER + PRELUDE_GL + PRELUDE_NO_GL;
+    /** Server scripts do not initialize optional client render/sound classes. */
+    public static final String SERVER_PRELUDE = PRELUDE.replaceAll(
+        "(?m)^var (NGTUtilClient|MCWrapperClient|Minecraft|SoundUpdaterTrain|PartsRenderer|VehiclePartsRenderer|RailPartsRenderer|MachinePartsRenderer|SignalPartsRenderer|WirePartsRenderer|OrnamentPartsRenderer|TileEntityPartsRenderer|EntityPartsRenderer|NGTObjectRenderer|NGTRenderer|NGTRenderHelper) = __rtmBind[^\\n]*\\n", "var $1 = null;\n");
 
     /**
      * ★バニラのクラスはこちら (class リテラル版) を使うこと。
@@ -225,13 +232,27 @@ public final class PackScriptSource {
                 + "__bindFails += '" + name + " '; }\n";
     }
 
-    private static final Pattern INCLUDE_PATTERN = Pattern.compile("^\\s*//include\\s*<([^>]+)>", Pattern.MULTILINE);
-
     private static final String[][] FQN_REMAP = {
+            {"Packages.net.minecraft.world.gen.structure.MapGenStructureData", "Packages.jp.ngt.mccompat.world.MapGenStructureData"},
+            {"Packages.net.minecraft.client.gui.Gui", "Packages.jp.ngt.mccompat.Gui"},
+            {"Packages.jp.ngt.rtm.block.tileentity.TileEntityScaffold", "Packages.jp.ngt.rtm.block.tileentity.TileEntityScaffold.TYPE"},
+            {"Packages.net.minecraft.util.ChunkCoordinates", "Packages.jp.ngt.mccompat.ChunkCoordinates"},
+            {"Packages.net.minecraft.nbt.NBTTagList", "Packages.jp.ngt.mccompat.nbt.NBTTagList"},
+            {"Packages.net.minecraft.util.AxisAlignedBB", "Packages.jp.ngt.mccompat.AxisAlignedBB"},
+            {"Packages.net.minecraft.block.BlockOldLog", "Packages." + net.minecraft.world.level.block.RotatedPillarBlock.class.getName()},
+            {"Packages.net.minecraft.block.BlockNewLog", "Packages." + net.minecraft.world.level.block.RotatedPillarBlock.class.getName()},
+            {"Packages.net.minecraft.block.BlockSlab", "Packages." + net.minecraft.world.level.block.SlabBlock.class.getName()},
+            {"Packages.net.minecraft.entity.Entity", "Packages." + net.minecraft.world.entity.Entity.class.getName()},
+            {"Packages.net.minecraft.entity.EntityLivingBase", "Packages." + net.minecraft.world.entity.LivingEntity.class.getName()},
+            {"Packages.net.minecraft.world.World", "Packages." + net.minecraft.world.level.Level.class.getName()},
+            {"Packages.net.minecraft.tileentity.TileEntity", "Packages." + net.minecraft.world.level.block.entity.BlockEntity.class.getName()},
+
             // LWJGL直束縛 (var GL11 = Packages.org.lwjgl.opengl.GL11 等) を互換クラスへ。
             // LWJGL3の実GL11に解決されると、固定機能関数(glPushMatrix等)は関数ポインタNULLで
             // jni_FatalError→プロセスabort (200が設置直後に落ちていた原因)。
             {"Packages.org.lwjgl.opengl.GL11", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
+            {"Packages.org.lwjgl.opengl.GL13", "Packages.jp.ngt.ngtlib.renderer.GL13Facade"},
+            {"Packages.org.lwjgl.opengl.GL14", "Packages.jp.ngt.ngtlib.renderer.GL14Facade"},
             {"Packages.org.lwjgl.opengl.GL12", "Packages.jp.ngt.ngtlib.renderer.GL11Facade"},
             {"Packages.org.lwjgl.BufferUtils", "Packages.jp.ngt.ngtlib.renderer.BufferUtilsCompat"},
             // 1.7.10 net.minecraft.util.Vec3 を本家 Vec3 へ (func_72443_a / createVectorHelper を提供)
@@ -239,6 +260,7 @@ public final class PackScriptSource {
             {"Packages.net.minecraft.client.renderer.OpenGlHelper", "Packages.jp.ngt.ngtlib.renderer.OpenGlHelperCompat"},
             {"Packages.org.lwjgl.input.Keyboard", "Packages.jp.ngt.mccompat.input.Keyboard"},
             {"Packages.org.lwjgl.input.Mouse", "Packages.jp.ngt.mccompat.input.Mouse"},
+            {"Packages.net.minecraftforge.client.model.ModelFormatException", "Packages.jp.ngt.ngtlib.renderer.model.ModelFormatException"},
             {"Packages.net.minecraft.util.ResourceLocation", "Packages.jp.ngt.mccompat.ResourceLocation"},
             {"Packages.net.minecraft.client.renderer.texture.TextureUtil", "Packages.jp.ngt.mccompat.TextureUtil"},
             {"Packages.net.minecraft.client.renderer.texture.DynamicTexture", "Packages.jp.ngt.mccompat.DynamicTexture"},
@@ -328,6 +350,11 @@ public final class PackScriptSource {
      * @param path 元のファイルのパス。.ts のときだけ TypeScript として
      */
     public static String prepare(String source, String path) {
+        return prepare(source, path, NGTFileLoader::findAsset);
+    }
+
+    /** Allows development tools to resolve includes without a running game directory. */
+    public static String prepare(String source, String path, java.util.function.Function<String, byte[]> loader) {
         if (TypeScriptTranspiler.isTypeScript(path)) {
             String problem = TypeScriptTranspiler.diagnose(source);
             if (problem != null) {
@@ -336,14 +363,19 @@ public final class PackScriptSource {
             }
             source = TypeScriptTranspiler.toJavaScript(source);
         }
-        String out = resolveIncludes(source, new HashSet<>());
+        String out = resolveIncludes(source, new HashSet<>(), loader);
         // ★widenLegacyWorldHeight (y<0||y>=256 を -64||320 へ置換) は撤去した。
         //   本家に無く、スクリプト本文のリテラルを勝手に書き換えるため挙動が変わる。
-        out = remapLegacyClasses(out);
-        out = SELF_ASSIGN_DECL.matcher(out).replaceAll("");
-        out = remapVanillaOnlyMethods(out);
-        out = remapNbtCalls(out);
-        return remapFieldAccess(out);
+        return remapExecutionSource(out);
+    }
+
+    static String remapExecutionSource(String source) {
+        String out=remapLegacyClasses(source);
+        return LegacySourceMask.transform(out, code -> {
+            code = remapVanillaOnlyMethods(code);
+            code = remapNbtCalls(code);
+            return remapFieldAccess(code);
+        });
     }
 
     /**
@@ -507,10 +539,11 @@ public final class PackScriptSource {
         Pattern.compile("([A-Za-z_$][A-Za-z0-9_$]*(?:\\.[A-Za-z_$][A-Za-z0-9_$]*)*)\\.field_145850_b\\b(?!\\s*\\()(?!\\s*=(?!=))");
 
     public static String remapLegacyClasses(String source) {
-        String out = source;
-        for (String[] pair : FQN_REMAP) {
-            out = out.replace(pair[0], pair[1]);
-        }
+        String out = LegacyClassReferences.remap(source, FQN_REMAP);
+        return LegacySourceMask.transform(out, PackScriptSource::remapLegacyCode);
+    }
+
+    private static String remapLegacyCode(String out) {
         // Packages.net.minecraft.block.Block.func_xxx → 互換 static (先に FQN を素の形に落とす)
         out = out.replace("Packages.net.minecraft.block.Block.", "Block.");
         // ItemBlock.field_150939_a (内包する Block)。1.21 の BlockItem に SRG フィールドは無いが
@@ -518,8 +551,8 @@ public final class PackScriptSource {
         out = out.replace(".field_150939_a", ".getBlock()");
         // NGTO Builder の hasTileEntity は 1.12 idiom: block.hasTileEntity(block.func_176203_a(meta))。
         // 1.21 の Block にこれらメソッドは無く、毎ブロック TypeError→catch で大量ログになる。
-        out = out.replace("block.hasTileEntity(block.func_176203_a(blockSet.metadata))", "false");
-        out = out.replace("block.hasTileEntity(blockSet.metadata)", "false");
+        out = out.replace("block.hasTileEntity(block.func_176203_a(blockSet.metadata))", "Packages.jp.ngt.mccompat.init.Blocks.func_149716_u(block)");
+        out = out.replace("block.hasTileEntity(blockSet.metadata)", "Packages.jp.ngt.mccompat.init.Blocks.func_149716_u(block)");
         for (int i = 0; i < BLOCK_STATIC_PATTERNS.length; i++) {
             out = BLOCK_STATIC_PATTERNS[i].matcher(out).replaceAll(
                     Matcher.quoteReplacement(BLOCK_STATIC_REPLACEMENTS[i]));
@@ -535,34 +568,25 @@ public final class PackScriptSource {
     }
 
     public static String resolveIncludes(String source, Set<String> visited) {
-        Matcher m = INCLUDE_PATTERN.matcher(source);
-        StringBuilder includes = new StringBuilder();
-        while (m.find()) {
-            String path = m.group(1).trim();
-            if (!visited.add(path.toLowerCase(Locale.ROOT))) {
-                continue;
-            }
-            byte[] bytes = NGTFileLoader.findAsset(path);
+        return resolveIncludes(source, visited, NGTFileLoader::findAsset);
+    }
+
+    public static String resolveIncludes(String source, Set<String> visited,
+                                         java.util.function.Function<String, byte[]> loader) {
+        return LegacyScriptIncludes.expand(source, visited, path -> {
+            byte[] bytes = loader.apply(path);
             if (bytes == null) {
-                RealTrainModUnofficial.LOGGER.warn("Script include not found: {}", path);
-                continue;
+                return null;
             }
             String text = decode(bytes);
-            // //include で読んだ側も .ts なら型を落とす (混在してよい)
-            if (TypeScriptTranspiler.isTypeScript(path)) {
-                text = TypeScriptTranspiler.toJavaScript(text);
-            }
-            includes.append(resolveIncludes(text, visited)).append('\n');
-        }
-        return includes + source;
+            return TypeScriptTranspiler.isTypeScript(path)
+                    ? TypeScriptTranspiler.toJavaScript(text) : text;
+        });
     }
 
     public static String decode(byte[] bytes) {
-        String utf8 = new String(bytes, StandardCharsets.UTF_8);
-        if (utf8.indexOf('�') >= 0) {
-            return new String(bytes, java.nio.charset.Charset.forName("Shift_JIS"));
-        }
-        return utf8;
+        String text = jp.ngt.ngtlib.io.NGTText.decodeText(bytes);
+        return text.startsWith("\ufeff") ? text.substring(1) : text;
     }
 
     /**

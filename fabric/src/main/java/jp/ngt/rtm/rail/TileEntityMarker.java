@@ -25,11 +25,7 @@ import java.util.List;
  * 本家 jp.ngt.rtm.rail.TileEntityMarker (KaizPatchX) の忠実移植。
  * NBT: RP / MarkerState (本家キーのまま)。
  */
-// ★jp.ngt.mccompat.LoadAwareBlockEntity を必ず付けること。
-// バニラの BlockEntity に onLoad は無く、Fabric 側はこの印が付いた物だけへ
-// BLOCK_ENTITY_LOAD から onLoad を呼んでいる。
-public class TileEntityMarker extends BlockEntity
-        implements jp.ngt.mccompat.LoadAwareBlockEntity {
+public class TileEntityMarker extends BlockEntity implements jp.ngt.mccompat.LoadAwareBlockEntity {
     private RailPosition rp;
 
     public boolean displayDistance = true;//同期必要なし
@@ -136,9 +132,8 @@ public class TileEntityMarker extends BlockEntity
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void onLoad() {
-        // super.onLoad; — バニラの BlockEntity には onLoad が無い
+        
         MarkerManager.add(this);
     }
 

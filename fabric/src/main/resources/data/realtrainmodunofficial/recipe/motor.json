@@ -1,0 +1,31 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "SSSSS",
+    "SWWRS",
+    "SIIAA",
+    "SWWRS",
+    "SSSSS"
+  ],
+  "key": {
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    },
+    "W": {
+      "item": "realtrainmodunofficial:wire"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "A": {
+      "item": "realtrainmodunofficial:material_shaft"
+    },
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:material_motor",
+    "count": 2
+  }
+}

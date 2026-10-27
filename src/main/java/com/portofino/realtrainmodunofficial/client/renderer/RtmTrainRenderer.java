@@ -58,6 +58,16 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         }
     }
 
+    private final java.util.Map<EntityTrain,Integer> poseChecks=new java.util.WeakHashMap<>();
+    private void reportInitialPose(EntityTrain entity,VehicleDefinition def,MqoModelLoader.MqoModel model) {
+        int checked=poseChecks.getOrDefault(entity,0);
+        if(checked>=2 || (checked==1 && entity.tickCount<40))return;
+        poseChecks.put(entity,checked+1);
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+            "[RTMU] vehicle pose: model={} tick={} yaw={} pitch={} roll={} previousRoll={} scale={} bounds={}",
+            def.getId(),entity.tickCount,entity.getYRot(),entity.getXRot(),entity.rotationRoll,entity.prevRotationRoll,def.getModelScale(),java.util.Arrays.toString(model.getSizeBox()));
+    }
+
     private void renderTrain(EntityTrain entity, float entityYaw, float partialTicks, PoseStack poseStack,
                              MultiBufferSource buffer, int packedLight) {
         long tSec = ClientRenderProfiler.sec();
@@ -69,6 +79,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         if (model == null) {
             return;
         }
+        reportInitialPose(entity,def,model);
         // 本家 preRenderBody: 室内灯 ON かつ周囲が暗いなら車体の通常描画をフルブライトで描く。
         // ★本家は preRenderBody/postRenderBody で車体パスだけを挟む。
         final int interiorLightState = entity.getTrainStateData(
@@ -133,7 +144,10 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                         TrainEntityRenderer.partsChains(def.getLeftDoors());
                 java.util.Map<String, java.util.List<TrainEntityRenderer.PartsStep>> rightChains =
                         TrainEntityRenderer.partsChains(def.getRightDoors());
+                var partDrawOrder = com.portofino.realtrainmodunofficial.client.model.LegacyVehiclePartOrder.create(
+                        def.getLeftDoors(),def.getRightDoors());
                 MqoModelLoader.GroupTransform doorTransform = new MqoModelLoader.GroupTransform() {
+                    @Override public int drawOrder(String groupName) { return partDrawOrder.getOrDefault(groupName,0); }
                     @Override public void apply(PoseStack stack, String groupName) {
                         if (leftChains.isEmpty() && rightChains.isEmpty()) {
                             TrainEntityRenderer.applyDoorTransform(stack, def.getLeftDoors(), groupName, entity.doorMoveL, true);
@@ -170,23 +184,14 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                         interiorLightingActive ? def.getInteriorLights() : null,
                         interiorLightState == 2, entity.level().getGameTime() * 50L);
                     try {
-                        // ★焼き込みはしない。本家 1.7.10 も車両は毎フレーム投げ直している。
-                        // 代わりに LocalSpaceBatch が pose を GPU 側の ModelView へ移すので、
-                        // 頂点あたりの CPU 行列演算がゼロになる。
-                        // 動かない車体と動く部品を分けるのは変換の適用範囲を絞るためで、
-                        // 焼くためではない (分けたまま残す)。
-                        MqoModelLoader.GroupPredicate staticFilter =
-                            n -> filter.shouldRender(n) && !doorTransform.mayModify(n);
-                        MqoModelLoader.GroupPredicate movingFilter =
-                            n -> filter.shouldRender(n) && doorTransform.mayModify(n);
+                        // One complete normal pass, then one complete alpha pass, as in
+                        // RenderVehicleBase. Splitting static/moving groups here submitted
+                        // shadow/glass before the opaque faces of moving doors.
                         final int lightForBody = bodyLight;
                         com.portofino.realtrainmodunofficial.client.render.LocalSpaceBatch.run(
                             poseStack, buffer, (localPose, localBuffer) -> {
                                 MqoModelLoader.renderModel(model, localPose, localBuffer,
-                                    lightForBody, staticFilter, null, entity);
-                                // 動く部品 (ドア・パンタ等)。持たない車両ならここは何も描かない。
-                                MqoModelLoader.renderModel(model, localPose, localBuffer,
-                                    lightForBody, movingFilter, doorTransform, entity);
+                                    lightForBody, filter, doorTransform, entity);
                                 return true;
                             });
                     } finally {
@@ -272,54 +277,8 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         }
     }
 
-    /**
-     * ヘルパーグループ (shadow/guide/atari/影ms/連結曲げ変種) の除外。
-     * 台車グループは別台車モデルがある場合のみ非表示 (EntityBogie 側が描画)。
-     */
-
+    /** BasicVehiclePartsRenderer registers every authored body/part group. */
     private static boolean shouldRenderGroup(String groupName) {
-        if (groupName == null || groupName.isBlank()) {
-            return true;
-        }
-        String n = groupName.toLowerCase(Locale.ROOT);
-        // 本家のパックは「影」という名前の偽の影ポリゴンを持つことがある (1.7.10 時代の名残)。
-        // 半透明マテリアルで描かれるが深度も書き込むため、レールの上に乗ると
-        // レールが深度テストに落ちて描かれなくなる (「レールが透ける」)。
-        if (n.contains("影")) {
-            return false;
-        }
-        if (n.contains("shadow")) {
-            return false;
-        }
-        if (n.endsWith("_ms") || n.endsWith("_kage") || n.contains("_ms_") || n.contains("_kage_")) {
-            return false;
-        }
-        if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) {
-            return false;
-        }
-        if (isAngleBendVariant(n)) {
-            return false;
-        }
-        // ★本家は名前で台車グループを隠さない (TrainEntityRenderer と同じ理由)。
         return true;
-    }
-
-    /** 連結曲げ用の角度バリアント (末尾 "-NN" で NN>=10、(mx) は先に剥がす)。 */
-    private static boolean isAngleBendVariant(String normalized) {
-        String s = normalized.endsWith("(mx)") ? normalized.substring(0, normalized.length() - 4) : normalized;
-        int dash = s.lastIndexOf('-');
-        if (dash <= 0 || dash == s.length() - 1) {
-            return false;
-        }
-        for (int i = dash + 1; i < s.length(); i++) {
-            if (!Character.isDigit(s.charAt(i))) {
-                return false;
-            }
-        }
-        try {
-            return Integer.parseInt(s.substring(dash + 1)) >= 10;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 }

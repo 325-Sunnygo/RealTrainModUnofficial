@@ -6,6 +6,7 @@ import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 import com.portofino.realtrainmodunofficial.rail.RailDefinition;
 import com.portofino.realtrainmodunofficial.rail.RailPackLoader;
 import jp.ngt.ngtlib.io.ScriptUtil;
+import jp.ngt.ngtlib.io.NGTFileLoader;
 import jp.ngt.ngtlib.renderer.GLRecorder;
 import jp.ngt.ngtlib.renderer.model.Material;
 import jp.ngt.ngtlib.renderer.model.TextureSet;
@@ -87,6 +88,11 @@ public final class RailScriptRenderers {
             renderer.setScript(se);
             se.put("renderer", renderer);
             ModelObject modelObject = new ModelObject(new TextureSet[]{new TextureSet(new Material(null))});
+            byte[] bytes = NGTFileLoader.findAsset("models/" + def.getModelFile());
+            if (bytes == null) bytes = NGTFileLoader.findAsset(def.getModelFile());
+            modelObject.model = bytes == null ? new jp.ngt.ngtlib.renderer.model.PolygonModel()
+                    : jp.ngt.ngtlib.renderer.model.ModelLoader.parse(bytes, def.getModelFile());
+            modelObject.setTextures(jp.ngt.ngtlib.renderer.model.LegacyTextureLayout.create(modelObject.model, def.getTextureOverrides()));
             renderer.init(null, modelObject);
             return new Scripted(renderer, se);
         } catch (Throwable t) {
@@ -107,6 +113,19 @@ public final class RailScriptRenderers {
     private static int frameCounter;
     /** 明るさを調べ直す間隔 (フレーム)。 */
     private static final int LIGHT_PROBE_INTERVAL = 10;
+
+    /**
+     * そのレール 1 本ぶんの記録と指紋を捨てる。
+     *
+     * <p>線形が届いた/変わった時に呼ぶ。これをしないと、線形がまだ揃っていない時点で
+     * 焼いた古いメッシュが VBO に残り続け、<b>道床 (ブロック側) だけ新しい線形になって
+     * レールの線だけ元の位置に取り残される</b> (入り直すと直るのはこれ)。
+     */
+    public static void invalidate(BlockPos pos) {
+        PLAIN_CACHE.remove(pos);
+        LIGHT_SIGNATURES.remove(pos);
+        RailMeshCache.invalidate(pos);
+    }
 
     /** フレーム頭で 1 回。 */
     public static void beginFrame() {
@@ -212,8 +231,12 @@ public final class RailScriptRenderers {
      */
     public static void renderSubRail(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
                                      PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay,
-                                     RailDefinition subDef, MqoModelLoader.MqoModel subModel) {
-        if (be instanceof TileEntityLargeRailSwitchCore || subDef == null || subModel == null) {
+                                     RailDefinition subDef, MqoModelLoader.MqoModel subModel, int railIndex) {
+        // ★分岐コアも対象にする。以前は TileEntityLargeRailSwitchCore を弾いていたため
+        //   分岐レールだけ重ね (サブレール) が描かれなかった。
+        //   renderStaticParts は getAllRailMaps() を全ループするので、分岐でも各分岐先に
+        //   サブレールが乗る (本家 RailPartsRendererBase#createRailPos と同じ)。
+        if (subDef == null || subModel == null) {
             return;
         }
         BlockPos pos = be.getBlockPos();
@@ -228,7 +251,10 @@ public final class RailScriptRenderers {
                 Scripted sc = get(subDef);
                 if (sc != null) {
                     sc.renderer.modelGroupNames = subModel.getOriginalGroupNames();
-                    sc.renderer.currentRailIndex = 0;
+                    //★本家 RenderLargeRail はサブレール i を currentRailIndex = i+1 で描く
+                    //  (添字ごとの静的キャッシュ/キーを持つ)。RTMU は 0 固定だったため、
+                    //  サブレールが増えても添字が衝突していた。
+                    sc.renderer.currentRailIndex = railIndex;
                     sc.renderer.renderRailStatic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
                     sc.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
                 } else {
@@ -324,7 +350,11 @@ public final class RailScriptRenderers {
             GLRecorder dyn = null;
             if (isSwitch) {
                 long dynKey = computeSwitchDynKey((TileEntityLargeRailSwitchCore) be);
-                DynEntry cached = this.dynamicCache.get(pos);
+                // ★敷設し直し (rebuilt) は線形そのものが変わっている。トング位置 (movement) が
+                //   同じでも可動部の記録を作り直す。これが無いと「同じ場所に分岐を敷き直したのに
+                //   可動部だけ最初に敷いた経路で描かれる」(静的側だけ shouldRerenderRail で
+                //   更新され、動的側はキー一致で古い記録が残るため)。
+                DynEntry cached = rebuilt ? null : this.dynamicCache.get(pos);
                 if (cached != null && cached.key == dynKey) {
                     dyn = cached.rec;
                 } else {
@@ -410,6 +440,25 @@ public final class RailScriptRenderers {
                     }
                 }
             }
+            // ★線形も鍵に含める。同位置に敷き直してトング位置 (movement) が一致しても、
+            //   経路が変わっていれば記録を作り直す。
+            jp.ngt.rtm.rail.util.RailPosition[] positions = be.getRailPositions();
+            if (positions != null) {
+                for (jp.ngt.rtm.rail.util.RailPosition rp : positions) {
+                    if (rp == null) {
+                        key = key * 31L;
+                        continue;
+                    }
+                    key = key * 31L + Double.doubleToLongBits(rp.posX);
+                    key = key * 31L + Double.doubleToLongBits(rp.posY);
+                    key = key * 31L + Double.doubleToLongBits(rp.posZ);
+                    key = key * 31L + rp.direction;
+                    key = key * 31L + rp.height;
+                    key = key * 31L + rp.blockX;
+                    key = key * 31L + rp.blockY;
+                    key = key * 31L + rp.blockZ;
+                }
+            }
             return key;
         }
 
@@ -424,50 +473,6 @@ public final class RailScriptRenderers {
     @SuppressWarnings("unchecked")
     private static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                                int packedLight, int packedOverlay, MqoModelLoader.MqoModel model) {
-        int light = packedLight;
-        int depth = 0;
-        for (GLRecorder.Cmd cmd : rec.getCommands()) {
-            switch (cmd.op) {
-                case PUSH -> {
-                    poseStack.pushPose();
-                    depth++;
-                }
-                case POP -> {
-                    if (depth > 0) {
-                        poseStack.popPose();
-                        depth--;
-                    }
-                }
-                case TRANSLATE -> poseStack.translate(cmd.a, cmd.b, cmd.c);
-                case ROTATE -> {
-                    // Quaternion は記録時に確定済み (payload)
-                    if (cmd.payload instanceof org.joml.Quaternionf quat) {
-                        poseStack.mulPose(quat);
-                    }
-                }
-                case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
-                case BRIGHTNESS -> light = (int) cmd.a;
-                case COLOR -> {
-                    // カラーオーバーレイは現状のレールスクリプトでは未使用
-                }
-                case RENDER_PARTS -> {
-                    // 正規化 Set は記録時に確定済み (payload) — 同一インスタンスで
-                    // renderNamedGroups の IdentityHashMap キャッシュにヒットさせる
-                    if (cmd.payload instanceof Set<?> names) {
-                        model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
-                    }
-                }
-                case RENDER_GROUPS -> {
-                    if (cmd.payload instanceof Set<?> names) {
-                        model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
-                    }
-                }
-            }
-        }
-        // スクリプトの push/pop 不整合を補正
-        while (depth > 0) {
-            poseStack.popPose();
-            depth--;
-        }
+        VehicleScriptRenderers.replay(rec,poseStack,buffer,packedLight,packedOverlay,model,null,0);
     }
 }

@@ -55,7 +55,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     /** レールを再描画するかどうか(明るさ変更等) */
     public boolean shouldRerenderRail;
     // see RailMapBasic.fixRTMRailMapVersion
-    protected int fixRTMRailMapVersion;
+    public int fixRTMRailMapVersion;
 
     // WebCTC (別mod) 用: ロード済みレールコアの一覧。weak なのでチャンクアンロードで自然に消える。
     private static final java.util.Set<TileEntityLargeRailCore> LOADED_CORES =
@@ -323,12 +323,18 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         return (this.railPositions != null && this.railPositions.length > 0 && Arrays.stream(this.railPositions).allMatch(Objects::nonNull));
     }
 
+    public int getRailRenderMinimumSplit() { return 0; }
+    public int getRailRenderEndOffset() { return 0; }
+    public boolean shouldRenderRailStartCap() { return true; }
+    public boolean shouldRenderRailEndCap() { return true; }
+
     public RailPosition[] getRailPositions() {
         return this.railPositions;
     }
 
     public void setRailPositions(RailPosition[] par1) {
         this.railPositions = par1;
+        this.railmap = null;
     }
 
     public RailProperty getProperty() {
@@ -424,6 +430,16 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         }
         return this.railmap;
     }
+
+    public void breakLogicalRail() {
+        if(level==null || breaking)return;breaking=true;
+        var maps=getAllRailMaps();if(maps!=null) {for(var map:maps)if(map!=null)map.breakRail(level,getProperty(),this);}
+        else level.removeBlock(getBlockPos(),false);
+    }
+    public boolean isLogicalRailOccupied() {return isCollidedTrain();}
+
+    public boolean isSameLogicalRail(TileEntityLargeRailCore other) {return this==other;}
+    public jp.ngt.rtm.rail.util.RailPosition[] getLogicalRailPositions() {return getRailPositions();}
 
     public RailMap[] getAllRailMaps() {
         RailMap rm = this.getRailMap(null);

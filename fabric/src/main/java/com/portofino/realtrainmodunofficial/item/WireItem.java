@@ -30,7 +30,6 @@ public class WireItem extends Item implements ModelSelectableItem {
      * 実際に使われるのは、選択中のモデルが customIconTexture を持つときだけ
      * (com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel が判定する)。
      */
-    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
         consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {
@@ -102,6 +101,13 @@ public class WireItem extends Item implements ModelSelectableItem {
                 tag.putInt("Y", clickedPos.getY());
                 tag.putInt("Z", clickedPos.getZ());
                 stack.set(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get(), tag);
+                // ★本家 TileEntityElectricalWiring.onRightClick: 接続待ちの状態はタイル側に持ち、
+                //   TO_PLAYER 接続でプレイヤーの手元へ仮ワイヤーを描く。RTMU はアイテム側に
+                //   持つだけだったので仮ワイヤーが出なかった。
+                if (level.getBlockEntity(clickedPos) instanceof InstalledObjectBlockEntity startBe) {
+                    startBe.setConnectionTo(player.getId(), -1, 0,
+                        jp.ngt.rtm.electric.Connection.ConnectionType.TO_PLAYER, definition.getId());
+                }
                 player.displayClientMessage(Component.literal("始点の碍子を記録しました"), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
@@ -110,12 +116,36 @@ public class WireItem extends Item implements ModelSelectableItem {
         BlockPos startPos = new BlockPos(startTag.getInt("X"), startTag.getInt("Y"), startTag.getInt("Z"));
         if (startPos.equals(clickedPos)) {
             if (!level.isClientSide) {
+                clearPendingWire(level, startPos, player);
                 stack.remove(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get());
                 player.displayClientMessage(Component.literal("ワイヤー設置を解除しました"), true);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
 
+        // 本家 ItemWire: 2 回目にクリックした碍子へ接続を張る (そちらが root)。
+        // 中間ブロックは置かない。ワイヤーモデルは接続 (Connection) が持ち、
+        // 碍子はそのまま残る (NGTO Builder2 のビーム設置と同じ形)。
+        if (level.getBlockEntity(clickedPos) instanceof InstalledObjectBlockEntity targetBe) {
+            if (!level.isClientSide) {
+                // 始点に残した仮ワイヤー (TO_PLAYER) を消してから本接続を張る。
+                clearPendingWire(level, startPos, player);
+                targetBe.setConnectionTo(startPos.getX(), startPos.getY(), startPos.getZ(),
+                    jp.ngt.rtm.electric.Connection.ConnectionType.WIRE, definition.getId());
+                stack.remove(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get());
+                if (!player.getAbilities().instabuild) {
+                    stack.shrink(1);
+                }
+                player.displayClientMessage(Component.literal("ワイヤーを設置しました"), true);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        // 設置物以外 (信号変換器など) は従来の中間ブロック式のまま。
+        // 先に始点の仮ワイヤーを消しておく。
+        if (!level.isClientSide) {
+            clearPendingWire(level, startPos, player);
+        }
         BlockPos mid = new BlockPos((startPos.getX() + clickedPos.getX()) >> 1, (startPos.getY() + clickedPos.getY()) >> 1, (startPos.getZ() + clickedPos.getZ()) >> 1);
         BlockState state = level.getBlockState(mid);
         if (!state.canBeReplaced()) {
@@ -139,6 +169,14 @@ public class WireItem extends Item implements ModelSelectableItem {
             player.displayClientMessage(Component.literal("ワイヤーを設置しました"), true);
         }
         return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    /** 始点に残した接続待ちの仮ワイヤー (TO_PLAYER) を消す。 */
+    private static void clearPendingWire(Level level, BlockPos startPos, Player player) {
+        if (level.getBlockEntity(startPos) instanceof InstalledObjectBlockEntity startBe) {
+            startBe.setConnectionTo(player.getId(), -1, 0,
+                jp.ngt.rtm.electric.Connection.ConnectionType.NONE, "");
+        }
     }
 
     @Override

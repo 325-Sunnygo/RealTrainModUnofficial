@@ -89,7 +89,7 @@ public final class LocalSpaceBatch {
      * @param body      実際に頂点を出す処理
      */
     public static boolean run(PoseStack poseStack, MultiBufferSource fallback, Body body) {
-        if (!ENABLED || inside || poseStack == null) {
+        if (!ENABLED || inside || poseStack == null || com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
             return body.run(poseStack, fallback);
         }
 

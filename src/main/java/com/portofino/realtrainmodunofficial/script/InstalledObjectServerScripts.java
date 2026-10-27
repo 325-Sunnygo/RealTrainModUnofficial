@@ -89,11 +89,7 @@ public final class InstalledObjectServerScripts {
         be.refreshScriptFields();
         ScriptExecuter executer = be.getScriptExecuter(level);
         try {
-            ((Invocable) se).invokeFunction("onUpdate", be, executer);
-            executer.count++;
-        } catch (NoSuchMethodException e) {
-            // onUpdate を持たないスクリプト (ライブラリだけ等) は対象外
-            INVALID.add(id);
+            executer.updateScript(se, be);
         } catch (Throwable t) {
             // 本家 ScriptUtil.doScriptIgnoreError と同じく、失敗しても止めない。
             // 以前はここで FAILED.add(id) して定義ごと永久停止させていたため、
@@ -129,16 +125,23 @@ public final class InstalledObjectServerScripts {
         entity.refreshScriptFields();
         ScriptExecuter executer = entity.getScriptExecuter();
         try {
-            ((Invocable) se).invokeFunction("onUpdate", entity, executer);
-            executer.count++;
-        } catch (NoSuchMethodException e) {
-            INVALID.add(id);
+            executer.updateScript(se, entity);
         } catch (Throwable t) {
             if (LOGGED.add(id)) {
                 RealTrainModUnofficial.LOGGER.warn("[serverScript] {} の onUpdate が失敗しました (実行は継続します): {}",
                         id, String.valueOf(t.getCause() != null ? t.getCause() : t));
             }
         }
+    }
+
+    public static ScriptEngine getEngine(InstalledObjectDefinition def) {
+        if (def == null || !def.hasServerScript() || INVALID.contains(def.getId())) return null;
+        ScriptEngine existing = ENGINES.get(def.getId());
+        if (existing != null) return existing;
+        ScriptEngine loaded = load(def);
+        if (loaded == null) INVALID.add(def.getId());
+        else ENGINES.put(def.getId(), loaded);
+        return loaded;
     }
 
     private static ScriptEngine load(InstalledObjectDefinition def) {
@@ -158,7 +161,7 @@ public final class InstalledObjectServerScripts {
             // ★ //include の展開と FQN remap は全経路で共通 (PackScriptSource.prepare)。
             // 以前この経路だけ prepare を通しておらず、include を使うレール/架線/設置物パックが
             // 「スクリプトはあるのに何も描かない」状態になっていた。
-            ScriptEngine se = ScriptUtil.doScript(PRELUDE + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, path));
+            ScriptEngine se = ScriptUtil.doScript(PackScriptSource.PRELUDE + PRELUDE + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, path));
             // ★SRB3 専用ブリッジ __SRB__ は本家に無いため撤去。
             return se;
         } catch (Throwable t) {

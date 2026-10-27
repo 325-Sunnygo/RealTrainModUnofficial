@@ -16,23 +16,6 @@ import java.util.function.Function;
 public final class RtmuRenderTypes extends RenderType {
 
 
-    /**
-     * 発光パス用のごく小さいポリゴンオフセット。
-     * pass0 と発光パスは同じ頂点・同じ行列で描いているが、シェーダーが別
-     * (pass0 = ENTITY_CUTOUT / 前照灯・尾灯 = ENTITY_TRANSLUCENT_EMISSIVE) なので、
-     * 同じ式でも最適化の違いで深度が僅かにずれ、画素ごとに勝敗が揺れる。
-     */
-    private static final LayeringStateShard LIGHT_PASS_OFFSET = new LayeringStateShard(
-        "rtmu_light_pass_offset",
-        () -> {
-            com.mojang.blaze3d.systems.RenderSystem.polygonOffset(-0.05F, -1.0F);
-            com.mojang.blaze3d.systems.RenderSystem.enablePolygonOffset();
-        },
-        () -> {
-            com.mojang.blaze3d.systems.RenderSystem.polygonOffset(0.0F, 0.0F);
-            com.mojang.blaze3d.systems.RenderSystem.disablePolygonOffset();
-        });
-
     // ★以前の経緯:
     // 同一深度の「後勝ち」を深度バイアスで作ると、傾き比例のため遠方・浅い角度で
     // 内装が車体を突き抜けて破線に見える (実測)。
@@ -142,8 +125,7 @@ public final class RtmuRenderTypes extends RenderType {
                     // 前照灯/尾灯パスは車体と完全に同じ面を _light1/_light2 で
                     // α0.8 ブレンドして重ねるだけの上塗りで、深度は pass0 が既に書いている。
                     // ★ポリゴンオフセットで勝たせる手は使わない。
-                    .setWriteMaskState(COLOR_WRITE)
-                .setLayeringState(LIGHT_PASS_OFFSET)
+                    .setWriteMaskState(COLOR_DEPTH_WRITE)
                     .createCompositeState(true))));
     }
 
@@ -160,7 +142,6 @@ public final class RtmuRenderTypes extends RenderType {
                 .setLightmapState(LIGHTMAP)
                 .setOverlayState(OVERLAY)
                 .setCullState(CULL)
-                .setLayeringState(LIGHT_PASS_OFFSET)
                 .createCompositeState(true)));
 
     private static final Function<ResourceLocation, RenderType> EMISSIVE_CUTOUT_NO_CULL_LAYERED = Util.memoize(tex ->
@@ -173,7 +154,6 @@ public final class RtmuRenderTypes extends RenderType {
                 .setLightmapState(LIGHTMAP)
                 .setOverlayState(OVERLAY)
                 .setCullState(NO_CULL)
-                .setLayeringState(LIGHT_PASS_OFFSET)
                 .createCompositeState(true)));
 
     /** 室内灯パス (i==0) 用。本家と同じ不透明描画に、深度だけのオフセットを足したもの。 */
@@ -181,7 +161,7 @@ public final class RtmuRenderTypes extends RenderType {
         return cull ? EMISSIVE_CUTOUT_LAYERED.apply(texture) : EMISSIVE_CUTOUT_NO_CULL_LAYERED.apply(texture);
     }
 
-    /** 前照灯/尾灯パス (i>0) 用。発光 + ブレンド + 深度書き込み + ポリゴンオフセット。 */
+    /** 前照灯/尾灯パス (i>0) 用。発光 + ブレンド + 深度書き込み。 */
     public static RenderType emissiveBlendLayered(ResourceLocation texture, int legacyPass, boolean cull) {
         return emissiveBlendFactory(legacyPass, cull).apply(texture);
     }
@@ -277,4 +257,23 @@ public final class RtmuRenderTypes extends RenderType {
     public static RenderType glassNoDepthWriteCull(ResourceLocation texture) {
         return GLASS_NO_DEPTH_WRITE_CULL.apply(texture);
     }
+    private static final java.util.Map<Boolean, Function<ResourceLocation, RenderType>> LEGACY_ALPHA =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Forge vehicle pass 1: source alpha blending and depth testing, with depth writes disabled. */
+    public static RenderType legacyAlphaBlend(ResourceLocation texture, boolean cull) {
+        return LEGACY_ALPHA.computeIfAbsent(cull, enabled -> Util.memoize(tex ->
+                create("rtmu_legacy_alpha_" + enabled, DefaultVertexFormat.NEW_ENTITY,
+                        VertexFormat.Mode.QUADS, 1536, true, false,
+                        CompositeState.builder()
+                                .setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+                                .setTextureState(new TextureStateShard(tex, false, false))
+                                .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+                                .setWriteMaskState(COLOR_WRITE)
+                                .setLightmapState(LIGHTMAP)
+                                .setOverlayState(OVERLAY)
+                                .setCullState(enabled ? CULL : NO_CULL)
+                                .createCompositeState(true)))).apply(texture);
+    }
+
 }

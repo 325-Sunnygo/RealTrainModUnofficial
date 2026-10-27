@@ -62,6 +62,14 @@ public final class TrainControlKeyHandler {
             }
             return;
         }
+        // 自動車 (ModelVehicle): 本家 GuiVehicleControl 相当のカスタムボタン画面を開く。
+        // (シールドマシン等は Button0 を GUI で操作する。列車用画面しか無かったため操作できなかった)
+        if (mc.player.getVehicle() instanceof com.portofino.realtrainmodunofficial.entity.CarEntity car) {
+            if (TrainControlKeyMappings.OPEN_CONTROL.matches(event.getKey(), event.getScanCode())) {
+                mc.setScreen(new com.portofino.realtrainmodunofficial.client.screen.CarControlScreen(car));
+            }
+            return;
+        }
         TrainEntity train = getControlledTrain(mc);
         if (train == null) {
             return;
@@ -132,6 +140,11 @@ public final class TrainControlKeyHandler {
             return;
         }
         if (com.portofino.realtrainmodunofficial.client.renderer.MarkerBlockEntityRenderer.onRightClick()) {
+            event.setCanceled(true);
+            return;
+        }
+        // 本家 ActionParts: 乗車中に運転台のマスコン/スイッチへ右クリックを送る。
+        if (com.portofino.realtrainmodunofficial.client.ActionPartsPicker.onRightClick(mc)) {
             event.setCanceled(true);
         }
     }

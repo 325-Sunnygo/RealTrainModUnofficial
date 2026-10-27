@@ -66,7 +66,11 @@ runs {
     // By default, the server will crash when no gametests are provided.
     // The gametest system is also enabled by default for other run configs under the /test command.
     gameTestServer {
+        systemProperty 'rtmu.e259Pack', providers.gradleProperty('e259Pack').getOrElse('')
+        systemProperty 'rtmu.srbxPack', providers.gradleProperty('rtmuSrbxPack').getOrElse('')
         systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        modSource project.sourceSets.test
+        workingDirectory = project.file('build/signal-gametest')
     }
 
     data {
@@ -162,7 +166,7 @@ tasks.named('jar', Jar).configure {
     // zip と同じ場所にも置く。BundledPackInstaller が zip 以外もそこへコピーする。
     from('bundled_pack_src/E257_DefaultPack/Readme.txt') {
         into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
-        rename { 'E257_DefaultPack_Readme.txt' }
+        rename { 'e257_defaultpack_readme.txt' }
     }
     from {
         configurations.jsRuntime
@@ -226,6 +230,8 @@ tasks.register('scriptPreflight', JavaExec) {
     mainClass = 'com.portofino.realtrainmodunofficial.dev.ScriptPreflight'
     dependsOn tasks.named('classes')
     workingDir = projectDir
+    if (project.hasProperty('scriptDir')) args project.property('scriptDir')
+    if (project.hasProperty('scriptFilter')) args project.property('scriptFilter')
 }
 
 tasks.register('copyJarToModrinthMods') {
@@ -332,3 +338,90 @@ idea {
 }
 
 
+
+// Behavioral checks against the actual Nashorn runtime and compatibility classes.
+tasks.register('legacyScriptRegression', JavaExec) {
+    group = 'verification'
+    description = 'Checks legacy include, class lookup, and server callback semantics.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.portofino.realtrainmodunofficial.script.LegacyRuntimeRegression'
+    dependsOn tasks.named('testClasses')
+}
+
+tasks.register('legacyModelCorpus', JavaExec) {
+    group = 'verification'
+    description = 'Parses every locally available MQO/MQOZ model and checks polygon and normal validity.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.portofino.realtrainmodunofficial.script.LegacyModelCorpus'
+    dependsOn tasks.named('testClasses')
+    workingDir = projectDir
+}
+
+// Native item registries are bootstrapped in a separate JVM from pure script checks.
+tasks.register('legacyInventoryRegression', JavaExec) {
+    group = 'verification'
+    description = 'Checks actual stack counts, inventory lookup, and deferred item rendering.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.portofino.realtrainmodunofficial.script.LegacyInventoryRegression'
+    dependsOn tasks.named('testClasses')
+}
+
+tasks.register('legacyPackGeometryRegression', JavaExec) {
+    group = 'verification'
+    description = 'Compares external pack graph and render mesh positions, UVs, winding, and duplicate faces.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.portofino.realtrainmodunofficial.script.LegacyPackGeometryRegression'
+    dependsOn tasks.named('testClasses')
+    args providers.gradleProperty('legacyPackZip').getOrElse('')
+}
+
+tasks.register('legacyTextureUploadRegression', JavaExec) {
+    group = 'verification'
+    description = 'Checks actual Minecraft PNG decoding and GPU texture upload against the external source PNG.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.portofino.realtrainmodunofficial.client.render.LegacyTextureUploadRegression'
+    dependsOn tasks.named('testClasses')
+    jvmArgs '-XstartOnFirstThread'
+    systemProperty 'rtmu.e259Pack', providers.gradleProperty('e259Pack').getOrElse('')
+    args providers.gradleProperty('legacyPackZip').getOrElse('')
+}
+
+// Legacy RTM filenames may contain uppercase characters; modern resource IDs may not.
+// Keep source names intact and canonicalize only the packaged asset paths.
+tasks.named('processResources', ProcessResources).configure {
+    includeEmptyDirs = false
+    doFirst { delete destinationDir }
+    eachFile { details ->
+        if (details.path.startsWith('assets/')) details.path = details.path.toLowerCase(Locale.ROOT)
+    }
+    filesMatching(['assets/*/models/block/**/*.json', 'assets/*/models/item/**/*.json', 'assets/*/blockstates/**/*.json']) {
+        filter { String line ->
+            line.replaceAll(/"([^"\n]*[:\/][^"\n]*)"/) { all, value -> '"' + value.toLowerCase(Locale.ROOT) + '"' }
+        }
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    includeEmptyDirs = false
+    eachFile { details ->
+        if (details.path.startsWith('assets/')) details.path = details.path.toLowerCase(Locale.ROOT)
+    }
+}
+
+tasks.register('legacyExternalScriptRegression', JavaExec) {
+    group = 'verification'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.portofino.realtrainmodunofficial.script.LegacyExternalScriptRegression'
+    dependsOn tasks.named('testClasses')
+    maxHeapSize = '1G'
+    args providers.gradleProperty('legacyPackZip').getOrElse('')
+}
+
+tasks.register('legacyAsyncSelectionRegression', JavaExec) {
+    group = 'verification'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.portofino.realtrainmodunofficial.script.LegacyAsyncSelectionRegression'
+    dependsOn tasks.named('testClasses')
+    maxHeapSize = '1G'
+    args providers.gradleProperty('legacyPackZip').getOrElse('')
+}

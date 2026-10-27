@@ -1,0 +1,28 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "IGI",
+    "IYI",
+    "IRI",
+    "IYI",
+    "IGI"
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:red_dye"
+    },
+    "Y": {
+      "item": "minecraft:yellow_dye"
+    },
+    "G": {
+      "item": "minecraft:green_dye"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:signal",
+    "count": 2
+  }
+}

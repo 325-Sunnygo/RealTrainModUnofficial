@@ -26,9 +26,20 @@ public final class TrainConfigAdapter {
     }
 
     private static TrainConfig create(VehicleDefinition def) {
+        if(def!=null && def.getLegacyConfig()!=null) {
+            var json=def.getLegacyConfig();
+            if(json.has("model") && !json.has("trainModel2"))json.add("trainModel2",json.get("model"));
+            TrainConfig parsed=new com.google.gson.Gson().fromJson(json,TrainConfig.class);
+            parsed.trainName=def.getId();parsed.init();return parsed;
+        }
         TrainConfig cfg = new TrainConfig();
         if (def != null) {
             cfg.trainName = def.getId();
+            if(!def.isCarType() && !def.getVehicleType().isBlank()) cfg.trainType=def.getVehicleType();
+            cfg.smoothing=def.isSmoothing();cfg.doCulling=def.isDoCulling();
+            cfg.scale=def.getModelScale();
+            var offset=def.getModelOffset();cfg.offset=new float[]{(float)offset.x,(float)offset.y,(float)offset.z};
+            cfg.notDisplayCab=def.isNotDisplayCab();cfg.isSingleTrain=def.isSingleTrain();
 
             List<net.minecraft.world.phys.Vec3> bogies = def.getBogiePositions();
             if (bogies != null && bogies.size() >= 2) {
@@ -43,7 +54,7 @@ public final class TrainConfigAdapter {
             }
 
             List<Float> speeds = def.getNotchMaxSpeeds();
-            if (speeds != null && speeds.size() == 5) {
+            if (speeds != null && !speeds.isEmpty()) {
                 float[] ms = new float[speeds.size()];
                 for (int i = 0; i < ms.length; ++i) {
                     ms[i] = speeds.get(i);
@@ -54,6 +65,27 @@ public final class TrainConfigAdapter {
             if (def.getAcceleration() > 0.0F) {
                 cfg.accelerateion = def.getAcceleration();
             }
+
+            //KaizPatchX: ノッチ段ごとの加速度 (段数は maxSpeed と同じ)
+            List<Float> accels = def.getNotchAccelerations();
+            if (accels != null && !accels.isEmpty()) {
+                float[] aa = new float[accels.size()];
+                for (int i = 0; i < aa.length; ++i) {
+                    aa[i] = accels.get(i);
+                }
+                cfg.accelerateions = aa;
+            }
+            //KaizPatchX: ブレーキ 9 段
+            List<Float> decels = def.getDecelerations();
+            if (decels != null && !decels.isEmpty()) {
+                float[] dd = new float[decels.size()];
+                for (int i = 0; i < dd.length; ++i) {
+                    dd[i] = decels.get(i);
+                }
+                cfg.deccelerations = dd;
+            }
+            cfg.useVariableAcceleration = def.isUseVariableAcceleration();
+            cfg.useVariableDeceleration = def.isUseVariableDeceleration();
 
             List<String> rollsigns = def.getRollsignNames();
             if (rollsigns != null && !rollsigns.isEmpty()) {
@@ -82,5 +114,6 @@ public final class TrainConfigAdapter {
 
     public static void clearCache() {
         CACHE.clear();
+        VehicleConfigAdapter.clearCache();
     }
 }

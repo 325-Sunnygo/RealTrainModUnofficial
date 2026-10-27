@@ -12,46 +12,6 @@ import net.minecraft.world.level.Level;
 public class BogieController {
     private final EntityBogie[] bogies = new EntityBogie[2];
 
-    // ===== 車体サスペンション (RTMU オリジナル機能) =====
-    // 台車はレールへ正確に追従させたまま、車体の Y だけを空気ばね風のばね-ダンパーに通す。
-    // 継ぎ目・勾配の折れ目で車体がわずかに沈んで揺り戻す「生きている」上下動を出す。
-    private boolean suspInit;
-    private double suspY;
-    private double suspYVel;
-    private double suspPrevTargetY;
-    private double suspTargetVelY;
-    /**
-     * 定速成分 (目標速度) の平滑化係数。目標 Y はレール分割点の量子化で毎 tick 微振動する。
-     * 生の差分をそのまま先読みに使うとその振動が車体へ素通しされて常時揺れて見えるため、
-     * EMA を通した速度で追従する (一定勾配へは数 tick で収束、ノイズは通さない)。
-     */
-    private static final float SUSP_VEL_SMOOTH = 0.3F;
-    /** ばね定数 (残差を 1tick でどれだけ速度へ変換するか)。 */
-    private static final float SUSP_SPRING = 0.12F;
-    /** 速度の減衰率。SPRING と合わせて弱アンダーダンプ (2 割弱のオーバーシュート 1 回で収束)。 */
-    private static final float SUSP_DAMPING = 0.60F;
-    /** これ以上の段差は設置/テレポート/脱線とみなして即スナップ。 */
-    private static final double SUSP_SNAP = 0.5D;
-    /** 目標高さから沈み込める最大量 (ブロック)。地面へめり込ませないよう小さく抑える。 */
-    private static final double SUSP_MAX_DROP = 0.045D;
-    /** 目標高さから浮き上がれる最大量 (ブロック)。 */
-    private static final double SUSP_MAX_RISE = 0.045D;
-
-    /**
-     * レール継ぎ目 (レール core 境界) 通過時の「ガタン」(RTMU オリジナル)。
-     * レール形状は継ぎ目でも連続なので自然な段差入力が無い。
-     */
-    public void onRailJoint(EntityBogie bogie, float speed) {
-        if (!this.suspInit) {
-            return;
-        }
-        double kick = Math.min(0.012D, Math.abs(speed) * 0.03D);
-        if (kick < 0.001D) {
-            return;
-        }
-        this.suspYVel -= kick;
-    }
-
     public void createBogie(Level world, EntityTrainBase train) {
         this.bogies[0] = new EntityBogie(RTMEntities.BOGIE.get(), world, (byte) 0);
         this.bogies[1] = new EntityBogie(RTMEntities.BOGIE.get(), world, (byte) 1);
@@ -172,9 +132,10 @@ public class BogieController {
         y += vec.getY() - EntityTrainBase.TRAIN_HEIGHT;
         z += vec.getZ();
 
-        // 車体サスペンション (RTMU独自の「沈んで揺り戻す」上下動) は坂で列車が沈んで戻るを
-        // 繰り返して見えると報告されたため無効化。車体 Y は台車中点の理想値をそのまま使い、
-        // レールにぴったり乗せる (上下振動なし)。※フィールド/onRailJoint は将来の再利用のため残置。
+        // ★車体を上下に揺らす仕掛けは持たない。
+        // 以前 RTMU 独自の「車体サスペンション」(継ぎ目や勾配で沈んで揺り戻す上下動) を
+        // 入れていたが、坂で列車が沈んでは戻るのを繰り返して見えるため撤去した。
+        // 車体 Y は台車中点の理想値をそのまま使い、レールにぴったり乗せる。
 
         train.setPositionAndRotationDirect(x, y, z, yaw, pitch);
         train.updateRoll(roll);

@@ -12,6 +12,23 @@ public final class NGTText {
     private NGTText() {
     }
 
+    /** KaizPatchX keeps the encoding parameter for source compatibility. */
+    public static List<String> readText(Object resource, String encoding) {
+        if (resource instanceof java.io.File file) {
+            try {
+                String text = decodeText(java.nio.file.Files.readAllBytes(file.toPath()));
+                return new ArrayList<>(java.util.Arrays.asList(text.split(LINE_SEPARATOR_PATTERN)));
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        }
+        return readTextLines(resource);
+    }
+
+    public static String readText(java.io.File file, boolean indention, String encoding) {
+        return append(readText(file, encoding), indention);
+    }
+
     public static List<String> readText(Object resource) {
         return readTextLines(resource);
     }

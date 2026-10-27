@@ -23,7 +23,7 @@ public abstract class BlockLightEngineMixin {
                                       CallbackInfoReturnable<Integer> cir) {
         // RTMU のブロック以外は一切触らない (バニラの明るさ計算に負荷も影響も足さない)
         if (!(state.getBlock()
-                instanceof com.portofino.realtrainmodunofficial.block.InstalledObjectBlock)) {
+                instanceof com.portofino.realtrainmodunofficial.block.InstalledObjectBlock) && !(state.getBlock() instanceof com.portofino.realtrainmodunofficial.block.MiniatureBlock)) {
             return;
         }
         try {
@@ -36,6 +36,10 @@ public abstract class BlockLightEngineMixin {
             BlockPos pos = BlockPos.of(packedPos);
             // ★getBlockEntity を使うこと。getExistingBlockEntity 相当が無いので、
             // 読み込まれていない位置では null が返る。そのときはバニラの値のまま。
+            if (state.getBlock() instanceof com.portofino.realtrainmodunofficial.block.MiniatureBlock miniature) {
+                cir.setReturnValue(miniature.getLightEmission(state,level,pos));
+                return;
+            }
             if (level.getBlockEntity(pos)
                     instanceof com.portofino.realtrainmodunofficial.blockentity
                         .InstalledObjectBlockEntity be) {

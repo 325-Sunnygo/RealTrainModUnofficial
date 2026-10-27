@@ -26,9 +26,20 @@ public final class TrainConfigAdapter {
     }
 
     private static TrainConfig create(VehicleDefinition def) {
+        if(def!=null && def.getLegacyConfig()!=null) {
+            var json=def.getLegacyConfig();
+            if(json.has("model") && !json.has("trainModel2"))json.add("trainModel2",json.get("model"));
+            TrainConfig parsed=new com.google.gson.Gson().fromJson(json,TrainConfig.class);
+            parsed.trainName=def.getId();parsed.init();return parsed;
+        }
         TrainConfig cfg = new TrainConfig();
         if (def != null) {
             cfg.trainName = def.getId();
+            if(!def.isCarType() && !def.getVehicleType().isBlank()) cfg.trainType=def.getVehicleType();
+            cfg.smoothing=def.isSmoothing();cfg.doCulling=def.isDoCulling();
+            cfg.scale=def.getModelScale();
+            var offset=def.getModelOffset();cfg.offset=new float[]{(float)offset.x,(float)offset.y,(float)offset.z};
+            cfg.notDisplayCab=def.isNotDisplayCab();cfg.isSingleTrain=def.isSingleTrain();
 
             List<net.minecraft.world.phys.Vec3> bogies = def.getBogiePositions();
             if (bogies != null && bogies.size() >= 2) {
@@ -103,5 +114,6 @@ public final class TrainConfigAdapter {
 
     public static void clearCache() {
         CACHE.clear();
+        VehicleConfigAdapter.clearCache();
     }
 }

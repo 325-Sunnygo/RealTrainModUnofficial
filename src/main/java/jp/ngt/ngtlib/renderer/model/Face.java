@@ -61,7 +61,8 @@ public class Face {
             this.uvs[index * 2] = coord.getU();
             this.uvs[index * 2 + 1] = coord.getV();
         }
-        this.texCoordView = null;
+        if(this.texCoordView==null) this.texCoordView=new TextureCoordinate[this.vertices.length];
+        this.texCoordView[index]=coord;
     }
 
     /**
@@ -76,9 +77,9 @@ public class Face {
         this.vertexNormals = new Vertex[n];
         for (int i = 0; i < n; i++) {
             Vertex base = this.faceNormal;
-            float nx = base.getX();
-            float ny = base.getY();
-            float nz = base.getZ();
+            double nx = base.getX();
+            double ny = base.getY();
+            double nz = base.getZ();
             java.util.List<Face> shared = map == null ? null : map.get(this.vertices[i]);
             if (shared != null) {
                 for (Face other : shared) {
@@ -86,19 +87,19 @@ public class Face {
                         continue;
                     }
                     // 法線同士の角がスムージング角以内なら足す (cos 比較)
-                    float dot = base.getX() * other.faceNormal.getX()
-                            + base.getY() * other.faceNormal.getY()
-                            + base.getZ() * other.faceNormal.getZ();
-                    if (dot >= angleCos) {
+                    double dot = (double)base.getX() * other.faceNormal.getX()
+                            + (double)base.getY() * other.faceNormal.getY()
+                            + (double)base.getZ() * other.faceNormal.getZ();
+                    double lengths=Math.sqrt((double)base.x*base.x+(double)base.y*base.y+(double)base.z*base.z)
+                        * Math.sqrt((double)other.faceNormal.x*other.faceNormal.x+(double)other.faceNormal.y*other.faceNormal.y+(double)other.faceNormal.z*other.faceNormal.z);
+                    if (lengths>0 && dot/lengths >= angleCos) {
                         nx += other.faceNormal.getX();
                         ny += other.faceNormal.getY();
                         nz += other.faceNormal.getZ();
                     }
                 }
             }
-            Vertex v = new Vertex(nx, ny, nz);
-            v.normalize();
-            this.vertexNormals[i] = v;
+            this.vertexNormals[i] = Vertex.create(new jp.ngt.ngtlib.math.Vec3(nx,ny,nz).normalize(),accuracy);
         }
     }
 
@@ -130,7 +131,7 @@ public class Face {
                 float y = src.getY() * MIRROR_PATTERN[type][1];
                 float z = src.getZ() * MIRROR_PATTERN[type][2];
                 boolean onPlane = (type == 0 && x == 0.0F) || (type == 1 && y == 0.0F) || (type == 2 && z == 0.0F);
-                mirrored = onPlane ? src : new Vertex(x, y, z);
+                mirrored = onPlane ? src : Vertex.create(x,y,z,accuracy);
                 if (mirrorVertex != null) {
                     mirrorVertex.put(src, mirrored);
                 }
@@ -150,32 +151,15 @@ public class Face {
     }
 
     public void calculateFaceNormal(VecAccuracy accuracy) {
-        if (this.vertices.length < 3) {
-            this.faceNormal = new Vertex(0.0F, 1.0F, 0.0F);
-            return;
+        float[] points = new float[this.vertices.length * 3];
+        for (int i = 0; i < this.vertices.length; i++) {
+            Vertex vertex = this.vertices[i];
+            if (vertex == null) continue;
+            points[i * 3] = vertex.getX();
+            points[i * 3 + 1] = vertex.getY();
+            points[i * 3 + 2] = vertex.getZ();
         }
-        Vertex v0 = this.vertices[0];
-        Vertex v1 = this.vertices[1];
-        Vertex v2 = this.vertices[2];
-        float ax = v1.x - v0.x, ay = v1.y - v0.y, az = v1.z - v0.z;
-        float bx = v2.x - v0.x, by = v2.y - v0.y, bz = v2.z - v0.z;
-        float nx = ay * bz - az * by;
-        float ny = az * bx - ax * bz;
-        float nz = ax * by - ay * bx;
-        // ★大きさで捨てない。先に最大成分で割ってから正規化する (細かい文字の三角形対策)。
-        float max = Math.max(Math.abs(nx), Math.max(Math.abs(ny), Math.abs(nz)));
-        if (!(max > 0.0F) || !Float.isFinite(max)) {
-            this.faceNormal = new Vertex(0.0F, 1.0F, 0.0F);
-            return;
-        }
-        nx /= max;
-        ny /= max;
-        nz /= max;
-        float len = (float) Math.sqrt((double) nx * nx + (double) ny * ny + (double) nz * nz);
-        if (!(len > 0.0F) || !Float.isFinite(len)) {
-            this.faceNormal = new Vertex(0.0F, 1.0F, 0.0F);
-        } else {
-            this.faceNormal = new Vertex(nx / len, ny / len, nz / len);
-        }
+        float[] normal = LegacyPolygon.faceNormal(points);
+        this.faceNormal = Vertex.create(normal[0], normal[1], normal[2], accuracy);
     }
 }

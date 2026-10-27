@@ -129,11 +129,6 @@ public final class RealTrainModUnofficialClientModEvents {
             com.portofino.realtrainmodunofficial.client.renderer.BulletRenderer::new
         );
 
-        // エディタの選択範囲 (neo mcte)
-        event.registerEntityRenderer(
-            com.portofino.realtrainmodunofficial.RealTrainModUnofficialEntities.EDITOR.get(),
-            com.portofino.realtrainmodunofficial.client.renderer.EditorEntityRenderer::new
-        );
 
         // 装飾ブロック (本家 RenderDecoration)
         event.registerBlockEntityRenderer(
@@ -173,11 +168,6 @@ public final class RealTrainModUnofficialClientModEvents {
         event.registerBlockEntityRenderer(
             RealTrainModUnofficialBlockEntities.INSTALLED_OBJECT.get(),
             InstalledObjectBlockEntityRenderer::new
-        );
-        // 背景パネル (模型の背景に写真を立てる)
-        event.registerBlockEntityRenderer(
-            RealTrainModUnofficialBlockEntities.BACKGROUND_PANEL.get(),
-            com.portofino.realtrainmodunofficial.client.renderer.BackgroundPanelBlockEntityRenderer::new
         );
         // jp.ngt.rtm.entity: 本家忠実移植の列車/台車 (Phase 2 フリップ)
         event.registerEntityRenderer(
@@ -247,6 +237,7 @@ public final class RealTrainModUnofficialClientModEvents {
     public static void registerShaders(net.neoforged.neoforge.client.event.RegisterShadersEvent event)
             throws java.io.IOException {
         com.portofino.realtrainmodunofficial.client.camera.CameraPostProcessor.registerShaders(event);
+        com.portofino.realtrainmodunofficial.client.render.LegacyRenderTypes.register(event);
     }
 
     @SubscribeEvent

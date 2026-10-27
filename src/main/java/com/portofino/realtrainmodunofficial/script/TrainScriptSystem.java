@@ -329,36 +329,19 @@ public class TrainScriptSystem {
             scriptEngine.put("executor", executer);
         } catch (Throwable ignored) {
         }
-        Invocable invocable = (Invocable) scriptEngine;
-        // ★本家 ScriptUtil.doScriptIgnoreError と同じく「エラーは無視して毎tick呼ぶ」。
-        //   RTMU は以前「N 回失敗したら停止」という独自処理を入れており、
-        //   一度失敗したモデルのサーバースクリプトが以後一切動かなくなっていた。
         try {
-            invocable.invokeFunction("onUpdate", entity, executer);
-            if (executer != null) {
-                ++executer.count;
-            }
+            ((Invocable) scriptEngine).invokeFunction("onUpdate", entity, executer);
             noteScriptSuccess(scriptEngine, "onUpdate(entity, executer) [server]");
             noteScriptSuccess(scriptEngine, "onUpdate(entity, executer) [server-runtime]");
-            return;
         } catch (NoSuchMethodException ignored) {
         } catch (ScriptException e) {
             reportScriptFailure(scriptEngine, "onUpdate(entity, executer) [server]", e);
-            return;
         } catch (Throwable t) {
             reportScriptFailure(scriptEngine, "onUpdate(entity, executer) [server-runtime]", t);
-            return;
-        }
-        try {
-            invocable.invokeFunction("onUpdate", entity);
+        } finally {
             if (executer != null) {
                 ++executer.count;
             }
-        } catch (NoSuchMethodException ignored) {
-        } catch (ScriptException e) {
-            reportScriptFailure(scriptEngine, "onUpdate(entity) [server]", e);
-        } catch (Throwable t) {
-            reportScriptFailure(scriptEngine, "onUpdate(entity) [server-runtime]", t);
         }
     }
 
@@ -368,7 +351,11 @@ public class TrainScriptSystem {
         if (scriptEngine == null || train == null) {
             return;
         }
-        SoundScriptExecutor su = new SoundScriptExecutor(train);
+        SoundScriptExecutor su = train instanceof jp.ngt.rtm.entity.train.EntityTrainBase legacy
+                ? legacy.getSoundUpdater()
+                : train instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity modern
+                    ? modern.getSoundUpdater() : new SoundScriptExecutor(train);
+        su.updateAts();
         try {
             scriptEngine.put("executer", su);
             scriptEngine.put("executor", su);
@@ -1436,7 +1423,7 @@ public class TrainScriptSystem {
         private static final java.util.regex.Pattern TYPE_N_PATTERN = java.util.regex.Pattern.compile("type\\d+");
 
         private static final class ParsedGroupSet {
-            final List<String> filteredGroupNames;   // shadow/guide 除外後の元名前列
+            final List<String> filteredGroupNames;   // guide 除外後の元名前列
             final Set<String> normalizedNames;       // 正規化(lowercase trim) 後
             final Set<String> presentGroupNames;     // モデルに実在する正規化名
             final boolean legacyDisplaySelection;
@@ -1790,8 +1777,6 @@ public class TrainScriptSystem {
             for (String n : rawNames) {
                 String x = normalizeLegacyGroupName(n);
                 if (x.isEmpty()) continue;
-                // 擬似シャドウ(黒平板)を無効化。shadow完全一致のみ
-                if (x.equalsIgnoreCase("shadow")) continue;
                 if (currentPass >= 2 && isLightOffGroup(x)) continue;
                 normalized.add(x);
             }
@@ -2732,7 +2717,6 @@ public class TrainScriptSystem {
                         List<String> filtered = new ArrayList<>(raw.size());
                         for (String g : raw) {
                             String n = normalizeLegacyGroupName(g);
-                            if (n.equals("shadow") || n.startsWith("shadow_") || n.endsWith("_shadow")) continue;
                             if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) continue;
                             if (currentPass >= 2 && isLightOffGroup(n)) continue;
                             filtered.add(g);
@@ -2784,7 +2768,6 @@ public class TrainScriptSystem {
                     groupNames = groupNames.stream()
                         .filter(g -> {
                             String n = normalizeLegacyGroupName(g);
-                            if (n.equals("shadow") || n.startsWith("shadow_") || n.endsWith("_shadow")) return false;
                             if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) return false;
                             if (currentPass >= 2 && isLightOffGroup(n)) return false;
                             return true;
@@ -3192,10 +3175,6 @@ public class TrainScriptSystem {
             String normalized = normalizeLegacyGroupName(groupName);
             if (normalized.isEmpty()) {
                 return true;
-            }
-            // 擬似シャドウ group (完全一致のみ) は常に skip (ユーザー要望で車両の影は無効化)。
-            if (normalized.equalsIgnoreCase("shadow")) {
-                return false;
             }
             // 角度曲げ変種は描かない(原点姿勢だと散乱する)
             if (isBendVariant(normalized)) {
@@ -3988,13 +3967,30 @@ public class TrainScriptSystem {
             return 0.0F;
         }
 
-        // ---- Inventory helpers (stubs) ----
+        // Inventory-dependent scripts must run again when their contents change.
+        public Object getInventoryItem(Object entity, int slot) {
+            disableReplayCacheForFrame();
+            return jp.ngt.ngtlib.renderer.LegacyItemRenderer.inventoryItem(entity,slot);
+        }
 
-        public Object getInventoryItem(Object entity, int slot) { return null; }
+        public int getStackSize(Object stack) {
+            var nativeStack=jp.ngt.mccompat.ItemStackCompat.unwrap(stack);
+            return nativeStack==null ? 0 : nativeStack.getCount();
+        }
 
-        public int getStackSize(Object stack) { return stack == null ? 0 : 1; }
-
-        public void renderItem(Object entity, Object item) {}
+        public void renderItem(Object entity, Object item) {
+            disableReplayCacheForFrame();
+            var stack=jp.ngt.mccompat.ItemStackCompat.unwrap(item);
+            if(stack==null || stack.isEmpty()) return;
+            if(jp.ngt.ngtlib.renderer.GLRecorder.active()!=null) {
+                jp.ngt.ngtlib.renderer.LegacyItemRenderer.INSTANCE.renderItem(entity,item,0);
+            } else if(poseStack!=null && buffer!=null) {
+                var minecraft=net.minecraft.client.Minecraft.getInstance();
+                minecraft.getItemRenderer().renderStatic(stack,net.minecraft.world.item.ItemDisplayContext.FIXED,
+                        packedLight,overlay,poseStack,buffer,minecraft.level,
+                        entity instanceof net.minecraft.world.entity.Entity nativeEntity ? nativeEntity.getId():0);
+            }
+        }
 
         // ---- Player camera / view ----
 

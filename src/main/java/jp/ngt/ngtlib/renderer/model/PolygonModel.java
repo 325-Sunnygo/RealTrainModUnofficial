@@ -10,11 +10,12 @@ import java.util.Locale;
  * 本家 jp.ngt.ngtlib.renderer.model.PolygonModel のスクリプト互換移植。
  * renderPart は GLRecorder に記録され、再生側が現在テクスチャで面を emit する。
  */
-public class PolygonModel {
+public class PolygonModel implements IModelNGT {
+    public jp.ngt.ngtlib.io.FileType getType() { return jp.ngt.ngtlib.io.FileType.getType(this.fileName); }
     public final List<GroupObject> groupObjects = new ArrayList<>();
     /** 全頂点。本家はパース中に貯める。 */
     public final List<Vertex> vertices = new ArrayList<>();
-    /** 座標精度。RTMU は float 固定だがスクリプトが読むので持つ。 */
+    /** 座標精度。スクリプトの LOW/MEDIUM 指定を保持する。 */
     public VecAccuracy accuracy = VecAccuracy.MEDIUM;
     /** 外接箱 {minX,minY,minZ,maxX,maxY,maxZ}。 */
     public float[] sizeBox = new float[6];

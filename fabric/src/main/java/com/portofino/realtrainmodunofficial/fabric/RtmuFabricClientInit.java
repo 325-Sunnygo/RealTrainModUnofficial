@@ -34,6 +34,8 @@ public class RtmuFabricClientInit implements ClientModInitializer {
         // --- MOD バス: 起動時に 1 回 ---
         // レンダラー登録・キーマッピング・クライアント初期化。順番は NeoForge と同じにする。
         RtmuFabricInit.MOD_BUS.post(new EntityRenderersEvent.RegisterRenderers());
+        RtmuFabricInit.MOD_BUS.post(new net.neoforged.neoforge.client.event.RegisterMenuScreensEvent());
+        WorldRenderEvents.START.register(ctx -> NeoForge.EVENT_BUS.post(new net.neoforged.neoforge.client.event.RenderFrameEvent.Pre()));
         registerKeyMappings();
         RtmuFabricInit.MOD_BUS.post(new FMLClientSetupEvent());
 
@@ -44,6 +46,16 @@ public class RtmuFabricClientInit implements ClientModInitializer {
             new net.neoforged.neoforge.client.event.RegisterColorHandlersEvent.Item());
 
         registerCutoutBlocks();
+        net.fabricmc.fabric.api.resource.ResourceManagerHelper.get(net.minecraft.server.packs.PackType.CLIENT_RESOURCES)
+            .registerReloadListener(new net.fabricmc.fabric.api.resource.SimpleSynchronousResourceReloadListener() {
+                @Override public net.minecraft.resources.ResourceLocation getFabricId() {
+                    return net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+                        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.MODID, "vehicle_model_packs");
+                }
+                @Override public void onResourceManagerReload(net.minecraft.server.packs.resources.ResourceManager manager) {
+                    com.portofino.realtrainmodunofficial.modelpack.VehicleModelPackManager.INSTANCE.onResourceManagerReload(manager);
+                }
+            });
         registerBakedModelHook();
         registerCustomItemRenderers();
 
@@ -156,9 +168,14 @@ public class RtmuFabricClientInit implements ClientModInitializer {
         net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin.register(pluginContext ->
             pluginContext.modifyModelAfterBake().register((model, context) -> {
                 net.minecraft.client.resources.model.ModelResourceLocation id = context.topLevelId();
-                if (id == null || model == null) {
+                if (id == null || model == null || !id.id().getNamespace().equals(com.portofino.realtrainmodunofficial.RealTrainModUnofficial.MODID)) {
                     return model;
                 }
+                String path = id.id().getPath();
+                boolean item = "inventory".equals(id.getVariant());
+                boolean ballast = !item && java.util.Set.of("large_rail_base", "large_rail_normal_core",
+                    "large_rail_switch_base", "large_rail_switch_core", "large_rail_slope_core").contains(path);
+                if (!item && !ballast) return model;
                 java.util.Map<net.minecraft.client.resources.model.ModelResourceLocation,
                     net.minecraft.client.resources.model.BakedModel> one = new java.util.HashMap<>();
                 one.put(id, model);

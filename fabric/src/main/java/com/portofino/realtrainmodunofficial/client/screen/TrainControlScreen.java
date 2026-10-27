@@ -485,4 +485,9 @@ public class TrainControlScreen extends Screen {
             graphics.blit(TAB_INVENTORY_TEXTURE, getX() + 44, getY() + 48, 224, opened ? 80 : 88, 8, 8, 256, 256);
         }
     }
+
+    /** 1.21 のメニューぼかしを無効化 (本家 1.7.10 の GUI にぼかしは無い)。 */
+    @Override
+    protected void renderBlurredBackground(float partialTick) {
+    }
 }

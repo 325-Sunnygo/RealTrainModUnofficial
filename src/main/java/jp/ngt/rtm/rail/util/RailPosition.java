@@ -41,6 +41,8 @@ public final class RailPosition {
     public float constLimitHN;
     public float constLimitWP;
     public float constLimitWN;
+    public double offsetX, offsetY, offsetZ;
+
     public double posX;
     public double posY;
     public double posZ;
@@ -51,6 +53,10 @@ public final class RailPosition {
      * blockX/Z + REVISION[direction] から posX/posZ を導出できる。
      */
     public boolean freePos;
+
+    public RailPosition(int x, int y, int z, byte direction) {
+        this(x, y, z, direction, 0);
+    }
 
     public RailPosition(int x, int y, int z, int dir, int type) {
         this.blockX = x;
@@ -73,9 +79,9 @@ public final class RailPosition {
             // ペンマーカーの点は posX/posY/posZ が一次情報。ここで潰さない。
             return;
         }
-        this.posX = (double) this.blockX + 0.5D + (double) REVISION[this.direction & 7][0];
-        this.posY = (double) this.blockY + (double) (this.height + 1) * 0.0625D;
-        this.posZ = (double) this.blockZ + 0.5D + (double) REVISION[this.direction & 7][1];
+        this.posX = (double) this.blockX + 0.5D + (double) REVISION[this.direction & 7][0] + this.offsetX;
+        this.posY = (double) this.blockY + (double) (this.height + 1) * 0.0625D + this.offsetY;
+        this.posZ = (double) this.blockZ + 0.5D + (double) REVISION[this.direction & 7][1] + this.offsetZ;
     }
 
     /**
@@ -101,12 +107,26 @@ public final class RailPosition {
         return rp;
     }
 
+    public void setPosition(double x, double y, double z) {
+        if (this.freePos) {
+            this.posX = x;
+            this.posY = y;
+            this.posZ = z;
+            return;
+        }
+        this.offsetX = x - (this.blockX + 0.5D + REVISION[this.direction & 7][0]);
+        this.offsetY = y - (this.blockY + (this.height + 1) * 0.0625D);
+        this.offsetZ = z - (this.blockZ + 0.5D + REVISION[this.direction & 7][1]);
+        this.init();
+    }
+
     public void addHeight(double par1) {
         int h2 = (int) (par1 / 0.0625D);
         this.height = (byte) (this.height + h2);
         this.init();
     }
 
+    public static RailPosition readFromNBT(Object nbt) {return readFromNBT(java.util.Objects.requireNonNull(jp.ngt.mccompat.nbt.NBTTagCompound.unwrap(nbt)));}
     public static RailPosition readFromNBT(CompoundTag nbt) {
         int[] pos = nbt.getIntArray("BlockPos");
         if (pos.length < 3) return null;
@@ -125,6 +145,9 @@ public final class RailPosition {
         rp.constLimitHN = nbt.getFloat("Const_Limit_HN");
         rp.constLimitWP = nbt.getFloat("Const_Limit_WP");
         rp.constLimitWN = nbt.getFloat("Const_Limit_WN");
+        rp.offsetX = nbt.getDouble("OffsetX");
+        rp.offsetY = nbt.getDouble("OffsetY");
+        rp.offsetZ = nbt.getDouble("OffsetZ");
         rp.anchorManual = nbt.getBoolean("A_Manual");
         // ペンマーカーの点は posX/posY/posZ が一次情報なので、init より先に復元して
         // freePos を立てる (立っていれば init は上書きしない)。
@@ -155,6 +178,9 @@ public final class RailPosition {
         nbt.putFloat("Const_Limit_HN", this.constLimitHN);
         nbt.putFloat("Const_Limit_WP", this.constLimitWP);
         nbt.putFloat("Const_Limit_WN", this.constLimitWN);
+        if (this.offsetX != 0.0D) nbt.putDouble("OffsetX", this.offsetX);
+        if (this.offsetY != 0.0D) nbt.putDouble("OffsetY", this.offsetY);
+        if (this.offsetZ != 0.0D) nbt.putDouble("OffsetZ", this.offsetZ);
         nbt.putBoolean("A_Manual", this.anchorManual);
         if (this.freePos) {
             nbt.putBoolean("FreePos", true);
@@ -167,7 +193,7 @@ public final class RailPosition {
 
     public void setHeight(byte par1) {
         this.height = par1;
-        this.posY = (double) this.blockY + (double) (par1 + 1) * 0.0625D;
+        this.posY = (double) this.blockY + (double) (par1 + 1) * 0.0625D + this.offsetY;
     }
 
     /** 与えられた距離だけ平行移動 */

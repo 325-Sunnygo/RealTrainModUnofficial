@@ -10,19 +10,11 @@ public final class GLHelper {
     private GLHelper() {
     }
 
-    public static void disableLighting() {
-        // 1.21 側でライティングはパイプライン管理 — brightness 記録のみで表現
-        // (フルブライト化はスクリプトが直後の setLightmapMaxBrightness で行う)
-    }
+    public static final GLHelper INSTANCE=new GLHelper();
+    public static final jp.ngt.ngtlib.util.Locker LOCKER=new jp.ngt.ngtlib.util.Locker();
 
-    public static void enableLighting() {
-        // 本家: ライティング復帰。RTMU では「環境光へ戻す」= brightness 負値を記録
-        // (再生側 replay が負値を packedLight リセットとして扱う)。
-        GLRecorder r = GLRecorder.active();
-        if (r != null) {
-            r.brightness(-1);
-        }
-    }
+    public static void disableLighting() { GL11Facade.glDisable(GL11Facade.GL_LIGHTING); }
+    public static void enableLighting() { GL11Facade.glEnable(GL11Facade.GL_LIGHTING); }
 
     public static void setLightmapMaxBrightness() {
         GLRecorder r = GLRecorder.active();
@@ -45,21 +37,10 @@ public final class GLHelper {
         }
     }
 
-    // マウスピック系 (ActionParts) は未対応 — 安全に no-op
-    public static void startMousePicking(float par1) {
-    }
-
-    public static int finishMousePicking() {
-        return 0;
-    }
-
-    public static double getPickedObjDepth(int i) {
-        return 0.0D;
-    }
-
-    public static int getPickedObjId(int i) {
-        return 0;
-    }
+    public static void startMousePicking(float range) { LegacySelection.start(range); }
+    public static int finishMousePicking() { return LegacySelection.finish(); }
+    public static double getPickedObjDepth(int index) { return LegacySelection.hit(index).depth(); }
+    public static int getPickedObjId(int index) { return LegacySelection.hit(index).id(); }
 
     // ---- ディスプレイリスト (NGTO Builder のミニチュアプレビューが使用) ----
     // 本家の GL ディスプレイリストを GLRecorder のサブ記録として実装する:
@@ -67,37 +48,41 @@ public final class GLHelper {
     // callList 分岐が永久に実行されず、プレビューが表示されない)。
     private static final java.util.Map<Integer, GLRecorder> GL_LISTS =
         new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Set<DisplayList> LIST_HANDLES=java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static DisplayList handle(int value) { DisplayList list=new DisplayList(value); LIST_HANDLES.add(list); return list; }
     private static final java.util.concurrent.atomic.AtomicInteger NEXT_LIST_ID =
         new java.util.concurrent.atomic.AtomicInteger(1);
-    private static GLRecorder compilePrev;
-    private static int compilingId;
+    private record Compilation(GLRecorder previous, int id) {}
+    private static final ThreadLocal<java.util.Deque<Compilation>> COMPILATIONS=ThreadLocal.withInitial(java.util.ArrayDeque::new);
 
-    public static int generateGLList() {
-        return NEXT_LIST_ID.getAndIncrement();
+    public static DisplayList generateGLList() {
+        return handle(NEXT_LIST_ID.getAndIncrement());
     }
 
     /** 非 old 分岐は generateGLList(null) と呼ぶ (引数は未使用)。 */
-    public static int generateGLList(Object ignored) {
-        return generateGLList();
+    public static DisplayList generateGLList(Object previous) {
+        return previous instanceof DisplayList list && GL_LISTS.containsKey(list.value) ? handle(list.value) : generateGLList();
     }
 
+    public static void startCompile(DisplayList list) { startCompile(list.value); }
+
     public static void startCompile(int list) {
-        compilePrev = GLRecorder.active();
-        compilingId = list;
+        if(list<=0) throw new IllegalArgumentException("Invalid display list");
+        COMPILATIONS.get().push(new Compilation(GLRecorder.active(),list));
         GLRecorder rec = new GLRecorder();
         GL_LISTS.put(list, rec);
         GLRecorder.activate(rec);
     }
 
     public static void endCompile() {
-        if (compilePrev != null) {
-            GLRecorder.activate(compilePrev);
-        } else {
-            GLRecorder.deactivate();
-        }
-        compilePrev = null;
-        compilingId = 0;
+        var stack=COMPILATIONS.get();
+        if(stack.isEmpty()) throw new IllegalStateException("endCompile without startCompile");
+        GLRecorder previous=stack.pop().previous();
+        if(previous!=null) GLRecorder.activate(previous); else GLRecorder.deactivate();
+        if(stack.isEmpty()) COMPILATIONS.remove();
     }
+
+    public static void callList(DisplayList list) { if(list!=null) callList(list.value); }
 
     public static void callList(int list) {
         GLRecorder current = GLRecorder.active();
@@ -106,6 +91,8 @@ public final class GLHelper {
             current.appendFrom(stored);
         }
     }
+
+    public static void deleteGLList(DisplayList list) { if(list!=null) { deleteGLList(list.value); list.value=0; } }
 
     public static void deleteGLList(int list) {
         GL_LISTS.remove(list);
@@ -122,14 +109,13 @@ public final class GLHelper {
     }
 
     // ---- テクスチャ UV スクロール (方向幕/回転計器) ----
-    // 本家は GL_TEXTURE 行列を push/translate/pop するが、1.21 の RTMU 描画では
-    // テクスチャ行列を直接いじれない。
-    // renderer.setUvOffset に振る経路) が担うため、Java.type で GLHelper を掴んだスクリプト
-    // 用にここでは安全な no-op を提供する。
+    // テクスチャ行列の平行移動をコマンド状態と専用シェーダーへ保存する。
     public static void preMoveTexUV(float u, float v) {
+        LegacyRenderState.current().pushTexture(u,v);
     }
 
     public static void postMoveTexUV() {
+        LegacyRenderState.current().popTexture();
     }
 
     /** 本家setColor: 0xRRGGBB + alpha(0-255) を現在色に設定 (GLRecorder経由)。 */
@@ -148,23 +134,25 @@ public final class GLHelper {
     public static void clearGLList() {
     }
 
-    /** 本家initGLList: no-op。 */
+    /** リソース再読込時に記録済みリストを破棄する。 */
     public static void initGLList() {
+        LIST_HANDLES.forEach(list->list.value=0); LIST_HANDLES.clear();
+        GL_LISTS.clear();
     }
 
-    /** 本家isCompiling: GLリスト非使用のため常にfalse。 */
+    /** 現在のスレッドが表示リストを記録しているか。 */
     public static boolean isCompiling() {
-        return false;
+        return !COMPILATIONS.get().isEmpty();
     }
 
     /** 本家isValid(DisplayList)。 */
     public static boolean isValid(Object par1) {
-        return false;
+        return par1 instanceof DisplayList list ? list.value>0 : par1 instanceof Number number && number.intValue()>0;
     }
 
-    /** 本家getShaderProgram: 旧GLSL直叩きは非対応。 */
+    /** Compile, link and validate source strings in the active render context. */
     public static int getShaderProgram(String vsh, String fsh) {
-        return -1;
+        return LegacyShaderProgram.create(vsh,fsh);
     }
 
 }

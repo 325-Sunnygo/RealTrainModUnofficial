@@ -99,11 +99,36 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
         }
     }
 
-    /** 本家getNormal: 機器の向きベクトル。 */
+    /**
+     * 本家 TileEntityPartsRenderer.getMetadata = 設置物のブロック meta。
+     * 本家 ItemInstalledObject は照明/スピーカー/看板/碍子の meta に
+     * <b>クリックした面 (0-5)</b> を入れるので、RTMU では保存してある取付面を返す。
+     * <p>
+     * ★ここが 0 固定だと RenderSearchLight.js / RenderSpeaker.js の
+     * 「壁付け (meta 2-5) のときは樽の pitch を -90 して打ち消す」分岐が働かず、
+     * BER の面回転 90 度と樽の 90 度が二重に掛かってモデルが斜めに傾く。
+     */
+    @Override
+    public int getMetadata(Object tile) {
+        if (tile instanceof InstalledObjectBlockEntity) {
+            return mountFaceOf(tile);
+        }
+        return super.getMetadata(tile);
+    }
+
+    /** 取付面 (本家 meta)。未設定の古い設置物は BER と同じく 1 (上向き=面回転なし) 扱い。 */
+    private static int mountFaceOf(Object tile) {
+        if (tile instanceof InstalledObjectBlockEntity be) {
+            int face = be.getMountFace();
+            return face >= 0 ? face : 1;
+        }
+        return 0;
+    }
+
+    /** 本家getNormal: 機器の向きベクトル。本家 TileEntityLight.getNormal と同じく meta で回す。 */
     public jp.ngt.ngtlib.math.Vec3 getNormal(Object tile, float x, float y, float z, float pitch, float yaw) {
         jp.ngt.ngtlib.math.Vec3 vec = new jp.ngt.ngtlib.math.Vec3(x, y, z);
-        vec.rotateAroundX(jp.ngt.ngtlib.math.NGTMath.toRadians(pitch));
-        vec.rotateAroundY(jp.ngt.ngtlib.math.NGTMath.toRadians(yaw));
+        rotateVec(vec, mountFaceOf(tile), pitch, yaw);
         return vec;
     }
 
@@ -113,7 +138,7 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
             return new double[3];
         }
         jp.ngt.ngtlib.math.Vec3 vec = new jp.ngt.ngtlib.math.Vec3(x, y, z);
-        rotateVec(vec, 0, pitch, yaw);
+        rotateVec(vec, mountFaceOf(tile), pitch, yaw);
         return new double[]{
             be.getBlockPos().getX() + 0.5D + vec.getX(),
             be.getBlockPos().getY() + 0.5D + vec.getY(),

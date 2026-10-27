@@ -429,7 +429,9 @@ public class RailPackLoader {
             if (pair.size() < 2) continue;
             String mat = pair.get(0).getAsString();
             String tex = pair.get(1).getAsString();
-            if (!mat.isBlank() && !tex.isBlank()) overrides.put(mat, tex);
+            if (!mat.isBlank() && !tex.isBlank()) {
+                overrides.put(mat,com.portofino.realtrainmodunofficial.modelpack.LegacyTextureDescriptor.encode(pair));
+            }
         }
         return overrides;
     }

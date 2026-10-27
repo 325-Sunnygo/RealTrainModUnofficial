@@ -1,11 +1,6 @@
 package com.portofino.realtrainmodunofficial.client;
 
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
-import com.portofino.realtrainmodunofficial.client.screen.ScriptBlockScreen;
-import com.portofino.realtrainmodunofficial.client.screen.SignalChangerScreen;
-import com.portofino.realtrainmodunofficial.client.screen.SignalReceiverScreen;
-import com.portofino.realtrainmodunofficial.client.screen.SignalValueScreen;
-import com.portofino.realtrainmodunofficial.client.screen.TrainDetectorScreen;
 import com.portofino.realtrainmodunofficial.client.sound.CrossingGateSoundManager;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import com.portofino.realtrainmodunofficial.item.TrainItem;
@@ -23,10 +18,7 @@ public final class ClientHooksClient {
     private ClientHooksClient() {
     }
 
-    public static void openEditorScreen() {
-        net.minecraft.client.Minecraft.getInstance().setScreen(
-            new com.portofino.realtrainmodunofficial.client.screen.EditorScreen());
-    }
+
 
     public static void openPainterSettingsScreen(ItemStack stack, boolean offHand) {
         net.minecraft.client.Minecraft.getInstance().setScreen(
@@ -60,24 +52,12 @@ public final class ClientHooksClient {
         ClientItemHelper.openTrainSelectScreen(player, stack);
     }
 
-    public static void openVehicleFormationScreen(ItemStack stack) {
-        ClientItemHelper.openVehicleFormationScreen(stack);
-    }
-
     public static void openCarSelectScreen(Player player, ItemStack stack) {
         ClientItemHelper.openCarSelectScreen(player, stack);
     }
 
     public static void openInstalledObjectSelectScreen(Player player, ItemStack stack, InstalledObjectCategory category) {
         ClientItemHelper.openInstalledObjectSelectScreen(player, stack, category);
-    }
-
-    /** SignalControllerMod (masa300) 移植: 設定 GUI */
-    public static void openSignalControllerScreen(Object controller) {
-        if (controller instanceof jp.masa.signalcontrollermod.TileEntitySignalController te) {
-            Minecraft.getInstance().setScreen(
-                new com.portofino.realtrainmodunofficial.client.screen.SignalControllerScreen(te));
-        }
     }
 
     /** 本家 GuiChangeOffset: バールで設置物を右クリック → 微調整 GUI */
@@ -102,24 +82,6 @@ public final class ClientHooksClient {
                 new com.portofino.realtrainmodunofficial.client.screen.MarkerCantScreen(te));
         }
     }
-
-    public static void openSignalChangerScreen(BlockPos pos) {
-        Minecraft.getInstance().setScreen(new SignalChangerScreen(pos));
-    }
-
-    public static void openSignalReceiverScreen(BlockPos pos) {
-        Minecraft.getInstance().setScreen(new SignalReceiverScreen(pos));
-    }
-
-    public static void openSignalValueScreen(BlockPos pos) {
-        Minecraft.getInstance().setScreen(new SignalValueScreen(pos));
-    }
-
-    public static void openTrainDetectorScreen(BlockPos pos) {
-        Minecraft.getInstance().setScreen(new TrainDetectorScreen(pos));
-    }
-
-
 
     /** 機械の customForm (DataMap) 編集画面。本家 DataForm GUI の移植。 */
     public static void openMachineConfigScreen(BlockPos pos) {
@@ -169,18 +131,6 @@ public final class ClientHooksClient {
             new com.portofino.realtrainmodunofficial.client.screen.CameraScreen());
     }
 
-    /** 編成アイテムの編集画面。 */
-    public static void openFormationScreen(ItemStack stack) {
-        Minecraft.getInstance().setScreen(
-            new com.portofino.realtrainmodunofficial.client.screen.FormationEditScreen(stack));
-    }
-
-    /** 駅設定 GUI を開く (現在のタグビット付き)。 */
-    public static void openStationScreen(net.minecraft.core.BlockPos pos, int bits, int capacity) {
-        Minecraft.getInstance().setScreen(
-            new com.portofino.rtmupassenger.client.StationScreen(pos, bits, capacity));
-    }
-
     /** 券売機 (本家 GuiTicketVendor): 切符 / 回数券 の2ボタン */
     public static void openTicketVendorScreen(BlockPos pos) {
         Minecraft.getInstance().setScreen(
@@ -195,10 +145,6 @@ public final class ClientHooksClient {
         }
     }
 
-    /**
-     * 背景パネルの設定画面。今の設定を持って開く
-     * (開いた瞬間に現在値が入っていないと、保存で既定値に戻ってしまう)。
-     */
     public static void openNpcModelScreen(int entityId) {
         ClientItemHelper.openNpcModelScreen(entityId, false);
     }
@@ -242,30 +188,6 @@ public final class ClientHooksClient {
 
     public static void openStationCoreScreen(BlockPos pos) {
         com.portofino.realtrainmodunofficial.client.screen.StationCoreScreen.open(pos);
-    }
-
-    public static void openBackgroundPanelScreen(BlockPos pos) {
-        Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null) {
-            return;
-        }
-        byte[] image = new byte[0];
-        String name = "";
-        float scale = com.portofino.realtrainmodunofficial.blockentity.BackgroundPanelBlockEntity.DEFAULT_SCALE;
-        float offsetY = 0.0F;
-        if (mc.level.getBlockEntity(pos)
-                instanceof com.portofino.realtrainmodunofficial.blockentity.BackgroundPanelBlockEntity be) {
-            image = be.getImage();
-            name = be.getImageName();
-            scale = be.getScale();
-            offsetY = be.getOffsetY();
-        }
-        mc.setScreen(new com.portofino.realtrainmodunofficial.client.screen.BackgroundPanelScreen(
-            pos, image, name, scale, offsetY));
-    }
-
-    public static void openScriptBlockScreen(BlockPos pos) {
-        Minecraft.getInstance().setScreen(new ScriptBlockScreen(pos));
     }
 
     public static void stopCrossingGateSound(Level level, BlockPos pos) {

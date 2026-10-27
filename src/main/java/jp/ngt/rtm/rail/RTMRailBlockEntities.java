@@ -19,7 +19,7 @@ public final class RTMRailBlockEntities {
                     RTMRailBlocks.LARGE_RAIL_BASE.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TileEntityLargeRailNormalCore>> LARGE_RAIL_NORMAL_CORE =
-            REGISTER.register("large_rail_normal_core", () -> BlockEntityType.Builder.of(TileEntityLargeRailNormalCore::new,
+            REGISTER.register("large_rail_normal_core", () -> BlockEntityType.Builder.<TileEntityLargeRailNormalCore>of((pos,state)->state.hasProperty(BlockLargeRailCore.SECTIONED) && state.getValue(BlockLargeRailCore.SECTIONED)?new jp.kaiz.kaizpatch.rtm.rail.TileEntityLargeRailSectionCore(pos,state):new TileEntityLargeRailNormalCore(pos,state),
                     RTMRailBlocks.LARGE_RAIL_NORMAL_CORE.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TileEntityLargeRailSwitchBase>> LARGE_RAIL_SWITCH_BASE =

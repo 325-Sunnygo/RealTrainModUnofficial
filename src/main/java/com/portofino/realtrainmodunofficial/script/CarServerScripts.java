@@ -26,37 +26,39 @@ public final class CarServerScripts {
         if (def == null || !def.hasServerScript()) {
             return null;
         }
-        Entry e = CACHE.computeIfAbsent(def.getId(), id -> create(def));
-        return e == INVALID ? null : e;
+        Entry cached=CACHE.get(def.getId());if(cached!=null)return cached==INVALID?null:cached;
+        String key="vehicle-server|"+def.getId();
+        var compilation=AsyncScriptCompiler.requestPrepared(key,def.getServerScriptPath(),()->prepare(def));
+        if(!compilation.isDone())return null;
+        try {
+            Entry entry=CACHE.computeIfAbsent(def.getId(),id->create(def,compilation.join()));
+            return entry==INVALID?null:entry;
+        } catch(java.util.concurrent.CompletionException failure) {
+            RealTrainModUnofficial.LOGGER.warn("Failed to compile server script for {}",def.getId(),failure);CACHE.put(def.getId(),INVALID);return null;
+        } finally {AsyncScriptCompiler.release(key);}
     }
+
+    public static boolean isLoading(VehicleDefinition def) {return def!=null && def.hasServerScript() && !CACHE.containsKey(def.getId());}
 
     /** 読み込み結果を捨てて next get で読み直させる (診断コマンド用)。 */
     public static void forget(String id) {
         if (id != null) {
             CACHE.remove(id);
+            AsyncScriptCompiler.release("vehicle-server|"+id);
         }
     }
 
-    private static Entry create(VehicleDefinition def) {
+    private static LegacyExecutionIncludes.Prepared prepare(VehicleDefinition def) {
+        String path=def.getServerScriptPath();byte[] bytes=NGTFileLoader.findAsset(path);
+        if(bytes==null)bytes=NGTFileLoader.findAsset("scripts/"+path);
+        if(bytes==null)throw new IllegalArgumentException("Server script not found: "+path);
+        return LegacyExecutionIncludes.prepare(PackScriptSource.decode(bytes),path,NGTFileLoader::findAsset,PackScriptSource.SERVER_PRELUDE);
+    }
+    private static Entry create(VehicleDefinition def,javax.script.CompiledScript compiled) {
         try {
-            String path = def.getServerScriptPath();
-            byte[] bytes = NGTFileLoader.findAsset(path);
-            if (bytes == null) {
-                // "scripts/..." 前置の揺れを吸収
-                bytes = NGTFileLoader.findAsset("scripts/" + path);
-            }
-            if (bytes == null) {
-                RealTrainModUnofficial.LOGGER.warn("Server script not found for {}: {}", def.getId(), path);
-                return INVALID;
-            }
-            String source = PackScriptSource.decode(bytes);
-            source = PackScriptSource.prepare(source, path);
-            // ★SuperRailBuilder3 のビルダーは車として登録されているので、その敷設処理は
-            // この経路で読まれる。ここに差し込まないとブリッジが一切効かず、SRB 本来の
-            // 1.12.2 向けコードがそのまま走って分岐敷設で失敗する。
-            // ★パック名で分岐する SuperRailBuilder3 専用の関数差し替えは本家に無いため撤去した
-            //   (appendSuperRailBuilderOverrides は no-op 化済み)。
-            ScriptEngine engine = ScriptUtil.doScript(PackScriptSource.PRELUDE + source);
+            String path=def.getServerScriptPath();
+            // Compilation is CPU-only; evaluate and execute world callbacks on the server caller.
+            ScriptEngine engine=compiled.getEngine();compiled.eval();
             // ★SRB3 専用ブリッジ __SRB__ は本家に無く、どの同梱スクリプトも参照しないため撤去。
             //どのツールのサーバー側が動いているかログで追えるようにする
             //(クライアントの "vehicle script init" と対になる)
@@ -117,20 +119,31 @@ public final class CarServerScripts {
                 return;
             }
             try {
-                jp.ngt.rtm.modelpack.ScriptExecuter executer = executerFor(entity);
-                ((Invocable) engine).invokeFunction("onUpdate", entity, executer);
-                if (executer != null) {
-                    executer.count++;
+                java.util.Map<String,String> requests=null;
+                if(entity instanceof com.portofino.realtrainmodunofficial.entity.CarEntity car) {
+                    for(var data:car.scriptDataMap().entrySet())if(data.getKey().endsWith("Request") && !data.getValue().isEmpty()) {
+                        if(requests==null)requests=new java.util.LinkedHashMap<>();requests.put(data.getKey(),data.getValue());
+                    }
                 }
-            } catch (NoSuchMethodException e) {
-                // onUpdate を持たないスクリプト (本家も doScriptIgnoreError で黙って無視する)。
+                jp.ngt.rtm.modelpack.ScriptExecuter executer = executerFor(entity);
+                if (executer != null) {
+                    executer.updateScript(engine, entity);
+                }
+                if(requests!=null && entity instanceof com.portofino.realtrainmodunofficial.entity.CarEntity car)for(var request:requests.entrySet()) {
+                    String resultKey=request.getKey().substring(0,request.getKey().length()-7)+"Result";
+                    String result=car.scriptDataMap().getOrDefault(resultKey,"");
+                    if(result.contains("invalid_request")) {
+                        String value=request.getValue();if(value.length()>8192)value=value.substring(0,8192)+"...";
+                        RealTrainModUnofficial.LOGGER.warn("[RTMU] rejected script request: model={} key={} result={} request={}",car.getVehicleId(),request.getKey(),result,value);
+                    }
+                }
             } catch (Throwable t) {
                 // ★本家 ScriptUtil.doScriptIgnoreError と同じく「エラーは無視して毎tick呼ぶ」。
                 //   RTMU は以前「N 回失敗したら停止」という独自処理を入れており、
                 //   一度失敗したモデルのサーバースクリプトが以後一切動かなくなっていた。
                 if (!warned) {
                     warned = true;
-                    RealTrainModUnofficial.LOGGER.warn("[ScriptUtil] server onUpdate failed: {}", t.toString());
+                    RealTrainModUnofficial.LOGGER.warn("[ScriptUtil] server onUpdate failed", t);
                 }
             }
         }

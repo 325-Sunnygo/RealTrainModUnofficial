@@ -83,7 +83,6 @@ public class MiniatureBlockEntityRenderer implements BlockEntityRenderer<Miniatu
         poseStack.popPose();
     }
 
-    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public AABB getRenderBoundingBox(MiniatureBlockEntity be) {
         return be.getRenderBoundingBox();
     }

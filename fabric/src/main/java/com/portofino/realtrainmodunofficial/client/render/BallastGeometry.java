@@ -29,6 +29,16 @@ public final class BallastGeometry {
     /** 高さが出せないときの既定 (1/16 ブロック)。本家と同じ。 */
     public static final float DEFAULT_HEIGHT = 0.0625F;
 
+    /**
+     * チャンクを組み立てるスレッドへ形を渡すための入れ物 (NeoForge)。
+     *
+     * <p>★ここに置くのは意図的。持ち主を {@link BallastModel} にすると、
+     * レールの BlockEntity (専用サーバーでも動く) が client 専用の親型を持つクラスを
+     * 参照することになる。[[rtmu-dedicated-server-client-class-crash]] と同じ踏み方。
+     */
+    public static final net.neoforged.neoforge.client.model.data.ModelProperty<Shape> SHAPE =
+        new net.neoforged.neoforge.client.model.data.ModelProperty<>();
+
     private BallastGeometry() {
     }
 
@@ -148,7 +158,7 @@ public final class BallastGeometry {
         if (prop == null || prop.block == null || prop.block == Blocks.AIR) {
             return null;   //本家: prop.block == Blocks.air なら道床無し
         }
-        BlockState source = prop.block.defaultBlockState();
+        BlockState source = prop.blockState();
 
         // useCache=false は本家 RenderBlockLargeRail と同じ。描画は常に今の線形で引く。
         float[] heights = rail.getBlockHeights(pos.getX(), pos.getY(), pos.getZ(), prop.blockHeight, false);
@@ -157,17 +167,9 @@ public final class BallastGeometry {
         } else {
             heights = heights.clone();   //キャッシュ配列を書き換えない
         }
-        // 床下へ潜らせない / ブロックから飛び出させない。
-        // 本家は 1.7.10 の即時描画なので素通しだったが、1.21 はチャンクメッシュに焼くため
-        // 単位立方体の外へ出た面は隣セクションで切られて欠けて見える。
-        // 当たり判定 (TileEntityLargeRailBase.getRailCollisionShape) も同じ範囲で切っている。
-        for (int i = 0; i < heights.length; i++) {
-            if (!Float.isFinite(heights[i]) || heights[i] < 0.0F) {
-                heights[i] = 0.0F;
-            } else if (heights[i] > 1.0F) {
-                heights[i] = 1.0F;
-            }
-        }
+        // Original RenderBlockLargeRail uses these coordinates without clipping.
+        // Chunk meshes can contain vertices beyond their owner's unit cube.
+        heights = finiteHeights(heights,prop.blockHeight);
 
         //本家と同じ面引き: 隣が塞がっているか、隣もレールなら側面を描かない
         boolean[] sides = new boolean[SIDE_ORDER.length];
@@ -178,6 +180,12 @@ public final class BallastGeometry {
         BlockPos below = pos.below();
         boolean bottom = !level.getBlockState(below).isSolidRender(level, below);
         return new Shape(heights, source, sides, bottom);
+    }
+
+    static float[] finiteHeights(float[] source,float fallback) {
+        float[] result=source.clone();
+        for(int i=0;i<result.length;i++) if(!Float.isFinite(result[i])) result[i]=fallback;
+        return result;
     }
 
     /** その隣に向けて面を描くか。本家 {@code !isOpaqueCube() && !(instanceof BlockLargeRailBase)}。 */

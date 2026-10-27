@@ -57,6 +57,12 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         this(RTMRailBlockEntities.LARGE_RAIL_BASE.get(), pos, state);
     }
 
+    public jp.ngt.mccompat.WorldCompat func_145831_w() {return level==null?null:new jp.ngt.mccompat.WorldCompat(level);}
+    public int getX() { return this.getBlockPos().getX(); }
+    public int getY() { return this.getBlockPos().getY(); }
+    public int getZ() { return this.getBlockPos().getZ(); }
+    public Block getBlockType() { return this.getBlockState().getBlock(); }
+
     @Override
     protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
         super.loadAdditional(nbt, registries);

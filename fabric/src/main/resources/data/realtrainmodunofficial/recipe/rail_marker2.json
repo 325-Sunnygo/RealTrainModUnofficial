@@ -1,0 +1,22 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "GGGGG",
+    "G  DG",
+    "G D G",
+    "GD  G",
+    "GGGGG"
+  ],
+  "key": {
+    "D": {
+      "item": "minecraft:red_dye"
+    },
+    "G": {
+      "item": "minecraft:glass"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:marker",
+    "count": 16
+  }
+}

@@ -37,6 +37,8 @@ public class InstalledObjectDefinition {
     // ワイヤー用パラメータ(WireConfig 相当)。コンストラクタ後に setWireParams で設定。
     private float sectionLength = 0.5F;
     private float deflectionCoefficient = 0.0F;
+    /** 本家 WireConfig.lengthCoefficient。既定 0 = 長さによる補正なし。 */
+    private float lengthCoefficient = 0.0F;
     // 看板用パラメータ(本家 SignboardConfig 相当)。コンストラクタ後に setSignboardParams で設定。
     // animationCycle: frame を1コマ進めるのに要する tick 数。
     private int animationCycle = 1;
@@ -45,11 +47,94 @@ public class InstalledObjectDefinition {
     // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate(entity, executer) が呼ばれる
     // スクリプト (列車検知器など)。コンストラクタ引数が既に多いので setter で後付けする。
     private String serverScriptPath = "";
+
+    /** 本家 ModelConfig.customForm: 機械を右クリックしたときの DataMap 編集フォーム。 */
+    public record FormField(String key, String label, int row, int column) {
+    }
+
+    public record CustomForm(String title, java.util.List<FormField> fields) {
+    }
+
+    private CustomForm customForm;
+
+    public CustomForm getCustomForm() {
+        return this.customForm;
+    }
+
+    public void setCustomForm(CustomForm form) {
+        this.customForm = form;
+    }
+
+    /**
+     * 本家 ModelConfig.defaultValues: 設置物の DataMap 既定値。
+     * スクリプトは {@code dataMap.getString("audio_loop_sound")} 等で読む。
+     */
+    public record DefaultValue(String type, String elementType, String key, String value,
+                               java.util.List<String> values) {
+    }
+
+    private final java.util.List<DefaultValue> defaultValues = new java.util.ArrayList<>();
+
+    public java.util.List<DefaultValue> getDefaultValues() {
+        return this.defaultValues;
+    }
     // 本家 ModelConfig.doCulling (既定 false = 両面描画)。上と同じくコンストラクタが肥大するため setter。
     private boolean doCulling = false;
     // 本家 MachineConfig.rotateByMetadata。true の照明 (サーチライト/回転灯/灯台灯) は
     // RenderMachine と同じく「クリック面 (meta 0-5) の回転 ∘ プレイヤー向き」で描く。
     private boolean rotateByMetadata = false;
+    /**
+     * 本家 FlagConfig (textures/flag/Flag_*.json) の旗。null なら通常の mqo モデル設置物。
+     * texture はパック相対パス ("textures/flag/x.png")。
+     */
+    public record FlagParams(String texture, float width, float height,
+                             int resolutionU, int resolutionV, float poleLength) {}
+
+    /**
+     * 本家 SignalConfig.maxSignalLevel。信号機が出せる現示の上限。
+     * json に無ければ {@code lights} の S(n) の最大値 (本家 SignalConfig.init と同じ導出)。
+     * 0 なら上限なし扱い。
+     */
+    private int maxSignalLevel = -1;
+
+    public int getMaxSignalLevel() {
+        if (this.maxSignalLevel >= 0) {
+            return this.maxSignalLevel;
+        }
+        int max = 0;
+        for (Integer key : this.signalLightGroups.keySet()) {
+            if (key != null && key > max) {
+                max = key;
+            }
+        }
+        this.maxSignalLevel = max;
+        return max;
+    }
+
+    public void setMaxSignalLevel(int maxSignalLevel) {
+        this.maxSignalLevel = maxSignalLevel;
+    }
+
+    private FlagParams flagParams;
+
+    public FlagParams getFlagParams() {
+        return this.flagParams;
+    }
+
+    public void setFlagParams(FlagParams flagParams) {
+        this.flagParams = flagParams;
+    }
+
+    /** 本家 OrnamentConfig.conveyorSpeed。足場 (エスカレーター) が乗った物を押す速さ。 */
+    private float conveyorSpeed = 0.0F;
+
+    public float getConveyorSpeed() {
+        return this.conveyorSpeed;
+    }
+
+    public void setConveyorSpeed(float conveyorSpeed) {
+        this.conveyorSpeed = conveyorSpeed;
+    }
 
     public boolean isRotateByMetadata() {
         return rotateByMetadata;
@@ -111,11 +196,25 @@ public class InstalledObjectDefinition {
         return deflectionCoefficient;
     }
 
+    /**
+     * 本家 WireConfig.lengthCoefficient。長いほどたるみを小さくする係数で、
+     * 本家は alpha = deflectionCoefficient * cos(pitch) / (1+lengthCoefficient)^水平長 に使う。
+     * 既定の架線 (ModelWire_BasicWireBlack.json) は 0.0625 を指定している。
+     */
+    public float getLengthCoefficient() {
+        return lengthCoefficient;
+    }
+
     public void setWireParams(float sectionLength, float deflectionCoefficient) {
+        setWireParams(sectionLength, deflectionCoefficient, this.lengthCoefficient);
+    }
+
+    public void setWireParams(float sectionLength, float deflectionCoefficient, float lengthCoefficient) {
         if (sectionLength > 0.0F) {
             this.sectionLength = sectionLength;
         }
         this.deflectionCoefficient = Math.max(0.0F, deflectionCoefficient);
+        this.lengthCoefficient = Math.max(0.0F, lengthCoefficient);
     }
 
     public Vec3 getWireAttachPos() {
@@ -124,6 +223,32 @@ public class InstalledObjectDefinition {
 
     public void setWireAttachPos(Vec3 wireAttachPos) {
         this.wireAttachPos = wireAttachPos == null ? Vec3.ZERO : wireAttachPos;
+    }
+
+    // ---- 信号用 (本家 SignalConfig.modelPartsFixture / rotateBody) ----
+    // 本家 BasicSignalPartsRenderer: 柱 (fixture) は設置面の4方位のまま、
+    // ヘッド (body) だけ「プレイヤー向き (15°/スニーク1°) − 設置面の向き」回転させる。
+    // これで信号だけ斜めに置ける。コンストラクタ引数が既に多いので setter で後付けする。
+    private List<String> fixtureObjects = List.of();
+    private Vec3 fixturePos = Vec3.ZERO;
+    private boolean rotateBody = false;
+
+    public List<String> getFixtureObjects() {
+        return fixtureObjects;
+    }
+
+    public Vec3 getFixturePos() {
+        return fixturePos;
+    }
+
+    public boolean isRotateBody() {
+        return rotateBody;
+    }
+
+    public void setSignalParts(List<String> fixtureObjects, Vec3 fixturePos, boolean rotateBody) {
+        this.fixtureObjects = fixtureObjects == null ? List.of() : List.copyOf(fixtureObjects);
+        this.fixturePos = fixturePos == null ? Vec3.ZERO : fixturePos;
+        this.rotateBody = rotateBody;
     }
 
     // 本家 ModelConnector_*.json の connectorType ("Relay" 等)。NGTO Builder の Wire ツールが

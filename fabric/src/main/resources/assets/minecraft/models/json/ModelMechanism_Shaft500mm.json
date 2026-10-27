@@ -1,0 +1,19 @@
+{
+	"name": "shaft_500mm",
+	"model": {
+		"modelFile": "gear_1750mm.mqoz",
+		"textures": [["default", "textures/mechanism/mecha_simple.png", ""]],
+		"rendererPath": "scripts/RenderGear.js"
+	},
+	"buttonTexture": "textures/mechanism/button_shaft_500mm.png",
+	"type": "GEAR",
+	"transmissionRatioON": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"transmissionRatioOFF": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"maxSpeed": 10000.0,
+	"acceleration": 0.0,
+	"radius": 0.0,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479"
+}

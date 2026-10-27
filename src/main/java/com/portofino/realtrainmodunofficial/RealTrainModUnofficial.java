@@ -83,8 +83,7 @@ public class RealTrainModUnofficial {
      * RTMU はタブ 1 つなので {@code CreativeTabRTM} の宣言順どおり
      * 鉄道 → 工業 → 道具 の順につなげる。
      *
-     * <p>RTMU にしか無いもの (エディタ・リモコン・信号制御器・乗客シミュ) は、
-     * 本家に対応する位置が無いので最後にまとめる。
+     * <p>Neo MCTE のエディタは本家に対応する位置が無いので最後にまとめる。
      */
     private static void acceptMainTab(net.minecraft.world.item.CreativeModeTab.Output output) {
         // ===== 本家 tabRailway =====
@@ -169,7 +168,7 @@ public class RealTrainModUnofficial {
 
         // ===== 旧シグコンタブ + 旧 RTMU タブ (廃止・要望) =====
         // RTM_鉄道 の一番最後に、シグコン一式 → RTMU 独自アイテムの順で並べる。
-        acceptRtmuTab(output);
+        acceptNeoMcteTab(output);
     }
 
     /**
@@ -214,7 +213,6 @@ public class RealTrainModUnofficial {
         output.accept(RealTrainModUnofficialItems.SNIPER_RIFLE_ITEM.get());
         output.accept(RealTrainModUnofficialItems.SMG_ITEM.get());
         output.accept(RealTrainModUnofficialItems.AMR_ITEM.get());
-        output.accept(RealTrainModUnofficialItems.RAZER_GUN_ITEM.get());
         output.accept(RealTrainModUnofficialItems.CAMERA_ITEM.get());          //camera
         //money 0〜8
         for (var entry : RealTrainModUnofficialItems.MONEY_ITEMS.entrySet()) {
@@ -231,27 +229,9 @@ public class RealTrainModUnofficial {
             output::accept, RealTrainModUnofficialItems.BULLET_ITEM.get());
     }
 
-    /** 旧 RTMU タブ + 旧シグコンタブの中身。main タブ末尾から呼ぶ。 */
-    private static void acceptRtmuTab(net.minecraft.world.item.CreativeModeTab.Output output) {
-        //シグナルコントローラー (SignalControllerMod 移植) 一式を先に
-        output.accept(RealTrainModUnofficialItems.SIGNAL_CONTROLLER_ITEM.get());
-        output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_0.get());
-        output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_1.get());
-        // neo mcte: タブに出すのは Neo Editor だけ。
-        // ミニチュアは MCTEU のものを使うため、ペインターは Neo Editor と役割が重なるため外した。
+    /** Neo MCTE タブの中身。main タブ末尾から呼ぶ。 */
+    private static void acceptNeoMcteTab(net.minecraft.world.item.CreativeModeTab.Output output) {
         // ★アイテムの登録自体は残してある (機能は消さない)。
-        output.accept(RealTrainModUnofficialItems.EDITOR_ITEM.get());
-        // 編成アイテム: 複数両をまとめて連結設置する
-        output.accept(RealTrainModUnofficialItems.FORMATION_ITEM.get());
-        // 編成バール: 殴った車両の編成をまるごと消す
-        output.accept(RealTrainModUnofficialItems.FORMATION_CROWBAR_ITEM.get());
-        // リモコン: ブロック2つを無線レッドストーンでペアリング
-        output.accept(RealTrainModUnofficialItems.REMOTE_ITEM.get());
-        // 乗客シミュレーション (統合): 駅ブロック / 停止位置目標
-        output.accept(com.portofino.rtmupassenger.PassengerMod.STATION_ITEM.get());
-        output.accept(com.portofino.rtmupassenger.PassengerMod.STOP_TARGET_ITEM.get());
-        // 背景パネル: 模型やジオラマの背景に写真を立てる
-        output.accept(RealTrainModUnofficialItems.BACKGROUND_PANEL_ITEM.get());
     }
 
     /**
@@ -314,8 +294,6 @@ public class RealTrainModUnofficial {
         RealTrainModUnofficialComponents.REGISTRAR.register(modEventBus);
         RealTrainModUnofficialSounds.SOUNDS.register(modEventBus);
         RealTrainModUnofficialArmorMaterials.ARMOR_MATERIALS.register(modEventBus);
-        // 乗客シミュレーション (旧・別 jar rtmupassenger を統合)。本体の名前空間で登録する。
-        com.portofino.rtmupassenger.PassengerMod.register(modEventBus);
         // WebCTC は別 mod (RTMU-WebCTC_1.21.1, webctc サブプロジェクト) へ分離した。
         // スピーカー音源マッピングをサーバー起動時にロードし、プレイヤー接続時に同期する。
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
@@ -385,7 +363,7 @@ public class RealTrainModUnofficial {
                     continue;
                 }
                 for (com.portofino.realtrainmodunofficial.rail.RailDefinition.Ballast set : sets) {
-                    output.accept(railStack(def.getId(), set.blockId()));
+                    output.accept(railStack(def.getId(), set));
                 }
             }
         } catch (Throwable t) {
@@ -395,13 +373,17 @@ public class RealTrainModUnofficial {
     }
 
     /** 種類と道床を焼き込んだレールアイテム 1 つ。 */
-    private static net.minecraft.world.item.ItemStack railStack(String railId, String ballastId) {
+    private static net.minecraft.world.item.ItemStack railStack(String railId, com.portofino.realtrainmodunofficial.rail.RailDefinition.Ballast ballast) {
         net.minecraft.world.item.ItemStack stack =
             new net.minecraft.world.item.ItemStack(RealTrainModUnofficialItems.RAIL_ITEM.get());
         stack.set(RealTrainModUnofficialComponents.SELECTED_MODEL_ID.get(), railId);
+        String ballastId=ballast.blockId();
         if (ballastId != null && !ballastId.isBlank()) {
             stack.set(RealTrainModUnofficialComponents.SELECTED_BALLAST.get(), ballastId);
         }
+        var block=jp.ngt.rtm.rail.util.RailProperty.resolveBlock(ballastId,ballast.meta());
+        jp.ngt.rtm.item.ItemRail.writePropToItem(new jp.ngt.rtm.rail.util.RailProperty(
+                railId,block,ballast.meta(),ballast.height()),stack);
         return stack;
     }
 

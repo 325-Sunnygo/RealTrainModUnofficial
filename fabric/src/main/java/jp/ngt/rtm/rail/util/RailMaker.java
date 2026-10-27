@@ -150,6 +150,13 @@ public final class RailMaker {
             if (type.init(switchList, normalList)) {
                 return type;
             }
+            //★どの向きの組み合わせで落ちたかまで残す。
+            //  SwitchScissorsCross.init は「角度差 45 度超の組が 4 つ」を要求するので、
+            //  向きが分かればマーカーの置き方の問題か RTMU の向き計算の問題かを切り分けられる。
+            StringBuilder dirs = new StringBuilder();
+            this.rpList.forEach(rp -> dirs.append(String.format("(%d,%d,%d dir=%d sw=%d) ",
+                    rp.blockX, rp.blockY, rp.blockZ, rp.direction, rp.switchType)));
+            jp.ngt.ngtlib.io.NGTLog.debug("[RailMaker] getSwitch: 頂点 %s", dirs.toString().trim());
             jp.ngt.ngtlib.io.NGTLog.debug(
                 "[RailMaker] getSwitch: %s.init が false (分岐あり=%d 分岐なし=%d)",
                 type.getClass().getSimpleName(), switchList.size(), normalList.size());

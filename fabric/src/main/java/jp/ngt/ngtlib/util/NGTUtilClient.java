@@ -176,6 +176,20 @@ public final class NGTUtilClient {
         }
     }
 
+    /**
+     * 本家 {@code NGTUtilClient.playSound(ISound)}: SoundHandler に登録する。
+     * パックのムービングサウンド ({@link jp.ngt.ngtlib.sound.MovingSoundBase}) を渡す。
+     */
+    public static void playSound(jp.ngt.ngtlib.sound.MovingSoundBase sound) {
+        if (sound == null) {
+            return;
+        }
+        try {
+            getRealMinecraft().getSoundManager().play(sound);
+        } catch (Throwable ignored) {
+        }
+    }
+
     /** 本家checkGLError: no-op。 */
     public static void checkGLError(String msg) {
     }

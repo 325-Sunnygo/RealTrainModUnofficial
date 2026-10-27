@@ -3,10 +3,6 @@ package com.portofino.realtrainmodunofficial;
 import com.portofino.realtrainmodunofficial.blockentity.LargeRailCoreBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.RailCollisionBlockEntity;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.ScriptBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.SignalRemoteBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.SignalStateBlockEntity;
-import com.portofino.realtrainmodunofficial.blockentity.TrainDetectorBlockEntity;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -25,13 +21,6 @@ public class RealTrainModUnofficialBlockEntities {
         BLOCK_ENTITY_TYPES.register("miniature", () -> net.minecraft.world.level.block.entity.BlockEntityType.Builder.of(
             com.portofino.realtrainmodunofficial.blockentity.MiniatureBlockEntity::new,
             RealTrainModUnofficialBlocks.MINIATURE.get()).build(null));
-
-    /** 背景パネル。 */
-    public static final DeferredHolder<BlockEntityType<?>,
-        BlockEntityType<com.portofino.realtrainmodunofficial.blockentity.BackgroundPanelBlockEntity>> BACKGROUND_PANEL =
-        BLOCK_ENTITY_TYPES.register("background_panel", () -> BlockEntityType.Builder.of(
-            com.portofino.realtrainmodunofficial.blockentity.BackgroundPanelBlockEntity::new,
-            RealTrainModUnofficialBlocks.BACKGROUND_PANEL.get()).build(null));
 
     /** レールコア: 起点ブロック1個。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LargeRailCoreBlockEntity>> LARGE_RAIL_CORE =
@@ -65,39 +54,12 @@ public class RealTrainModUnofficialBlockEntities {
             jp.ngt.rtm.electric.TileEntitySignalConverter::new,
             RealTrainModUnofficialBlocks.SIGNAL_CONVERTER.get()).build(null));
 
-    /** SignalControllerMod (masa300) 移植: 信号制御器 */
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.masa.signalcontrollermod.TileEntitySignalController>> SIGNAL_CONTROLLER =
-        BLOCK_ENTITY_TYPES.register("signal_controller", () -> BlockEntityType.Builder.of(
-            jp.masa.signalcontrollermod.TileEntitySignalController::new,
-            RealTrainModUnofficialBlocks.SIGNAL_CONTROLLER.get()).build(null));
-
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SignalRemoteBlockEntity>> SIGNAL_REMOTE =
-        BLOCK_ENTITY_TYPES.register("signal_remote", () -> BlockEntityType.Builder.of(SignalRemoteBlockEntity::new,
-            RealTrainModUnofficialBlocks.SIGNAL_RECEIVER.get(),
-            RealTrainModUnofficialBlocks.SIGNAL_CHANGER.get(),
-            RealTrainModUnofficialBlocks.SIGNAL_VALUE_RECEIVER.get()).build(null));
-
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TrainDetectorBlockEntity>> TRAIN_DETECTOR =
-        BLOCK_ENTITY_TYPES.register("train_detector", () -> BlockEntityType.Builder.of(TrainDetectorBlockEntity::new,
-            RealTrainModUnofficialBlocks.TRAIN_DETECTOR.get()).build(null));
-
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SignalStateBlockEntity>> SIGNAL_STATE =
-        BLOCK_ENTITY_TYPES.register("signal_state", () -> BlockEntityType.Builder.of(SignalStateBlockEntity::new,
-            RealTrainModUnofficialBlocks.SIGNAL_STATE.get()).build(null));
-
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ScriptBlockEntity>> SCRIPT_BLOCK =
-        BLOCK_ENTITY_TYPES.register("script_block", () -> BlockEntityType.Builder.of(ScriptBlockEntity::new,
-            RealTrainModUnofficialBlocks.SCRIPT_BLOCK.get()).build(null));
     /** 本家 TileEntitySlot (液体の吸込口)。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.block.tileentity.TileEntitySlot>> SLOT =
         BLOCK_ENTITY_TYPES.register("slot", () -> BlockEntityType.Builder.of(
             jp.ngt.rtm.block.tileentity.TileEntitySlot::new,
             RealTrainModUnofficialBlocks.SLOT.get()).build(null));
-    /**
-     * 本家 TileEntityStation (駅コア)。
-     * ★id は "station_core"。"station" は<b>乗客シミュの駅ブロック</b>が先に使っている
-     * (PassengerMod.STATION_BE)。同じ名前空間なので重複登録で起動時に落ちる。
-     */
+    /** 本家 TileEntityStation (駅コア)。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.block.tileentity.TileEntityStation>> STATION =
         BLOCK_ENTITY_TYPES.register("station_core", () -> BlockEntityType.Builder.of(
             jp.ngt.rtm.block.tileentity.TileEntityStation::new,

@@ -1,0 +1,19 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    " I I",
+    " III",
+    "  I ",
+    "  I ",
+    "  I "
+  ],
+  "key": {
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:wrench",
+    "count": 1
+  }
+}

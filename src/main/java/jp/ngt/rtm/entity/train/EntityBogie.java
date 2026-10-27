@@ -285,24 +285,14 @@ public class EntityBogie extends Entity {
         RailMap rm = this.currentRailMap;
         int pIndex = 0;
         if (frontBogie == null || this.prevPosIndex == -1) {
-            pIndex = rm.getNearlestPoint(this.split, px, pz);
+            pIndex = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findNearestPointAround(rm,this.split,this.prevPosIndex,px,pz,speed);
         } else {
             // 移動範囲を制限して、「台車からの距離は同じでも位置は真逆」な点の検出を防ぐ
             int indexInc = (int) ((Math.abs(speed) + 0.25F) * (float) SPLITS_PER_METER);
             int indexMin = Math.max(this.prevPosIndex - indexInc, 0);
             int indexMax = Math.min(this.prevPosIndex + indexInc, this.split);
-            double[] fp = frontBogie.getPosBuf();
-            double dif = Double.MAX_VALUE;
-            double tlSq = trainLength * trainLength;
-            for (int i = indexMin; i < indexMax; ++i) {
-                double[] pxz = rm.getRailPos(this.split, i);
-                double lenTemp = distanceSq(pxz[1], py, pxz[0], fp[0], fp[1], fp[2]);
-                double difTemp = Math.abs(lenTemp - tlSq);
-                if (difTemp < dif) {
-                    dif = difTemp;
-                    pIndex = i;//理想の台車間距離と実際の距離の差が最も小さくなる点を求める
-                }
-            }
+            pIndex=jp.ngt.rtm.entity.train.util.LegacyBogieSearch.trailingIndex(
+                rm,this.split,indexMin,indexMax,py,frontBogie.getPosBuf(),trainLength);
         }
         this.prevPosIndex = pIndex;
 
@@ -349,7 +339,12 @@ public class EntityBogie extends Entity {
 
     /** @return 移動先にレールがあればtrue */
     private boolean resetRailObj(double px, double py, double pz) {
-        TileEntityLargeRailCore coreObj = this.getRail(px, py, pz);
+        TileEntityLargeRailCore coreObj = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findCrossedConnectedCore(level(),currentRailObj,currentRailMap,split,prevPosIndex,getX(),getZ(),px,pz,movingYaw);
+        if(coreObj==null) {
+            coreObj=this.getRail(px,py,pz);
+            if(coreObj!=null)coreObj=jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.keepCurrentSectionCore(currentRailObj,coreObj);
+        }
+        if(coreObj==null)coreObj=jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedCore(level(),currentRailObj,currentRailMap,split,prevPosIndex,getX(),getZ(),px,pz,movingYaw);
 
         if (coreObj == null) {
             return false;
@@ -371,10 +366,11 @@ public class EntityBogie extends Entity {
                     return true;
                 }
 
+                RailMap previousMap=this.currentRailMap;
                 this.currentRailObj = coreObj;
                 this.currentRailMap = railMap;
                 this.split = (int) (this.currentRailMap.getLength() * (double) SPLITS_PER_METER);
-                this.prevPosIndex = -1;
+                this.prevPosIndex = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedEntryIndex(previousMap,railMap,this.split);
                 this.onChangeRail(coreObj);
             }
 

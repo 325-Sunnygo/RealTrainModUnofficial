@@ -12,7 +12,8 @@ import net.minecraft.world.level.Level;
  * onUpdate 骨格: onVehicleUpdate → (server) updateMovement → applyPhysicalEffect。
  * @param <T> 本家は VehicleBaseConfig; 当面 TrainConfig のみ。
  */
-public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
+public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity
+        implements jp.ngt.rtm.modelpack.IModelSelector {
     /**
      * 本家 EntityVehicleBase.getBrightnessForRender 相当。
      * 1.7.10 のバニラ Entity.getBrightnessForRender は
@@ -100,6 +101,11 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public double field_70169_q;
     public double field_70167_r;
     public double field_70166_s;
+    // lastTickPosX / lastTickPosY / lastTickPosZ (1.7.10 本来の SRG 名)。
+    // NGTO Builder2 の getInterpolatedPos が field_70142_S 系を読む。
+    public double field_70142_S;
+    public double field_70137_T;
+    public double field_70136_U;
     // boundingBox
     public jp.ngt.mccompat.AxisAlignedBB field_70121_D;
 
@@ -120,6 +126,13 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public float prevRotationPitchVehicle;
 
     // 本家 setPositionAndRotation2/updatePosAndRotationClient のクライアント補間
+    /**
+     * ★滑らかさのための遅延バッファ。
+     * 漸近方式 (1/inc ずつ寄せる) は速度が一定にならず、常に約 3 tick 遅れる。
+     * 届いた位置を時刻つきで貯めて「今 − 遅延」を再生すると、速度が一定になり遅れも減る。
+     */
+    protected final jp.ngt.rtm.entity.ClientMotionBuffer motionBuffer =
+        new jp.ngt.rtm.entity.ClientMotionBuffer();
     protected int vehiclePosRotationInc;
     protected double vehicleX, vehicleY, vehicleZ;
     protected float vehicleYaw, vehiclePitch, vehicleRoll;
@@ -193,6 +206,9 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
         this.field_70169_q = this.xOld;
         this.field_70167_r = this.yOld;
         this.field_70166_s = this.zOld;
+        this.field_70142_S = this.xOld;
+        this.field_70137_T = this.yOld;
+        this.field_70136_U = this.zOld;
         this.field_70165_t = this.getX();
         this.field_70163_u = this.getY();
         this.field_70161_v = this.getZ();
@@ -329,6 +345,55 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
     public String getModelType() {
         return jp.ngt.rtm.modelpack.cfg.TrainConfig.TYPE;
     }
+
+    // ---- 本家 EntityVehicle (1.12 系) の戦車/車両スクリプト API ----
+
+    /** 砲塔の旋回 (度)。スクリプトの entity.getBarrelYaw() が読む。 */
+    protected float barrelYaw;
+    protected float barrelPitch;
+    /** 発砲後のリコイル 0..1。 */
+    protected float recoil;
+    /** 前後/横の加速度。サウンドスクリプト (sound_crusader 等) が読む。 */
+    protected double accelForward;
+    protected double accelStrafe;
+
+    public float getBarrelYaw() {
+        return this.barrelYaw;
+    }
+
+    public float getBarrelPitch() {
+        return this.barrelPitch;
+    }
+
+    public float getRecoil() {
+        return this.recoil;
+    }
+
+    public float getAccelerationForward() {
+        return (float) this.accelForward;
+    }
+
+    public float getAccelerationStrafe() {
+        return (float) this.accelStrafe;
+    }
+
+    public void setBarrelYaw(float value) {
+        this.barrelYaw = value;
+    }
+
+    public void setBarrelPitch(float value) {
+        this.barrelPitch = value;
+    }
+
+    public void setRecoil(float value) {
+        this.recoil = value;
+    }
+
+    /** 本家 Entity.onGround をメソッド名で読むスクリプト用 (RenderNGT-18 等)。 */
+    public boolean isOnGround() {
+        return this.onGround();
+    }
+
 
     /**
      * 本家 useInteriorLight: 室内灯を点けるか (設定で常時オフに出来る)。
@@ -602,12 +667,38 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
             this.vehicleYaw = yaw;
             this.vehiclePitch = pitch;
         }
+        // 遅延バッファへ到着時刻つきで積む。姿勢は float 同期側の値を使う
+        this.motionBuffer.push(x, y, z, this.vehicleYaw, this.vehiclePitch, this.vehicleRoll);
     }
 
     /**
      * 本家 updatePosAndRotationClient の忠実移植 (クライアント補間)。
      * 位置・回転 (ヨー/ピッチ/ロール) をどちらも同じ 1/inc で漸近補間する。
      */
+    /** クライアント側で初期姿勢を入れ終えたか。 */
+    protected boolean isClientRotInit() {
+        return this.clientRotInit;
+    }
+
+    /**
+     * クライアントで姿勢を<b>補間せず即座に</b>合わせる。
+     *
+     * <p>スポーンパケットの yaw は byte 1 個ぶんの粗い値 (車両は 0 のことが多い) なので、
+     * 最初の tick で {@link #updatePosAndRotationClient} が直すまでの<b>1 フレームだけ
+     * 横を向いた車両が描かれる</b> (チャンク外から近付いたときに一瞬横向きに出るのがこれ)。
+     * 実姿勢が同期された時点でここを呼び、tick を待たずに向きを確定させる。
+     */
+    protected void snapClientRotation(float yaw, float pitch) {
+        this.vehicleYaw = yaw;
+        this.vehiclePitch = pitch;
+        this.setRot(yaw, pitch);
+        this.yRotO = yaw;
+        this.xRotO = pitch;
+        this.prevRotationYawVehicle = yaw;
+        this.prevRotationPitchVehicle = pitch;
+        this.clientRotInit = true;
+    }
+
     protected void updatePosAndRotationClient() {
         if (!this.clientRotInit) {
             this.clientRotInit = true;
@@ -616,6 +707,15 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity {
             this.xRotO = this.vehiclePitch;
             this.rotationRoll = this.vehicleRoll;
             this.prevRotationRoll = this.vehicleRoll;
+        }
+        // ★まず遅延バッファ。届いた位置を時刻で再生するので速度が一定になる。
+        // 標本が足りない間 (湧いた直後・テレポート直後) だけ従来の漸近方式へ落とす。
+        if (this.motionBuffer.sample()) {
+            this.setPos(this.motionBuffer.outX, this.motionBuffer.outY, this.motionBuffer.outZ);
+            this.setRot(this.motionBuffer.outYaw, this.motionBuffer.outPitch);
+            this.rotationRoll = this.motionBuffer.outRoll;
+            this.vehiclePosRotationInc = 0;
+            return;
         }
         if (this.vehiclePosRotationInc > 0) {
             float d0 = 1.0F / (float) this.vehiclePosRotationInc;

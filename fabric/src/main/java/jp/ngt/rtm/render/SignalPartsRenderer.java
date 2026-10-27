@@ -30,6 +30,24 @@ public class SignalPartsRenderer extends TileEntityPartsRenderer {
         return tile instanceof InstalledObjectBlockEntity be ? be.getRotation() : 0.0F;
     }
 
+    /** 本家: TileEntitySignal.getRotationPitch。 */
+    public float getPitch(Object tile) {
+        return tile instanceof InstalledObjectBlockEntity be ? be.getMountPitch() : 0.0F;
+    }
+
+    /** 本家: TileEntitySignal.getRotationRoll。 */
+    public float getRoll(Object tile) {
+        return tile instanceof InstalledObjectBlockEntity be ? be.getMountRoll() : 0.0F;
+    }
+
+    /** 本家: TileEntitySignal.getRenderBlock (isOpaqueCube 等が使う)。 */
+    public net.minecraft.world.level.block.Block getBlock(Object tile) {
+        if (tile instanceof BlockEntity be && be.getLevel() != null) {
+            return be.getLevel().getBlockState(be.getBlockPos()).getBlock();
+        }
+        return net.minecraft.world.level.block.Blocks.AIR;
+    }
+
     /** 本家: 信号が埋まっているブロックが不透明か (時計の両面描画判定に使う) */
     public boolean isOpaqueCube(Object tile) {
         if (tile instanceof BlockEntity be && be.getLevel() != null) {

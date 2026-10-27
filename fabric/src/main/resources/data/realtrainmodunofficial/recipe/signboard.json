@@ -1,0 +1,22 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "     ",
+    "SSSSS",
+    "SFFFS",
+    "SFFFS",
+    "SSSSS"
+  ],
+  "key": {
+    "F": {
+      "item": "realtrainmodunofficial:fluorescent"
+    },
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:signboard",
+    "count": 2
+  }
+}

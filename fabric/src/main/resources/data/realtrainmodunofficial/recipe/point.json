@@ -1,0 +1,25 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "    ",
+    "  M ",
+    "IISI",
+    "  S ",
+    "IISI"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:material_shaft"
+    },
+    "M": {
+      "item": "minecraft:lever"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:point_machine",
+    "count": 1
+  }
+}

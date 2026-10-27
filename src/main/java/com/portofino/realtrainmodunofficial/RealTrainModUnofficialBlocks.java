@@ -5,10 +5,6 @@ import com.portofino.realtrainmodunofficial.block.CrossingGateBlock;
 import com.portofino.realtrainmodunofficial.block.InstalledObjectBlock;
 import com.portofino.realtrainmodunofficial.block.LargeRailCoreBlock;
 import com.portofino.realtrainmodunofficial.block.RailCollisionBlock;
-import com.portofino.realtrainmodunofficial.block.ScriptBlock;
-import com.portofino.realtrainmodunofficial.block.SignalRemoteBlock;
-import com.portofino.realtrainmodunofficial.block.SignalStateBlock;
-import com.portofino.realtrainmodunofficial.block.TrainDetectorBlock;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -21,10 +17,6 @@ public class RealTrainModUnofficialBlocks {
     /** 設置済みミニチュア (neo mcte)。中身は MiniatureBlockEntity が丸ごと持つ。 */
     public static final net.neoforged.neoforge.registries.DeferredBlock<com.portofino.realtrainmodunofficial.block.MiniatureBlock> MINIATURE
         = BLOCKS.register("miniature", () -> new com.portofino.realtrainmodunofficial.block.MiniatureBlock());
-    /** 背景パネル: 模型やジオラマの背景に写真を立てる。 */
-    public static final DeferredBlock<com.portofino.realtrainmodunofficial.block.BackgroundPanelBlock> BACKGROUND_PANEL
-        = BLOCKS.register("background_panel",
-            () -> new com.portofino.realtrainmodunofficial.block.BackgroundPanelBlock());
     // 旧 Remaster レール系ブロック (legacy_*)。新規の敷設は本家 jp.ngt マーカー/レールを
     // 使うが、既に設置済みのワールドを活かすため登録は維持する。
     //★legacy_* は本家 BlockMarker にエイリアスする (同じクラス = 同じ敷設処理)。
@@ -58,28 +50,6 @@ public class RealTrainModUnofficialBlocks {
             net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()
                 .strength(1.5F).sound(net.minecraft.world.level.block.SoundType.STONE)));
 
-    /** SignalControllerMod (masa300) 移植: 信号制御器 (閉塞信号の自動制御) */
-    public static final DeferredBlock<jp.masa.signalcontrollermod.SignalController> SIGNAL_CONTROLLER
-        = BLOCKS.register("signal_controller", () -> new jp.masa.signalcontrollermod.SignalController(
-            net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()));
-
-    public static final DeferredBlock<SignalRemoteBlock> SIGNAL_RECEIVER
-        = BLOCKS.register("signal_receiver", () -> new SignalRemoteBlock(SignalRemoteBlock.Mode.RECEIVER));
-
-    public static final DeferredBlock<SignalRemoteBlock> SIGNAL_CHANGER
-        = BLOCKS.register("signal_changer", () -> new SignalRemoteBlock(SignalRemoteBlock.Mode.CHANGER));
-
-    public static final DeferredBlock<SignalRemoteBlock> SIGNAL_VALUE_RECEIVER
-        = BLOCKS.register("signal_value_receiver", () -> new SignalRemoteBlock(SignalRemoteBlock.Mode.VALUE_INPUT));
-
-    public static final DeferredBlock<TrainDetectorBlock> TRAIN_DETECTOR
-        = BLOCKS.register("train_detector", () -> new TrainDetectorBlock());
-
-    public static final DeferredBlock<SignalStateBlock> SIGNAL_STATE
-        = BLOCKS.register("signal_state", () -> new SignalStateBlock());
-
-    public static final DeferredBlock<ScriptBlock> SCRIPT_BLOCK
-        = BLOCKS.register("script_block", () -> new ScriptBlock());
     // ───── 本家 RTM_工業 タブのブロック (RTMBlock.init と同じ並び) ─────
 
     /** 本家 steel_material: ただの鋼のブロック。 */

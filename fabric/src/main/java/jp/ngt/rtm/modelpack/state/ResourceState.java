@@ -17,8 +17,11 @@ public class ResourceState {
      */
     public int color = 16777215;
 
-    /** 本家は public フィールド。スクリプトが state.dataMap と直接読む。 */
-    public final DataMap dataMap = new DataMap();
+    /**
+     * 本家は public フィールド。スクリプトが state.dataMap と直接読む。
+     * 車両 (CarEntity) のように外部の保存先へブリッジしたい場合は差し替えられるよう final にしない。
+     */
+    public DataMap dataMap = new DataMap();
     private final Supplier<String> nameSupplier;
 
     /**
@@ -27,7 +30,7 @@ public class ResourceState {
      * entity.getResourceState.getResourceSet.getConfig で読む
      * (古いパックは entity.getModelSet.getConfig)。
      */
-    private final Supplier<jp.ngt.rtm.modelpack.modelset.ModelSetCompat> resourceSetSupplier;
+    private final Supplier<? extends jp.ngt.rtm.modelpack.modelset.ModelSetBase<?>> resourceSetSupplier;
 
     /**
      * 本家 ResourceState.exclusionParts: 「今は描かないパーツ」の名前。
@@ -40,9 +43,22 @@ public class ResourceState {
     }
 
     public ResourceState(Supplier<String> nameSupplier,
-                         Supplier<jp.ngt.rtm.modelpack.modelset.ModelSetCompat> resourceSetSupplier) {
+                         Supplier<? extends jp.ngt.rtm.modelpack.modelset.ModelSetBase<?>> resourceSetSupplier) {
         this.nameSupplier = nameSupplier;
         this.resourceSetSupplier = resourceSetSupplier == null ? () -> null : resourceSetSupplier;
+    }
+
+    /**
+     * DataMap を外から差し替える版 (CarEntity が既存の保存先 scriptData へブリッジするため)。
+     * 本家の API 面 (getResourceName / getDataMap / state.dataMap) はそのまま使える。
+     */
+    public ResourceState(Supplier<String> nameSupplier,
+                         Supplier<? extends jp.ngt.rtm.modelpack.modelset.ModelSetBase<?>> resourceSetSupplier,
+                         DataMap dataMap) {
+        this(nameSupplier, resourceSetSupplier);
+        if (dataMap != null) {
+            this.dataMap = dataMap;
+        }
     }
 
     public DataMap getDataMap() {
@@ -65,7 +81,7 @@ public class ResourceState {
      * entity.getModelSet と同じ jp.ngt.rtm.modelpack.modelset.ModelSetCompat
      * (getConfig を持つ) を返す。
      */
-    public jp.ngt.rtm.modelpack.modelset.ModelSetCompat getResourceSet() {
+    public jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getResourceSet() {
         return this.resourceSetSupplier.get();
     }
 

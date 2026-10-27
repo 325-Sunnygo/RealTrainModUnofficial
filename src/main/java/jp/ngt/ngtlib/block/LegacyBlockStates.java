@@ -155,7 +155,7 @@ public final class LegacyBlockStates {
         Map.entry("noteblock", "note_block"),
         Map.entry("piston_extension", "piston_head"),
         Map.entry("sea_lantern", "sea_lantern"),
-        Map.entry("grass", "short_grass"),
+        Map.entry("grass", "grass_block"),
         Map.entry("tallgrass", "short_grass"),
         Map.entry("double_plant", "tall_grass")
     );

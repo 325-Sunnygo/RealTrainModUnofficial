@@ -6,6 +6,7 @@ import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 import com.portofino.realtrainmodunofficial.rail.RailDefinition;
 import com.portofino.realtrainmodunofficial.rail.RailPackLoader;
 import jp.ngt.ngtlib.io.ScriptUtil;
+import jp.ngt.ngtlib.io.NGTFileLoader;
 import jp.ngt.ngtlib.renderer.GLRecorder;
 import jp.ngt.ngtlib.renderer.model.Material;
 import jp.ngt.ngtlib.renderer.model.TextureSet;
@@ -87,6 +88,11 @@ public final class RailScriptRenderers {
             renderer.setScript(se);
             se.put("renderer", renderer);
             ModelObject modelObject = new ModelObject(new TextureSet[]{new TextureSet(new Material(null))});
+            byte[] bytes = NGTFileLoader.findAsset("models/" + def.getModelFile());
+            if (bytes == null) bytes = NGTFileLoader.findAsset(def.getModelFile());
+            modelObject.model = bytes == null ? new jp.ngt.ngtlib.renderer.model.PolygonModel()
+                    : jp.ngt.ngtlib.renderer.model.ModelLoader.parse(bytes, def.getModelFile());
+            modelObject.setTextures(jp.ngt.ngtlib.renderer.model.LegacyTextureLayout.create(modelObject.model, def.getTextureOverrides()));
             renderer.init(null, modelObject);
             return new Scripted(renderer, se);
         } catch (Throwable t) {
@@ -467,50 +473,6 @@ public final class RailScriptRenderers {
     @SuppressWarnings("unchecked")
     private static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                                int packedLight, int packedOverlay, MqoModelLoader.MqoModel model) {
-        int light = packedLight;
-        int depth = 0;
-        for (GLRecorder.Cmd cmd : rec.getCommands()) {
-            switch (cmd.op) {
-                case PUSH -> {
-                    poseStack.pushPose();
-                    depth++;
-                }
-                case POP -> {
-                    if (depth > 0) {
-                        poseStack.popPose();
-                        depth--;
-                    }
-                }
-                case TRANSLATE -> poseStack.translate(cmd.a, cmd.b, cmd.c);
-                case ROTATE -> {
-                    // Quaternion は記録時に確定済み (payload)
-                    if (cmd.payload instanceof org.joml.Quaternionf quat) {
-                        poseStack.mulPose(quat);
-                    }
-                }
-                case SCALE -> poseStack.scale(cmd.a, cmd.b, cmd.c);
-                case BRIGHTNESS -> light = (int) cmd.a;
-                case COLOR -> {
-                    // カラーオーバーレイは現状のレールスクリプトでは未使用
-                }
-                case RENDER_PARTS -> {
-                    // 正規化 Set は記録時に確定済み (payload) — 同一インスタンスで
-                    // renderNamedGroups の IdentityHashMap キャッシュにヒットさせる
-                    if (cmd.payload instanceof Set<?> names) {
-                        model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
-                    }
-                }
-                case RENDER_GROUPS -> {
-                    if (cmd.payload instanceof Set<?> names) {
-                        model.renderNamedGroups(poseStack, buffer, light, packedOverlay, false, (Set<String>) names, null);
-                    }
-                }
-            }
-        }
-        // スクリプトの push/pop 不整合を補正
-        while (depth > 0) {
-            poseStack.popPose();
-            depth--;
-        }
+        VehicleScriptRenderers.replay(rec,poseStack,buffer,packedLight,packedOverlay,model,null,0);
     }
 }

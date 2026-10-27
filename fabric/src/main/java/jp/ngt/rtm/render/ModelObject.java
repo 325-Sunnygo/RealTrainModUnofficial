@@ -1,6 +1,7 @@
 package jp.ngt.rtm.render;
 
 import jp.ngt.ngtlib.renderer.model.TextureSet;
+import jp.ngt.ngtlib.renderer.model.Material;
 
 /**
  * 本家 jp.ngt.rtm.render.ModelObject の最小移植。
@@ -23,6 +24,12 @@ public class ModelObject {
     public boolean alphaBlend;
 
     public ModelObject(TextureSet[] textures) {
+        this.setTextures(textures);
+    }
+
+    public void setTextures(TextureSet[] textures) {
+        this.light = false;
+        this.alphaBlend = false;
         this.textures = textures != null ? textures : new TextureSet[0];
         for (TextureSet set : this.textures) {
             if (set == null) {
@@ -31,10 +38,27 @@ public class ModelObject {
             if (set.doAlphaBlend) {
                 this.alphaBlend = true;
             }
-            if (set.subTextures != null && set.subTextures.length > 0) {
+            if (set.lightOptionDeclared) {
                 this.light = true;
             }
         }
+    }
+
+    public Material[] getMaterials(java.util.Map<String, String> textureMap) {
+        if (this.model == null || this.model.materials.isEmpty()) {
+            String path = textureMap.get("default");
+            return new Material[]{new Material((byte) 0, path == null ? null : new jp.ngt.mccompat.ResourceLocation(path))};
+        }
+        return this.model.materials.entrySet().stream().map(entry -> {
+            String path = jp.ngt.ngtlib.renderer.model.LegacyTextureLayout.resolve(entry.getKey(), textureMap);
+            return new Material(entry.getValue().id, path == null ? null : new jp.ngt.mccompat.ResourceLocation(path));
+        }).toArray(Material[]::new);
+    }
+
+    public java.util.Map<String, String> getTextureMap(String[][] rows) {
+        java.util.Map<String, String> result = new java.util.LinkedHashMap<>();
+        for (String[] row : rows) result.put(row[0], row[1]);
+        return result;
     }
 
     /** 本家getMaterials相当: テクスチャセット。 */

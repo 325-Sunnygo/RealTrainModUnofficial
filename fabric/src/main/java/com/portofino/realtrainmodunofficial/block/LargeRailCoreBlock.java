@@ -11,7 +11,7 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
-import com.portofino.realtrainmodunofficial.item.WrenchItem;
+import com.portofino.realtrainmodunofficial.item.RtmWrenchItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -104,7 +104,7 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
     }
 
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
-        if (player.getItemInHand(hand).getItem() instanceof WrenchItem) {
+        if (player.getItemInHand(hand).getItem() instanceof RtmWrenchItem) {
             if (!level.isClientSide()) {
                 if (level.getBlockEntity(pos) instanceof LargeRailCoreBlockEntity core) {
                     int total = core.getAllRailMaps().length;

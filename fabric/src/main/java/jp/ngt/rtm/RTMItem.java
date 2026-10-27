@@ -48,7 +48,7 @@ public final class RTMItem {
             crowbar = com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.CROWBAR_ITEM.get();
 
             itemtrain = com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.TRAIN_ITEM.get();
-            itemVehicle = com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get();
+            itemVehicle = com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.CAR_ITEM.get();
             itemSignal = com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.SIGNAL_ITEM.get();
             itemRailroadSign = com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.RAILROAD_SIGN_ITEM.get();
             itemLinePole = com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.OVERHEAD_LINE_POLE_ITEM.get();

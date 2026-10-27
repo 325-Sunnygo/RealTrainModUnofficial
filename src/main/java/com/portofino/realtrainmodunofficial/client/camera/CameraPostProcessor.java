@@ -18,187 +18,109 @@ import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
-/**
- * カメラのポストエフェクト。被写界深度 (ボケ) と 流し撮り (残像) を掛ける。
- * 本家 jp.ngt.rtm.gui.camera.Camera が生の GL (ARB シェーダー + FBO) でやっていたことを、
- * 1.21 のコアシェーダー (ShaderInstance) と RenderTarget で書き直したもの。
- */
+/** Original eight depth bands and ten-frame sensitivity snapshot, on core-profile FBOs. */
 public final class CameraPostProcessor {
-
-    /** 最大ぼかし半径 (px, 1080p 基準)。これ以上はいくら絞りを開けてもぼけない。 */
-    private static final float MAX_BLUR_PX = 22.0F;
-
-    private static ShaderInstance dofShader;
-    private static ShaderInstance accumShader;
-    private static ShaderInstance blitShader;
-
-    private static RenderTarget blurA;
-    private static RenderTarget blurB;
-    /** 流し撮り用の蓄積バッファ (前フレームの結果) */
-    private static RenderTarget accum;
-    private static boolean accumValid;
-    private static int lastW = -1;
-    private static int lastH = -1;
-
-    private CameraPostProcessor() {
-    }
-
+    private static final org.slf4j.Logger LOGGER=org.slf4j.LoggerFactory.getLogger(CameraPostProcessor.class);
+    private static ShaderInstance dofShader,accumShader,blitShader;
+    private static RenderTarget blurA,blurB,accum,delayed;
+    private static int lastW=-1,lastH=-1,frames,depthTexture=-1;
+    private static boolean snapshotValid,depthScreenshot;
+    private static java.nio.FloatBuffer rawDepth;
+    private static java.nio.ByteBuffer depthColors;
+    private CameraPostProcessor() {}
     public static void registerShaders(RegisterShadersEvent event) throws java.io.IOException {
-        event.registerShader(new ShaderInstance(event.getResourceProvider(),
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "rtm_dof"),
-            DefaultVertexFormat.POSITION_TEX), s -> dofShader = s);
-        event.registerShader(new ShaderInstance(event.getResourceProvider(),
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "rtm_accum"),
-            DefaultVertexFormat.POSITION_TEX), s -> accumShader = s);
-        event.registerShader(new ShaderInstance(event.getResourceProvider(),
-            ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "rtm_blit"),
-            DefaultVertexFormat.POSITION_TEX), s -> blitShader = s);
+        event.registerShader(new ShaderInstance(event.getResourceProvider(),ResourceLocation.fromNamespaceAndPath(
+                RealTrainModUnofficial.MODID,"rtm_dof"),DefaultVertexFormat.POSITION_TEX),s->dofShader=s);
+        event.registerShader(new ShaderInstance(event.getResourceProvider(),ResourceLocation.fromNamespaceAndPath(
+                RealTrainModUnofficial.MODID,"rtm_accum"),DefaultVertexFormat.POSITION_TEX),s->accumShader=s);
+        event.registerShader(new ShaderInstance(event.getResourceProvider(),ResourceLocation.fromNamespaceAndPath(
+                RealTrainModUnofficial.MODID,"rtm_blit"),DefaultVertexFormat.POSITION_TEX),s->blitShader=s);
     }
-
-    /** カメラを閉じたら蓄積を捨てる (次に開いたとき前の絵が残らないように)。 */
-    public static void reset() {
-        accumValid = false;
+    public static void reset() { frames=0;snapshotValid=false;depthScreenshot=false; }
+    public static void requestDepthScreenshot() { depthScreenshot=true; }
+    public static void process(Minecraft mc,CameraState state) {
+        if(ShaderCompat.isShaderPackInUse()) return;
+        var path=mc.gameDirectory.toPath().resolve("mods/ss_depth.png");boolean requested=depthScreenshot;
+        processTarget(mc.getMainRenderTarget(),state,mc.getWindow().getGuiScaledWidth(),mc.getWindow().getGuiScaledHeight(),path);
+        if(requested && !depthScreenshot && mc.player!=null) mc.player.displayClientMessage(net.minecraft.network.chat.Component.literal("save:"+path),false);
     }
-
-    /** ワールド描画後・GUI 描画前に呼ぶ。 */
-    public static void process(Minecraft mc, CameraState state, float focusDistance) {
-        if (dofShader == null || accumShader == null || blitShader == null) {
-            return;
-        }
-        // Iris/Oculus のシェーダーパックが有効なときはコアシェーダーが差し替わっており、
-        // こちらのパスを重ねると壊れる。ボケはシェーダーパック側に任せる。
-        if (ShaderCompat.isShaderPackInUse()) {
-            return;
-        }
-        float bokeh = state.getBokehStrength();
-        float motion = state.getMotionBlend();
-        if (bokeh <= 0.01F && motion <= 0.01F) {
-            accumValid = false;
-            return;
-        }
-
-        RenderTarget main = mc.getMainRenderTarget();
-        int w = main.width;
-        int h = main.height;
-        if (w <= 0 || h <= 0) {
-            return;
-        }
-        ensureTargets(w, h);
-
-        // 描画状態を退避 (ここは GUI 描画の直前なので、戻さないとバニラの GUI が壊れる)
-        Matrix4f savedProj = RenderSystem.getProjectionMatrix();
-        com.mojang.blaze3d.vertex.VertexSorting savedSort = RenderSystem.getVertexSorting();
-        Matrix4fStack mv = RenderSystem.getModelViewStack();
-        mv.pushMatrix();
-        mv.identity();
-        RenderSystem.applyModelViewMatrix();
-        // クリップ空間へ直接頂点を出すので投影は単位行列
-        RenderSystem.setProjectionMatrix(new Matrix4f(), com.mojang.blaze3d.vertex.VertexSorting.ORTHOGRAPHIC_Z);
-        RenderSystem.disableBlend();
-        RenderSystem.disableDepthTest();
-        RenderSystem.depthMask(false);
-
+    static void processTarget(RenderTarget main,CameraState state,int guiWidth,int guiHeight,java.nio.file.Path screenshotPath) {
+        if(dofShader==null || accumShader==null || blitShader==null) return;
+        if(state.sensitivity()>=1 && state.focusMode()==0) return;
+        int w=main.width,h=main.height;
+        if(w<=0 || h<=0) return;
+        ensureTargets(w,h);
+        Matrix4f savedProjection=new Matrix4f(RenderSystem.getProjectionMatrix());
+        var savedSort=RenderSystem.getVertexSorting();var mv=RenderSystem.getModelViewStack();mv.pushMatrix();mv.identity();
+        RenderSystem.applyModelViewMatrix();RenderSystem.setProjectionMatrix(new Matrix4f(),com.mojang.blaze3d.vertex.VertexSorting.ORTHOGRAPHIC_Z);
+        RenderSystem.disableDepthTest();RenderSystem.depthMask(false);RenderSystem.disableBlend();
         try {
-            int sceneTex = main.getColorTextureId();
-            int depthTex = main.getDepthTextureId();
-            // MC の投影は near=0.05 固定。far はレンダー距離から決まる。
-            float near = 0.05F;
-            float far = Math.max(near + 1.0F, mc.gameRenderer.getDepthFar());
-            // 画面が大きいほどぼかし半径も比例させる (720p と 4K で見た目を揃える)
-            float maxRadius = MAX_BLUR_PX * (h / 1080.0F);
-
-            int result = sceneTex;
-
-            if (bokeh > 0.01F) {
-                // 横ぼかし: main.color + main.depth → blurA
-                blurA.bindWrite(false);
-                dofPass(sceneTex, depthTex, w, h, 1.0F, 0.0F, focusDistance, bokeh, near, far, maxRadius);
-                // 縦ぼかし: blurA + main.depth → blurB
-                blurB.bindWrite(false);
-                dofPass(blurA.getColorTextureId(), depthTex, w, h, 0.0F, 1.0F, focusDistance, bokeh, near, far, maxRadius);
-                result = blurB.getColorTextureId();
+            int scene=main.getColorTextureId(),result=scene,base=scene;
+            if(state.sensitivity()<1) {
+                if(frames>=10) { accum.bindWrite(false);blitPass(scene);snapshotValid=true;frames=0; }
+                frames++;
+                if(snapshotValid) { delayed.bindWrite(false);accumPass(scene,accum.getColorTextureId(),state.delayBlend());base=delayed.getColorTextureId();result=base; }
             }
-
-            if (motion > 0.01F) {
-                // 前フレームと合成。accum は前回の結果を持っているので、
-                // 読みながら書けないよう blurA を作業用に使い回す。
-                blurA.bindWrite(false);
-                if (accumValid) {
-                    accumPass(result, accum.getColorTextureId(), motion);
-                } else {
-                    blitPass(result);
+            if(state.focusMode()>0) {
+                readDepth(main,state,w,h,screenshotPath);
+                blurA.setClearColor(0,0,0,0);blurB.setClearColor(0,0,0,0);
+                blurA.clear(Minecraft.ON_OSX);blurB.clear(Minecraft.ON_OSX);
+                RenderSystem.enableBlend();RenderSystem.blendFunc(770,771);
+                for(int band=8;band>0;band--) {
+                    float threshold=band/8F;
+                    float[] weights=CameraState.gaussian(CameraState.blurRange(threshold,state.focus(),w));
+                    blurA.bindWrite(false);dofPass(scene,0,threshold,weights,guiWidth,guiHeight);
+                    blurB.bindWrite(false);dofPass(blurA.getColorTextureId(),1,threshold,weights,guiWidth,guiHeight);
                 }
-                // 結果を accum へ写して次フレームに備える
-                accum.bindWrite(false);
-                blitPass(blurA.getColorTextureId());
-                accumValid = true;
-                result = accum.getColorTextureId();
-            } else {
-                accumValid = false;
+                result=blurB.getColorTextureId();
             }
-
-            // メインターゲットへ書き戻す
             main.bindWrite(false);
-            if (result != sceneTex) {
-                blitPass(result);
-            }
-        } catch (Throwable t) {
-            RealTrainModUnofficial.LOGGER.warn("Camera post-processing failed; disabling effects", t);
-            dofShader = null;
+            RenderSystem.disableBlend();
+            if(base!=scene) blitPass(base);
+            if(result!=base) { RenderSystem.enableBlend();RenderSystem.blendFunc(770,771);blitPass(result); }
+        } catch(Throwable failure) {
+            LOGGER.warn("Original camera post-processing failed",failure);
+            reset();
         } finally {
-            RenderSystem.depthMask(true);
-            RenderSystem.enableDepthTest();
-            RenderSystem.enableBlend();
-            RenderSystem.setProjectionMatrix(savedProj, savedSort);
-            mv.popMatrix();
-            RenderSystem.applyModelViewMatrix();
-            main.bindWrite(true);
+            RenderSystem.disableBlend();RenderSystem.depthMask(true);RenderSystem.enableDepthTest();
+            RenderSystem.setProjectionMatrix(savedProjection,savedSort);mv.popMatrix();RenderSystem.applyModelViewMatrix();main.bindWrite(true);
         }
     }
-
-    private static void dofPass(int colorTex, int depthTex, int w, int h,
-                                float dirX, float dirY, float focus, float bokeh,
-                                float near, float far, float maxRadius) {
-        RenderSystem.setShader(() -> dofShader);
-        RenderSystem.setShaderTexture(0, colorTex);
-        RenderSystem.setShaderTexture(1, depthTex);
-        setUniform(dofShader, "InSize", (float) w, (float) h);
-        setUniform(dofShader, "BlurDir", dirX, dirY);
-        setUniform(dofShader, "FocusDepth", focus);
-        setUniform(dofShader, "Bokeh", bokeh);
-        setUniform(dofShader, "NearPlane", near);
-        setUniform(dofShader, "FarPlane", far);
-        setUniform(dofShader, "MaxRadius", maxRadius);
-        drawFullscreenQuad();
-    }
-
-    private static void accumPass(int currentTex, int prevTex, float blend) {
-        RenderSystem.setShader(() -> accumShader);
-        RenderSystem.setShaderTexture(0, currentTex);
-        RenderSystem.setShaderTexture(1, prevTex);
-        setUniform(accumShader, "Blend", blend);
-        drawFullscreenQuad();
-    }
-
-    private static void blitPass(int tex) {
-        RenderSystem.setShader(() -> blitShader);
-        RenderSystem.setShaderTexture(0, tex);
-        drawFullscreenQuad();
-    }
-
-    private static void setUniform(ShaderInstance shader, String name, float... values) {
-        com.mojang.blaze3d.shaders.Uniform u = shader.getUniform(name);
-        if (u == null) {
-            return;
-        }
-        switch (values.length) {
-            case 1 -> u.set(values[0]);
-            case 2 -> u.set(values[0], values[1]);
-            default -> {
+    private static void readDepth(RenderTarget main,CameraState state,int w,int h,java.nio.file.Path screenshotPath) throws java.io.IOException {
+        int previous=org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER_BINDING);
+        org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER,main.frameBufferId);
+        rawDepth.clear();
+        try { org.lwjgl.opengl.GL11.glReadPixels(0,0,w,h,org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT,org.lwjgl.opengl.GL11.GL_FLOAT,rawDepth); }
+        finally { org.lwjgl.opengl.GL30.glBindFramebuffer(org.lwjgl.opengl.GL30.GL_READ_FRAMEBUFFER,previous); }
+        depthColors.clear();
+        for(int i=0;i<w*h;i++) depthColors.put((byte)CameraState.depthLevel(rawDepth.get(i)));
+        depthColors.flip();state.autoFocus((depthColors.get((h/2)*w+w/2)&255)/255F);
+        RenderSystem.bindTexture(depthTexture);
+        int alignment=org.lwjgl.opengl.GL11.glGetInteger(org.lwjgl.opengl.GL11.GL_UNPACK_ALIGNMENT);
+        org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_UNPACK_ALIGNMENT,1);
+        org.lwjgl.opengl.GL11.glTexSubImage2D(org.lwjgl.opengl.GL11.GL_TEXTURE_2D,0,0,0,w,h,org.lwjgl.opengl.GL11.GL_RED,org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE,depthColors);
+        org.lwjgl.opengl.GL11.glPixelStorei(org.lwjgl.opengl.GL11.GL_UNPACK_ALIGNMENT,alignment);
+        if(depthScreenshot) {
+            depthScreenshot=false;
+            java.awt.image.BufferedImage image=new java.awt.image.BufferedImage(w,h,java.awt.image.BufferedImage.TYPE_INT_RGB);
+            for(int y=0;y<h;y++) for(int x=0;x<w;x++) { int c=depthColors.get(y*w+x)&255;image.setRGB(x,y,(c<<16)|(c<<8)|c); }
+            if(screenshotPath!=null) {
+                java.nio.file.Files.createDirectories(screenshotPath.getParent());
+                javax.imageio.ImageIO.write(image,"png",screenshotPath.toFile());
             }
         }
     }
-
+    private static void dofPass(int color,int pass,float threshold,float[] weights,int guiWidth,int guiHeight) {
+        RenderSystem.setShader(()->dofShader);RenderSystem.setShaderTexture(0,color);RenderSystem.setShaderTexture(1,depthTexture);
+        dofShader.safeGetUniform("InSize").set((float)guiWidth,(float)guiHeight);
+        dofShader.safeGetUniform("Pass").set(pass);dofShader.safeGetUniform("Threshold").set(threshold);
+        dofShader.safeGetUniform("Weights").set(weights);drawFullscreenQuad();
+    }
+    private static void accumPass(int current,int previous,float blend) {
+        RenderSystem.disableBlend();RenderSystem.setShader(()->accumShader);RenderSystem.setShaderTexture(0,current);RenderSystem.setShaderTexture(1,previous);
+        accumShader.safeGetUniform("Blend").set(blend);drawFullscreenQuad();
+    }
+    private static void blitPass(int texture) { RenderSystem.setShader(()->blitShader);RenderSystem.setShaderTexture(0,texture);drawFullscreenQuad(); }
     /** クリップ空間 (-1..1) に直接四角形を出す。投影/モデルビューは単位行列にしてある。 */
     private static void drawFullscreenQuad() {
         BufferBuilder buffer = Tesselator.getInstance()
@@ -209,37 +131,36 @@ public final class CameraPostProcessor {
         buffer.addVertex(-1.0F, 1.0F, 0.0F).setUv(0.0F, 1.0F);
         MeshData mesh = buffer.build();
         if (mesh != null) {
-            BufferUploader.drawWithShader(mesh);
+            // These shaders consume clip-space positions and explicit uniforms. Avoid
+            // the world renderer's window-dependent default uniform setup.
+            var shader = RenderSystem.getShader();
+            if (shader.MODEL_VIEW_MATRIX != null) shader.MODEL_VIEW_MATRIX.set(new org.joml.Matrix4f());
+            if (shader.PROJECTION_MATRIX != null) shader.PROJECTION_MATRIX.set(new org.joml.Matrix4f());
+            for (int i = 0; i < 2; i++) shader.setSampler("Sampler" + i, RenderSystem.getShaderTexture(i));
+            try (var vertices = new com.mojang.blaze3d.vertex.VertexBuffer(com.mojang.blaze3d.vertex.VertexBuffer.Usage.DYNAMIC)) {
+                vertices.bind(); vertices.upload(mesh);
+                shader.apply(); vertices.draw(); shader.clear();
+            } finally { com.mojang.blaze3d.vertex.VertexBuffer.unbind(); }
+
         }
     }
 
-    private static void ensureTargets(int w, int h) {
-        if (blurA != null && lastW == w && lastH == h) {
-            return;
+    private static void ensureTargets(int w,int h) {
+        if(blurA!=null && lastW==w && lastH==h) return;
+        for(RenderTarget target:new RenderTarget[]{blurA,blurB,accum,delayed}) if(target!=null) target.destroyBuffers();
+        if(depthTexture>=0) com.mojang.blaze3d.platform.TextureUtil.releaseTextureId(depthTexture);
+        blurA=new TextureTarget(w,h,false,Minecraft.ON_OSX);blurB=new TextureTarget(w,h,false,Minecraft.ON_OSX);accum=new TextureTarget(w,h,false,Minecraft.ON_OSX);delayed=new TextureTarget(w,h,false,Minecraft.ON_OSX);
+        for(RenderTarget target:new RenderTarget[]{blurA,blurB,accum,delayed}) target.setFilterMode(org.lwjgl.opengl.GL11.GL_NEAREST);
+        rawDepth=org.lwjgl.BufferUtils.createFloatBuffer(w*h);depthColors=org.lwjgl.BufferUtils.createByteBuffer(w*h);
+        depthTexture=com.mojang.blaze3d.platform.TextureUtil.generateTextureId();RenderSystem.bindTexture(depthTexture);
+        org.lwjgl.opengl.GL11.glTexImage2D(org.lwjgl.opengl.GL11.GL_TEXTURE_2D,0,org.lwjgl.opengl.GL30.GL_R8,w,h,0,org.lwjgl.opengl.GL11.GL_RED,org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE,(java.nio.ByteBuffer)null);
+        org.lwjgl.opengl.GL11.glTexParameteri(org.lwjgl.opengl.GL11.GL_TEXTURE_2D,org.lwjgl.opengl.GL11.GL_TEXTURE_MIN_FILTER,org.lwjgl.opengl.GL11.GL_NEAREST);
+        org.lwjgl.opengl.GL11.glTexParameteri(org.lwjgl.opengl.GL11.GL_TEXTURE_2D,org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER,org.lwjgl.opengl.GL11.GL_NEAREST);
+        for (int texture : new int[]{blurA.getColorTextureId(),blurB.getColorTextureId(),accum.getColorTextureId(),delayed.getColorTextureId(),depthTexture}) {
+            RenderSystem.bindTexture(texture);
+            org.lwjgl.opengl.GL11.glTexParameteri(org.lwjgl.opengl.GL11.GL_TEXTURE_2D,org.lwjgl.opengl.GL11.GL_TEXTURE_WRAP_S,org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE);
+            org.lwjgl.opengl.GL11.glTexParameteri(org.lwjgl.opengl.GL11.GL_TEXTURE_2D,org.lwjgl.opengl.GL11.GL_TEXTURE_WRAP_T,org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE);
         }
-        destroy();
-        // 深度は不要 (メインターゲットのものを読む)
-        blurA = new TextureTarget(w, h, false, Minecraft.ON_OSX);
-        blurB = new TextureTarget(w, h, false, Minecraft.ON_OSX);
-        accum = new TextureTarget(w, h, false, Minecraft.ON_OSX);
-        for (RenderTarget t : new RenderTarget[]{blurA, blurB, accum}) {
-            t.setFilterMode(com.mojang.blaze3d.platform.GlConst.GL_LINEAR);
-            t.setClearColor(0.0F, 0.0F, 0.0F, 1.0F);
-        }
-        lastW = w;
-        lastH = h;
-        accumValid = false;
-    }
-
-    private static void destroy() {
-        for (RenderTarget t : new RenderTarget[]{blurA, blurB, accum}) {
-            if (t != null) {
-                t.destroyBuffers();
-            }
-        }
-        blurA = null;
-        blurB = null;
-        accum = null;
-        accumValid = false;
+        lastW=w;lastH=h;boolean pending=depthScreenshot;reset();depthScreenshot=pending;
     }
 }

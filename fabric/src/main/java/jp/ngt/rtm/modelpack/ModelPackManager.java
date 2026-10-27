@@ -40,15 +40,67 @@ public final class ModelPackManager {
         if (resource instanceof String s) {
             return getScript(s);
         }
+        if (resource instanceof jp.ngt.mccompat.ResourceLocation rl) {
+            return getScript(rl.toString());
+        }
         if (resource instanceof net.minecraft.resources.ResourceLocation rl) {
-            return getScript(rl.getPath());
+            return getScript(rl.toString());
         }
         return getScript(String.valueOf(resource));
     }
 
+    /** 本家 SC_INCLUDE: //include <path> を再帰展開する。 */
+    private static final java.util.regex.Pattern SC_INCLUDE =
+            java.util.regex.Pattern.compile("//include <(.+)>");
+
+    /** 本家 scriptCache: fileName → include 展開済みソース。 */
+    private final java.util.Map<String, String> scriptCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * 本家 ModelPackManager.getScript(String) 完全移植。
+     * //include を再帰展開し、結果をキャッシュして返す。
+     * 本家は読めなければ ModelPackException を投げるが、RTMU は既存呼び出しの
+     * null チェックを壊さないよう null を返す (見つからない include は空文字に置換)。
+     */
     public String getScript(String path) {
-        byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path);
-        return bytes != null ? new String(bytes, java.nio.charset.StandardCharsets.UTF_8) : null;
+        if (path == null) {
+            return null;
+        }
+        return this.loadScript(path);
+    }
+
+    /** 本家 ModelPackManager.loadScript 完全移植 (include 再帰 + キャッシュ)。 */
+    private String loadScript(String fileName) {
+        String cached = this.scriptCache.get(fileName);
+        if (cached != null) {
+            return cached;
+        }
+
+        byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(fileName);
+        if (bytes == null) {
+            return null;
+        }
+        // 本家は indention=true で読む (改行保持)。文字コードは MS932 フォールバック付き。
+        String rawScript = jp.ngt.ngtlib.io.NGTText.decodeText(bytes)
+                .replaceAll("\r\n|[\n\r\u2028\u2029\u0085]", "\n");
+        while (true) {
+            java.util.regex.Matcher matcher = SC_INCLUDE.matcher(rawScript);
+            if (!matcher.find()) {
+                break;
+            }
+            String includePath = matcher.group(1);
+            String rep = this.loadScript(includePath);
+            rawScript = matcher.replaceFirst(
+                    java.util.regex.Matcher.quoteReplacement(rep == null ? "" : rep));
+        }
+
+        this.scriptCache.put(fileName, rawScript);
+        return rawScript;
+    }
+
+    /** キャッシュ破棄 (診断コマンド用)。 */
+    public void clearScriptCache() {
+        this.scriptCache.clear();
     }
 
     /**
@@ -56,7 +108,17 @@ public final class ModelPackManager {
      * getModelSet("ModelConnector", modelName).getConfig.wirePos で碍子の電線取付点を読む
      * (null ガード無しで参照するため、見つからなくても既定 wirePos を返す非 null が必須)。
      */
-    public ModelSetShim getModelSet(String type, String name) {
+    public jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getModelSet(String type, String name) {
+        if("ModelTrain".equals(type) || "ModelVehicle".equals(type)) {
+            var definition=com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(name);
+            if(definition==null)for(var candidate:com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getAll())if(candidate.getDisplayName().equals(name)) {definition=candidate;break;}
+            if("ModelVehicle".equals(type))return definition==null?new jp.ngt.rtm.modelpack.modelset.ModelSetVehicle():new jp.ngt.rtm.modelpack.modelset.ModelSetVehicle(jp.ngt.rtm.modelpack.cfg.VehicleConfigAdapter.get(definition));
+            return definition==null?new jp.ngt.rtm.modelpack.modelset.ModelSetCompat():new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.get(definition.getId()));
+        }
+        if("ModelRail".equals(type)) {
+            var definition=com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(name);
+            return definition==null?new jp.ngt.rtm.modelpack.modelset.ModelSetRail():new jp.ngt.rtm.rail.util.RailProperty(name,net.minecraft.world.level.block.Blocks.GRAVEL,0,0.0625F).getModelSet();
+        }
         com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def =
             com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry.getByBareName(
                 name, com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.INSULATOR);
@@ -64,13 +126,17 @@ public final class ModelPackManager {
     }
 
     /** getModelSet の戻り値: getConfig.wirePos (double[3]) と getConfig.getName を提供。 */
-    public static final class ModelSetShim {
+    public static final class ModelSetShim extends jp.ngt.rtm.modelpack.modelset.ModelSetBase<ConfigShim> {
         private final ConfigShim config;
+        private final boolean missing;
 
         ModelSetShim(com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def) {
-            this.config = new ConfigShim(def);
+            super(new ConfigShim(def));
+            this.config = new ConfigShim(def);this.missing=def==null;
         }
 
+        public ConfigShim getDummyConfig() {return new ConfigShim(null);}
+        @Override public boolean isDummy() {return missing;}
         public ConfigShim getConfig() {
             return config;
         }

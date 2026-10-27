@@ -42,7 +42,8 @@ import java.util.function.Consumer;
 @OnlyIn(Dist.CLIENT)
 public class ModelSelectScreen extends Screen {
     /** 選択結果。旧呼び出し互換のため (modelId, dataMapValue) のコンストラクタも残す。 */
-    public record SelectionResult(String modelId, String dataMapValue, String customName, int color) {
+    public record SelectionResult(String modelId, String dataMapValue, String customName, int color,boolean autoSplit) {
+        public SelectionResult(String modelId,String dataMapValue,String customName,int color) {this(modelId,dataMapValue,customName,color,true);}
         public SelectionResult(String modelId, String dataMapValue) {
             this(modelId, dataMapValue, "", 0xFFFFFF);
         }
@@ -89,6 +90,8 @@ public class ModelSelectScreen extends Screen {
     /** 右上入力群の左端 x (init で確定)。ホイール判定などに使う。 */
     private int clusterLeftX;
 
+    private Boolean railAutoSplit;
+    public ModelSelectScreen withRailOptions(boolean enabled) {railAutoSplit=enabled;return this;}
     private boolean draggingScrollbar = false;
 
     // ---- モデルプレビュー ----
@@ -158,6 +161,9 @@ public class ModelSelectScreen extends Screen {
         searchField = addBox(width - 80, 5, 60, "Search", "");
         dataMapField = addBox(width - 205, 30, 100, "DataMap", initialDataMapValue);
         colorField = addBox(width - 80, 30, 40, "Color", String.format("0x%06X", initialColor & 0xFFFFFF));
+
+        if(railAutoSplit!=null)addRenderableWidget(net.minecraft.client.gui.components.Checkbox.builder(Component.literal("Disable Auto Split"),font)
+            .pos(width-205,55).selected(!railAutoSplit).onValueChange((box,disabled)->railAutoSplit=!disabled).build());
 
         // 完了・キャンセルは画面下・中央 (真ん中)。一覧側は下マージンを空けて重なりを避ける。
         int bw = Math.min(100, Math.max(70, width / 5));
@@ -242,6 +248,9 @@ public class ModelSelectScreen extends Screen {
 
         // 本家: ホバー中のモデルを右手に浮かべる (何も乗っていなければ選択中を出す)
         renderPreview(g, mouseX, mouseY);
+        VehicleDefinition loadingDefinition=VehicleRegistry.getById(selectedId);
+        if(com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.isLoading(loadingDefinition))
+            g.drawString(font,Component.literal("スクリプトを読み込み中…"),width-205,82,0xAAAAAA);
 
         super.render(g, mouseX, mouseY, pt);
 
@@ -715,7 +724,7 @@ public class ModelSelectScreen extends Screen {
             selectedId,
             dataMapField == null ? "" : dataMapField.getValue(),
             nameField == null ? "" : nameField.getValue(),
-            color));
+            color,railAutoSplit==null || railAutoSplit));
         onClose();
     }
 

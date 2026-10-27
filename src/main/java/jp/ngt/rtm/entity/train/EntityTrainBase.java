@@ -132,13 +132,25 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      * TODO(Phase 4): ModelSetTrainClient の本実装。
      */
     public jp.ngt.rtm.modelpack.modelset.ModelSetCompat getModelSet() {
-        return new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(this.getConfig());
+        jp.ngt.rtm.modelpack.modelset.ModelSetCompat set =
+                new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(this.getConfig());
+        set.serverSE = this.getServerScriptEngine();
+        return set;
     }
 
     /**
      * 本家 ModelSetBase.serverSE 相当。サーバースクリプト (Server_*.js) の engine。
      * 未ロード / クライアント側では null。TrainSpeedManager の可変加減速フックが使う。
      */
+    private com.portofino.realtrainmodunofficial.script.SoundScriptExecutor legacySoundUpdater;
+
+    @net.neoforged.api.distmarker.OnlyIn(net.neoforged.api.distmarker.Dist.CLIENT)
+    public com.portofino.realtrainmodunofficial.script.SoundScriptExecutor getSoundUpdater() {
+        if (this.legacySoundUpdater == null) this.legacySoundUpdater =
+                new com.portofino.realtrainmodunofficial.script.SoundScriptExecutor(this);
+        return this.legacySoundUpdater;
+    }
+
     public javax.script.ScriptEngine getServerScriptEngine() {
         // ★本家 ModelSetBase.serverSE 相当: エンジンは「モデルセット (定義) ごとに 1 個」で
         //   全インスタンスが共有する。RTMU は以前エンティティごとに別エンジンを作っていた。
@@ -699,71 +711,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
         }
         // 本家 SoundUpdaterTrain.update: ATS チャイム/ベル (制御車が signal=1 で走行中にループ)。
-        this.tickAtsSounds();
-    }
-
-    /** ATS チャイム/ベル。本家 SoundUpdaterTrain.update の該当部分の移植。 */
-    private int atsCurrentSignal;
-
-    private void tickAtsSounds() {
-        com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
-                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
-        if (def == null || !def.hasAtsSounds()) {
-            return;
-        }
-        String chime = def.getSoundAtsChime();
-        String bell = def.getSoundAtsBell();
-        int signal = this.getSignal();
-        boolean moving = Math.abs(this.getSpeed()) > 0.0F;
-        if (this.isControlCar() && moving) {
-            if (signal == 1) {
-                if (this.atsCurrentSignal != 1) {
-                    stopSoundId(chime);
-                    stopSoundId(bell);
-                    playSoundId(chime);
-                    playSoundId(bell);
-                    this.atsCurrentSignal = 1;
-                }
-            } else if (signal == -1) {
-                if (this.atsCurrentSignal != -1) {
-                    stopSoundId(bell);
-                    this.atsCurrentSignal = -1;
-                }
-            }
-        } else if (signal != -1 && this.atsCurrentSignal != 0) {
-            stopSoundId(chime);
-            stopSoundId(bell);
-            this.atsCurrentSignal = 0;
-        }
-    }
-
-    private void playSoundId(String id) {
-        if (id == null || id.isBlank()) {
-            return;
-        }
-        String ns = "rtm";
-        String name = id;
-        int i = id.indexOf(':');
-        if (i >= 0) {
-            ns = id.substring(0, i);
-            name = id.substring(i + 1);
-        }
-        com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
-                .play(this, ns, name, 1.0F, 1.0F, true);
-    }
-
-    private void stopSoundId(String id) {
-        if (id == null || id.isBlank()) {
-            return;
-        }
-        String ns = "rtm";
-        String name = id;
-        int i = id.indexOf(':');
-        if (i >= 0) {
-            ns = id.substring(0, i);
-            name = id.substring(i + 1);
-        }
-        com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stop(this, ns, name);
+        this.getSoundUpdater().updateAts();
     }
 
     @Override
@@ -1147,11 +1095,6 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return new net.minecraft.world.phys.Vec3(w.x, w.y + 0.15D, w.z);
     }
 
-    /** 乗客 NPC (RTMU に統合済み) か。統合後は同一 jar なので型で直接判定できる。 */
-    private static boolean isRtmuPassenger(Entity rider) {
-        return rider instanceof com.portofino.rtmupassenger.entity.PassengerEntity;
-    }
-
     @Override
     protected void positionRider(Entity rider, Entity.MoveFunction move) {
         if (this.hasPassenger(rider)) {
@@ -1163,11 +1106,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 sv = sv.rotateAroundX(this.getXRot());
                 sv = sv.rotateAroundY(this.getYRot());
                 // 旧 EntityFloor 搭乗時の実効高さ (floorY + 0.15) に合わせる。
-                // 乗客 NPC (rtmupassenger) は座り位置が高すぎたので下げる (プレイヤーの着席は不変)。
                 double seatY = this.getY() + sv.getY() + 0.15D;
-                if (isRtmuPassenger(rider)) {
-                    seatY -= 0.35D;
-                }
                 move.accept(rider,
                         this.getX() + sv.getX(),
                         seatY,

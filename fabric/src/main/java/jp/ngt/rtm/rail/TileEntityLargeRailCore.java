@@ -26,7 +26,7 @@ import java.util.Objects;
  * 本家 jp.ngt.rtm.rail.TileEntityLargeRailCore (KaizPatchX) の忠実移植。
  * NBT 形式は本家準拠: Property / SubRails / StartRP / EndRP / fixRTMRailMapVersion。
  */
-public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase implements jp.ngt.mccompat.LoadAwareBlockEntity {
+public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
 
     /**
      * 本家 sendPacket: レールコアの状態をクライアントへ配る。
@@ -55,7 +55,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
     /** レールを再描画するかどうか(明るさ変更等) */
     public boolean shouldRerenderRail;
     // see RailMapBasic.fixRTMRailMapVersion
-    protected int fixRTMRailMapVersion;
+    public int fixRTMRailMapVersion;
 
     // WebCTC (別mod) 用: ロード済みレールコアの一覧。weak なのでチャンクアンロードで自然に消える。
     private static final java.util.Set<TileEntityLargeRailCore> LOADED_CORES =
@@ -71,8 +71,9 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         }
     }
 
+    @Override
     public void onLoad() {
-        // NeoForge 拡張の onLoad はバニラに無いので super 呼び出しは不要
+        
         LOADED_CORES.add(this);
         // ★道床はレールベース側のブロックが描くが、形はこのコアの線形から引く。
         // ベースのチャンクが先に焼かれているとコアが無い状態で焼かれていて道床が出ない。
@@ -80,11 +81,28 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         this.refreshBallastArea();
     }
 
+    /** レール線形がまだ届いていなくて焼き直せなかった。次の tick で試し直す。 */
+    private boolean pendingBallastRefresh;
+
     /** レール一帯 (道床の敷かれている範囲) の道床を焼き直させる。クライアントのみ。 */
     public void refreshBallastArea() {
-        if (this.level == null || !this.level.isClientSide() || !this.isLoaded()) {
+        if (this.level == null || !this.level.isClientSide()) {
             return;
         }
+        // ★線形がまだ入っていない時点で諦めてはいけない。
+        //   新規に敷いたレールは「BE が置かれる → 少し後に線形が届く」順なので、
+        //   ここで return すると<b>焼き直しの機会が二度と来ない</b>
+        //   (入り直すと直るのはこれ。長い＝浅い分岐ほど派手に崩れて見える)。
+        if (!this.isLoaded()) {
+            this.pendingBallastRefresh = true;
+            return;
+        }
+        this.pendingBallastRefresh = false;
+        // ★レールの線 (焼き込みメッシュ) も一緒に捨てる。道床だけ作り直すと、
+        //   ブロック側は新しい線形・レールの線は古い線形になって<b>ずれて見える</b>。
+        com.portofino.realtrainmodunofficial.ClientHooks.invalidateRailMesh(this.level,
+                this.worldPosition.getX(), this.worldPosition.getY(), this.worldPosition.getZ());
+        this.shouldRerenderRail = true;
         int[] size = this.getRailSize();
         int pad = (this.getProperty().getBallastWidth() >> 1) + 2;
         com.portofino.realtrainmodunofficial.ClientHooks.refreshRailBallast(this.level,
@@ -165,9 +183,20 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         if (this.isLoaded())//同期ができてない状態でのRailMapの生成を防ぐ
         {
             this.railmap = new RailMapBasic(this.railPositions[0], this.railPositions[1], this.fixRTMRailMapVersion);
-            this.collisionGrids = null;
-            this.collisionVersion++;
+            this.invalidateCollisionCache();
         }
+    }
+
+    /**
+     * 当たり判定の焼き直しを促す。レールを引き直した (レンチでの高さ変更など) ら必ず呼ぶ。
+     *
+     * <p>★分岐 (Switch) / 坂 (Slope) / 転車台 (Turntable) の createRailMap はこれを呼んでおらず、
+     * レンチで高さを変えても各レールブロックの当たり判定キャッシュ (cachedShape) が
+     * 古い世代のまま残っていた。そのため<b>分岐レールだけ</b>当たり判定が高さに追従しなかった。
+     */
+    protected void invalidateCollisionCache() {
+        this.collisionGrids = null;
+        this.collisionVersion++;
     }
 
     // ===== 当たり判定 (レール曲線をサンプリングして焼く) =====
@@ -294,12 +323,18 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         return (this.railPositions != null && this.railPositions.length > 0 && Arrays.stream(this.railPositions).allMatch(Objects::nonNull));
     }
 
+    public int getRailRenderMinimumSplit() { return 0; }
+    public int getRailRenderEndOffset() { return 0; }
+    public boolean shouldRenderRailStartCap() { return true; }
+    public boolean shouldRenderRailEndCap() { return true; }
+
     public RailPosition[] getRailPositions() {
         return this.railPositions;
     }
 
     public void setRailPositions(RailPosition[] par1) {
         this.railPositions = par1;
+        this.railmap = null;
     }
 
     public RailProperty getProperty() {
@@ -371,8 +406,13 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         }
     }
 
+
     /** 本家 updateEntity 相当。Block 側の BlockEntityTicker から毎 tick 呼ばれる。 */
     public void tick() {
+        // 焼き直しを取りこぼしていたら、線形が届いた時点でやり直す
+        if (this.pendingBallastRefresh && this.level != null && this.level.isClientSide()) {
+            this.refreshBallastArea();
+        }
         if (this.level != null && !this.level.isClientSide) {
             this.isCollidedTrain = this.colliding;
             this.colliding = false;
@@ -391,6 +431,16 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
         return this.railmap;
     }
 
+    public void breakLogicalRail() {
+        if(level==null || breaking)return;breaking=true;
+        var maps=getAllRailMaps();if(maps!=null) {for(var map:maps)if(map!=null)map.breakRail(level,getProperty(),this);}
+        else level.removeBlock(getBlockPos(),false);
+    }
+    public boolean isLogicalRailOccupied() {return isCollidedTrain();}
+
+    public boolean isSameLogicalRail(TileEntityLargeRailCore other) {return this==other;}
+    public jp.ngt.rtm.rail.util.RailPosition[] getLogicalRailPositions() {return getRailPositions();}
+
     public RailMap[] getAllRailMaps() {
         RailMap rm = this.getRailMap(null);
         return rm != null ? new RailMap[]{rm} : null;
@@ -398,13 +448,13 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase im
 
     public AABB getRenderBoundingBox() {
         if (!this.isLoaded()) {
-            return jp.ngt.mccompat.AABBCompat.INFINITE;
+            return new AABB(Double.NEGATIVE_INFINITY,Double.NEGATIVE_INFINITY,Double.NEGATIVE_INFINITY,Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY);
         }
 
         if (this.renderAABB == null) {
             this.renderAABB = this.getRenderAABB();
             if (this.renderAABB == null) {
-                return jp.ngt.mccompat.AABBCompat.INFINITE;
+                return new AABB(Double.NEGATIVE_INFINITY,Double.NEGATIVE_INFINITY,Double.NEGATIVE_INFINITY,Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY);
             }//ぬるぽ回避
         }
         return this.renderAABB;

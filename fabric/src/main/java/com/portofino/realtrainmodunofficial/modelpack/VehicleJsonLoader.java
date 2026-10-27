@@ -171,25 +171,7 @@ public class VehicleJsonLoader {
     }
 
     private static String encodeTextureDescriptor(JsonArray pair) {
-        String texture = pair.get(1).getAsString();
-        if (pair.size() < 3) {
-            return texture;
-        }
-        List<String> flags = new ArrayList<>();
-        for (int i = 2; i < pair.size(); i++) {
-            JsonElement option = pair.get(i);
-            if (option == null || !option.isJsonPrimitive()) {
-                continue;
-            }
-            String value = option.getAsString();
-            if (!value.isBlank()) {
-                flags.add(value.trim());
-            }
-        }
-        if (flags.isEmpty()) {
-            return texture;
-        }
-        return texture + "|ptmeta=" + String.join(",", flags);
+        return com.portofino.realtrainmodunofficial.modelpack.LegacyTextureDescriptor.encode(pair);
     }
     
     /** Append Vec3 array from JSON object to list */

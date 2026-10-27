@@ -113,7 +113,6 @@ item.rtm:autoloading_rifle.name=Автоматическая винтовка
 item.rtm:sniper_rifle.name=Снайперская винтовка
 item.rtm:smg.name=Автомат
 item.rtm:amr.name=Крупнокалиберная винтовка
-item.rtm:razer_gun.name=Лучевой пистолет
 item.rtm:magazine_handgun.name=Магазин(Пистолет)
 item.rtm:magazine_rifle.name=Магазин(Винтовка)
 item.rtm:magazine_alr.name=Магазин(Автоматическая винтовка)

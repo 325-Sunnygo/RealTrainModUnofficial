@@ -8,7 +8,6 @@ import com.portofino.realtrainmodunofficial.item.MarkerItem;
 import com.portofino.realtrainmodunofficial.item.RailItem;
 import com.portofino.realtrainmodunofficial.item.TrainItem;
 import com.portofino.realtrainmodunofficial.item.InstalledObjectItem;
-import com.portofino.realtrainmodunofficial.item.TrainVehicleItem;
 import com.portofino.realtrainmodunofficial.item.WireItem;
 import com.portofino.realtrainmodunofficial.item.RtmWrenchItem;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
@@ -22,10 +21,10 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> CROSSING_GATE_ITEM = ITEMS.register(
         "crossing_gate", () -> new InstalledObjectItem(InstalledObjectCategory.CROSSING)
     );
-    // 以下のアイテムはユーザー要望により削除:
-    // 受信機(signal_receiver) / 受信機シグナル値(signal_value_receiver) / 電車検知ブロック(train_detector)
+    // 以下の RTMU オリジナル機能はユーザー要望により完全削除:
+    // 受信機(signal_receiver) / 受信機シグナル値(signal_value_receiver) / 旧RTMU列車検知ブロック
     // 状態ブロック(signal_state) / スクリプトブロック(script_block) / 通信機(signal_communicator)
-    // 道床(ballast)アイテムも廃止済み。ブロック自体は残るがアイテム(入手手段)は登録しない。
+    // 道床(ballast)アイテムも廃止済み。ブロック自体は本家 RTM のため残るがアイテム(入手手段)は登録しない。
     public static final DeferredItem<MarkerItem> MARKER_ITEM = ITEMS.register(
         "marker", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get(), false)
     );
@@ -58,22 +57,9 @@ public class RealTrainModUnofficialItems {
         "train", () -> new TrainItem(TrainItem.Category.ELECTRIC)
     );
     // 試験用車両(test_train)は本家 ItemTrain のメタ127として復活 (ユーザー確認済み)。
-    public static final DeferredItem<TrainVehicleItem> TRAIN_VEHICLE_ITEM = ITEMS.register(
-        "train_vehicle", TrainVehicleItem::new
-    );
     public static final DeferredItem<CarItem> CAR_ITEM = ITEMS.register(
         "car", CarItem::new
     );
-    /**
-     * 編成アイテム。右クリックで編成を組み、線路へ右クリックで連結した状態のまま設置する。
-     * 1 両ずつ置く TRAIN_ITEM とは別物 (あちらはそのまま)。
-     */
-    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.FormationItem> FORMATION_ITEM =
-        ITEMS.register("formation", com.portofino.realtrainmodunofficial.item.FormationItem::new);
-
-    /** 編成バール。殴った車両の編成をまるごと消す (1 両ずつ壊す CROWBAR_ITEM とは別)。 */
-    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.FormationCrowbarItem> FORMATION_CROWBAR_ITEM =
-        ITEMS.register("formation_crowbar", com.portofino.realtrainmodunofficial.item.FormationCrowbarItem::new);
     // 本家 itemMotorman (運転士)。列車に使うと運転台に乗り、信号/ダイヤ/マクロで自動運転する
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.MotormanItem> MOTORMAN_ITEM = ITEMS.register(
         "motorman", com.portofino.realtrainmodunofficial.item.MotormanItem::new
@@ -87,18 +73,9 @@ public class RealTrainModUnofficialItems {
         "painter", com.portofino.realtrainmodunofficial.item.PainterItem::new
     );
 
-    /** エディタ (neo mcte)。 */
-    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.EditorItem> EDITOR_ITEM = ITEMS.register(
-        "editor", com.portofino.realtrainmodunofficial.item.EditorItem::new
-    );
 
     public static final DeferredItem<MiniatureItem> MINIATURE_ITEM = ITEMS.register(
         "miniature", MiniatureItem::new
-    );
-    /** 背景パネル。設定 (画像・大きさ) はブロックエンティティが持つ。 */
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> BACKGROUND_PANEL_ITEM = ITEMS.register(
-        "background_panel", () -> new net.minecraft.world.item.BlockItem(
-            RealTrainModUnofficialBlocks.BACKGROUND_PANEL.get(), new net.minecraft.world.item.Item.Properties())
     );
     public static final DeferredItem<CrowbarItem> CROWBAR_ITEM = ITEMS.register(
         "crowbar", CrowbarItem::new
@@ -239,27 +216,12 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.CameraItem> CAMERA_ITEM = ITEMS.register(
         "camera", com.portofino.realtrainmodunofficial.item.CameraItem::new
     );
-    // リモコン: 2つのブロックを無線レッドストーンでペアリング (シフト+右クリック)
-    public static final DeferredItem<com.portofino.realtrainmodunofficial.item.RemoteItem> REMOTE_ITEM = ITEMS.register(
-        "remote", com.portofino.realtrainmodunofficial.item.RemoteItem::new
-    );
     // 本家 ItemTicket: 券売機が発券し改札が消費する。切符=1回, 回数券=11回。
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.TicketItem> TICKET_ITEM = ITEMS.register(
         "ticket", () -> new com.portofino.realtrainmodunofficial.item.TicketItem(1)
     );
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.TicketItem> TICKET_BOOK_ITEM = ITEMS.register(
         "ticket_book", () -> new com.portofino.realtrainmodunofficial.item.TicketItem(11)
-    );
-
-    // SignalControllerMod (masa300) 移植: 信号制御器 + 位置設定ツール×2
-    public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_CONTROLLER_ITEM = ITEMS.register(
-        "signal_controller", () -> new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.SIGNAL_CONTROLLER.get(), new net.minecraft.world.item.Item.Properties())
-    );
-    public static final DeferredItem<jp.masa.signalcontrollermod.ItemPosSettingTool> POS_SETTING_TOOL_0 = ITEMS.register(
-        "pos_setting_tool_0", () -> new jp.masa.signalcontrollermod.ItemPosSettingTool(0)
-    );
-    public static final DeferredItem<jp.masa.signalcontrollermod.ItemPosSettingTool> POS_SETTING_TOOL_1 = ITEMS.register(
-        "pos_setting_tool_1", () -> new jp.masa.signalcontrollermod.ItemPosSettingTool(1)
     );
 
     // ───────────────────────────────────────────────────────────────
@@ -287,9 +249,6 @@ public class RealTrainModUnofficialItems {
     );
     public static final DeferredItem<jp.ngt.rtm.item.ItemGun> AMR_ITEM = ITEMS.register(
         "amr", () -> new jp.ngt.rtm.item.ItemGun(jp.ngt.rtm.item.ItemGun.GunType.amr)
-    );
-    public static final DeferredItem<jp.ngt.rtm.item.ItemGun> RAZER_GUN_ITEM = ITEMS.register(
-        "razer_gun", () -> new jp.ngt.rtm.item.ItemGun(jp.ngt.rtm.item.ItemGun.GunType.razer_gun)
     );
     /**
      * 本家 money: メタ 0〜8 の 9 種。

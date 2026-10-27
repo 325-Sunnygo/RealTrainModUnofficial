@@ -1,9 +1,9 @@
 package com.portofino.realtrainmodunofficial.client;
 
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
+import com.portofino.realtrainmodunofficial.client.screen.FlagSelectScreen;
 import com.portofino.realtrainmodunofficial.client.screen.ModelSelectScreen;
 import com.portofino.realtrainmodunofficial.client.screen.SignSelectGridScreen;
-import com.portofino.realtrainmodunofficial.client.screen.TrainFormationScreen;
 import com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
@@ -39,7 +39,7 @@ public final class ClientItemHelper {
      */
     private static void commitSelection(ItemStack stack, ModelSelectScreen.SelectionResult selection) {
         PacketDistributor.sendToServer(new SelectModelPayload(
-            selection.modelId(), selection.dataMapValue(), selection.customName(), selection.color()));
+            selection.modelId(), selection.dataMapValue(), selection.customName(), selection.color(),selection.autoSplit()));
     }
 
     /** 手持ち (メイン→オフ) から選択式アイテムのスタックを探す。引数なし選択画面用。 */
@@ -79,7 +79,7 @@ public final class ClientItemHelper {
             LegacyItemStackBridge.getSelectedDataMap(stack),
             LegacyItemStackBridge.getSelectedCustomName(stack),
             LegacyItemStackBridge.getSelectedColor(stack)
-        ));
+        ).withRailOptions(jp.ngt.rtm.item.ItemRail.getProperty(stack)==null || jp.ngt.rtm.item.ItemRail.getProperty(stack).autoSplit));
     }
 
     /**
@@ -134,19 +134,6 @@ public final class ClientItemHelper {
             LegacyItemStackBridge.getSelectedDataMap(stack),
             LegacyItemStackBridge.getSelectedCustomName(stack),
             LegacyItemStackBridge.getSelectedColor(stack)
-        ));
-    }
-
-    public static void openTrainSelectScreen(TrainFormationScreen formationScreen) {
-        List<ModelSelectScreen.ModelInfo> infos = getVisibleTrainModels();
-        Minecraft.getInstance().setScreen(new ModelSelectScreen(
-            Component.translatable("screen.realtrainmodunofficial.select_train"),
-            infos,
-            selection -> {
-                formationScreen.updateFormationWithVehicle(selection.modelId());
-            },
-            null,
-            ""
         ));
     }
 
@@ -223,28 +210,6 @@ public final class ClientItemHelper {
         ));
     }
 
-    /**
-     * 編成の編集画面から呼ぶモデル選択。決めたら編集画面へ戻る。
-     * @param index 差し替える車両の番号。-1 なら末尾へ追加
-     */
-    public static void openTrainSelectForFormation(ItemStack stack, int index) {
-        List<ModelSelectScreen.ModelInfo> infos = getVisibleTrainModels();
-        // 決定でもキャンセルでも編成の編集画面へ戻す (戻り先は画面側が onClose で処理する)
-        Minecraft.getInstance().setScreen(new ModelSelectScreen(
-            Component.translatable("screen.realtrainmodunofficial.select_train"),
-            infos,
-            selection -> com.portofino.realtrainmodunofficial.client.screen.FormationEditScreen
-                .applySelection(stack, index, selection.modelId()),
-            null,
-            ""
-        ).withReturnScreen(() ->
-            new com.portofino.realtrainmodunofficial.client.screen.FormationEditScreen(stack)));
-    }
-
-    public static void openVehicleFormationScreen(ItemStack stack) {
-        Minecraft.getInstance().setScreen(new TrainFormationScreen(stack));
-    }
-
     public static void openInstalledObjectSelectScreen(Player player, ItemStack stack, InstalledObjectCategory category) {
         // 標識/看板は本家式のテクスチャ・グリッド選択画面。
         if (category == InstalledObjectCategory.SIGNBOARD || category == InstalledObjectCategory.RAILROAD_SIGN) {
@@ -257,6 +222,15 @@ public final class ClientItemHelper {
                 id -> PacketDistributor.sendToServer(new SelectModelPayload(id)),
                 LegacyItemStackBridge.getSelectedModelId(stack)
             ));
+            return;
+        }
+        //旗は本家 GuiSelectTexture (4x2 の升目にテクスチャそのものを並べる)。
+        if (category == InstalledObjectCategory.FLAG) {
+            Minecraft.getInstance().setScreen(new FlagSelectScreen(
+                Component.translatable(getInstalledObjectTitleKey(category)),
+                InstalledObjectRegistry.getByCategory(category),
+                id -> PacketDistributor.sendToServer(new SelectModelPayload(id)),
+                LegacyItemStackBridge.getSelectedModelId(stack)));
             return;
         }
         List<ModelSelectScreen.ModelInfo> infos = InstalledObjectRegistry.getByCategory(category).stream()
@@ -312,6 +286,90 @@ public final class ClientItemHelper {
             case BUMPING_POST -> "screen.realtrainmodunofficial.select_bumping_post";
             case POINT -> "screen.realtrainmodunofficial.select_point_machine";
             case TICKET_VENDOR -> "screen.realtrainmodunofficial.select_ticket_vendor";
+            case PLANT -> "screen.realtrainmodunofficial.select_plant";
+            case STAIR -> "screen.realtrainmodunofficial.select_stair";
+            case SCAFFOLD -> "screen.realtrainmodunofficial.select_scaffold";
+            case FLAG -> "screen.realtrainmodunofficial.select_flag";
+            case MECHANISM -> "screen.realtrainmodunofficial.select_mechanism";
         };
+    }
+    /**
+     * 貨物のモデル選択。{@code entityId >= 0} なら設置済みの貨物、負なら手持ちのアイテム。
+     */
+    public static void openCargoModelScreen(int entityId, boolean offHand) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            return;
+        }
+        com.portofino.realtrainmodunofficial.cargo.CargoDefinition.Kind kind;
+        String current = "";
+        if (entityId >= 0) {
+            if (!(mc.level != null
+                    && mc.level.getEntity(entityId) instanceof jp.ngt.rtm.entity.train.parts.EntityCargoWithModel cargo)) {
+                return;
+            }
+            kind = cargo instanceof jp.ngt.rtm.entity.train.parts.EntityArtillery
+                ? com.portofino.realtrainmodunofficial.cargo.CargoDefinition.Kind.FIREARM
+                : com.portofino.realtrainmodunofficial.cargo.CargoDefinition.Kind.CONTAINER;
+            current = cargo.getModelId();
+        } else {
+            net.minecraft.world.item.ItemStack stack = mc.player.getItemInHand(
+                offHand ? net.minecraft.world.InteractionHand.OFF_HAND : net.minecraft.world.InteractionHand.MAIN_HAND);
+            if (!(stack.getItem() instanceof jp.ngt.rtm.item.ItemCargo)) {
+                return;
+            }
+            kind = jp.ngt.rtm.item.ItemCargo.kindOf(jp.ngt.rtm.item.ItemCargo.getVariant(stack));
+            current = jp.ngt.rtm.item.ItemCargo.getModelId(stack);
+        }
+
+        List<ModelSelectScreen.ModelInfo> infos = new java.util.ArrayList<>();
+        for (var def : com.portofino.realtrainmodunofficial.cargo.CargoRegistry.getByKind(kind)) {
+            infos.add(new ModelSelectScreen.ModelInfo(
+                def.getId(), def.getDisplayName(), def.getPackName(), def.getButtonTexture()));
+        }
+        final int id = entityId;
+        final boolean off = offHand;
+        Minecraft.getInstance().setScreen(new ModelSelectScreen(
+            Component.translatable(kind == com.portofino.realtrainmodunofficial.cargo.CargoDefinition.Kind.FIREARM
+                ? "screen.realtrainmodunofficial.select_firearm"
+                : "screen.realtrainmodunofficial.select_container"),
+            infos,
+            selection -> net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new com.portofino.realtrainmodunofficial.network.CargoModelPayload(id, off, selection.modelId())),
+            current, ""));
+    }
+    /** NPC のモデル選択。{@code entityId >= 0} なら設置済み、負なら手持ちのアイテム。 */
+    public static void openNpcModelScreen(int entityId, boolean offHand) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            return;
+        }
+        String current = "";
+        if (entityId >= 0) {
+            if (!(mc.level != null && mc.level.getEntity(entityId) instanceof jp.ngt.rtm.entity.npc.EntityNPC npc)) {
+                return;
+            }
+            current = npc.getModelId();
+        } else {
+            net.minecraft.world.item.ItemStack stack = mc.player.getItemInHand(
+                offHand ? net.minecraft.world.InteractionHand.OFF_HAND : net.minecraft.world.InteractionHand.MAIN_HAND);
+            if (!(stack.getItem() instanceof com.portofino.realtrainmodunofficial.item.NpcItem)) {
+                return;
+            }
+            current = com.portofino.realtrainmodunofficial.item.NpcItem.getModelId(stack);
+        }
+        List<ModelSelectScreen.ModelInfo> infos = new java.util.ArrayList<>();
+        for (var def : com.portofino.realtrainmodunofficial.npc.NpcRegistry.getAll()) {
+            infos.add(new ModelSelectScreen.ModelInfo(
+                def.getId(), def.getId(), def.getPackName(), def.getButtonTexture(), def.getRole()));
+        }
+        final int id = entityId;
+        final boolean off = offHand;
+        Minecraft.getInstance().setScreen(new ModelSelectScreen(
+            Component.translatable("screen.realtrainmodunofficial.select_npc"),
+            infos,
+            selection -> net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                new com.portofino.realtrainmodunofficial.network.CargoModelPayload(id, off, selection.modelId())),
+            current, ""));
     }
 }

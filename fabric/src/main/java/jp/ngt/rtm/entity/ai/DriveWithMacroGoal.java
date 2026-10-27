@@ -27,6 +27,10 @@ public class DriveWithMacroGoal extends Goal {
 
     @Override
     public boolean canUse() {
+        //別 mod が運転を握っている間は本家 AI を止める (打ち消し合って動かなくなる)
+        if (this.motorman.isExternallyDriven()) {
+            return false;
+        }
         return this.motorman.getVehicle() instanceof EntityTrainBase
                 && this.executor != null && !this.executor.finished();
     }

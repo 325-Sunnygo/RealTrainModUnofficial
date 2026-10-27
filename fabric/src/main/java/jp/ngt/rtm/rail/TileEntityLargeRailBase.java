@@ -18,7 +18,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * 本家 jp.ngt.rtm.rail.TileEntityLargeRailBase (KaizPatchX) の忠実移植。
  * 道床(レールベース)ブロック1個ごとの BlockEntity。startPoint でコアを参照する。
  */
-public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
+public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail, jp.ngt.mccompat.LoadAwareBlockEntity {
     private static final int SPLIT = 128;
     protected int[] startPoint = new int[3];
 
@@ -57,6 +57,12 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         this(RTMRailBlockEntities.LARGE_RAIL_BASE.get(), pos, state);
     }
 
+    public jp.ngt.mccompat.WorldCompat func_145831_w() {return level==null?null:new jp.ngt.mccompat.WorldCompat(level);}
+    public int getX() { return this.getBlockPos().getX(); }
+    public int getY() { return this.getBlockPos().getY(); }
+    public int getZ() { return this.getBlockPos().getZ(); }
+    public Block getBlockType() { return this.getBlockState().getBlock(); }
+
     @Override
     protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries) {
         super.loadAdditional(nbt, registries);
@@ -68,6 +74,45 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         this.blockHeights = null;
         this.cachedShape = null;
         this.finishSetupBlockBounds = false;
+        this.refreshBallastModel();
+    }
+
+    public void onLoad() {
+        
+        this.refreshBallastModel();
+    }
+
+    /**
+     * 道床の形を作り直させる。
+     *
+     * <p>NeoForge はチャンクを焼く直前に {@code getModelData()} を呼ぶが、
+     * 呼ぶ相手は「作り直しを申請した BlockEntity」だけ。申請しないと
+     * コアが後から届いても古い (空の) 形のまま焼かれ、道床が出ない。
+     */
+    public void refreshBallastModel() {
+        if (this.level != null && this.level.isClientSide()) {
+            this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 8);
+        }
+    }
+
+    /**
+     * 道床 (レール下の砂利) の形をチャンクビルダへ渡す。
+     *
+     * <p>本家 1.7.10 は {@code RenderBlockLargeRail} (ISimpleBlockRenderingHandler) で
+     * チャンクメッシュへ焼いていた。1.21 でも同じく焼く側に載せるので、毎フレームの負担は無い。
+     */
+    public net.neoforged.neoforge.client.model.data.ModelData getModelData() {
+        if (this.level == null) {
+            return net.neoforged.neoforge.client.model.data.ModelData.EMPTY;
+        }
+        var shape = com.portofino.realtrainmodunofficial.client.render.BallastGeometry
+                .shapeAt(this.level, this.worldPosition);
+        if (shape == null) {
+            return net.neoforged.neoforge.client.model.data.ModelData.EMPTY;
+        }
+        return net.neoforged.neoforge.client.model.data.ModelData.builder()
+                .with(com.portofino.realtrainmodunofficial.client.render.BallastGeometry.SHAPE, shape)
+                .build();
     }
 
     @Override

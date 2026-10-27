@@ -1,0 +1,52 @@
+{
+  "variants": {
+    "temperature=0": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=1": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=2": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=3": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=4": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=5": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=6": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=7": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=8": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=9": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=10": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=11": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=12": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=13": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=14": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    },
+    "temperature=15": {
+      "model": "realtrainmodunofficial:block/steel_slab"
+    }
+  }
+}

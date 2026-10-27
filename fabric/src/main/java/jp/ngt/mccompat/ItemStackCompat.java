@@ -9,6 +9,10 @@ import net.minecraft.world.item.ItemStack;
  */
 public final class ItemStackCompat {
     public final ItemStack stack;
+    private record TagView(jp.ngt.mccompat.nbt.NBTTagCompound tag,
+                           java.util.concurrent.atomic.AtomicReference<net.minecraft.world.item.component.CustomData> data) {}
+    private static final java.util.Map<ItemStack,java.lang.ref.WeakReference<TagView>> TAG_VIEWS=
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     public ItemStackCompat(ItemStack stack) {
         this.stack = stack;
@@ -42,9 +46,9 @@ public final class ItemStackCompat {
         return stack.getItem();
     }
 
-    /** func_77960_j = getItemDamage (1.21 にメタは無い) */
+    /** Item damage uses the native damage component. */
     public int func_77960_j() {
-        return 0;
+        return stack.getDamageValue();
     }
 
     /** func_77942_o = hasTagCompound */
@@ -67,10 +71,9 @@ public final class ItemStackCompat {
     /** func_77982_d = setTagCompound */
     public void func_77982_d(Object tag) {
         net.minecraft.nbt.CompoundTag real = jp.ngt.mccompat.nbt.NBTTagCompound.unwrap(tag);
-        if (real != null) {
-            stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
-                    net.minecraft.world.item.component.CustomData.of(real));
-        }
+        if(real==null) { stack.remove(net.minecraft.core.component.DataComponents.CUSTOM_DATA); TAG_VIEWS.remove(stack); return; }
+        stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,net.minecraft.world.item.component.CustomData.of(real));
+        if(tag instanceof jp.ngt.mccompat.nbt.NBTTagCompound wrapper) observe(wrapper);
     }
 
     /** func_190916_E = getCount (1.12) */
@@ -81,11 +84,52 @@ public final class ItemStackCompat {
     private jp.ngt.mccompat.nbt.NBTTagCompound getTagCompat() {
         net.minecraft.world.item.component.CustomData data =
                 stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA);
-        if (data == null || data.isEmpty()) {
+        if (data == null) {
             return null;
         }
-        return new jp.ngt.mccompat.nbt.NBTTagCompound(data.copyTag());
+        var reference=TAG_VIEWS.get(stack); var current=reference==null ? null : reference.get();
+        if(current!=null && current.data().get()==data) return current.tag();
+        var wrapper=new jp.ngt.mccompat.nbt.NBTTagCompound(data.copyTag());
+        observe(wrapper); return wrapper;
     }
+
+    private void observe(jp.ngt.mccompat.nbt.NBTTagCompound wrapper) {
+        var reference=new java.lang.ref.WeakReference<ItemStack>(stack);
+        var view=new TagView(wrapper,new java.util.concurrent.atomic.AtomicReference<>(stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA)));
+        TAG_VIEWS.put(stack,new java.lang.ref.WeakReference<>(view));
+        wrapper.watch(()->{
+            var current=reference.get();
+            // Replacing or removing the tag detaches old references, just as setTagCompound does.
+            if(current==null || current.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA)!=view.data().get()) return;
+            var data=net.minecraft.world.item.component.CustomData.of(wrapper.tag);
+            view.data().set(data); current.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,data);
+        });
+    }
+    public int getItemDamage() { return func_77960_j(); }
+    public void setItemDamage(int damage) { stack.setDamageValue(damage); }
+    public void func_77964_b(int damage) { setItemDamage(damage); }
+    public int getMaxDamage() { return stack.getMaxDamage(); }
+    public int func_77958_k() { return getMaxDamage(); }
+    public boolean isItemDamaged() { return stack.isDamaged(); }
+    public boolean func_77951_h() { return isItemDamaged(); }
+    public boolean isItemStackDamageable() { return stack.isDamageableItem(); }
+    public boolean func_77984_f() { return isItemStackDamageable(); }
+    public int getStackSize() { return stack.getCount(); }
+    public void setStackSize(int count) { stack.setCount(count); }
+    public int getField_77994_a() { return getStackSize(); }
+    public void setField_77994_a(int count) { setStackSize(count); }
+    public int getCount() { return stack.getCount(); }
+    public void setCount(int count) { stack.setCount(count); }
+    public ItemStackCompat copy() { return new ItemStackCompat(stack.copy()); }
+    public ItemStackCompat func_77946_l() { return copy(); }
+    public ItemStackCompat splitStack(int count) { return new ItemStackCompat(stack.split(count)); }
+    public ItemStackCompat func_77979_a(int count) { return splitStack(count); }
+    public net.minecraft.world.item.Item getItem() { return func_77973_b(); }
+    public int getMaxStackSize() { return stack.getMaxStackSize(); }
+    public int func_77976_d() { return getMaxStackSize(); }
+    public boolean hasTagCompound() { return func_77942_o(); }
+    public jp.ngt.mccompat.nbt.NBTTagCompound getTagCompound() { return func_77978_p(); }
+    public void setTagCompound(Object tag) { func_77982_d(tag); }
 
     @Override
     public String toString() {

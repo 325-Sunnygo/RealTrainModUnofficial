@@ -14,6 +14,7 @@ import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.RenderShape;
@@ -74,9 +75,17 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         return super.getCloneItemStack(level, pos, state);
     }
 
-    // ★3 引数の getLightEmission は NeoForge が足したもので、バニラは呼ばない。
-    // Fabric では光源計算そのものを差し替えている (BlockLightEngineMixin)。
-
+    // 照明カテゴリかつレッドストーンで点灯中のときブロック光源レベル15を返す。
+    // 看板は本家 BlockSignBoard.getLightValue 準拠 (設定の lightValue による)。
+    public int getLightEmission(BlockState state, net.minecraft.world.level.BlockGetter level, BlockPos pos) {
+        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
+            int emission = dynamicLightEmission(be);
+            if (emission > 0) {
+                return emission;
+            }
+        }
+        return state.getLightEmission();
+    }
 
     /**
      * 置いた物ごとの明るさ (0-15)。
@@ -101,6 +110,7 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         return 0;
     }
 
+
     // ===== 本家の当たり判定 =====
     // 本家は設置物ごとに別のブロッククラスで、それぞれ setBlockBounds を持っている。
     // RTMU は 1 つのブロックに設置物を集約しているので、種類で振り分けて同じ形にする。
@@ -118,8 +128,32 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     private static final VoxelShape CROSSING_SHAPE =
         Shapes.box(0.125D, 0.0D, 0.125D, 0.875D, 3.0D, 0.875D);
     /** 碍子・コネクタ (BlockConnector): 中心の 0.25〜0.75 の小箱。 */
+    /**
+     * 足場の当たり判定。本家 {@code BlockScaffold.addCollisionBoxToList} と同じで、
+     * <b>床 1/16 + 隣が足場でない側の手すり (高さ 1.5)</b> を組む。
+     * これが無いと足場の上に立てず、すり抜けてしまう。
+     */
+    private static final VoxelShape SCAFFOLD_FLOOR = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 0.0625D, 1.0D);
+    private static final VoxelShape SCAFFOLD_RAIL_XP = Shapes.box(0.9375D, 0.0D, 0.0D, 1.0D, 1.5D, 1.0D);
+    private static final VoxelShape SCAFFOLD_RAIL_XN = Shapes.box(0.0D, 0.0D, 0.0D, 0.0625D, 1.5D, 1.0D);
+    private static final VoxelShape SCAFFOLD_RAIL_ZP = Shapes.box(0.0D, 0.0D, 0.9375D, 1.0D, 1.5D, 1.0D);
+    private static final VoxelShape SCAFFOLD_RAIL_ZN = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 1.5D, 0.0625D);
+    /** 階段の壁 (高さ 2.0)。本家 BlockScaffoldStairs.addCollisionBoxToList。 */
+    private static final VoxelShape STAIR_WALL_XN = Shapes.box(0.0D, 0.0D, 0.0D, 0.0625D, 2.0D, 1.0D);
+    private static final VoxelShape STAIR_WALL_XP = Shapes.box(0.9375D, 0.0D, 0.0D, 1.0D, 2.0D, 1.0D);
+    private static final VoxelShape STAIR_WALL_ZN = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 2.0D, 0.0625D);
+    private static final VoxelShape STAIR_WALL_ZP = Shapes.box(0.0D, 0.0D, 0.9375D, 1.0D, 2.0D, 1.0D);
+
     private static final VoxelShape CONNECTOR_SHAPE =
         Shapes.box(0.25D, 0.25D, 0.25D, 0.75D, 0.75D, 0.75D);
+    /** 旗 (BlockFlag): 7/16〜9/16 の細い柱、高さ 1。 */
+    private static final VoxelShape FLAG_SHAPE =
+        Shapes.box(0.4375D, 0.0D, 0.4375D, 0.5625D, 1.0D, 0.5625D);
+    /** 改札 (BlockTurnstile): 0.375〜0.625 の薄い壁、高さ 1.5 (向きで軸が変わる)。 */
+    private static final VoxelShape TICKET_GATE_SHAPE_X =
+        Shapes.box(0.375D, 0.0D, 0.0D, 0.625D, 1.5D, 1.0D);
+    private static final VoxelShape TICKET_GATE_SHAPE_Z =
+        Shapes.box(0.0D, 0.0D, 0.375D, 1.0D, 1.5D, 0.625D);
 
     @Override
     public VoxelShape getShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
@@ -132,6 +166,15 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         return RTM_SELECTION_SHAPE;
     }
 
+    /**
+     * 信号の当たり判定をモデルと同じ場所へ動かす。
+     *
+     * <p>本家 {@code ItemSignal} は<b>クリックした柱ブロックそのものを信号に置き換える</b>ので、
+     * 当たり判定は必ず見えている信号と同じ位置にある。RTMU は 1 つ手前のブロックに置いて
+     * モデルだけ柱の中へ押し込んでいるため、そのままだと当たり判定だけが 1 ブロック
+     * ずれた場所に残る (柱に挿したときだけズレる = 置き方で当たり判定が変わる)。
+     * 描画オフセットぶん当たり判定も動かすことで、<b>どう置いても信号の当たり判定は常に同じ</b>になる。
+     */
     /** 種類ごとの見た目どおりの形 (選択枠)。本家の setBlockBounds と同じ。 */
     private static VoxelShape outlineShape(InstalledObjectCategory category, BlockGetter level, BlockPos pos) {
         if (category == null) {
@@ -141,11 +184,182 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             case RAILROAD_SIGN -> level.getBlockState(pos.above()).isAir() ? SIGN_SHAPE : SIGN_SHAPE_UNDER;
             case POINT -> POINT_SHAPE;
             case CROSSING -> CROSSING_SHAPE;
-            case INSULATOR, CONNECTOR_INPUT, CONNECTOR_OUTPUT -> CONNECTOR_SHAPE;
+            case INSULATOR, CONNECTOR_INPUT, CONNECTOR_OUTPUT -> connectorShape(level, pos);
+            case FLAG -> FLAG_SHAPE;
+            case TICKET_GATE -> ticketGateShape(level, pos);
+            //★本家 BlockScaffold/BlockScaffoldStairs の選択枠は<b>フルブロック</b>
+            //  (setAABB(FULL_BLOCK_AABB) が既定)。床+手すりの複合形状は
+            //  addCollisionBoxToList (=衝突) にしか使わない。選択枠へ流用すると
+            //  枠が手すり形になり、狙い先も歩行感も本家とズレる。
+            case SCAFFOLD, STAIR -> RTM_SELECTION_SHAPE;
             // 信号・架線柱・看板・券売機・スピーカー・照明などは本家も BlockContainer 既定の
             // 1 ブロックのまま (setBlockBounds を持っていない)。
             default -> RTM_SELECTION_SHAPE;
         };
+    }
+
+    /**
+     * 本家 {@code BlockConnector.getBlockBounds}: 中心 0.25〜0.75 の小箱を
+     * <b>取付面の側へ伸ばす</b> (meta%6 = クリック面)。
+     */
+    private static VoxelShape connectorShape(BlockGetter level, BlockPos pos) {
+        int face = -1;
+        if (level.getBlockEntity(pos) instanceof com.portofino.realtrainmodunofficial.blockentity
+                .InstalledObjectBlockEntity be) {
+            face = be.getMountFace();
+        }
+        double minX = 0.25D, minY = 0.25D, minZ = 0.25D, maxX = 0.75D, maxY = 0.75D, maxZ = 0.75D;
+        switch (face) {
+            case 0 -> maxY = 1.0D;   //本家 case0: 上へ (1.7.10 の面番号)
+            case 1 -> minY = 0.0D;
+            case 2 -> maxZ = 1.0D;
+            case 3 -> minZ = 0.0D;
+            case 4 -> maxX = 1.0D;
+            case 5 -> minX = 0.0D;
+            default -> {
+            }
+        }
+        return Shapes.box(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+
+    /** 本家 {@code BlockTurnstile.getSelectedBoundingBox}: 向きで薄い壁の軸が変わる。 */
+    private static VoxelShape ticketGateShape(BlockGetter level, BlockPos pos) {
+        if (level.getBlockEntity(pos) instanceof com.portofino.realtrainmodunofficial.blockentity
+                .InstalledObjectBlockEntity be) {
+            int dir = net.minecraft.util.Mth.floor(be.getYaw() / 90.0F + 0.5F) & 3;
+            //本家: meta 0/2 → Z 薄・X 貫通、それ以外 → X 薄・Z 貫通
+            return (dir == 0 || dir == 2) ? TICKET_GATE_SHAPE_Z : TICKET_GATE_SHAPE_X;
+        }
+        return TICKET_GATE_SHAPE_Z;
+    }
+
+    /**
+     * 本家 {@code BlockScaffold.addCollisionBoxToList} の移植。
+     *
+     * <p>★手すりは 4 方向に出るのではなく、<b>自分の向き (dir) に対して横になる 2 面</b>だけ。
+     * 隣に足場/階段が続いていればその面は出さない。
+     */
+    private static VoxelShape scaffoldShape(BlockGetter level, BlockPos pos) {
+        // 本家 BlockScaffold.addCollisionBoxesToList の完全移植:
+        //   床 (1/16) + 自分の向きに対して横 2 面の手すり (高さ 1.5)。
+        //   隣が足場/階段で続いていればその面は出さない。
+        int dir = scaffoldDir(level, pos);
+        boolean b0 = dir == 0;
+        byte f0 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX() + 1, pos.getY(), pos.getZ(), dir);
+        byte f1 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX() - 1, pos.getY(), pos.getZ(), dir);
+        byte f2 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() + 1, dir);
+        byte f3 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() - 1, dir);
+
+        VoxelShape shape = SCAFFOLD_FLOOR;
+        if ((b0 && f0 == 0) || (!b0 && f0 == 0 && (f2 == 1 || f3 == 1 || f2 == 3 || f3 == 3))) {
+            shape = Shapes.or(shape, SCAFFOLD_RAIL_XP);
+        }
+        if ((b0 && f1 == 0) || (!b0 && f1 == 0 && (f2 == 1 || f3 == 1 || f2 == 3 || f3 == 3))) {
+            shape = Shapes.or(shape, SCAFFOLD_RAIL_XN);
+        }
+        if ((!b0 && f2 == 0) || (b0 && f2 == 0 && (f0 == 2 || f1 == 2 || f0 == 3 || f1 == 3))) {
+            shape = Shapes.or(shape, SCAFFOLD_RAIL_ZP);
+        }
+        if ((!b0 && f3 == 0) || (b0 && f3 == 0 && (f0 == 2 || f1 == 2 || f0 == 3 || f1 == 3))) {
+            shape = Shapes.or(shape, SCAFFOLD_RAIL_ZN);
+        }
+        return shape;
+    }
+
+    /**
+     * 本家 {@code BlockScaffoldStairs.addCollisionBoxToList}: 4 段の階段 + 両側の壁 (高さ 2.0)。
+     * 壁は隣に<b>同じ向きの階段</b>が続いていれば出さない。
+     */
+    private static VoxelShape stairShape(BlockGetter level, BlockPos pos) {
+        // 本家 BlockScaffoldStairs.addCollisionBoxesToList の完全移植:
+        //   4 段の踏面 (0.25 刻み) + 両側の壁 (高さ 2.0)。壁は隣が同じ向きの階段なら出さない。
+        int dir = scaffoldDir(level, pos);
+        byte f0 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX() + 1, pos.getY(), pos.getZ(), dir);
+        byte f1 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX() - 1, pos.getY(), pos.getZ(), dir);
+        byte f2 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() + 1, dir);
+        byte f3 = jp.ngt.rtm.block.BlockScaffold.getConnectionType(level, pos.getX(), pos.getY(), pos.getZ() - 1, dir);
+
+        VoxelShape shape = Shapes.empty();
+        if (dir == 0 || dir == 2) {
+            if (f1 != 3) {
+                shape = Shapes.or(shape, STAIR_WALL_XN);
+            }
+            if (f0 != 3) {
+                shape = Shapes.or(shape, STAIR_WALL_XP);
+            }
+            for (int i = 0; i < 4; ++i) {
+                double f = i * 0.25D;
+                double z = (dir == 2) ? f : 0.75D - f;
+                shape = Shapes.or(shape, Shapes.box(0.0D, f, z, 1.0D, 0.25D + f, 0.25D + z));
+            }
+        } else {
+            if (f3 != 3) {
+                shape = Shapes.or(shape, STAIR_WALL_ZN);
+            }
+            if (f2 != 3) {
+                shape = Shapes.or(shape, STAIR_WALL_ZP);
+            }
+            for (int i = 0; i < 4; ++i) {
+                double f = i * 0.25D;
+                double x = (dir == 1) ? f : 0.75D - f;
+                shape = Shapes.or(shape, Shapes.box(x, f, 0.0D, 0.25D + x, 0.25D + f, 1.0D));
+            }
+        }
+        return shape;
+    }
+
+    private static int scaffoldDir(BlockGetter level, BlockPos pos) {
+        return jp.ngt.rtm.block.BlockScaffold.dirAt(level, pos);
+    }
+
+    /**
+     * 本家 {@code BlockScaffold.modifyAcceleration}: エスカレーター (conveyorSpeed 付きの足場) は
+     * 乗っている物を押す。向きは {@code TileEntityScaffold.getMotionVec} と同じで
+     * <b>(0,0,speed) を 180 - dir*90 度だけ Y 軸回転</b>。
+     */
+    @Override
+    protected void entityInside(BlockState state, Level level, BlockPos pos, Entity entity) {
+        if (!(level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be)) {
+            return;
+        }
+        InstalledObjectCategory category = be.getCategory();
+        if (category != InstalledObjectCategory.SCAFFOLD && category != InstalledObjectCategory.STAIR) {
+            return;
+        }
+        var definition = be.getDefinition();
+        float speed = definition == null ? 0.0F : definition.getConveyorSpeed();
+        if (speed == 0.0F) {
+            return;
+        }
+        //本家 TileEntityScaffold.getVec = (0,0,s)。
+        //★階段 (TileEntityScaffoldStairs) は<b>斜め上 (0, s·sin45, s·sin45)</b>。
+        //  これが無いと上りエスカレーターに乗っても押し上げられず、段で止まる。
+        double horizontal = speed;
+        double vertical = 0.0D;
+        if (category == InstalledObjectCategory.STAIR) {
+            double d0 = Math.sin(Math.toRadians(45.0D));
+            horizontal = speed * d0;
+            vertical = speed * d0;
+        }
+        int dir = scaffoldDir(level, pos);
+        float rad = (float) Math.toRadians(180.0F - (dir * 90.0F));
+        double mx = net.minecraft.util.Mth.sin(rad) * horizontal;
+        double mz = net.minecraft.util.Mth.cos(rad) * horizontal;
+        entity.setDeltaMovement(entity.getDeltaMovement().add(mx, vertical, mz));
+    }
+
+    /** 「ブロックの中を歩けない」調査用: カテゴリごとに一度だけ衝突形状をログに出す。 */
+    private static final java.util.Set<String> COLLISION_PROBED =
+        java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private static VoxelShape probe(InstalledObjectCategory category, VoxelShape shape) {
+        return shape;
+    }
+
+    private static boolean isFullBlockShape(VoxelShape shape) {
+        net.minecraft.world.phys.AABB b = shape.bounds();
+        return b.minX <= 0.0D && b.minY <= 0.0D && b.minZ <= 0.0D
+            && b.maxX >= 1.0D && b.maxY >= 1.0D && b.maxZ >= 1.0D;
     }
 
     /**
@@ -165,11 +379,23 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             if (category == InstalledObjectCategory.FLUORESCENT) {
                 return EMPTY_SHAPE;   //本家 BlockFluorescent: 当たり判定なし (壊せはする)
             }
-            return outlineShape(category, level, pos);
+            //★足場/階段の衝突は本家 addCollisionBoxToList の複合形状 (床 1/16 + 手すり 1.5 /
+            //  4 段 + 壁 2.0)。選択枠 (getShape) はフルブロックのままにする。
+            if (category == InstalledObjectCategory.SCAFFOLD) {
+                return probe(category, scaffoldShape(level, pos));
+            }
+            if (category == InstalledObjectCategory.STAIR) {
+                return probe(category, stairShape(level, pos));
+            }
+            VoxelShape outline = outlineShape(category, level, pos);
+            // 「ブロックの中を歩けない」調査用: フルブロック衝突になっているカテゴリを一度だけ記録する。
+            if (isFullBlockShape(outline)) {
+                probe(category, outline);
+            }
+            return outline;
         }
         return RTM_SELECTION_SHAPE;
     }
-
 
     @Nullable
     @Override
@@ -226,13 +452,25 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return ItemInteractionResult.sidedSuccess(level.isClientSide);
         }
+        // 本家 BlockMachineBase.clickMachine: 素の右クリック → customForm の DataMap GUI を開く。
+        if (!player.isShiftKeyDown()
+            && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
+            && be.getDefinition() != null && be.getDefinition().getCustomForm() != null) {
+            if (level.isClientSide) {
+                com.portofino.realtrainmodunofficial.ClientHooks.openMachineConfigScreen(pos);
+            }
+            return ItemInteractionResult.sidedSuccess(level.isClientSide);
+        }
         return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 
     @Override
     protected net.minecraft.world.InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
             net.minecraft.world.entity.player.Player player, net.minecraft.world.phys.BlockHitResult hit) {
-        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be && be.isSpeaker()) {
+        // 本家 BlockSpeaker.onBlockActivated: スニーク中は機械処理 (モデル選択等)、
+        // 通常の右クリックだけスピーカー GUI (GuiSpeaker) を開く。
+        if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be && be.isSpeaker()
+            && !player.isShiftKeyDown()) {
             if (level.isClientSide) {
                 com.portofino.realtrainmodunofficial.ClientHooks.openSpeakerScreen(pos);
             }
@@ -284,6 +522,15 @@ public class InstalledObjectBlock extends BaseEntityBlock {
             }
             return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
         }
+        // 本家 BlockMachineBase.clickMachine: 素手の右クリック → customForm の DataMap GUI。
+        if (!player.isShiftKeyDown()
+            && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity cfgBe
+            && cfgBe.getDefinition() != null && cfgBe.getDefinition().getCustomForm() != null) {
+            if (level.isClientSide) {
+                com.portofino.realtrainmodunofficial.ClientHooks.openMachineConfigScreen(pos);
+            }
+            return net.minecraft.world.InteractionResult.sidedSuccess(level.isClientSide);
+        }
         return super.useWithoutItem(state, level, pos, player, hit);
     }
 
@@ -305,9 +552,8 @@ public class InstalledObjectBlock extends BaseEntityBlock {
     protected int getSignal(BlockState state, net.minecraft.world.level.BlockGetter getter, BlockPos pos,
                             net.minecraft.core.Direction direction) {
         if (getter.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
-            if (be.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
-                return net.minecraft.util.Mth.clamp(be.getElectricity(), 0, 15);
-            }
+            //★本家のコネクタはレッドストーンを出さない (RS との橋渡しは信号変換機)。
+            //  出力コネクタは「取り付け先ブロックから信号出力」して配線へ流す側。
             // 本家 BlockPoint.getWeakPower: 転轍機は切り替わっている間 15 を出す。
             // これで分岐器 (レール) やレッドストーン回路を直接動かせる。
             if (be.getCategory() == InstalledObjectCategory.POINT) {
@@ -339,9 +585,71 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         super.neighborChanged(state, level, pos, block, fromPos, isMoving);
     }
 
+    private record SignalRestoration(Level level,BlockPos pos) {}
+    private static final ThreadLocal<java.util.Set<SignalRestoration>> SIGNAL_RESTORATIONS=
+            ThreadLocal.withInitial(java.util.HashSet::new);
+
+    public boolean onDestroyedByPlayer(BlockState state,Level level,BlockPos pos,Player player,
+                                       boolean willHarvest,net.minecraft.world.level.material.FluidState fluid) {
+        if (!(level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity signal)
+                || !signal.isSignal() || signal.getSignalOrigBlock()==null) {
+            return level.setBlock(pos,fluid.createLegacyBlock(),3);
+        }
+        BlockState original=signal.getSignalOrigBlock();
+        net.minecraft.nbt.CompoundTag saved=signal.getSignalOrigTileNbt();
+        if(saved!=null) saved=saved.copy();
+        if(!level.isClientSide) {
+            removeSignalLink(level,pos);
+            if(original.isAir()) removeAttachedWires(level,pos);
+        }
+        var restoring=SIGNAL_RESTORATIONS.get();
+        var key=new SignalRestoration(level,pos.immutable()); restoring.add(key);
+        try {
+            // Signals and RTMU poles share one Block type. Recreate the tile even when
+            // setBlock sees an identical state, otherwise signal-only fields survive.
+            level.removeBlockEntity(pos);
+            level.setBlock(pos,original,3);
+            if(original.getBlock() instanceof net.minecraft.world.level.block.EntityBlock factory) {
+                BlockEntity restored=level.getBlockEntity(pos);
+                if(restored==null) {
+                    restored=factory.newBlockEntity(pos,original);
+                    if(restored!=null) level.setBlockEntity(restored);
+                }
+                if(restored!=null) {
+                    if(saved!=null) restored.loadWithComponents(saved,level.registryAccess());
+                    restored.setChanged();
+                }
+            }
+            // An unchanged BlockState still needs a fresh block-entity packet.
+            level.sendBlockUpdated(pos,state,original,3);
+            if(!level.isClientSide) level.updateNeighborsAt(pos,original.getBlock());
+        } finally {
+            restoring.remove(key); if(restoring.isEmpty()) SIGNAL_RESTORATIONS.remove();
+        }
+        if(!level.isClientSide && !player.getAbilities().instabuild) {
+            popResource(level,pos,new ItemStack(RealTrainModUnofficialItems.SIGNAL_ITEM.get()));
+        }
+        return true;
+    }
+
+    @Override
+    public void playerDestroy(Level level,Player player,BlockPos pos,BlockState state,
+                              @Nullable BlockEntity blockEntity,ItemStack tool) {
+        if(blockEntity instanceof InstalledObjectBlockEntity signal && signal.isSignal()
+                && signal.getSignalOrigBlock()!=null) {
+            // The attachment was removed and dropped in onDestroyedByPlayer. The
+            // restored support must not be harvested using the old signal state.
+            player.awardStat(net.minecraft.stats.Stats.BLOCK_MINED.get(this));
+            player.causeFoodExhaustion(0.005F);
+            return;
+        }
+        super.playerDestroy(level,player,pos,state,blockEntity,tool);
+    }
+
     @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
-        if (!level.isClientSide && state.getBlock() != newState.getBlock()) {
+        if (!level.isClientSide && state.getBlock() != newState.getBlock()
+                && !SIGNAL_RESTORATIONS.get().contains(new SignalRestoration(level,pos))) {
             removeSignalLink(level, pos);
             removeAttachedWires(level, pos);
             stopSpeakerSoundOnRemove(level, pos);

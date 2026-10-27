@@ -93,6 +93,11 @@ public final class RailDrawQueue {
             VehicleScriptRenderers.beginLevelRender();
             return;
         }
+        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
+            // Forge 1.7.10 entity pass 1 follows translucent terrain, not just rail BERs.
+            VehicleScriptRenderers.flushDeferredTranslucent();
+            return;
+        }
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_BLOCK_ENTITIES) {
             return;
         }
@@ -103,10 +108,7 @@ public final class RailDrawQueue {
         ObjectMeshCache.beginFrame();
         RailScriptRenderers.beginFrame();
         flush();
-        // ★レールを描き終えた「あと」に車両の半透明を描く。
-        // 本家は Forge 描画パス 1 (地形半透明・パス0の TileEntity のあと) で
-        // renderBodyTransparent を呼ぶので、レールはガラスより先に描き終わっている。
-        VehicleScriptRenderers.flushDeferredTranslucent();
+
     }
 
     private static void flush() {
@@ -194,7 +196,7 @@ public final class RailDrawQueue {
     private static java.lang.reflect.Field shaderLightDirsField;
     private static boolean shaderLightDirsFailed;
 
-    private static Vector3f[] currentShaderLights() {
+    static Vector3f[] currentShaderLights() {
         if (shaderLightDirsFailed) {
             return null;
         }

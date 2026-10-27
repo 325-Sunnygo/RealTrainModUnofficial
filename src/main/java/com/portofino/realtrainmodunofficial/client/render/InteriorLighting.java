@@ -20,6 +20,14 @@ public final class InteriorLighting {
     private static float colorG = 1.0F;
     private static float colorB = 1.0F;
 
+    record Snapshot(float[] positions,float red,float green,float blue) {}
+    static Snapshot snapshot() {
+        return new Snapshot(positions == null ? null : positions.clone(),colorR,colorG,colorB);
+    }
+    static void restore(Snapshot state) {
+        positions=state.positions(); colorR=state.red(); colorG=state.green(); colorB=state.blue();
+    }
+
     private InteriorLighting() {
     }
 

@@ -266,6 +266,15 @@ public class BlockMarker extends BaseEntityBlock {
         return false;
     }
 
+    public static boolean createRail(Object world,int x,int y,int z,Object positions,RailProperty property,boolean makeRail,boolean creative) {
+        var level=jp.ngt.ngtlib.block.BlockUtil.toLevel(world);if(level==null)return false;
+        var list=new java.util.ArrayList<RailPosition>();
+        if(positions instanceof Iterable<?> iterable)for(var value:iterable) {if(value instanceof RailPosition point)list.add(point);}
+        else if(positions instanceof Object[] array)for(var value:array) {if(value instanceof RailPosition point)list.add(point);}
+        else if(positions instanceof java.util.Map<?,?> map)for(var value:map.values()) {if(value instanceof RailPosition point)list.add(point);}
+        return createRail(level,x,y,z,list,property,makeRail,creative);
+    }
+
     public static boolean createRail(Level world, int x, int y, int z, List<RailPosition> rps, RailProperty prop, boolean makeRail, boolean isCreative) {
         return createRail(world, x, y, z, rps, prop, makeRail, isCreative, RailMapBasic.fixRTMRailMapVersionCurrent);
     }
@@ -334,6 +343,10 @@ public class BlockMarker extends BaseEntityBlock {
         }
 
         if (makeRail && railMap.canPlaceRail(world, isCreative, prop)) {
+            if(prop.autoSplit) {
+                var sections=jp.kaiz.kaizpatch.rtm.rail.util.RailChunkSectioner.split(railMap);
+                if(sections.size()>1)return createSectionedRail(world,railMap,sections,prop,isCreative);
+            }
             railMap.setRail(world, RTMRailBlocks.LARGE_RAIL_BASE.get(), start.blockX, start.blockY, start.blockZ, prop);
 
             BlockPos corePos = new BlockPos(start.blockX, start.blockY, start.blockZ);
@@ -365,6 +378,32 @@ public class BlockMarker extends BaseEntityBlock {
             }
             return false;
         }
+    }
+
+    private static boolean createSectionedRail(Level world,RailMapBasic source,java.util.List<jp.kaiz.kaizpatch.rtm.rail.util.RailChunkSectioner.RailSection> sections,RailProperty prop,boolean creative) {
+        var id=java.util.UUID.randomUUID();var logical=new RailPosition[]{source.getStartRP(),source.getEndRP()};
+        var cores=sections.stream().map(section -> new BlockPos(section.startRP().blockX,section.startRP().blockY,section.startRP().blockZ)).toList();
+        for(var section:sections) {
+            var point=section.startRP();if(hasRailCore(world,point.blockX,point.blockY,point.blockZ))return false;
+            var map=new jp.kaiz.kaizpatch.rtm.rail.util.RailMapSection(source,section.startRP(),section.endRP(),section.startRatio(),section.endRatio());
+            if(!map.canPlaceRail(world,creative,prop))return false;
+        }
+        source.prepareBaseBlocks(world,logical[0].blockX,logical[0].blockY,logical[0].blockZ);
+        for(int i=0;i<sections.size();i++) {
+            var section=sections.get(i);var core=cores.get(i);
+            world.setBlock(core,RTMRailBlocks.LARGE_RAIL_NORMAL_CORE.get().defaultBlockState().setValue(BlockLargeRailCore.SECTIONED,true),2);
+            if(!(world.getBlockEntity(core) instanceof TileEntityLargeRailNormalCore tile))throw new IllegalStateException("Missing section rail core at "+core);
+            tile.configureRailSection(id,logical,new RailPosition[]{section.startRP(),section.endRP()},section.startRatio(),section.endRatio(),cores);
+            tile.setProperty(prop);tile.setStartPoint(core.getX(),core.getY(),core.getZ());tile.setFixRTMRailMapVersion(source.fixRTMRailMapVersion);tile.createRailMap();tile.setChanged();
+            var state=world.getBlockState(core);world.sendBlockUpdated(core,state,state,3);
+        }
+        for(int i=0;i<sections.size();i++) {
+            var section=sections.get(i);var core=cores.get(i);
+            new jp.kaiz.kaizpatch.rtm.rail.util.RailMapSection(source,section.startRP(),section.endRP(),section.startRatio(),section.endRatio()).setRail(world,RTMRailBlocks.LARGE_RAIL_BASE.get(),core.getX(),core.getY(),core.getZ(),prop);
+        }
+        var end=logical[1];var endPos=new BlockPos(end.blockX,end.blockY,end.blockZ);
+        if(world.getBlockState(endPos).getBlock() instanceof BlockMarker)world.removeBlock(endPos,false);
+        return true;
     }
 
     /** 分岐レール */
@@ -522,15 +561,7 @@ public class BlockMarker extends BaseEntityBlock {
         }
         // Remaster RailItem: アイテム自身の選択モデル ID を最優先 (本家 ItemRail.getProperty(item) 相当)
         if (!item.isEmpty() && item.getItem() instanceof com.portofino.realtrainmodunofficial.item.RailItem) {
-            String model = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(item);
-            if (model == null || model.isEmpty()) {
-                com.portofino.realtrainmodunofficial.rail.RailDefinition def =
-                        com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
-                model = def != null ? def.getId() : "";
-            }
-            RailProperty prop = propertyFor(model == null ? "" : model,
-                    item.get(com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents
-                            .SELECTED_BALLAST.get()));
+            RailProperty prop = jp.ngt.rtm.item.ItemRail.getProperty((Object)item);
             setLastUsedProperty(prop);
             return prop;
         }
@@ -572,22 +603,12 @@ public class BlockMarker extends BaseEntityBlock {
                 (railModel == null || railModel.isEmpty()) ? null
                         : com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(railModel);
 
-        // 道床の決め方 (本家 ItemRail 準拠 + パック実態への対応):
-        //  ・そのレールの defaultBallast に<b>書いてある物からしか選べない</b>
-        //  ・defaultBallast を書いていないレール (Advanced Rails 等) は<b>道床なし</b>
-        //    ★ここでアイテムに焼かれた道床をそのまま使うと、砂利のレールアイテムから
-        //     モデルだけ切り替えたときに、道床を持たないレールへ砂利が付いてくる。
+        // Model selection and ballast selection are independent in ItemRail.setModelName.
+        // Never silently replace an explicitly selected block with another model's list.
         java.util.List<com.portofino.realtrainmodunofficial.rail.RailDefinition.Ballast> sets =
                 def == null ? java.util.List.of() : def.getBallastSets();
-        String blockId;
-        if (sets.isEmpty()) {
-            blockId = "";
-        } else if (ballastId != null && !ballastId.isBlank()
-                && sets.stream().anyMatch(set -> ballastId.equals(set.blockId()))) {
-            blockId = ballastId;                //そのレールが持っている道床を選んでいる
-        } else {
-            blockId = sets.get(0).blockId();    //別のレールの道床は引き継がない
-        }
+        String blockId = ballastId != null && !ballastId.isBlank() ? ballastId
+                : !sets.isEmpty() ? sets.get(0).blockId() : "minecraft:gravel";
 
         //その道床に対応する厚み/メタ (本家 RailConfig.defaultBallast の 1 行)
         int meta = 0;
@@ -604,18 +625,7 @@ public class BlockMarker extends BaseEntityBlock {
             }
         }
 
-        // ★道床はパックの defaultBallast の記述どおりにする。
-        // 書いていないレール (桁・高架・ガード・モノレール等) は道床なし = 空気。
-        // ここを砂利にフォールバックさせると、本家では道床が付かないレールにまで
-        // 砂利が敷かれる (ユーザー報告「道床がないレールモデルでも砂利が出る」)。
-        net.minecraft.world.level.block.Block block = net.minecraft.world.level.block.Blocks.AIR;
-        if (blockId != null && !blockId.isBlank()) {
-            net.minecraft.resources.ResourceLocation rl =
-                    net.minecraft.resources.ResourceLocation.tryParse(blockId);
-            if (rl != null && net.minecraft.core.registries.BuiltInRegistries.BLOCK.containsKey(rl)) {
-                block = net.minecraft.core.registries.BuiltInRegistries.BLOCK.get(rl);
-            }
-        }
+        net.minecraft.world.level.block.Block block = RailProperty.resolveBlock(blockId,meta);
         return new RailProperty(railModel == null ? "" : railModel, block, meta, height);
     }
 

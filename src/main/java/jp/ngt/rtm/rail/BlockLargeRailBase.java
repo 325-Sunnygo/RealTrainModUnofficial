@@ -141,15 +141,7 @@ public class BlockLargeRailBase extends BaseEntityBlock {
                 TileEntityLargeRailCore core = tile0.getRailCore();
                 if (!world.isClientSide) {
                     if (core != null && !core.breaking) {
-                        core.breaking = true;
-                        RailMap[] maps = core.getAllRailMaps();
-                        if (maps != null) {
-                            Arrays.stream(maps).filter(java.util.Objects::nonNull)
-                                    .forEach(rm -> rm.breakRail(world, core.getProperty(), core));
-                        } else {
-                            // RailMap 不明でもコアは撤去する
-                            world.removeBlock(core.getBlockPos(), false);
-                        }
+                        core.breakLogicalRail();
                     } else if (core == null) {
                         jp.ngt.ngtlib.io.NGTLog.debug("[Rail] break at %s: core not found (startPoint=%d,%d,%d)",
                                 pos.toShortString(), tile0.getStartPoint()[0], tile0.getStartPoint()[1], tile0.getStartPoint()[2]);

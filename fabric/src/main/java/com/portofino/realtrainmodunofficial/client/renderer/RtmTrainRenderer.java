@@ -35,12 +35,6 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
 
     @Override
     public boolean shouldRender(EntityTrain entity, Frustum frustum, double camX, double camY, double camZ) {
-        // 軽量化: 車両描画距離が有効なら、それより遠い車両は描画しない (最大負荷=毎フレーム
-        // スクリプト実行を丸ごと省く)。既定 0 = 無制限 = バニラどおり。
-        if (com.portofino.realtrainmodunofficial.RtmuSettings.beyondVehicleRenderDistance(
-                entity.getX(), entity.getY(), entity.getZ(), camX, camY, camZ)) {
-            return false;
-        }
         double half = Math.max(3.0D, entity.getConfig().trainDistance + 3.0D);
         AABB bounds = new AABB(
                 entity.getX() - half, entity.getY() - 2.0D, entity.getZ() - half,
@@ -64,6 +58,16 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         }
     }
 
+    private final java.util.Map<EntityTrain,Integer> poseChecks=new java.util.WeakHashMap<>();
+    private void reportInitialPose(EntityTrain entity,VehicleDefinition def,MqoModelLoader.MqoModel model) {
+        int checked=poseChecks.getOrDefault(entity,0);
+        if(checked>=2 || (checked==1 && entity.tickCount<40))return;
+        poseChecks.put(entity,checked+1);
+        com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.info(
+            "[RTMU] vehicle pose: model={} tick={} yaw={} pitch={} roll={} previousRoll={} scale={} bounds={}",
+            def.getId(),entity.tickCount,entity.getYRot(),entity.getXRot(),entity.rotationRoll,entity.prevRotationRoll,def.getModelScale(),java.util.Arrays.toString(model.getSizeBox()));
+    }
+
     private void renderTrain(EntityTrain entity, float entityYaw, float partialTicks, PoseStack poseStack,
                              MultiBufferSource buffer, int packedLight) {
         long tSec = ClientRenderProfiler.sec();
@@ -75,6 +79,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         if (model == null) {
             return;
         }
+        reportInitialPose(entity,def,model);
         // 本家 preRenderBody: 室内灯 ON かつ周囲が暗いなら車体の通常描画をフルブライトで描く。
         // ★本家は preRenderBody/postRenderBody で車体パスだけを挟む。
         final int interiorLightState = entity.getTrainStateData(
@@ -103,6 +108,11 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             poseStack.mulPose(Axis.ZP.rotationDegrees(roll));
 
             poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
+
+            // ★前照灯・尾灯の光 (本家 RenderVehicleBase.renderLightEffect)。
+            //   本家はモデルオフセットまで掛けた状態で描き、<b>モデルの拡大率は掛けない</b>ので
+            //   下の poseStack.scale より前に置く。
+            renderLightEffect(entity, def, poseStack, buffer);
             // ★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。本家は
             // NGTOParts.render の中だけで glScalef(scale) するので、スクリプトが台車/ドアを
             // 置く glTranslatef はブロック単位のまま。ここで掛けると全部が中央に寄る。
@@ -114,11 +124,16 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             tSec = ClientRenderProfiler.sec();
             com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.Scripted scripted =
                     com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
-            boolean scriptRendered = scripted != null && scripted.render(entity, partialTicks, poseStack, buffer,
+            if (scripted != null) {
+                scripted.render(entity, partialTicks, poseStack, buffer,
                     bodyLight, net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY, model);
+            }
             ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_SCRIPTED, tSec);
 
-            if (!scriptRendered) {
+            // ★スクリプトを持つ車両は、それが何も描かなくても素モデルへ逃がさない。
+            //   本家 PartsRenderer.execScriptFunc は例外を投げ直すだけで代替描画を持たない。
+            //   スクリプトを持たない車両だけがこの経路 (本家の useScript=false 相当)。
+            if (scripted == null) {
                 MqoModelLoader.GroupPredicate filter =
                         groupName -> shouldRenderGroup(groupName);
 
@@ -129,7 +144,10 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                         TrainEntityRenderer.partsChains(def.getLeftDoors());
                 java.util.Map<String, java.util.List<TrainEntityRenderer.PartsStep>> rightChains =
                         TrainEntityRenderer.partsChains(def.getRightDoors());
+                var partDrawOrder = com.portofino.realtrainmodunofficial.client.model.LegacyVehiclePartOrder.create(
+                        def.getLeftDoors(),def.getRightDoors());
                 MqoModelLoader.GroupTransform doorTransform = new MqoModelLoader.GroupTransform() {
+                    @Override public int drawOrder(String groupName) { return partDrawOrder.getOrDefault(groupName,0); }
                     @Override public void apply(PoseStack stack, String groupName) {
                         if (leftChains.isEmpty() && rightChains.isEmpty()) {
                             TrainEntityRenderer.applyDoorTransform(stack, def.getLeftDoors(), groupName, entity.doorMoveL, true);
@@ -142,7 +160,8 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                     @Override public boolean mayModify(String groupName) {
                         if (groupName == null || groupName.isEmpty()) return false;
                         if (leftChains.isEmpty() && rightChains.isEmpty()) {
-                            return groupName.length() >= 4 && TrainEntityRenderer.containsDoorWord(groupName);
+                            // ドア定義が無いなら動かす対象も無い (名前推定はしない)。
+                            return false;
                         }
                         return TrainEntityRenderer.hasPartsTransform(leftChains, groupName)
                                 || TrainEntityRenderer.hasPartsTransform(rightChains, groupName);
@@ -165,23 +184,14 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                         interiorLightingActive ? def.getInteriorLights() : null,
                         interiorLightState == 2, entity.level().getGameTime() * 50L);
                     try {
-                        // ★焼き込みはしない。本家 1.7.10 も車両は毎フレーム投げ直している。
-                        // 代わりに LocalSpaceBatch が pose を GPU 側の ModelView へ移すので、
-                        // 頂点あたりの CPU 行列演算がゼロになる。
-                        // 動かない車体と動く部品を分けるのは変換の適用範囲を絞るためで、
-                        // 焼くためではない (分けたまま残す)。
-                        MqoModelLoader.GroupPredicate staticFilter =
-                            n -> filter.shouldRender(n) && !doorTransform.mayModify(n);
-                        MqoModelLoader.GroupPredicate movingFilter =
-                            n -> filter.shouldRender(n) && doorTransform.mayModify(n);
+                        // One complete normal pass, then one complete alpha pass, as in
+                        // RenderVehicleBase. Splitting static/moving groups here submitted
+                        // shadow/glass before the opaque faces of moving doors.
                         final int lightForBody = bodyLight;
                         com.portofino.realtrainmodunofficial.client.render.LocalSpaceBatch.run(
                             poseStack, buffer, (localPose, localBuffer) -> {
                                 MqoModelLoader.renderModel(model, localPose, localBuffer,
-                                    lightForBody, staticFilter, null, entity);
-                                // 動く部品 (ドア・パンタ等)。持たない車両ならここは何も描かない。
-                                MqoModelLoader.renderModel(model, localPose, localBuffer,
-                                    lightForBody, movingFilter, doorTransform, entity);
+                                    lightForBody, filter, doorTransform, entity);
                                 return true;
                             });
                     } finally {
@@ -213,6 +223,32 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
     }
 
     /**
+     * 前照灯・尾灯の光。本家 {@code RenderVehicleBase.renderLightEffect} の引数集め。
+     *
+     * <p>本家は {@code getConnectedTrain(dir)} で「その向きに連結相手が居るか」を見て、
+     * 先頭車だけ前照灯・最後尾だけ尾灯を点ける。単行 (isSingleTrain かつ両端とも非連結) は
+     * 進行方向側が前照灯・反対側が尾灯になる。
+     */
+    private static void renderLightEffect(EntityTrain entity, VehicleDefinition def,
+                                          PoseStack poseStack, MultiBufferSource buffer) {
+        int mode = entity.getTrainStateData(
+            jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Light.id);
+        if (mode <= 0) {
+            return;
+        }
+        int dir = entity.getTrainDirection();
+        boolean frontFree = entity.getConnectedTrain(dir) == null;
+        boolean rearFree = entity.getConnectedTrain(1 - dir) == null;
+        int ambient = TrainEntityRenderer.ambientLightValue(
+            entity.level(), entity.getX(), entity.getY(), entity.getZ());
+        com.portofino.realtrainmodunofficial.client.render.VehicleLightEffect.render(
+            def, mode, dir, frontFree, rearFree,
+            entity.getX(), entity.getY(), entity.getZ(),
+            entity.getYRot(), entity.getXRot(),
+            ambient, poseStack, buffer);
+    }
+
+    /**
      * 乗員 (運転士等) を車体より先に描画する。
      * 通常の描画ループでも描かれるが、同一変換の二重描画は視覚上問題にならない。
      */
@@ -241,54 +277,8 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         }
     }
 
-    /**
-     * ヘルパーグループ (shadow/guide/atari/影ms/連結曲げ変種) の除外。
-     * 台車グループは別台車モデルがある場合のみ非表示 (EntityBogie 側が描画)。
-     */
-
+    /** BasicVehiclePartsRenderer registers every authored body/part group. */
     private static boolean shouldRenderGroup(String groupName) {
-        if (groupName == null || groupName.isBlank()) {
-            return true;
-        }
-        String n = groupName.toLowerCase(Locale.ROOT);
-        // 本家のパックは「影」という名前の偽の影ポリゴンを持つことがある (1.7.10 時代の名残)。
-        // 半透明マテリアルで描かれるが深度も書き込むため、レールの上に乗ると
-        // レールが深度テストに落ちて描かれなくなる (「レールが透ける」)。
-        if (n.contains("影")) {
-            return false;
-        }
-        if (n.contains("shadow")) {
-            return false;
-        }
-        if (n.endsWith("_ms") || n.endsWith("_kage") || n.contains("_ms_") || n.contains("_kage_")) {
-            return false;
-        }
-        if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) {
-            return false;
-        }
-        if (isAngleBendVariant(n)) {
-            return false;
-        }
-        // ★本家は名前で台車グループを隠さない (TrainEntityRenderer と同じ理由)。
         return true;
-    }
-
-    /** 連結曲げ用の角度バリアント (末尾 "-NN" で NN>=10、(mx) は先に剥がす)。 */
-    private static boolean isAngleBendVariant(String normalized) {
-        String s = normalized.endsWith("(mx)") ? normalized.substring(0, normalized.length() - 4) : normalized;
-        int dash = s.lastIndexOf('-');
-        if (dash <= 0 || dash == s.length() - 1) {
-            return false;
-        }
-        for (int i = dash + 1; i < s.length(); i++) {
-            if (!Character.isDigit(s.charAt(i))) {
-                return false;
-            }
-        }
-        try {
-            return Integer.parseInt(s.substring(dash + 1)) >= 10;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 }

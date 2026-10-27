@@ -36,11 +36,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         // (rtm_src RailPartsRendererBase.java:305 / :123)
         // RTMU は Math.ceil にしていたため、長さ 10.7 なら本家 21 に対して 22 となり、
         // 枕木が 1 本多く入って間隔が本家とずれていた。切り捨てに揃える。
-        int split = (int) (length * 2.0D);
-        // 0 だと以降の割り算が壊れるので 1 は確保する (本家はループ回数 1 で成立する形)
-        int samples = Math.max(1, split);
-        // 暴走よけの上限。本家には無いが、極端に長いレールで描画が破綻しないように残す。
-        return Math.min(samples, 768);
+        return Math.max(1,jp.ngt.rtm.render.LegacyRailSampling.split(length,0));
     }
 
 /**
@@ -48,7 +44,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
  * 曲線ではベジェと整合したサンプル間隔のためオフセットしない。
  */
     private static float depthJitter(int pos) {
-        return ((pos & 15) - 7.5f) * 1.2e-6f;
+        return 0.0F;
     }
 
 
@@ -161,7 +157,9 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
      */
     private void renderSubRails(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
                                 PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
-        for (jp.ngt.rtm.rail.util.RailProperty sub : be.subRails) {
+        java.util.List<jp.ngt.rtm.rail.util.RailProperty> subs = be.subRails;
+        for (int i = 0; i < subs.size(); i++) {
+            jp.ngt.rtm.rail.util.RailProperty sub = subs.get(i);
             if (sub == null || sub.railModel == null || sub.railModel.isBlank()) {
                 continue;
             }
@@ -173,8 +171,9 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             if (subModel == null) {
                 continue;
             }
+            // 本家 RenderLargeRail と同じくサブレール i を railIndex = i+1 で描く。
             com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.renderSubRail(
-                    be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, subDef, subModel);
+                    be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, subDef, subModel, i + 1);
         }
     }
 
@@ -265,14 +264,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     return;
                 }
                 // フォールバック(Point 情報やパーツが無い): 本家 createRailPos 同様、全 RailMap を全描画。
-                // trimEnds=true: 端のサンプルを半ピース内側に寄せ、レール端からモデルが
-                // 飛び出さないようにする (AR 系パックのダブルクロッシング対策)。
+                // Sample the authored endpoints unchanged; the reference selects end faces separately.
                 for (int mapIndex = 0; mapIndex < maps.length; mapIndex++) {
                     RailMap map = maps[mapIndex];
                     if (map != null) {
                         renderRailMap(be, map, mapIndex, layout, activeIndex, previousIndex, switchProgress,
                             poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def,
-                            null, true);
+                            null, false);
                     }
                 }
                 return;
@@ -864,9 +862,8 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
      * sleeper_point を常に隠す、end/cap は端だけ… など)。
      */
     private static boolean shouldRenderObject(TileEntityLargeRailCore be, String groupName, int max, int pos) {
-        if (groupName == null || groupName.isBlank()) {
-            return true;
-        }
+        if (groupName == null || groupName.isBlank()) return true;
+        if(!jp.ngt.rtm.render.LegacyRailSampling.crossSection(groupName,pos,max+1,be.shouldRenderRailStartCap(),be.shouldRenderRailEndCap())) return false;
         try {
             com.portofino.realtrainmodunofficial.rail.RailDefinition def =
                 com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(be.getRailDefinitionId());
@@ -874,7 +871,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
                     com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
                 if (scripted != null && scripted.renderer() != null) {
-                    return scripted.renderer().shouldRenderObject(be, groupName, max, pos);
+                    return scripted.renderer().shouldRenderObject(be, groupName, max+1, pos);
                 }
             }
         } catch (Throwable ignored) {
@@ -885,7 +882,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
 
 
-    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public @NotNull AABB getRenderBoundingBox(TileEntityLargeRailCore be) {
         return be.getCachedRenderBounds();
     }
@@ -900,8 +896,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     @Override
     public int getViewDistance() {
-        // RTMU 設定でレール描画距離を変更可能 (既定 128)。「レールの描画が短い」対策。
-        return com.portofino.realtrainmodunofficial.RtmuSettings.clampRailRenderDistance(
-            com.portofino.realtrainmodunofficial.RtmuSettings.railRenderDistance);
+        return 128;
     }
 }

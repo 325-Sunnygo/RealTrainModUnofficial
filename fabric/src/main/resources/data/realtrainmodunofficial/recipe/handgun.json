@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SSS",
+    "  M"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "M": {
+      "item": "realtrainmodunofficial:magazine_handgun"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:handgun",
+    "count": 1
+  },
+  "category": "misc"
+}

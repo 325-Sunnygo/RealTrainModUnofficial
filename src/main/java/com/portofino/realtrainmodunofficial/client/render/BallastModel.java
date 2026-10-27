@@ -73,7 +73,7 @@ public class BallastModel implements IDynamicBakedModel {
             // 本家が手で書いていた係数とちょうど同じ値になる
             baker.setShade(true);
             baker.setTintIndex(-1);
-            baker.setHasAmbientOcclusion(true);
+            baker.setHasAmbientOcclusion(false);
             for (int i = 0; i < 4; i++) {
                 emit(baker, face, i, sprite);
             }
@@ -118,7 +118,8 @@ public class BallastModel implements IDynamicBakedModel {
 
     @Override
     public boolean useAmbientOcclusion() {
-        return true;
+        // Original RenderBlockLargeRail submits fixed face shades, without AO.
+        return false;
     }
 
     @Override

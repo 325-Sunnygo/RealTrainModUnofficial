@@ -9,14 +9,17 @@ public class TextureCoordinate {
     private float u;
     private float v;
 
-    public TextureCoordinate(float u, float v) {
-        this.u = u;
-        this.v = v;
+    private final VecAccuracy accuracy;
+    public TextureCoordinate(float u,float v) { this(u,v,VecAccuracy.MEDIUM); }
+    private TextureCoordinate(float u,float v,VecAccuracy accuracy) {
+        this.accuracy=accuracy==null?VecAccuracy.MEDIUM:accuracy;
+        setUV(u,v);
     }
+    private float encode(float value) { return accuracy==VecAccuracy.LOW ? (short)(value*2000F)*0.0005F : value; }
 
-    /** 本家 create。精度指定は RTMU では float 固定なので無視する。 */
+    /** 本家 create。LOW は座標と異なりゼロ方向へ切り捨てて short に格納する。 */
     public static TextureCoordinate create(float u, float v, VecAccuracy accuracy) {
-        return new TextureCoordinate(u, v);
+        return new TextureCoordinate(u, v,accuracy);
     }
 
     public float getU() {
@@ -28,11 +31,11 @@ public class TextureCoordinate {
     }
 
     public void setUV(float u, float v) {
-        this.u = u;
-        this.v = v;
+        this.u = encode(u);
+        this.v = encode(v);
     }
 
     public TextureCoordinate copy() {
-        return new TextureCoordinate(this.u, this.v);
+        return new TextureCoordinate(this.u, this.v,accuracy);
     }
 }

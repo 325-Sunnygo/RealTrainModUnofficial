@@ -1,6 +1,5 @@
 package com.portofino.realtrainmodunofficial.item;
 
-import jp.ngt.mcte.editor.filter.UndoHistory;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
@@ -83,7 +82,7 @@ public class PainterItem extends Item {
 
         BlockPos center = context.getClickedPos();
         int r = size - 1;
-        UndoHistory.Snapshot snapshot = new UndoHistory.Snapshot();
+        PainterUndoHistory.Snapshot snapshot = new PainterUndoHistory.Snapshot();
         int changed = 0;
         for (int dy = -r; dy <= r; dy++) {
             for (int dz = -r; dz <= r; dz++) {
@@ -110,7 +109,7 @@ public class PainterItem extends Item {
         }
         if (changed > 0) {
             // ペインターの履歴はプレイヤー単位。エディタとは別に戻せる。
-            UndoHistory.push(player.getUUID(), snapshot);
+            PainterUndoHistory.push(player.getUUID(), snapshot);
         }
         return InteractionResult.CONSUME;
     }

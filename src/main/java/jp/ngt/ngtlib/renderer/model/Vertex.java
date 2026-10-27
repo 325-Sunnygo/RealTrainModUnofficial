@@ -9,23 +9,27 @@ public class Vertex {
     public float y;
     public float z;
 
-    public Vertex(float x, float y, float z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+    private final VecAccuracy accuracy;
+    public Vertex(float x, float y, float z) { this(x,y,z,VecAccuracy.MEDIUM); }
+    private Vertex(float x,float y,float z,VecAccuracy accuracy) {
+        this.accuracy=accuracy==null?VecAccuracy.MEDIUM:accuracy;
+        setVec(x,y,z);
+    }
+    private float encode(float value) {
+        return accuracy==VecAccuracy.LOW ? (short)(int)Math.floor(value*2000.0F)*0.0005F : value;
     }
 
     public Vertex(double x, double y, double z) {
         this((float) x, (float) y, (float) z);
     }
 
-    /** 本家 Vertex.create。精度指定は RTMU では float 固定なので無視する。 */
+    /** 本家 Vertex.create。LOW は本家どおり floor → short → 0.0005 単位。 */
     public static Vertex create(float x, float y, float z, VecAccuracy accuracy) {
-        return new Vertex(x, y, z);
+        return new Vertex(x, y, z, accuracy);
     }
 
     public static Vertex create(Vec3 vec, VecAccuracy accuracy) {
-        return new Vertex((float) vec.getX(), (float) vec.getY(), (float) vec.getZ());
+        return create((float) vec.getX(), (float) vec.getY(), (float) vec.getZ(),accuracy);
     }
 
     public float getX() {
@@ -42,9 +46,9 @@ public class Vertex {
 
     /** 本家 setVec: 座標を書き換える。 */
     public void setVec(float x, float y, float z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+        this.x = encode(x);
+        this.y = encode(y);
+        this.z = encode(z);
     }
 
     /** 本家 add: 自身に加算して自身を返す。 */
@@ -70,7 +74,7 @@ public class Vertex {
     }
 
     public Vertex copy(VecAccuracy accuracy) {
-        return new Vertex(this.x, this.y, this.z);
+        return create(this.x, this.y, this.z,accuracy);
     }
 
     public Vertex copy() {
@@ -85,13 +89,12 @@ public class Vertex {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof Vertex other)) return false;
-        return Float.compare(this.x, other.x) == 0
-                && Float.compare(this.y, other.y) == 0
-                && Float.compare(this.z, other.z) == 0;
+        return this.x==other.x && this.y==other.y && this.z==other.z;
     }
 
     @Override
     public int hashCode() {
-        return 31 * (31 * Float.hashCode(this.x) + Float.hashCode(this.y)) + Float.hashCode(this.z);
+        int ix=Math.abs((int)(this.x*10F)),iy=Math.abs((int)(this.y*10F)),iz=Math.abs((int)(this.z*10F));
+        return ((ix&255)<<16)|((iy&255)<<8)|(iz&255);
     }
 }

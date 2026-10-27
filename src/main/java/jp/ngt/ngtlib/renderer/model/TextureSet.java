@@ -7,6 +7,7 @@ public class TextureSet {
     public jp.ngt.mccompat.ResourceLocation[] subTextures;
     /** α ブレンドするマテリアルか。 */
     public boolean doAlphaBlend;
+    public boolean lightOptionDeclared;
 
     public TextureSet(Material material) {
         this.material = material;
@@ -19,6 +20,7 @@ public class TextureSet {
     public TextureSet(Material material, int subTexturesSize, boolean doAlphaBlend, String... args) {
         this.material = material;
         this.doAlphaBlend = doAlphaBlend;
+        this.lightOptionDeclared = subTexturesSize > 0;
         if (subTexturesSize <= 0) {
             return;
         }

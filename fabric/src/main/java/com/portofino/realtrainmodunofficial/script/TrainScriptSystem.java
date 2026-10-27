@@ -155,19 +155,19 @@ public class TrainScriptSystem {
             // ダミー JS へ束縛されていた (NGTUtil.isClient が常に true 等)。
             scriptEngine.put("renderer", renderer);
             scriptEngine.put("model", renderer.getModel());
-            // SRB3 のネイティブ敷設ブリッジは JS 再実装ではなく実 Java なので残す。
-            scriptEngine.put("__SRB__", new SrbRailBridge());
             scriptEngine.put(SCRIPT_PATH_KEY, scriptPath == null ? "" : scriptPath);
             scriptEngine.put(SCRIPT_MODEL_KEY, modelName == null ? "" : modelName);
             // サーバー/サウンドスクリプトは描画しない (GL を触らない) ので、車両描画側と
             // 同じ PackScriptSource の前処理・束縛に一本化する。
             // SRB3 のネイティブ敷設ブリッジだけはこの経路固有なので個別に付ける。
-            script = PackScriptSource.PRELUDE
-                    + appendSuperRailBuilderOverrides(PackScriptSource.prepare(script, scriptPath));
-            scriptEngine.eval(script);
-            prepareScriptRuntimeBeforeInit(scriptEngine);
+            // ★以前は eval の直後に CustomTexture / CustomAnimator / DoorRenderer /
+            //   CustomLightParts / CustomMonitor_LCD / CustomMonitor_JRE_1/2 や
+            //   playComplessorSound・frontSideTrainList 等を JS で「再定義」していた。
+            //   しかしこれらは本家ではパック側 JS が定義するもので、
+            //   上書きすると挙動が本家と変わる (= オリジナル実装) ため撤去した。
+            //   本家と同じく、パックスクリプトをそのまま評価するだけにする。
+            scriptEngine.eval(PackScriptSource.PRELUDE + PackScriptSource.prepare(script, scriptPath));
             invokeScriptInit(scriptEngine, renderer);
-            prepareScriptRuntimeAfterInit(scriptEngine);
             return scriptEngine;
         } catch (ScriptException e) {
             reportScriptError(scriptEngine, "load(standalone)", e);
@@ -177,168 +177,6 @@ public class TrainScriptSystem {
             RealTrainModUnofficial.LOGGER.error("Unexpected error loading standalone script: {}", scriptPath, e);
         }
         return null;
-    }
-
-    /**
-     * OpList 経路の描画スクリプトだけに要る機能的な回避策。
-     * クラス名の置換 (旧方言) ではなく、1.21 で挙動が変わる 2 点への対処:
-     */
-
-
-    /**
-     * SRB3 のスクリプトにネイティブ敷設ブリッジの上書き定義を追加する。
-     * SRB のビルダーは車 (ModelVehicle) なので、そのサーバースクリプトは
-     * CarServerScripts が読む。
-     */
-    /**
-     * かつてここに SuperRailBuilder3 専用の関数差し替えがあった (約 60 行)。
-     * getSelectedSlotItem を常に null にし、getPlayerRail /
-     * buildNormalRail / buildBranchRail / createRailPosition /
-     * getTileEntity / deleteRail を RTMU のブリッジ (__SRB__) へ
-     * 差し替えるものだったが、これはパック名で分岐する特別処理であり本家に無い。
-     */
-    public static String appendSuperRailBuilderOverrides(String script) {
-        return script;
-    }
-
-
-
-    private static void prepareScriptRuntimeBeforeInit(ScriptEngine scriptEngine) {
-        try {
-            scriptEngine.eval(
-                "if (typeof frontSideTrainList === 'undefined') frontSideTrainList = [];\n" +
-                "if (typeof rearSideTrainList === 'undefined') rearSideTrainList = [];\n" +
-                "if (typeof __ptNoopPart !== 'function') __ptNoopPart = function() { return { render: function() {}, renderLight: function() {}, setOption: function() {}, addEntriesSet: function() {}, addMotionData: function() {}, addState: function() {}, getDoorState: function() { return false; }, getDoorPosZ: function() { return 0; }, getFlashState: function() { return false; } }; };\n" +
-                "if (typeof __ptDummyTextureData !== 'function') __ptDummyTextureData = function() { return { images: [{}], size: 1, rate: 1, width: 1, height: 1 }; };\n" +
-                "if (typeof playComplessorSound !== 'function') {\n" +
-                "  playComplessorSound = function(su, soundDomain, soundName) {\n" +
-                "    if (!su) return;\n" +
-                "    if (su.isComplessorActive && su.isComplessorActive()) {\n" +
-                "      var count = su.complessorCount ? su.complessorCount() : 0;\n" +
-                "      var c0 = 50;\n" +
-                "      var vol = 1.0;\n" +
-                "      if (count < c0) { var c1 = c0 * c0; vol = -((((count - c0) * (count - c0)) + c1) / c1); }\n" +
-                "      var pitch = count < c0 ? (vol * 0.5) + 0.5 : 1.0;\n" +
-                "      if (su.playSound) su.playSound(soundDomain, soundName, vol, pitch);\n" +
-                "    } else if (su.stopSound) {\n" +
-                "      su.stopSound(soundDomain, soundName);\n" +
-                "    }\n" +
-                "  };\n" +
-                "}\n" +
-                "if (typeof playCompressorSound !== 'function' && typeof playComplessorSound === 'function') playCompressorSound = playComplessorSound;\n" +
-                "if (typeof CustomTexture !== 'undefined') {\n" +
-                "  CustomTexture._load = function(path) {\n" +
-                "    var size = 1, width = 1, height = 1;\n" +
-                "    try { if (renderer && typeof renderer.getScriptTextureFrameCount === 'function') size = Math.max(1, renderer.getScriptTextureFrameCount('minecraft', String(path))); } catch (e) { size = path && String(path).toLowerCase().indexOf('.gif') >= 0 ? 64 : 1; }\n" +
-                "    try { if (renderer && typeof renderer.getScriptTextureWidth === 'function') width = Math.max(1, renderer.getScriptTextureWidth('minecraft', String(path))); } catch (e) {}\n" +
-                "    try { if (renderer && typeof renderer.getScriptTextureHeight === 'function') height = Math.max(1, renderer.getScriptTextureHeight('minecraft', String(path))); } catch (e) {}\n" +
-                "    var images = [];\n" +
-                "    for (var i = 0; i < size; i++) images.push(path);\n" +
-                "    return { images: images, size: size, rate: 8, width: width, height: height };\n" +
-                "  };\n" +
-                "  if (CustomTexture.prototype) {\n" +
-                "    CustomTexture.prototype.bindTexture = function(entity, frameIndex) { if (renderer && typeof renderer.bindScriptTexture === 'function') renderer.bindScriptTexture('minecraft', this.texturePath, frameIndex || 0); };\n" +
-                "    CustomTexture.prototype.bindDefaultTexture = function(renderer) { if (renderer && typeof renderer.clearScriptTexture === 'function') renderer.clearScriptTexture(); if (renderer && typeof renderer.clearUvWindow === 'function') renderer.clearUvWindow(); };\n" +
-                "    CustomTexture.prototype._uploadTexture = function(entity, bufferedImage) {};\n" +
-                "    CustomTexture.prototype._bindTextureChached = function(frameIndex, textureId) {};\n" +
-                "  }\n" +
-                "}\n"
-            );
-            scriptEngine.eval(
-                "if (typeof CustomAnimator !== 'undefined' && CustomAnimator.prototype && !CustomAnimator.prototype.__ptAnimatorFacesWrapped) {\n" +
-                "  CustomAnimator.prototype.__ptAnimatorFacesWrapped = true;\n" +
-                "  CustomAnimator.prototype.__ptOldRender = CustomAnimator.prototype.render;\n" +
-                "  CustomAnimator.prototype.setFacesFromParts = function(part) {\n" +
-                "    this.__ptParts = part;\n" +
-                "    this.preVertexList = [];\n" +
-                "    try { if (renderer && typeof renderer.markScriptManagedParts === 'function') renderer.markScriptManagedParts(part); } catch (e0) {}\n" +
-                "    if (!renderer || typeof renderer.getScriptQuadVertexLists !== 'function') return;\n" +
-                "    var faces = Java.from(renderer.getScriptQuadVertexLists(part));\n" +
-                "    for (var i = 0; i < faces.length; i++) {\n" +
-                "      var face = Java.from(faces[i]);\n" +
-                "      var v = [];\n" +
-                "      for (var j = 0; j < face.length; j++) {\n" +
-                "        var p = Java.from(face[j]);\n" +
-                "        v.push([+p[0], +p[1], +p[2]]);\n" +
-                "      }\n" +
-                "      if (v.length === 4) this.preVertexList.push(v);\n" +
-                "    }\n" +
-                "  };\n" +
-                "  CustomAnimator.prototype.render = function(renderer, entity, pass, isLit) {\n" +
-                "    if (renderer && typeof renderer.disableReplayCacheForFrame === 'function') renderer.disableReplayCacheForFrame();\n" +
-                "    return this.__ptOldRender ? this.__ptOldRender.apply(this, arguments) : undefined;\n" +
-                "  };\n" +
-                "}\n"
-            );
-            scriptEngine.eval(
-                "if (typeof CustomMonitor_LCD !== 'undefined') {\n" +
-                "  CustomMonitor_LCD = function(modelSet, modelObj, baseParts, texturePath) { this.baseParts = baseParts; this.texturePath = texturePath; this.gif = new CustomTexture(modelObj, texturePath); };\n" +
-                "  CustomMonitor_LCD.prototype = { constructor: CustomMonitor_LCD, render: function(renderer, entity, pass, partialTick) { if (!entity || pass > 2 || !this.baseParts) return; var id = 0; try { id = Math.floor(entity.getTrainStateData(8)); } catch (e) {} if (typeof lcdDisplaySet !== 'undefined' && lcdDisplaySet[id]) { var set = lcdDisplaySet[id]; var tick = 0; try { tick = renderer.getTick(entity); } catch (e) {} id = set[Math.floor((tick % (set.length * 200)) / 200)] || set[0] || id; } else { try { var frames = renderer.getScriptTextureFrameCount('minecraft', this.texturePath); var tick2 = renderer.getTick(entity); if (frames > 0) id = Math.floor(tick2 / 2) % frames; } catch (e2) {} } try { if (typeof renderer.setLightmapMaxBrightness === 'function') renderer.setLightmapMaxBrightness(); if (renderer && typeof renderer.renderGifOnParts === 'function') renderer.renderGifOnParts(this.baseParts, 'minecraft', this.texturePath, id); else { this.gif.bindTexture(entity, id); this.baseParts.render(renderer); } } finally { if (typeof renderer.enableLighting === 'function') renderer.enableLighting(); renderer.clearUvWindow(); renderer.clearScriptTexture(); } } };\n" +
-                "}\n"
-            );
-            scriptEngine.eval(
-                "if (typeof DoorRenderer !== 'undefined' && DoorRenderer.prototype && !DoorRenderer.prototype.__ptDoorUpdateWrapped) {\n" +
-                "  DoorRenderer.prototype.__ptDoorUpdateWrapped = true;\n" +
-                "  DoorRenderer.prototype._isUpdateTick = function(entity, pass, renderer) { if (!entity || pass !== 0) return false; var currentTick = renderer.getTick(entity); var key = 'prevTick_' + (entity.getUUID ? entity.getUUID() : 'entity'); var prevTick = this.hashMap.get(key); this.hashMap.put(key, currentTick); return prevTick !== currentTick; };\n" +
-                "  DoorRenderer.prototype._calcZPos = function(entity, pass, partialTick) { if (!entity || pass > 2) return 0; var m = 0; try { if (this.dir === DoorRenderer.dir.left && renderer && typeof renderer.getDoorMovementL === 'function') m = renderer.getDoorMovementL(entity); else if (this.dir === DoorRenderer.dir.right && renderer && typeof renderer.getDoorMovementR === 'function') m = renderer.getDoorMovementR(entity); else { var state = Math.floor(entity.getTrainStateData(4)); var open = this.dir === DoorRenderer.dir.left ? ((state & 2) === 2) : ((state & 1) === 1); m = open ? 1 : 0; } } catch (e) { m = 0; } if (m < 0) m = 0; if (m > 1) m = 1; var pos = this.moveMaxZ * m; var map = this.hashMap.get(entity) || new java.util.HashMap(); map.put('posZ', pos); map.put('cachedRenderPos', pos); this.hashMap.put(entity, map); return this.isInvertMove ? -pos : pos; };\n" +
-                "}\n"
-            );
-            scriptEngine.eval(
-                "if (typeof CustomMonitor_JRE_1 !== 'undefined') {\n" +
-                "  CustomMonitor_JRE_1 = function(modelSet, modelObj, baseParts) { this.baseParts = baseParts; this.hashMap = new java.util.HashMap(); };\n" +
-                "  CustomMonitor_JRE_1.prototype = { constructor: CustomMonitor_JRE_1, setOption: function() {}, render: function() {}, getHashMap: function(entity) { return this.hashMap.get(entity) || {}; }, setHashMapData: function(entity, key, value) { var data = this.getHashMap(entity); data[key] = value; this.hashMap.put(entity, data); }, getHashMapData: function(entity, key) { return this.getHashMap(entity)[key]; } };\n" +
-                "}\n" +
-                "if (typeof CustomMonitor_JRE_2 !== 'undefined') {\n" +
-                "  var __ptJre2EntrySet = CustomMonitor_JRE_2.EntrySet || {};\n" +
-                "  CustomMonitor_JRE_2 = function(modelSet, modelObj, baseParts) { this.baseParts = baseParts; this.entrySet = {}; this.hashMap = new java.util.HashMap(); };\n" +
-                "  CustomMonitor_JRE_2.EntrySet = __ptJre2EntrySet;\n" +
-                "  ['tc','mc1','mc2','t','tsd','m1','m2','m3','m4','m5','m6','m7','m8'].forEach(function(k) { if (!CustomMonitor_JRE_2.EntrySet[k]) CustomMonitor_JRE_2.EntrySet[k] = { iconF: 'entry_' + k, iconB: 'entry_' + k }; });\n" +
-                "  CustomMonitor_JRE_2.prototype = { constructor: CustomMonitor_JRE_2, addEntrySet: function(trainName, type, options) { this.entrySet[trainName] = { type: type || {}, options: options || {} }; }, addEntriesSet: function(trainNameList, type, options) { if (!trainNameList) return; for (var i = 0; i < trainNameList.length; i++) this.addEntrySet(trainNameList[i], type, options); }, setOption: function(options, entity) { var data = this.getHashMap(entity); data.options = options || {}; this.hashMap.put(entity, data); }, render: function() {}, getHashMap: function(entity) { return this.hashMap.get(entity) || {}; }, setHashMapData: function(entity, key, value) { var data = this.getHashMap(entity); data[key] = value; this.hashMap.put(entity, data); }, getHashMapData: function(entity, key) { return this.getHashMap(entity)[key]; } };\n" +
-                "}\n"
-            );
-            scriptEngine.eval(
-                "if (typeof CustomLightParts !== 'undefined' && CustomLightParts.prototype && !CustomLightParts.prototype.__ptLightModeWrapped) {\n" +
-                "  CustomLightParts.prototype.__ptLightModeWrapped = true;\n" +
-                "  CustomLightParts.prototype.__ptOldRenderLight = CustomLightParts.prototype.renderLight;\n" +
-                "  CustomLightParts.prototype.__ptOldRender = CustomLightParts.prototype.render;\n" +
-                "  CustomLightParts.prototype.__ptLightAllowed = function(entity) {\n" +
-                "    var mode = 0;\n" +
-                "    try { mode = Math.floor(entity.getTrainStateData(5)); } catch (e) {}\n" +
-                "    if (this.lightTextureSuffix === '_headLight') return mode === 1 || mode === 3;\n" +
-                "    if (this.lightTextureSuffix === '_tailLight') return mode === 2 || mode === 3;\n" +
-                "    return true;\n" +
-                "  };\n" +
-                "  CustomLightParts.prototype.render = function(renderer, entity, pass, isObjectGlow) {\n" +
-                "    if (entity && isObjectGlow && !this.__ptLightAllowed(entity)) { if (this.parts && typeof this.parts.render === 'function') this.parts.render(renderer); return; }\n" +
-                "    return this.__ptOldRender.apply(this, arguments);\n" +
-                "  };\n" +
-                "  CustomLightParts.prototype.renderLight = function(renderer, entity, pass) {\n" +
-                "    if (!this.__ptLightAllowed(entity)) return;\n" +
-                "    return this.__ptOldRenderLight.apply(this, arguments);\n" +
-                "  };\n" +
-                "}\n"
-            );
-        } catch (ScriptException e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to prepare script runtime before init", e);
-        }
-    }
-
-    private static void prepareScriptRuntimeAfterInit(ScriptEngine scriptEngine) {
-        try {
-            scriptEngine.eval(
-                "if (typeof frontSideTrainList === 'undefined') frontSideTrainList = [];\n" +
-                "if (typeof rearSideTrainList === 'undefined') rearSideTrainList = [];\n" +
-                "if (typeof __ptNoopPart === 'function') {\n" +
-                "  if (typeof lcd1 === 'undefined') lcd1 = __ptNoopPart();\n" +
-                "  if (typeof lcd2 === 'undefined') lcd2 = __ptNoopPart();\n" +
-                "  if (typeof monitor1 === 'undefined') monitor1 = __ptNoopPart();\n" +
-                "  if (typeof monitor2 === 'undefined') monitor2 = __ptNoopPart();\n" +
-                "  if (typeof timsMonitor === 'undefined') timsMonitor = __ptNoopPart();\n" +
-                "}\n"
-            );
-        } catch (ScriptException e) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to prepare script runtime after init", e);
-        }
     }
 
     private static String quoteJs(String value) {
@@ -376,11 +214,8 @@ public class TrainScriptSystem {
             }
         }
 
-        try {
-            scriptEngine.eval("if (typeof init === 'function') init();");
-        } catch (ScriptException e) {
-            RealTrainModUnofficial.LOGGER.error("Failed to invoke init() fallback for model script", e);
-        }
+        // ★init() (0引数) フォールバックは撤去した。本家は init(renderer, model) の 2 引数のみを
+        //   呼ぶ (ScriptUtil.doScriptFunction 経由)。同梱 66 スクリプトも全て 2 引数。
     }
 
 
@@ -494,144 +329,33 @@ public class TrainScriptSystem {
             scriptEngine.put("executor", executer);
         } catch (Throwable ignored) {
         }
-        Invocable invocable = (Invocable) scriptEngine;
-        // ★止めてあるものは呼ばない (noteScriptFailure の説明を参照)。
-        // サーバースクリプトは編成の全車ぶん毎 tick 走るので、
-        // 失敗し続けると tick 時間がそのまま溶ける。
-        if (isScriptDisabled(scriptEngine, "onUpdate(entity, executer) [server]")
-                || isScriptDisabled(scriptEngine, "onUpdate(entity, executer) [server-runtime]")) {
-            return;
-        }
         try {
-            invocable.invokeFunction("onUpdate", entity, executer);
-            if (executer != null) {
-                ++executer.count;
-            }
+            ((Invocable) scriptEngine).invokeFunction("onUpdate", entity, executer);
             noteScriptSuccess(scriptEngine, "onUpdate(entity, executer) [server]");
             noteScriptSuccess(scriptEngine, "onUpdate(entity, executer) [server-runtime]");
-            return;
         } catch (NoSuchMethodException ignored) {
         } catch (ScriptException e) {
             reportScriptFailure(scriptEngine, "onUpdate(entity, executer) [server]", e);
-            return;
         } catch (Throwable t) {
             reportScriptFailure(scriptEngine, "onUpdate(entity, executer) [server-runtime]", t);
-            return;
-        }
-        try {
-            invocable.invokeFunction("onUpdate", entity);
+        } finally {
             if (executer != null) {
                 ++executer.count;
             }
-        } catch (NoSuchMethodException ignored) {
-        } catch (ScriptException e) {
-            reportScriptFailure(scriptEngine, "onUpdate(entity) [server]", e);
-        } catch (Throwable t) {
-            reportScriptFailure(scriptEngine, "onUpdate(entity) [server-runtime]", t);
         }
     }
 
-    public static void invokeScriptTick(ScriptEngine scriptEngine, Object entity) {
-        if (scriptEngine == null) return;
-        LegacyScriptExecutor compat = entity instanceof TrainEntity train ? new LegacyScriptExecutor(train) : null;
-        try {
-            scriptEngine.put("executer", compat);
-            scriptEngine.put("executor", compat);
-        } catch (Throwable ignored) {
-        }
-        if (entity instanceof TrainEntity train) {
-            try {
-                List<LegacyScriptExecutor> frontList = new ArrayList<>();
-                TrainEntity cur = train.getCoupledLeader();
-                while (cur != null && frontList.size() < 64) {
-                    frontList.add(new LegacyScriptExecutor(cur));
-                    cur = cur.getCoupledLeader();
-                }
-                List<LegacyScriptExecutor> rearList = new ArrayList<>();
-                cur = train.getCoupledFollower();
-                while (cur != null && rearList.size() < 64) {
-                    rearList.add(new LegacyScriptExecutor(cur));
-                    cur = cur.getCoupledFollower();
-                }
-                scriptEngine.put("__rtmFrontArr", frontList.toArray(new LegacyScriptExecutor[0]));
-                scriptEngine.put("__rtmRearArr", rearList.toArray(new LegacyScriptExecutor[0]));
-                scriptEngine.eval("frontSideTrainList = Array.from(__rtmFrontArr); rearSideTrainList = Array.from(__rtmRearArr);");
-            } catch (Throwable ignored) {
-            }
-        }
-        if (scriptEngine instanceof Invocable invocable) {
-            try {
-                invocable.invokeFunction("tick", entity);
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no tick function
-            } catch (ScriptException e) {
-                reportScriptFailure(scriptEngine, "tick(entity)", e);
-                return;
-            }
-            try {
-                invocable.invokeFunction("tick");
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no zero-arg tick function
-            } catch (ScriptException e) {
-                reportScriptFailure(scriptEngine, "tick()", e);
-                return;
-            }
-            if (compat != null) {
-                try {
-                    invocable.invokeFunction("onUpdate", compat);
-                    return;
-                } catch (NoSuchMethodException ignored) {
-                    // no one-argument compat onUpdate
-                } catch (ScriptException e) {
-                    reportScriptFailure(scriptEngine, "onUpdate(compat)", e);
-                    return;
-                }
-                try {
-                    invocable.invokeFunction("onUpdate", entity, compat);
-                    return;
-                } catch (NoSuchMethodException ignored) {
-                    // no two-argument onUpdate
-                    } catch (ScriptException e) {
-                        reportScriptFailure(scriptEngine, "onUpdate(entity, compat)", e);
-                        return;
-                    }
-                }
-            try {
-                invocable.invokeFunction("onUpdate", entity);
-                return;
-            } catch (NoSuchMethodException ignored) {
-                // no one-argument entity onUpdate
-            } catch (ScriptException e) {
-                reportScriptFailure(scriptEngine, "onUpdate(entity)", e);
-                return;
-            }
-        }
-        try {
-            scriptEngine.put("__ptTickEntity", entity);
-            scriptEngine.put("__ptCompat", compat);
-            scriptEngine.eval(
-                "if (typeof tick === 'function') tick(__ptTickEntity);" +
-                " else if (typeof onUpdate === 'function') {" +
-                "   if (__ptCompat != null) {" +
-                "     try { onUpdate(__ptCompat); } catch (e1) {" +
-                "       try { onUpdate(__ptTickEntity, __ptCompat); } catch (e2) { onUpdate(__ptTickEntity); }" +
-                "     }" +
-                "   } else { onUpdate(__ptTickEntity); }" +
-                " }"
-            );
-        } catch (ScriptException e) {
-            reportScriptFailure(scriptEngine, "tick/onUpdate fallback", e);
-        }
-    }
 
     /** サウンドスクリプトを1tick回す。SoundScriptExecutorを必ず渡す。 */
     public static void invokeSoundScript(ScriptEngine scriptEngine, net.minecraft.world.entity.Entity train) {
         if (scriptEngine == null || train == null) {
             return;
         }
-        SoundScriptExecutor su = new SoundScriptExecutor(train);
+        SoundScriptExecutor su = train instanceof jp.ngt.rtm.entity.train.EntityTrainBase legacy
+                ? legacy.getSoundUpdater()
+                : train instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity modern
+                    ? modern.getSoundUpdater() : new SoundScriptExecutor(train);
+        su.updateAts();
         try {
             scriptEngine.put("executer", su);
             scriptEngine.put("executor", su);
@@ -1350,7 +1074,8 @@ public class TrainScriptSystem {
 
     }
 
-    public static final class ScriptModelRenderer {
+    public static final class ScriptModelRenderer
+            implements com.portofino.realtrainmodunofficial.client.ActionPartsHost {
         private final Object model;
         private final MqoModelLoader.MqoModel mqoModel;
         private final String defaultModelName;
@@ -1389,6 +1114,11 @@ public class TrainScriptSystem {
         private int firstTranslucentPass = -1;
         // Groups registered via registerParts during init — script "owns" these, baked render skips them
         private final Set<String> scriptRegisteredGroups = new LinkedHashSet<>();
+        /** registerParts へ渡された Parts/ActionParts (ActionPartsPicker 用)。 */
+        private final List<jp.ngt.rtm.render.Parts> scriptTargets = new ArrayList<>();
+        /** 本家 PartsRenderer.hittedEntity / hittedParts (スクリプトが参照する)。 */
+        public Object hittedEntity;
+        public final Map<Object, jp.ngt.rtm.render.Parts> hittedParts = new java.util.HashMap<>();
         private final Map<Long, Object> scriptData = new HashMap<>();
         private TrainEntity cachedExecutorTrain;
         private LegacyScriptExecutor cachedExecutor;
@@ -1693,7 +1423,7 @@ public class TrainScriptSystem {
         private static final java.util.regex.Pattern TYPE_N_PATTERN = java.util.regex.Pattern.compile("type\\d+");
 
         private static final class ParsedGroupSet {
-            final List<String> filteredGroupNames;   // shadow/guide 除外後の元名前列
+            final List<String> filteredGroupNames;   // guide 除外後の元名前列
             final Set<String> normalizedNames;       // 正規化(lowercase trim) 後
             final Set<String> presentGroupNames;     // モデルに実在する正規化名
             final boolean legacyDisplaySelection;
@@ -1748,10 +1478,82 @@ public class TrainScriptSystem {
                     && jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path) != null;
         }
 
-        /** 本家 renderLightEffectS: ボリュームライトは未対応 (安全に無視)。 */
+        /** 実行中の車レンダラ (OpList 経路)。静的 renderLightEffectS をここへ委譲する。 */
+        private static ScriptModelRenderer activeLightTarget;
+
+        public static void setActiveLightTarget(ScriptModelRenderer renderer) {
+            activeLightTarget = renderer;
+        }
+
+        /** 本家 renderLightEffectS: 車経路では実行中レンダラへ、無ければ jp.ngt 版へ回す。 */
         public static void renderLightEffectS(Object normal, double x, double y, double z,
                                               float rL, float rS, float length,
                                               int color, int type, boolean reverse) {
+            ScriptModelRenderer target = activeLightTarget;
+            if (target != null) {
+                target.renderLightEffect(normal, new double[]{x, y, z}, rL, rS, length, color, type, reverse);
+                return;
+            }
+            jp.ngt.rtm.render.PartsRenderer.renderLightEffectS(
+                normal, x, y, z, rL, rS, length, color, type, reverse);
+        }
+
+        /**
+         * 本家 PartsRenderer.renderLightEffect と同じ引数形。
+         * 車経路 (OpList/Tessellator) は GLRecorder を持たないため、
+         * {@link com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry} で
+         * 幾何を作り、加算合成 RenderType でその場に描く (列車経路と同じ結果)。
+         */
+        public void renderLightEffect(Object normal, double[] pos, float rL, float rS,
+                                      float length, int color, int type, boolean reverse) {
+            if (pos == null || pos.length < 3 || poseStack == null || buffer == null) {
+                return;
+            }
+            jp.ngt.ngtlib.math.Vec3 viewerVec =
+                normal instanceof jp.ngt.ngtlib.math.Vec3
+                    ? jp.ngt.rtm.render.PartsRenderer.getViewerVec(pos[0], pos[1], pos[2])
+                    : null;
+            com.mojang.blaze3d.vertex.VertexConsumer vc = buffer.getBuffer(
+                com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.ADDITIVE_TESS);
+            org.joml.Matrix4f mat = poseStack.last().pose();
+            for (com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.Piece p
+                    : com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.compute(
+                        normal, viewerVec, rL, rS, length, color, type, reverse)) {
+                emitLightPiece(vc, mat, p);
+            }
+        }
+
+        /** ライト幾何 (stride 9) を即時頂点へ流す。加算合成 + フルブライト。 */
+        private void emitLightPiece(com.mojang.blaze3d.vertex.VertexConsumer vc,
+                                    org.joml.Matrix4f mat,
+                                    com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.Piece piece) {
+            float[] v = piece.verts;
+            int count = v.length / 9;
+            if (piece.mode == com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.GL_TRIANGLES) {
+                for (int t = 0; t + 2 < count; t += 3) {
+                    emitLightVertex(vc, mat, v, t);
+                    emitLightVertex(vc, mat, v, t + 1);
+                    emitLightVertex(vc, mat, v, t + 2);
+                }
+            } else if (piece.mode == com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.GL_TRIANGLE_FAN) {
+                for (int t = 1; t + 1 < count; t++) {
+                    emitLightVertex(vc, mat, v, 0);
+                    emitLightVertex(vc, mat, v, t);
+                    emitLightVertex(vc, mat, v, t + 1);
+                }
+            }
+        }
+
+        private void emitLightVertex(com.mojang.blaze3d.vertex.VertexConsumer vc,
+                                     org.joml.Matrix4f mat, float[] v, int index) {
+            int o = index * 9;
+            com.portofino.realtrainmodunofficial.client.render.VertexWriter.addVertex(vc, mat,
+                    v[o], v[o + 1], v[o + 2])
+                .setColor(v[o + 5], v[o + 6], v[o + 7], v[o + 8])
+                .setUv(v[o + 3], v[o + 4])
+                .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                .setLight(0xF000F0)
+                .setNormal(0.0F, 0.0F, 1.0F);
         }
 
         /** 本家 spawnParticle。 */
@@ -1786,12 +1588,91 @@ public class TrainScriptSystem {
             return getModel();
         }
 
+        // ---- ActionPartsHost (車経路の ActionParts 対話を列車経路と同じ精度にする) ----
+
+        @Override
+        public List<jp.ngt.rtm.render.Parts> getTargetsList() {
+            return this.scriptTargets;
+        }
+
+        @Override
+        public jp.ngt.ngtlib.renderer.model.PolygonModel getPolygonModel() {
+            if (this.mqoModel != null && this.mqoModel.getScriptModel() != null) {
+                return this.mqoModel.getScriptModel().model;
+            }
+            return null;
+        }
+
+        @Override
+        public javax.script.ScriptEngine getScript() {
+            return this.mqoModel != null ? this.mqoModel.getScriptEngine() : null;
+        }
+
+        @Override
+        public void setHoveredParts(Object entity, jp.ngt.rtm.render.Parts part) {
+            this.hittedEntity = entity;
+            if (part != null) {
+                this.hittedParts.put(entity, part);
+            } else {
+                this.hittedParts.remove(entity);
+            }
+        }
+
+        /**
+         * 本家 ActionParts.renderOutline: ホバー中パーツの輪郭を即時描画する。
+         * 巻き順を反転した三角形を通常の裏面カリングで描くため、前面が落ちてリムになる。
+         */
+        public void renderActionOutline(jp.ngt.rtm.render.ActionParts ap, int color) {
+            if (ap == null || poseStack == null || buffer == null) {
+                return;
+            }
+            jp.ngt.ngtlib.renderer.model.GroupObject[] outline = ap.getOutlineModels(getPolygonModel());
+            if (outline == null || outline.length == 0) {
+                return;
+            }
+            // 本家 glCullFace(GL_FRONT)。RenderType の CULL は面を指定できないので、
+            // RenderSystem で前面カリングを設定し、専用 RenderType を即時 flush する。
+            com.mojang.blaze3d.systems.RenderSystem.enableCull();
+            org.lwjgl.opengl.GL11.glCullFace(org.lwjgl.opengl.GL11.GL_FRONT);
+            com.mojang.blaze3d.vertex.VertexConsumer vc = buffer.getBuffer(
+                com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.OUTLINE_TESS);
+            org.joml.Matrix4f mat = poseStack.last().pose();
+            float r = ((color >>> 16) & 0xFF) / 255.0F;
+            float g = ((color >>> 8) & 0xFF) / 255.0F;
+            float b = (color & 0xFF) / 255.0F;
+            for (jp.ngt.ngtlib.renderer.model.GroupObject go : outline) {
+                float[] v = jp.ngt.rtm.render.ActionParts.buildOutlineTriangles(go, r, g, b);
+                int count = v.length / 9;
+                for (int t = 0; t + 2 < count; t += 3) {
+                    for (int k = 0; k < 3; k++) {
+                        int o = (t + k) * 9;
+                        com.portofino.realtrainmodunofficial.client.render.VertexWriter.addVertex(vc, mat,
+                                v[o], v[o + 1], v[o + 2])
+                            .setColor(v[o + 5], v[o + 6], v[o + 7], v[o + 8])
+                            .setUv(v[o + 3], v[o + 4])
+                            .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                            .setLight(0xF000F0)
+                            .setNormal(0.0F, 0.0F, 1.0F);
+                    }
+                }
+            }
+            // 前面カリングは flush 時の GL 状態で決まるので即時 flush してから戻す。
+            if (buffer instanceof net.minecraft.client.renderer.MultiBufferSource.BufferSource bs) {
+                bs.endBatch(com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.OUTLINE_TESS);
+            }
+            org.lwjgl.opengl.GL11.glCullFace(org.lwjgl.opengl.GL11.GL_BACK);
+        }
+
         /** Returns the model object as a legacy model-set placeholder. */
         public Object getModelSet() {
             return getModel();
         }
 
         public Object registerParts(Object parts) {
+            // ActionPartsPicker が onRightClick/onRightDrag を送れるよう、本家 Parts を保持する。
+            if (parts instanceof jp.ngt.rtm.render.Parts rtmParts) {
+                this.scriptTargets.add(rtmParts);
+            }
             List<String> names = extractGroupNames(parts);
             List<String> usable = new ArrayList<>();
             int rejected = 0;
@@ -1808,17 +1689,25 @@ public class TrainScriptSystem {
             }
             // RTM 原作の Parts は .render(renderer) で対応グループを描画する。
             // ここで実用版 ScriptParts を返し、bogieF.render(renderer) 等が機能するようにする。
-            return new ScriptParts(this, usable);
+            // 元の Parts を保持して ActionParts の輪郭描画にも使う。
+            return new ScriptParts(this, usable, parts);
         }
 
         /** スクリプトが bogieF.render(renderer) を呼ぶと現在の poseStack で描画する。 */
         public static final class ScriptParts {
             private final ScriptModelRenderer renderer;
             private final List<String> groupNames;
+            /** registerParts へ渡された元の Parts/ActionParts (輪郭描画に使う)。 */
+            private final Object sourceParts;
 
             public ScriptParts(ScriptModelRenderer renderer, List<String> groupNames) {
+                this(renderer, groupNames, null);
+            }
+
+            public ScriptParts(ScriptModelRenderer renderer, List<String> groupNames, Object sourceParts) {
                 this.renderer = renderer;
                 this.groupNames = groupNames == null ? List.of() : List.copyOf(groupNames);
+                this.sourceParts = sourceParts;
             }
 
             public List<String> getGroupNames() {
@@ -1828,8 +1717,17 @@ public class TrainScriptSystem {
             /** RTM 原作互換: 与えた renderer の現在の poseStack でグループを描画する。 */
             public void render(Object rendererArg) {
                 ScriptModelRenderer target = (rendererArg instanceof ScriptModelRenderer smr) ? smr : renderer;
-                if (target != null) {
-                    target.renderRegisteredGroups(groupNames);
+                if (target == null) {
+                    return;
+                }
+                target.renderRegisteredGroups(groupNames);
+                // 本家 ActionParts.render: LIGHT パスでホバー中のパーツに輪郭線を描く。
+                if (this.sourceParts instanceof jp.ngt.rtm.render.ActionParts ap
+                        && target.currentPass == jp.ngt.rtm.render.RenderPass.LIGHT.id
+                        && target.hittedParts.get(target.hittedEntity) == ap) {
+                    target.renderActionOutline(ap,
+                        jp.ngt.rtm.render.ActionParts.outlineColor(
+                            jp.ngt.rtm.render.ActionParts.isRightButtonDownClient()));
                 }
             }
 
@@ -1879,8 +1777,6 @@ public class TrainScriptSystem {
             for (String n : rawNames) {
                 String x = normalizeLegacyGroupName(n);
                 if (x.isEmpty()) continue;
-                // 擬似シャドウ(黒平板)を無効化。shadow完全一致のみ
-                if (x.equalsIgnoreCase("shadow")) continue;
                 if (currentPass >= 2 && isLightOffGroup(x)) continue;
                 normalized.add(x);
             }
@@ -2785,6 +2681,23 @@ public class TrainScriptSystem {
                 return;
             }
             renderPartsCalls++;
+            // ActionParts ピッキング用: この時点のパーツローカル→カメラ行列を記録する。
+            // (capturingEntity == null なら即 return するので通常描画の負荷は無い)
+            if (groups instanceof java.util.Collection<?> coll) {
+                java.util.Set<String> norm = new java.util.LinkedHashSet<>();
+                for (Object o : coll) {
+                    if (o == null) {
+                        continue;
+                    }
+                    String n = normalizeLegacyGroupName(String.valueOf(o));
+                    if (!n.isEmpty()) {
+                        norm.add(n);
+                    }
+                }
+                // 色ピッキング FBO 用: ActionParts を ID 色で専用バッファへ流す。
+                com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.emitGroups(
+                    norm, this.poseStack, this.packedLight, this.overlay);
+            }
             int baseDepth = matrixDepth;
             int savedPackedLight = packedLight;
             boolean savedLightmapMaxForced = lightmapMaxForced;
@@ -2804,7 +2717,6 @@ public class TrainScriptSystem {
                         List<String> filtered = new ArrayList<>(raw.size());
                         for (String g : raw) {
                             String n = normalizeLegacyGroupName(g);
-                            if (n.equals("shadow") || n.startsWith("shadow_") || n.endsWith("_shadow")) continue;
                             if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) continue;
                             if (currentPass >= 2 && isLightOffGroup(n)) continue;
                             filtered.add(g);
@@ -2856,7 +2768,6 @@ public class TrainScriptSystem {
                     groupNames = groupNames.stream()
                         .filter(g -> {
                             String n = normalizeLegacyGroupName(g);
-                            if (n.equals("shadow") || n.startsWith("shadow_") || n.endsWith("_shadow")) return false;
                             if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) return false;
                             if (currentPass >= 2 && isLightOffGroup(n)) return false;
                             return true;
@@ -3264,10 +3175,6 @@ public class TrainScriptSystem {
             String normalized = normalizeLegacyGroupName(groupName);
             if (normalized.isEmpty()) {
                 return true;
-            }
-            // 擬似シャドウ group (完全一致のみ) は常に skip (ユーザー要望で車両の影は無効化)。
-            if (normalized.equalsIgnoreCase("shadow")) {
-                return false;
             }
             // 角度曲げ変種は描かない(原点姿勢だと散乱する)
             if (isBendVariant(normalized)) {
@@ -3970,7 +3877,17 @@ public class TrainScriptSystem {
 
         public int getLodState(Object entity) { return 0; }
 
-        public int getMetadata(Object entity) { return 0; }
+        /**
+         * 本家の設置物 meta = クリックした面 (0-5)。RenderSearchLight.js 等が
+         * 壁付け時に樽の傾きを打ち消すのに使う (0 固定だと二重に傾く)。
+         */
+        public int getMetadata(Object entity) {
+            if (entity instanceof InstalledObjectBlockEntity be) {
+                int face = be.getMountFace();
+                return face >= 0 ? face : 1;
+            }
+            return 0;
+        }
 
         public boolean isSwitchRail(Object entity) {
             if (entity instanceof net.minecraft.world.level.block.entity.BlockEntity be) {
@@ -3993,12 +3910,12 @@ public class TrainScriptSystem {
             }
         }
 
-        public void renderLightEffect(Object entity, double x, double y, double z,
-                                      double sizeX, double sizeY, double sizeZ,
-                                      Object normal, int color, float alpha) {}
-        public void renderLightEffect(Object entity, double x, double y, double z,
-                                      double sizeX, double sizeZ, Object normal, int color, float alpha) {}
-        public void renderLightEffect(Object... args) {}
+        // ★本家 (KaizPatchX) の renderLightEffect は
+        //   (normal, double[] pos, float rL, float rS, float length, int color, int type, boolean reverse)
+        //   の 1 種のみ。ここにあった 9/10 引数の独自オーバーロードと (Object...) は、
+        //   本家に存在しない API を黙って握り潰す (= 本家と挙動が違う) ため削除した。
+        //   同梱 82 スクリプト・docs/rtmu.d.ts のどれもこの形を呼んでいないことを確認済み。
+        //   将来この形を呼ぶパックが出たら、そのパックの実物の引数を見て正しく写像する。
 
         public void renderRailMapStatic(Object... args) {}
 
@@ -4016,12 +3933,14 @@ public class TrainScriptSystem {
 
         // ---- Light position and surface normal helpers (stubs for catenary scripts) ----
 
-        public float[] getLightPos(Object entity, double offX, double offY, double offZ,
-                                   double offYaw, double yaw) {
+        public double[] getLightPos(Object entity, double offX, double offY, double offZ,
+                                    double offYaw, double yaw) {
             double ex = getX(entity) + offX;
             double ey = getY(entity) + offY;
             double ez = getZ(entity) + offZ;
-            return new float[]{ (float) ex, (float) ey, (float) ez };
+            // ★renderLightEffect(Object, double[] pos, ...) にそのまま渡せる型にする
+            //   (float[] だと Nashorn が double[] 引数へ変換できず解決に失敗する)。
+            return new double[]{ ex, ey, ez };
         }
 
         public float[] getNormal(Object entity, double nx, double ny, double nz,
@@ -4048,13 +3967,30 @@ public class TrainScriptSystem {
             return 0.0F;
         }
 
-        // ---- Inventory helpers (stubs) ----
+        // Inventory-dependent scripts must run again when their contents change.
+        public Object getInventoryItem(Object entity, int slot) {
+            disableReplayCacheForFrame();
+            return jp.ngt.ngtlib.renderer.LegacyItemRenderer.inventoryItem(entity,slot);
+        }
 
-        public Object getInventoryItem(Object entity, int slot) { return null; }
+        public int getStackSize(Object stack) {
+            var nativeStack=jp.ngt.mccompat.ItemStackCompat.unwrap(stack);
+            return nativeStack==null ? 0 : nativeStack.getCount();
+        }
 
-        public int getStackSize(Object stack) { return stack == null ? 0 : 1; }
-
-        public void renderItem(Object entity, Object item) {}
+        public void renderItem(Object entity, Object item) {
+            disableReplayCacheForFrame();
+            var stack=jp.ngt.mccompat.ItemStackCompat.unwrap(item);
+            if(stack==null || stack.isEmpty()) return;
+            if(jp.ngt.ngtlib.renderer.GLRecorder.active()!=null) {
+                jp.ngt.ngtlib.renderer.LegacyItemRenderer.INSTANCE.renderItem(entity,item,0);
+            } else if(poseStack!=null && buffer!=null) {
+                var minecraft=net.minecraft.client.Minecraft.getInstance();
+                minecraft.getItemRenderer().renderStatic(stack,net.minecraft.world.item.ItemDisplayContext.FIXED,
+                        packedLight,overlay,poseStack,buffer,minecraft.level,
+                        entity instanceof net.minecraft.world.entity.Entity nativeEntity ? nativeEntity.getId():0);
+            }
+        }
 
         // ---- Player camera / view ----
 

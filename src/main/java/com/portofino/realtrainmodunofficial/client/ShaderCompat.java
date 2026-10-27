@@ -2,15 +2,7 @@ package com.portofino.realtrainmodunofficial.client;
 
 import java.lang.reflect.Method;
 
-/**
- * Detects whether an Iris/Oculus shader pack is currently active, via reflection so
- * Iris is not a hard dependency.
- * Used by the model renderer: the "fullbright" fast direct-GL path renders the
- * train body with flat shading and bypasses the shader pipeline, which makes vertex
- * normal smoothing disappear under shaders. When a shader pack is in use we fall back
- * to the buffered, normal-lit render path so smoothing works. No model/normal/light
- * numeric values are changed — only the render path is chosen.
- */
+/** Optional Iris/Oculus pack detection. Active packs use entity-space vertex submission and vanilla shader suppliers. */
 public final class ShaderCompat {
     private static Boolean available;
     private static Object irisApiInstance;

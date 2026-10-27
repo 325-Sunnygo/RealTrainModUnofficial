@@ -42,6 +42,8 @@ public final class InstalledObjectPackLoader {
         }
         loaded = true;
         LOADED.clear();
+        com.portofino.realtrainmodunofficial.cargo.CargoPackLoader.begin();
+        com.portofino.realtrainmodunofficial.npc.NpcRegistry.begin();
         try {
             loadFromModJar();
             loadDirectoryPacks(FMLPaths.GAMEDIR.get());
@@ -71,12 +73,8 @@ public final class InstalledObjectPackLoader {
         }
         ensureDefaultConnectors();
         InstalledObjectRegistry.setDefinitions(LOADED);
-        long connectors = LOADED.stream().filter(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT
-                || d.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT).count();
-        // カテゴリ別の内訳。「看板の選択画面が空」等の切り分けがログだけでできるようにしておく。
-        java.util.Map<InstalledObjectCategory, Long> byCategory = LOADED.stream()
-                .collect(java.util.stream.Collectors.groupingBy(InstalledObjectDefinition::getCategory,
-                        java.util.stream.Collectors.counting()));
+        com.portofino.realtrainmodunofficial.cargo.CargoPackLoader.end();
+        com.portofino.realtrainmodunofficial.npc.NpcRegistry.end();
     }
 
     private static void loadFromModJar() {
@@ -124,6 +122,45 @@ public final class InstalledObjectPackLoader {
                         }
                     });
             }
+            //★旗の既定 (Flag_*.json) は models/json ではなく textures/flag に置かれている。
+            //  ここを走査しないと本家の周年旗が 1 つも選択画面に出ない。
+            Path flagDir = modFile.findResource("assets", "minecraft", "textures", "flag");
+            if (flagDir != null && Files.isDirectory(flagDir)) {
+                try (var stream = Files.list(flagDir)) {
+                    stream.filter(Files::isRegularFile)
+                        .filter(p -> isSupportedJson(normalize(p.getFileName().toString())))
+                        .forEach(path -> {
+                            try {
+                                parse(normalize(path.getFileName().toString()),
+                                    Files.readAllBytes(path), packName);
+                            } catch (Exception e) {
+                                RealTrainModUnofficial.LOGGER.warn(
+                                    "Failed to load built-in flag definition {}", path.getFileName(), e);
+                            }
+                        });
+                }
+            }
+
+            //★看板の既定 (SignBoard_*.json) は models/json ではなく textures/signboard に置かれている。
+            //  ここを走査しないと本家デフォルトの看板 (ngt_a01〜m13 等) が 1 つも読み込まれず、
+            //  看板のモデル選択が空になる。
+            Path signboardDir = modFile.findResource("assets", "minecraft", "textures", "signboard");
+            if (signboardDir != null && Files.isDirectory(signboardDir)) {
+                try (var stream = Files.list(signboardDir)) {
+                    stream.filter(Files::isRegularFile)
+                        .filter(p -> isSupportedJson(normalize(p.getFileName().toString())))
+                        .forEach(path -> {
+                            try {
+                                parse(normalize(path.getFileName().toString()),
+                                    Files.readAllBytes(path), packName);
+                            } catch (Exception e) {
+                                RealTrainModUnofficial.LOGGER.warn(
+                                    "Failed to load built-in signboard definition {}", path.getFileName(), e);
+                            }
+                        });
+                }
+            }
+
             // 標識 (RRS) は JSON を持たず textures/rrs/*.png 自体が選択肢になる。
             Path rrsDir = modFile.findResource("assets", "minecraft", "textures", "rrs");
             if (rrsDir != null && Files.isDirectory(rrsDir)) {
@@ -339,6 +376,46 @@ public final class InstalledObjectPackLoader {
         return def;
     }
 
+    /**
+     * 本家 FlagConfig の移植。既定値は FlagConfig.init と同じ
+     * (resolutionU=24 / resolutionV=16 / poleLength=1)。
+     */
+    private static void parseFlag(JsonObject obj, String packName, String file) {
+        try {
+            String texture = obj.get("texture").getAsString();
+            float width = obj.has("width") ? obj.get("width").getAsFloat() : 1.0F;
+            float height = obj.has("height") ? obj.get("height").getAsFloat() : 1.0F;
+            int resolutionU = obj.has("resolutionU") ? obj.get("resolutionU").getAsInt() : 0;
+            int resolutionV = obj.has("resolutionV") ? obj.get("resolutionV").getAsInt() : 0;
+            float poleLength = obj.has("poleLength") ? obj.get("poleLength").getAsFloat() : 0.0F;
+            if (resolutionU <= 0) {
+                resolutionU = 24;
+            }
+            if (resolutionV <= 0) {
+                resolutionV = 16;
+            }
+            if (poleLength <= 0.0F) {
+                poleLength = 1.0F;
+            }
+            String name = file.endsWith(".json") ? file.substring(0, file.length() - 5) : file;
+            String id = "flag:" + packName + ":" + name;
+            java.util.Map<String, String> textures = new HashMap<>();
+            textures.put("default", texture);
+            InstalledObjectDefinition def = new InstalledObjectDefinition(
+                    id, name, packName, InstalledObjectCategory.FLAG,
+                    "", "", texture, textures,
+                    Vec3.ZERO, 1.0F, false,
+                    width, height, 0.0F, "", "", "",
+                    Map.of(), List.of(), Vec3.ZERO, 1, 1);
+            def.setFlagParams(new InstalledObjectDefinition.FlagParams(
+                    texture, width, height, resolutionU, resolutionV, poleLength));
+            LOADED.add(def);
+        } catch (Exception e) {
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                    "[RTMU] 旗記述子を読めません: {} ({})", file, e.toString());
+        }
+    }
+
     private static boolean isSupportedJson(String path) {
         String file = leaf(path).toLowerCase(Locale.ROOT);
         return file.endsWith(".json") && (
@@ -351,6 +428,16 @@ public final class InstalledObjectPackLoader {
             // (足場/階段/パイプ/植物) は categoryFor が null を返して捨てる。
             || file.startsWith("modelornament_")
             || file.startsWith("signboard_")
+            // 貨物 (コンテナ / 火砲)。設置物ではないが、走査はこのローダーに相乗りしている。
+            // ★ここに足し忘れると parse まで届かず、モデル選択が空になる。
+            || file.startsWith("modelcontainer_")
+            || file.startsWith("modelfirearm_")
+            // 本家 ModelFlag_ / ModelMechanism_
+            || file.startsWith("modelflag_")
+            || file.startsWith("modelmechanism_")
+            || file.startsWith("modelnpc_")
+            // 本家の既定旗 (textures/flag/Flag_*.json)。モデルでなくテクスチャ記述子。
+            || file.startsWith("flag_")
         );
     }
 
@@ -370,6 +457,19 @@ public final class InstalledObjectPackLoader {
             String lower = file.toLowerCase(Locale.ROOT);
             if (lower.startsWith("signboard_")) {
                 parseSignboard(obj, packName, file);
+                return;
+            }
+            // 本家の旗記述子 (textures/flag/Flag_*.json)。{texture,width,height,resolutionU/V,poleLength}
+            if (lower.startsWith("flag_") && obj.has("texture") && !obj.has("model")) {
+                parseFlag(obj, packName, file);
+                return;
+            }
+            // 貨物 (コンテナ / 火砲) は設置物ではないので専用の受け皿へ渡す。
+            // 走査はこのローダーが全パックを舐めているのに相乗りする。
+            if (com.portofino.realtrainmodunofficial.cargo.CargoPackLoader.tryParse(obj, lower, packName)) {
+                return;
+            }
+            if (com.portofino.realtrainmodunofficial.npc.NpcRegistry.tryParse(obj, lower, packName)) {
                 return;
             }
 
@@ -436,11 +536,23 @@ public final class InstalledObjectPackLoader {
                 1,
                 1
             );
+            if (category == InstalledObjectCategory.SIGNAL) {
+                // 本家 SignalConfig.modelPartsFixture / rotateBody。
+                // 柱 (fixture) は固定、ヘッド (body) は本体向きに回す (斜め設置)。
+                JsonObject modelPartsFixture = getObject(obj, "modelPartsFixture");
+                def.setSignalParts(
+                    parseRenderObjects(modelPartsFixture),
+                    parseVec3(modelPartsFixture, "pos", 1.0),
+                    getBoolean(obj, "rotateBody", false));
+            }
             if (category == InstalledObjectCategory.WIRE) {
                 // ワイヤーは sectionLength(モデル1個分の長さ)と deflectionCoefficient(たるみ)を持つ。
+                // lengthCoefficient は本家 WireConfig の「長いほどたるみを小さくする」係数
+                // (ModelWire_BasicWireBlack.json が 0.0625 を指定)。
                 float sectionLength = parseFloat(obj, "sectionLength", 0.5F);
                 float deflection = parseFloat(obj, "deflectionCoefficient", 0.0F);
-                def.setWireParams(sectionLength, deflection);
+                float lengthCoef = parseFloat(obj, "lengthCoefficient", 0.0F);
+                def.setWireParams(sectionLength, deflection, lengthCoef);
             }
             // 本家 KaizPatchX の customIconTexture。持ち物欄でのアイテムの絵を差し替える。
             // 架線柱のように「1 つのアイテムで中身を選ぶ」物を見分けるための機能で、
@@ -456,16 +568,58 @@ public final class InstalledObjectPackLoader {
             boolean rotByMeta = getBoolean(obj, "rotateByMetadata", false)
                 || (model != null && getBoolean(model, "rotateByMetadata", false));
             def.setRotateByMetadata(rotByMeta);
-            if (rotByMeta) {
-                // 効いているかを起動時に確認できるようにする (該当は数件だけ)
-                RealTrainModUnofficial.LOGGER.info("[設置物] rotateByMetadata=true: {}", def.getId());
-            }
             // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate が回るスクリプト
             // (列車検知器は全ての処理をここに書く)。
             def.setServerScriptPath(getString(obj, "serverScriptPath"));
+            // 本家 ModelConfig.defaultValues: DataMap の既定値 (スクリプトが読む)。
+            if (obj.has("defaultValues") && obj.get("defaultValues").isJsonArray()) {
+                for (JsonElement dve : obj.getAsJsonArray("defaultValues")) {
+                    if (!dve.isJsonObject()) {
+                        continue;
+                    }
+                    JsonObject dv = dve.getAsJsonObject();
+                    String dvKey = getString(dv, "key");
+                    if (dvKey.isBlank()) {
+                        continue;
+                    }
+                    java.util.List<String> dvValues = new java.util.ArrayList<>();
+                    if (dv.has("values") && dv.get("values").isJsonArray()) {
+                        for (JsonElement v : dv.getAsJsonArray("values")) {
+                            dvValues.add(v.getAsString());
+                        }
+                    }
+                    def.getDefaultValues().add(new InstalledObjectDefinition.DefaultValue(
+                        getString(dv, "type"), getString(dv, "elementType"), dvKey,
+                        getString(dv, "value"), dvValues));
+                }
+            }
+            // 本家 ModelConfig.customForm: 機械右クリックの DataMap 編集フォーム。
+            if (obj.has("customForm") && obj.get("customForm").isJsonObject()) {
+                JsonObject form = obj.getAsJsonObject("customForm");
+                java.util.List<InstalledObjectDefinition.FormField> fields = new java.util.ArrayList<>();
+                if (form.has("fields") && form.get("fields").isJsonArray()) {
+                    for (JsonElement fe : form.getAsJsonArray("fields")) {
+                        if (!fe.isJsonObject()) {
+                            continue;
+                        }
+                        JsonObject f = fe.getAsJsonObject();
+                        String key = getString(f, "key");
+                        if (key == null || key.isBlank()) {
+                            continue;
+                        }
+                        fields.add(new InstalledObjectDefinition.FormField(
+                            key, getString(f, "label"),
+                            f.has("row") ? f.get("row").getAsInt() : 0,
+                            f.has("column") ? f.get("column").getAsInt() : 0));
+                    }
+                }
+                def.setCustomForm(new InstalledObjectDefinition.CustomForm(getString(form, "title"), fields));
+            }
             // 本家 ModelConfig.doCulling (既定 false = 両面描画)。
             // 車両も設置オブジェクトも同じ経路で !doCulling のとき GL_CULL_FACE を切る。
             def.setDoCulling(getBoolean(obj, "doCulling", false));
+            //本家 OrnamentConfig.conveyorSpeed (足場/エスカレーターが乗った物を押す速さ)
+            def.setConveyorSpeed(getFloat(obj, "conveyorSpeed", 0.0F));
             LOADED.add(def);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse installed object json {} in {}: {}", path, packName, e.getMessage());
@@ -570,9 +724,13 @@ public final class InstalledObjectPackLoader {
         boolean looksLikeSpeaker = lowerFile.contains("speaker")
             || name.contains("speaker")
             || machineType.contains("speaker");
-        // 分類対象文字列(ファイル名+name+machineType)。RTM は設置物の大半が ModelMachine_ なので
-        // プレフィックスでなくキーワードで種類を判定する。
-        String hay = lowerFile + " " + name + " " + machineType;
+        // 分類対象文字列(ファイル名+name+machineType+modelFile+ornamentType)。
+        // RTM は設置物の大半が ModelMachine_ なのでプレフィックスでなくキーワードで種類を判定する。
+        // ★modelFile / ornamentType を<b>含める</b>のが重要: パックが JSON を別名にして
+        //   いても、中身の modelFile が ModelOrnament_Scaffold… / Stair… なら足場/階段と判定できる。
+        //   (含めていなかったため、別名 JSON の足場/階段が汎用 ORNAMENT に落ち、
+        //    フルブロック衝突になって「ブロックの中を歩けない」状態になっていた)
+        String hay = lowerFile + " " + name + " " + machineType + " " + modelFile + " " + ornamentType;
 
         // 明示プレフィックスを最優先。
         // 本家 ModelConnector_*.json の connectorType: "Input"/"Output" (入出力コネクタ)
@@ -594,17 +752,37 @@ public final class InstalledObjectPackLoader {
         // 本家 ModelOrnament_*.json は ornamentType (Lamp/Pole/Stair/Scaffold/Pipe/Plant) で種類が決まる。
         // 移植済みは Lamp(蛍光灯) と Pole(架線柱) だけなので、それ以外は null で捨てる。
         if (lowerFile.startsWith("modelornament_")) {
-            if (ornamentType.equals("lamp") || containsAny(lowerFile, "fluorescent", "蛍光灯")) {
+            // ★判定は lowerFile ではなく hay (modelFile/ornamentType を含む) を使う。
+            //   別名 JSON のパックでも modelFile から種類を拾えるようにするため。
+            if (ornamentType.equals("lamp") || containsAny(hay, "fluorescent", "蛍光灯")) {
                 return InstalledObjectCategory.FLUORESCENT;
             }
-            if (ornamentType.equals("pole") || containsAny(lowerFile, "pole", "架線柱")) {
+            if (ornamentType.equals("pole") || containsAny(hay, "pole", "架線柱")) {
                 return InstalledObjectCategory.OVERHEAD_LINE_POLE;
             }
             // 本家 ModelOrnament_Pipe01 / Pipe01_Connectable (ornamentType="Pipe")
-            if (ornamentType.equals("pipe") || containsAny(lowerFile, "pipe", "パイプ")) {
+            if (ornamentType.equals("pipe") || containsAny(hay, "pipe", "パイプ")) {
                 return InstalledObjectCategory.PIPE;
             }
+            // 本家 ornamentType の残り。以前は null で捨てていたので、同梱パックの
+            // Plant 5 / Stair 3 / Scaffold 2 が丸ごと選べなかった。
+            if (ornamentType.equals("plant") || containsAny(hay, "plant", "植物")) {
+                return InstalledObjectCategory.PLANT;
+            }
+            if (ornamentType.equals("stair") || containsAny(hay, "stair", "階段")) {
+                return InstalledObjectCategory.STAIR;
+            }
+            if (ornamentType.equals("scaffold") || containsAny(hay, "scaffold", "足場")) {
+                return InstalledObjectCategory.SCAFFOLD;
+            }
             return null;
+        }
+
+        if (lowerFile.startsWith("modelflag_")) {
+            return InstalledObjectCategory.FLAG;
+        }
+        if (lowerFile.startsWith("modelmechanism_")) {
+            return InstalledObjectCategory.MECHANISM;
         }
         // 踏切は改札より先に判定する(CrossingGate を "gate" で改札に誤分類しないため)。
         // 本家 RTM は machineType="Gate" (RTMResource.MACHINE_GATE = MACHINE.getSubType("Gate"),
@@ -657,6 +835,16 @@ public final class InstalledObjectPackLoader {
         if (containsAny(hay, "light", "lamp", "lantern", "照明", "ライト", "beacon")) {
             return InstalledObjectCategory.LIGHT;
         }
+        // ★安全網: 別名 JSON (ModelOrnament_ で始まらない) でも、中身 (modelFile/name/
+        //   ornamentType) が足場/階段なら正しいカテゴリにする。ここで拾わないと汎用 ORNAMENT
+        //   (フルブロック衝突) に落ち、本来通れる「ブロックの中」を歩けなくなる。
+        //   具体的な機械カテゴリ判定より後に置くことで、既存の分類を奪わない。
+        if (containsAny(hay, "scaffold", "足場")) {
+            return InstalledObjectCategory.SCAFFOLD;
+        }
+        if (containsAny(hay, "stair", "階段")) {
+            return InstalledObjectCategory.STAIR;
+        }
         // それ以外の汎用 ModelMachine_(鳥居/モニタ/自販機等)は照明に置く(従来の落とし先)。
         if (lowerFile.startsWith("modelmachine_")) {
             return InstalledObjectCategory.LIGHT;
@@ -702,6 +890,15 @@ public final class InstalledObjectPackLoader {
             return null;
         }
         return object.has(key) && object.get(key).isJsonPrimitive() ? object.get(key).getAsString() : null;
+    }
+
+    private static float getFloat(JsonObject object, String key, float fallback) {
+        try {
+            return object.has(key) && object.get(key).isJsonPrimitive()
+                ? object.get(key).getAsFloat() : fallback;
+        } catch (Exception e) {
+            return fallback;
+        }
     }
 
     private static boolean getBoolean(JsonObject object, String key, boolean fallback) {
@@ -795,25 +992,7 @@ public final class InstalledObjectPackLoader {
     }
 
     private static String encodeTextureDescriptor(JsonArray pair) {
-        String texture = pair.get(1).getAsString();
-        if (pair.size() < 3) {
-            return texture;
-        }
-        List<String> flags = new ArrayList<>();
-        for (int i = 2; i < pair.size(); i++) {
-            JsonElement option = pair.get(i);
-            if (option == null || !option.isJsonPrimitive()) {
-                continue;
-            }
-            String value = option.getAsString();
-            if (!value.isBlank()) {
-                flags.add(value.trim());
-            }
-        }
-        if (flags.isEmpty()) {
-            return texture;
-        }
-        return texture + "|ptmeta=" + String.join(",", flags);
+        return com.portofino.realtrainmodunofficial.modelpack.LegacyTextureDescriptor.encode(pair);
     }
 
     private static Map<Integer, List<String>> parseSignalLights(JsonObject obj) {

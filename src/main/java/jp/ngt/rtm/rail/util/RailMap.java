@@ -237,6 +237,10 @@ public abstract class RailMap {
         this.rails.clear();
     }
 
+    public void prepareBaseBlocks(Level world,int x,int y,int z) {
+        var tile=world.getBlockEntity(new BlockPos(x,y,z));if(tile instanceof TileEntityMarker marker && marker.getState(MarkerState.LINE2))setBaseBlock(world,x,y,z);
+    }
+
     private void setBaseBlock(Level world, int x0, int y0, int z0) {
         int split = (int) (this.getLength() * 4.0D);
         RailPosition rp = this.getStartRP();

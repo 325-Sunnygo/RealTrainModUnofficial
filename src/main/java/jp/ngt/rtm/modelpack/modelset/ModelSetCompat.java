@@ -8,12 +8,14 @@ import jp.ngt.rtm.modelpack.cfg.TrainConfig;
  */
 public class ModelSetCompat extends ModelSetBase<TrainConfig> {
 
+    public ModelSetCompat() {super();}
+
     public ModelSetCompat(TrainConfig config) {
         super(config);
     }
 
     @Override
     public TrainConfig getDummyConfig() {
-        return null;
+        return TrainConfig.getDummyConfig();
     }
 }

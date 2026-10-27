@@ -1,0 +1,25 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "SSSSS",
+    "SWWWS",
+    "SIIIS",
+    "SWWWS",
+    "SSSSS"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "W": {
+      "item": "realtrainmodunofficial:wire"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:material_shaft"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:signal_converter",
+    "count": 1
+  }
+}

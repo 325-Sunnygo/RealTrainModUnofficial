@@ -22,6 +22,6 @@ public class CameraItem extends Item {
         if (context.getLevel().isClientSide) {
             com.portofino.realtrainmodunofficial.ClientHooks.openCameraScreen();
         }
-        return InteractionResult.sidedSuccess(context.getLevel().isClientSide);
+        return InteractionResult.PASS;
     }
 }

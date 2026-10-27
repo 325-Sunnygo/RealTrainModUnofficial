@@ -86,23 +86,13 @@ public final class MachineScriptRenderers {
             se.put("renderer", renderer);
 
             // ModelObject: テクスチャ + モデルグラフ
-            List<TextureSet> sets = new ArrayList<>();
-            if (def.getTextureOverrides() != null) {
-                for (String path : def.getTextureOverrides().values()) {
-                    int meta = path.indexOf("|ptmeta=");
-                    String clean = meta >= 0 ? path.substring(0, meta) : path;
-                    sets.add(new TextureSet(new Material(new jp.ngt.mccompat.ResourceLocation("minecraft", clean))));
-                }
-            }
-            if (sets.isEmpty()) {
-                sets.add(new TextureSet(new Material(null)));
-            }
-            ModelObject mo = new ModelObject(sets.toArray(new TextureSet[0]));
+            ModelObject mo = new ModelObject(new TextureSet[0]);
             byte[] modelBytes = NGTFileLoader.findAsset("models/" + def.getModelFile());
             if (modelBytes == null) {
                 modelBytes = NGTFileLoader.findAsset(def.getModelFile());
             }
             mo.model = modelBytes != null ? ModelLoader.parse(modelBytes, def.getModelFile()) : new PolygonModel();
+            mo.setTextures(jp.ngt.ngtlib.renderer.model.LegacyTextureLayout.create(mo.model, def.getTextureOverrides()));
 
             // getModelName は本家 config.getName 相当、つまり 素のモデル名
             // ("CrossingGate01R" / "Point01A") を返さなければならない。

@@ -10,7 +10,7 @@ import java.util.List;
 public final class GLRecorder {
 
     public enum Op {
-        PUSH, POP, TRANSLATE, ROTATE, SCALE, MULT_MATRIX, COLOR, BRIGHTNESS, RENDER_PARTS, RENDER_GROUPS,
+        PUSH, POP, TRANSLATE, ROTATE, SCALE, MULT_MATRIX, LOAD_MATRIX, PROJECTION, COLOR_MASK, DRAW_TEXT, COLOR, BRIGHTNESS, RENDER_PARTS, RENDER_GROUPS,
         /** テクスチャ差し替え (payload: ResourceLocation, null=デフォルトに戻す) */
         BIND_TEXTURE,
         /** NGTTessellator の即時描画 (payload: TessDraw) */
@@ -21,17 +21,68 @@ public final class GLRecorder {
          * バニラ BlockState のゴースト描画 (payload: BlockState、a/b/c=相対座標)。
          * NGTO Builder のミニチュアプレビュー (NGTRenderer.renderNGTObject) 用。
          */
-        RENDER_BLOCK
+        RENDER_BLOCK, RENDER_ITEM, RENDER_GUI_ITEM, LOAD_NAME
+    }
+
+    public record TextDraw(String text,float x,float y,int color,boolean shadow) {}
+    public void colorMask(boolean r,boolean g,boolean b,boolean a) {addCmd(Op.COLOR_MASK,r?1:0,g?1:0,b?1:0,a?1:0,null);}
+    public void drawText(String text,float x,float y,int color,boolean shadow) {addCmd(Op.DRAW_TEXT,0,0,0,0,null,new TextDraw(text,x,y,color,shadow));}
+    public void loadMatrix(float[] matrix) {addCmd(Op.LOAD_MATRIX,0,0,0,0,null,matrix.clone());}
+    public void projection(float[] matrix) {addCmd(Op.PROJECTION,0,0,0,0,null,matrix.clone());}
+    public final LegacyMatrixState matrices = new LegacyMatrixState(this);
+    public void loadName(int name) { addCmd(Op.LOAD_NAME,0,0,0,0,null,Integer.valueOf(name)); }
+
+    public record GuiItemDraw(net.minecraft.world.item.ItemStack stack, int x, int y, boolean decorations, String text, Object font, float depth) {}
+    public void renderGuiItem(net.minecraft.world.item.ItemStack stack,int x,int y,boolean decorations,String text,Object font,float depth) {
+        addCmd(Op.RENDER_GUI_ITEM,0,0,0,0,null,new GuiItemDraw(stack.copy(),x,y,decorations,text,font,depth));
+    }
+
+    public record ItemDraw(net.minecraft.world.item.ItemStack stack, int seed) {}
+
+    public void renderItem(net.minecraft.world.item.ItemStack stack,int seed) {
+        addCmd(Op.RENDER_ITEM,0,0,0,0,null,new ItemDraw(stack.copy(),seed));
     }
 
     /** NGTTessellator.draw の記録データ。verts は {x,y,z,u,v,r,g,b,a} × n。 */
     public static final class TessDraw {
         public final int mode;
         public final float[] verts;
+        /**
+         * 加算合成 (GL_SRC_ALPHA, GL_ONE) で描くか。
+         * 本家 renderLightEffect の前照灯/回転灯は加算合成なので、それだけ true。
+         * 既定 false = 半透明 (entityTranslucent)。
+         */
+        public final boolean additive;
+        public final float[] normals;
+        /**
+         * 前面カリング (本家 ActionParts の輪郭線 glCullFace(GL_FRONT)) で描くか。
+         * 描画側は RenderSystem.cullFace(FRONT) を設定して即時 flush する。
+         */
+        public final boolean cullFront;
+        public final boolean useCurrentColor;
 
         public TessDraw(int mode, float[] verts) {
+            this(mode, verts, false, false);
+        }
+
+        public TessDraw(int mode, float[] verts, boolean additive) {
+            this(mode, verts, additive, false);
+        }
+
+        public TessDraw(int mode, float[] verts, boolean additive, boolean cullFront) {
+            this(mode,verts,additive,cullFront,null);
+        }
+
+        public TessDraw(int mode, float[] verts, boolean additive, boolean cullFront, float[] normals) {
+            this(mode,verts,additive,cullFront,normals,false);
+        }
+        public TessDraw(int mode, float[] verts, boolean additive, boolean cullFront, float[] normals, boolean useCurrentColor) {
+            this.useCurrentColor=useCurrentColor;
+            this.normals = normals;
             this.mode = mode;
             this.verts = verts;
+            this.additive = additive;
+            this.cullFront = cullFront;
         }
     }
 
@@ -44,6 +95,15 @@ public final class GLRecorder {
         public float a, b, c, d;
         public String name;
         public Object payload;
+        /**
+         * RENDER_PARTS / RENDER_GROUPS を出した {@code jp.ngt.rtm.render.Parts} インスタンス。
+         * 色ピッキング (ActionParts) で<b>同名パーツを区別</b>するために運ぶ。
+         * 名前一致だけだと、同じグループ名を複数箇所に描くスクリプト
+         * (RenderTorii.js の数字キー 10 個 = 全て "key") で別パーツを区別できない。
+         * ★contentKey には混ぜない (同一名なら幾何は同じなので焼き込みキーを変えない)。
+         */
+        public Object partsRef;
+        public LegacyRenderState.Snapshot state;
 
         Cmd(Op op, float a, float b, float c, float d, String name) {
             this(op, a, b, c, d, name, null);
@@ -61,12 +121,16 @@ public final class GLRecorder {
             this.d = d;
             this.name = name;
             this.payload = payload;
+            this.partsRef = null;
+            this.state = null;
         }
     }
 
     private static final ThreadLocal<GLRecorder> ACTIVE = new ThreadLocal<>();
 
     private final List<Cmd> cmds = new ArrayList<>();
+    private final LegacyRenderState state = new LegacyRenderState();
+    public LegacyRenderState state() { return this.state; }
 
     public static GLRecorder active() {
         return ACTIVE.get();
@@ -77,6 +141,7 @@ public final class GLRecorder {
     }
 
     public static void deactivate() {
+        GL11Facade.resetImmediate();
         ACTIVE.remove();
     }
 
@@ -88,13 +153,34 @@ public final class GLRecorder {
     private int contentHash = 1;
     private boolean geometry;
     private boolean tess;
+    /**
+     * 記録中に「視点依存の光エフェクト (renderLightEffect に normal を渡した)」があったか。
+     * これがある内容はカメラを動かすだけで形が変わるため、焼き込みキーに混ぜてはいけない
+     * (混ぜると回転灯/ミラーボールの焼き込みが毎フレーム無効になる)。
+     */
+    private boolean viewDependent;
 
     /** 生きているコマンド数 (cmds.size ではない。使い回しのため配列は縮めない)。 */
     private int size;
 
+    /** 次に積む RENDER_PARTS/RENDER_GROUPS へ添える Parts インスタンス (1 コマンド限り)。 */
+    private Object pendingPartsRef;
+
+    /**
+     * 直後に積む RENDER_PARTS/RENDER_GROUPS へ Parts インスタンスを添える。
+     * 色ピッキングで同名パーツを区別するために使う (描画そのものには影響しない)。
+     */
+    public void partsRef(Object parts) {
+        this.pendingPartsRef = parts;
+    }
+
     /** 別の記録から取り込むとき用。 */
     private void add(Cmd cmd) {
-        addCmd(cmd.op, cmd.a, cmd.b, cmd.c, cmd.d, cmd.name, cmd.payload);
+        addCmd(cmd.op, cmd.a, cmd.b, cmd.c, cmd.d, cmd.name, cmd.payload, cmd.state);
+        // 取り込みでも色ピッキング用のインスタンス参照を保つ
+        if (cmd.partsRef != null && this.size > 0) {
+            this.cmds.get(this.size - 1).partsRef = cmd.partsRef;
+        }
     }
 
     /** payload 無し版。 */
@@ -107,6 +193,13 @@ public final class GLRecorder {
      * 既存インスタンスがあれば上書きして使う (毎フレームの Cmd 生成を無くすため)。
      */
     private void addCmd(Op op, float a, float b, float c, float d, String name, Object payload) {
+        boolean geometry = op == Op.RENDER_PARTS || op == Op.RENDER_GROUPS || op == Op.DRAW_MODEL_GROUP
+                || op == Op.DRAW_TEXT || op == Op.DRAW_TESS || op == Op.RENDER_BLOCK || op == Op.RENDER_ITEM || op == Op.RENDER_GUI_ITEM;
+        addCmd(op, a, b, c, d, name, payload, geometry ? this.state.snapshot() : null);
+    }
+
+    private void addCmd(Op op, float a, float b, float c, float d, String name, Object payload,
+                        LegacyRenderState.Snapshot state) {
         Cmd cmd;
         if (this.size < this.cmds.size()) {
             cmd = this.cmds.get(this.size);
@@ -116,9 +209,13 @@ public final class GLRecorder {
             this.cmds.add(cmd);
         }
         this.size++;
+        // Parts インスタンス参照は 1 コマンド限り (取りこぼすと以降のコマンドに付いて回る)。
+        cmd.partsRef = this.pendingPartsRef;
+        this.pendingPartsRef = null;
+        cmd.state = state;
         this.contentHash = 31 * this.contentHash + cmdKey(cmd);
         switch (op) {
-            case RENDER_PARTS, RENDER_GROUPS, DRAW_MODEL_GROUP, RENDER_BLOCK -> this.geometry = true;
+            case RENDER_PARTS, RENDER_GROUPS, DRAW_MODEL_GROUP, RENDER_BLOCK, RENDER_ITEM, RENDER_GUI_ITEM, DRAW_TEXT -> this.geometry = true;
             case DRAW_TESS -> {
                 this.geometry = true;
                 this.tess = true;
@@ -130,11 +227,15 @@ public final class GLRecorder {
 
     public void clear() {
         // ★配列は空にしない。Cmd を使い回すために書き込み位置だけ戻す。
+        this.state.clear();
+        this.matrices.clear();
         this.size = 0;
         this.contentHash = 1;
         this.geometry = false;
         this.tess = false;
+        this.viewDependent = false;
         this.lightSignature = 0L;
+        this.pendingPartsRef = null;
     }
 
     /** 生きている範囲のビュー。記録が作り直されると中身が変わるので持ち越さないこと。 */
@@ -223,6 +324,7 @@ public final class GLRecorder {
     }
 
     public void color(float r, float g, float b, float a) {
+        this.state().color(r,g,b,a);
         this.addCmd(Op.COLOR, r, g, b, a, null);
     }
 
@@ -306,6 +408,15 @@ public final class GLRecorder {
         return this.contentHash;
     }
 
+    /** 視点依存の光エフェクト (normal 付き renderLightEffect) を記録したか。 */
+    public void markViewDependent() {
+        this.viewDependent = true;
+    }
+
+    public boolean isViewDependent() {
+        return this.viewDependent;
+    }
+
     /**
      * 値を撹拌する (雪崩関数)。
      * 焼き込みキーを組み立てるときは、足し合わせる前に必ずこれを通すこと。
@@ -336,7 +447,7 @@ public final class GLRecorder {
 
     /** 1 コマンドぶんの内容ハッシュ。 */
     private static int cmdKey(Cmd cmd) {
-        int key = cmd.op.ordinal();
+        int key = 31 * cmd.op.ordinal() + java.util.Objects.hashCode(cmd.state);
         key = 31 * key + Float.floatToIntBits(cmd.a);
         key = 31 * key + Float.floatToIntBits(cmd.b);
         key = 31 * key + Float.floatToIntBits(cmd.c);
@@ -351,6 +462,7 @@ public final class GLRecorder {
             return 0;
         }
         // 中身で比べるもの
+        if (payload instanceof Number number) return number.hashCode();
         if (payload instanceof java.util.Set<?> set) {
             // ★Set.hashCode をそのまま使ってはいけない。
             // あれは要素ハッシュの単純な総和なので、差が打ち消し合うと別物が同じ値になる。
@@ -359,8 +471,17 @@ public final class GLRecorder {
         if (payload instanceof float[] fa) {
             return java.util.Arrays.hashCode(fa);
         }
+        if (payload instanceof GuiItemDraw item) {
+            return java.util.Objects.hash(net.minecraft.world.item.ItemStack.hashItemAndComponents(item.stack()),item.stack().getCount(),item.x(),item.y(),item.decorations(),item.text(),System.identityHashCode(item.font()),item.depth());
+        }
+        if (payload instanceof ItemDraw item) {
+            return 31 * (31 * net.minecraft.world.item.ItemStack.hashItemAndComponents(item.stack()) + item.stack().getCount()) + item.seed();
+        }
         if (payload instanceof TessDraw td) {
-            return 31 * td.mode + java.util.Arrays.hashCode(td.verts);
+            int hash = 31 * td.mode + java.util.Arrays.hashCode(td.verts);
+            hash = 31 * hash + java.util.Arrays.hashCode(td.normals);
+            hash = 31 * hash + Boolean.hashCode(td.additive);
+            return 31 * (31 * hash + Boolean.hashCode(td.cullFront)) + Boolean.hashCode(td.useCurrentColor);
         }
         if (payload instanceof net.minecraft.resources.ResourceLocation
                 || payload instanceof TexBind

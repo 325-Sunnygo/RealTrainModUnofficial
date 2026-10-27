@@ -586,25 +586,72 @@ public class InstalledObjectBlock extends BaseEntityBlock {
         super.neighborChanged(state, level, pos, block, fromPos, isMoving);
     }
 
+    private record SignalRestoration(Level level,BlockPos pos) {}
+    private static final ThreadLocal<java.util.Set<SignalRestoration>> SIGNAL_RESTORATIONS=
+            ThreadLocal.withInitial(java.util.HashSet::new);
+
+    @Override
+    public boolean onDestroyedByPlayer(BlockState state,Level level,BlockPos pos,Player player,
+                                       boolean willHarvest,net.minecraft.world.level.material.FluidState fluid) {
+        if (!(level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity signal)
+                || !signal.isSignal() || signal.getSignalOrigBlock()==null) {
+            return super.onDestroyedByPlayer(state,level,pos,player,willHarvest,fluid);
+        }
+        BlockState original=signal.getSignalOrigBlock();
+        net.minecraft.nbt.CompoundTag saved=signal.getSignalOrigTileNbt();
+        if(saved!=null) saved=saved.copy();
+        if(!level.isClientSide) {
+            removeSignalLink(level,pos);
+            if(original.isAir()) removeAttachedWires(level,pos);
+        }
+        var restoring=SIGNAL_RESTORATIONS.get();
+        var key=new SignalRestoration(level,pos.immutable()); restoring.add(key);
+        try {
+            // Signals and RTMU poles share one Block type. Recreate the tile even when
+            // setBlock sees an identical state, otherwise signal-only fields survive.
+            level.removeBlockEntity(pos);
+            level.setBlock(pos,original,3);
+            if(original.getBlock() instanceof net.minecraft.world.level.block.EntityBlock factory) {
+                BlockEntity restored=level.getBlockEntity(pos);
+                if(restored==null) {
+                    restored=factory.newBlockEntity(pos,original);
+                    if(restored!=null) level.setBlockEntity(restored);
+                }
+                if(restored!=null) {
+                    if(saved!=null) restored.loadWithComponents(saved,level.registryAccess());
+                    restored.setChanged();
+                }
+            }
+            // An unchanged BlockState still needs a fresh block-entity packet.
+            level.sendBlockUpdated(pos,state,original,3);
+            if(!level.isClientSide) level.updateNeighborsAt(pos,original.getBlock());
+        } finally {
+            restoring.remove(key); if(restoring.isEmpty()) SIGNAL_RESTORATIONS.remove();
+        }
+        if(!level.isClientSide && !player.getAbilities().instabuild) {
+            popResource(level,pos,new ItemStack(RealTrainModUnofficialItems.SIGNAL_ITEM.get()));
+        }
+        return true;
+    }
+
+    @Override
+    public void playerDestroy(Level level,Player player,BlockPos pos,BlockState state,
+                              @Nullable BlockEntity blockEntity,ItemStack tool) {
+        if(blockEntity instanceof InstalledObjectBlockEntity signal && signal.isSignal()
+                && signal.getSignalOrigBlock()!=null) {
+            // The attachment was removed and dropped in onDestroyedByPlayer. The
+            // restored support must not be harvested using the old signal state.
+            player.awardStat(net.minecraft.stats.Stats.BLOCK_MINED.get(this));
+            player.causeFoodExhaustion(0.005F);
+            return;
+        }
+        super.playerDestroy(level,player,pos,state,blockEntity,tool);
+    }
+
     @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
-        if (!level.isClientSide && state.getBlock() != newState.getBlock()) {
-            // 本家 BlockSignal.onBlockDestroyedByPlayer → TileEntitySignal.setOrigBlock:
-            // 信号は置いたときにクリックした柱ブロックを置き換えているので、壊したら元に戻す。
-            if (newState.isAir()
-                    && level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
-                    && be.getSignalOrigBlock() != null) {
-                BlockState orig = be.getSignalOrigBlock();
-                net.minecraft.nbt.CompoundTag origTileNbt = be.getSignalOrigTileNbt();
-                be.setSignalOrigBlock(null);
-                level.setBlock(pos, orig, 3);
-                // 本家 setOrigBlock: 元タイルの NBT も書き戻す (配線などを復元)
-                if (origTileNbt != null
-                        && level.getBlockEntity(pos) instanceof net.minecraft.world.level.block.entity.BlockEntity restored) {
-                    restored.loadWithComponents(origTileNbt, level.registryAccess());
-                }
-                return;
-            }
+        if (!level.isClientSide && state.getBlock() != newState.getBlock()
+                && !SIGNAL_RESTORATIONS.get().contains(new SignalRestoration(level,pos))) {
             removeSignalLink(level, pos);
             removeAttachedWires(level, pos);
             stopSpeakerSoundOnRemove(level, pos);

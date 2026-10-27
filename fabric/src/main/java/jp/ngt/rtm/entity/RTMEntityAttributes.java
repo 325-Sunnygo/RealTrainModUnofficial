@@ -16,5 +16,6 @@ public final class RTMEntityAttributes {
     @SubscribeEvent
     public static void onAttributeCreation(EntityAttributeCreationEvent event) {
         event.put(RTMEntities.MOTORMAN.get(), EntityMotorman.createAttributes().build());
+        event.put(RTMEntities.NPC.get(), jp.ngt.rtm.entity.npc.EntityNPC.createAttributes().build());
     }
 }

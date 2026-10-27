@@ -6,6 +6,16 @@ import java.util.Map;
 import java.util.ArrayList;
 
 public class VehicleDefinition {
+    private com.google.gson.JsonObject legacyConfig;
+    public void setLegacyConfig(com.google.gson.JsonObject config) {this.legacyConfig=config.deepCopy();}
+    public com.google.gson.JsonObject getLegacyConfig() {return legacyConfig==null?null:legacyConfig.deepCopy();}
+    public jp.ngt.ngtlib.renderer.model.VecAccuracy getModelAccuracy() {
+        // Original ModelPackManager chooses LOW for every configured value except MEDIUM.
+        var value=legacyConfig==null?null:legacyConfig.get("accuracy");
+        return value==null || value.isJsonNull() || value.getAsString().equals("MEDIUM")
+            ? jp.ngt.ngtlib.renderer.model.VecAccuracy.MEDIUM : jp.ngt.ngtlib.renderer.model.VecAccuracy.LOW;
+    }
+
     public static final int SEAT_TYPE_DISABLED = 0;
     public static final int SEAT_TYPE_DRIVER_CAB = -1;
 
@@ -94,6 +104,27 @@ public class VehicleDefinition {
     private String soundBrakeRelease = "";
     /** 本家 sound_BrakeRelease2: 同上 (弱、ノッチ -1 以外から戻したとき)。 */
     private String soundBrakeRelease2 = "";
+    /** 本家 SoundUpdaterTrain: ATS チャイム (signal=1 で走行中に鳴る、ループ)。 */
+    private String soundAtsChime = "";
+    /** 本家 SoundUpdaterTrain: ATS ベル (signal=1 で走行中に鳴る、ループ)。 */
+    private String soundAtsBell = "";
+
+    public String getSoundAtsChime() {
+        return soundAtsChime;
+    }
+
+    public String getSoundAtsBell() {
+        return soundAtsBell;
+    }
+
+    public boolean hasAtsSounds() {
+        return !soundAtsChime.isBlank() || !soundAtsBell.isBlank();
+    }
+
+    public void setAtsSounds(String chime, String bell) {
+        this.soundAtsChime = chime == null ? "" : chime;
+        this.soundAtsBell = bell == null ? "" : bell;
+    }
     /**
      */
     private String soundDoorOpen = "";
@@ -386,6 +417,32 @@ public class VehicleDefinition {
         this.serverScriptPath = path == null ? "" : path;
     }
 
+    // ---- 本家 ModelConfig.guiScriptPath / guiTexture (KaizPatchX) ----
+    // 運転台 GUI をスクリプトで描く機能。guiSE の renderGui(entity, gui) が呼ばれる。
+    private String guiScriptPath = "";
+    private String guiTexture = "";
+
+    public String getGuiScriptPath() {
+        return guiScriptPath;
+    }
+
+    public boolean hasGuiScript() {
+        return guiScriptPath != null && !guiScriptPath.isBlank();
+    }
+
+    public void setGuiScriptPath(String path) {
+        this.guiScriptPath = path == null ? "" : path;
+    }
+
+    /** 本家 guiTexture。空なら既定の cab テクスチャ。 */
+    public String getGuiTexture() {
+        return guiTexture;
+    }
+
+    public void setGuiTexture(String texture) {
+        this.guiTexture = texture == null ? "" : texture;
+    }
+
     /** 本家 slotPos: {x, y, z, seatType} (ブロック単位)。Loader が JSON 読込後に設定。 */
     private java.util.List<float[]> slotPositions = java.util.List.of();
 
@@ -439,6 +496,41 @@ public class VehicleDefinition {
 
     public boolean hasDoorAnimations() {
         return !leftDoors.isEmpty() || !rightDoors.isEmpty();
+    }
+
+    /**
+     * KaizPatchX TrainConfig の速度まわりの残り項目。
+     * accelerateions … ノッチ段ごとの加速度 (段数は maxSpeed と同じ)
+     * deccelerations … ブレーキ 9 段 (0=抑速〜8=非常)
+     * useVariableAcceleration/Deceleration … サーバースクリプトで加減速を出す
+     */
+    private List<Float> notchAccelerations = List.of();
+    private List<Float> decelerations = List.of();
+    private boolean useVariableAcceleration;
+    private boolean useVariableDeceleration;
+
+    public List<Float> getNotchAccelerations() {
+        return notchAccelerations;
+    }
+
+    public List<Float> getDecelerations() {
+        return decelerations;
+    }
+
+    public boolean isUseVariableAcceleration() {
+        return useVariableAcceleration;
+    }
+
+    public boolean isUseVariableDeceleration() {
+        return useVariableDeceleration;
+    }
+
+    public void setSpeedProfile(List<Float> notchAccelerations, List<Float> decelerations,
+                                boolean useVariableAcceleration, boolean useVariableDeceleration) {
+        this.notchAccelerations = notchAccelerations == null ? List.of() : List.copyOf(notchAccelerations);
+        this.decelerations = decelerations == null ? List.of() : List.copyOf(decelerations);
+        this.useVariableAcceleration = useVariableAcceleration;
+        this.useVariableDeceleration = useVariableDeceleration;
     }
 
     public List<Float> getNotchMaxSpeeds() {

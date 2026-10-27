@@ -16,6 +16,12 @@ public final class Blocks {
     public static final Block field_150348_b = net.minecraft.world.level.block.Blocks.STONE;
     /** dirt */
     public static final Block field_150346_d = net.minecraft.world.level.block.Blocks.DIRT;
+    /** grass (1.7.10 Blocks.grass) */
+    public static final Block field_150349_c = net.minecraft.world.level.block.Blocks.GRASS_BLOCK;
+    /** snow_layer (1.7.10 Blocks.snow_layer, 薄い雪) */
+    public static final Block field_150431_aC = net.minecraft.world.level.block.Blocks.SNOW;
+    /** snow (1.7.10 Blocks.snow, 雪ブロック) */
+    public static final Block field_150433_aE = net.minecraft.world.level.block.Blocks.SNOW_BLOCK;
     /** gravel */
     public static final Block field_150351_n = net.minecraft.world.level.block.Blocks.GRAVEL;
     /** wool */
@@ -93,6 +99,31 @@ public final class Blocks {
         Integer m = META.get(block);
         if (m == null) { decodeColor(block); m = META.get(block); }
         return m;
+    }
+
+    /**
+     * 1.7.10 の (block, meta) を 1.21 の BlockState へ解決する。
+     * 色付きブロック (1.7.10 は 1 ブロック + メタ 16 色) は色別ブロックへ読み替える。
+     * スクリプトの getIcon(side, meta) と setBlock(..., meta, ...) の両方から使う。
+     */
+    public static net.minecraft.world.level.block.state.BlockState stateFor(Block block, int meta) {
+        if (block == null) {
+            return net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        }
+        if (meta <= 0) {
+            return block.defaultBlockState();
+        }
+        String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
+        if (path.startsWith("white_")) {
+            String colored = COLORS_16[meta & 15] + path.substring("white".length());
+            Block b2 = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                .getOptional(net.minecraft.resources.ResourceLocation.withDefaultNamespace(colored))
+                .orElse(null);
+            if (b2 != null) {
+                return b2.defaultBlockState();
+            }
+        }
+        return block.defaultBlockState();
     }
 
     private static void decodeColor(Block block) {

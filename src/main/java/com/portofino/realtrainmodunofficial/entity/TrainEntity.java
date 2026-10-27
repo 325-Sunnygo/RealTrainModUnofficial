@@ -684,6 +684,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             }
         }
         boolean runScriptTick = !level().isClientSide() || shouldRunClientVisualScriptThisTick();
+        if (level().isClientSide()) this.getSoundUpdater().updateAts();
         if (level().isClientSide() && soundScriptEngine != null) {
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAutoRunningSound(this);
             // 本家 SoundUpdaterVehicle.update:45 と同じ onUpdate(su) 1 本。
@@ -4676,8 +4677,25 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return true;
     }
 
+    private com.portofino.realtrainmodunofficial.script.SoundScriptExecutor legacySoundUpdater;
+
+    public com.portofino.realtrainmodunofficial.script.SoundScriptExecutor getSoundUpdater() {
+        if (this.legacySoundUpdater == null) this.legacySoundUpdater =
+                new com.portofino.realtrainmodunofficial.script.SoundScriptExecutor(this);
+        return this.legacySoundUpdater;
+    }
+
+    public javax.script.ScriptEngine getServerScriptEngine() {
+        if (this.level().isClientSide()) return null;
+        com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry entry =
+                com.portofino.realtrainmodunofficial.script.CarServerScripts.get(VehicleRegistry.getById(this.getVehicleId()));
+        return entry == null ? null : entry.engine();
+    }
+
     public Object getModelSet() {
-        return new ModelSetCompat(getVehicleId());
+        ModelSetCompat set = new ModelSetCompat(getVehicleId());
+        set.serverSE = this.getServerScriptEngine();
+        return set;
     }
 
     public ResourceStateCompat getResourceState() {
@@ -5083,6 +5101,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     }
 
     public static final class ModelSetCompat {
+        public javax.script.ScriptEngine serverSE;
         private final String id;
         private final VehicleDefinition definition;
 
@@ -5931,8 +5950,6 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return player != null && (
             player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
                 || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
-                || player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get())
-                || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get())
         );
     }
 

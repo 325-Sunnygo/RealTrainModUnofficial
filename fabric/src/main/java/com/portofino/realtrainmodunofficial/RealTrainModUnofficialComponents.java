@@ -67,4 +67,37 @@ public class RealTrainModUnofficialComponents {
         "wire_placement_start",
         builder -> builder.persistent(CompoundTag.CODEC).networkSynchronized(ByteBufCodecs.COMPOUND_TAG)
     );
+
+    /**
+     * 弾薬 / 紙幣の種別。
+     *
+     * <p>本家 (1.7.10/1.12.2) はアイテムの<b>メタ</b>で種類を分けているが 1.21 にメタが無い。
+     * 値は本家のメタと同じ (弾薬なら {@code BulletType.id * 4 + 0..2}、紙幣なら {@code MoneyType.id})
+     * にしてあるので、本家の計算式をそのまま移植できる。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> ITEM_VARIANT
+        = REGISTRAR.registerComponentType(
+        "item_variant",
+        builder -> builder.persistent(Codec.INT).networkSynchronized(ByteBufCodecs.VAR_INT)
+    );
+    /**
+     * 液体入りバケツの中身 (本家の NBT {@code type} / {@code temperture} をそのまま持つ)。
+     */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<CompoundTag>> FLUID_DATA
+        = REGISTRAR.registerComponentType(
+        "fluid_data",
+        builder -> builder.persistent(CompoundTag.CODEC).networkSynchronized(ByteBufCodecs.COMPOUND_TAG)
+    );
+    /** 貨物アイテムが持つ中身 (選んだモデル id / コンテナの中身 / 装填状態)。 */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<CompoundTag>> CARGO_DATA
+        = REGISTRAR.registerComponentType(
+        "cargo_data",
+        builder -> builder.persistent(CompoundTag.CODEC).networkSynchronized(ByteBufCodecs.COMPOUND_TAG)
+    );
+    /** 装飾ブロックアイテムが持つモデル名 (本家は NBT "ModelName")。 */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> DECORATION_MODEL
+        = REGISTRAR.registerComponentType(
+        "decoration_model",
+        builder -> builder.persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8)
+    );
 }

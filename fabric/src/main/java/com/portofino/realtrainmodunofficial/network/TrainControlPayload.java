@@ -132,7 +132,8 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 case "toggle_reverse" -> controlTrain.setReverse(!controlTrain.isReverse());
                 case "set_reverser" -> controlTrain.setReverser(payload.value());
                 // ↑↓ キーのレバーサ操作。↑=前(+1)/↓=後(-1) に 1 段ずつ。中立(0)を挟む 3 段。
-                // マスコンが 0 (力行/制動なし) のときだけ動かせる = 走行中の逆転を防ぐ。
+                // ★動かせるのは<b>マスコンが非常ブレーキ位置のとき</b> (ユーザー要望)。
+                // 連結すると必ず非常位置になるので、ニュートラル条件だと連結後に切り替えられなかった。
                 case "reverser_up", "reverser_down" -> {
                     if (!driverPassenger) {
                         return;
@@ -206,8 +207,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 }
             }
             // ↑↓ キーのレバーサ操作。
-            // を読む (updateMotion)。
-            // ★動かせるのはマスコンが非常ブレーキ位置のとき (ユーザー要望)。
+            // ★動かせるのは<b>マスコンが非常ブレーキ位置のとき</b> (ユーザー要望)。
             // 連結すると必ず非常位置になるので、ニュートラル条件だと連結後に切り替えられなかった。
             case "reverser_up", "reverser_down" -> {
                 if (train.getNotch() == train.getEmergencyBrakeNotch()) {
@@ -254,9 +254,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             }
             // 運転席GUI (ドアタブ) の速度設定。JSON から読まなくなったぶんをここで決める。
             // value = 最高速度 (km/h)。0 で既定へ戻す。
-            case "set_max_speed" -> train.setConfiguredMaxSpeedKmh(value);
             // value = 加速度 (km/h/s ×100)。0 で既定へ戻す。
-            case "set_acceleration" -> train.setConfiguredAccelCentiKmhS(value);
             // ドアカット: この運転車両の開扉をカットする (物理でドアを開けない)。
             case "toggle_door_cut" -> {
                 var cutType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_DoorCut;

@@ -26,7 +26,9 @@ public class VehiclePartsRenderer extends EntityPartsRenderer {
 
     /**
      * 本家 PartsRenderer.render: スクリプトの render(entity, pass, partialTick) を実行。
-     * PICK パス (マウス操作) は未移植。
+     * PICK パス (マウス操作) はここでは行わず、
+     * {@code client.ActionPartsPicker} が描画時に記録したパーツ別行列で三角形レイキャストして
+     * onRightClick / onRightDrag を送る (本家の色ピッキングと同等の結果)。
      */
     public void render(Object t, int pass, float partialTick) {
         this.currentPass = pass;

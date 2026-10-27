@@ -14,6 +14,11 @@ import java.util.stream.IntStream;
 public final class NGTMath {
     public static final Random RANDOM = new Random();
 
+    /** 本家 NGTMath.generateHash: 配列から 0..bound-1 の決定的な値を作る。 */
+    public static int generateHash(int[] data, int bound) {
+        return new Random(Arrays.hashCode(data)).nextInt(bound);
+    }
+
     public static final float PI;
     private static final double TO_RAD;
     private static final double TO_DEG;

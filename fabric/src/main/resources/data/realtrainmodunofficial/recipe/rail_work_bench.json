@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ISI",
+    "SCS",
+    "ISI"
+  ],
+  "key": {
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    },
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "C": {
+      "item": "minecraft:crafting_table"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:rail_workbench",
+    "count": 1
+  },
+  "category": "misc"
+}

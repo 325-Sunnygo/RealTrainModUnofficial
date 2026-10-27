@@ -34,6 +34,8 @@ public class TileEntityLargeRailSlopeCore extends TileEntityLargeRailCore {
         if (this.railPositions != null) {
             this.railmap = new RailMapSlope(this.railPositions[0], this.railPositions[1], this.slopeType);
         }
+        // ★坂もレールを引き直したら当たり判定を焼き直す。
+        this.invalidateCollisionCache();
     }
 
     public byte getSlopeType() {

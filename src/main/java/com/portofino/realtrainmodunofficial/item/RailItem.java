@@ -85,9 +85,9 @@ public class RailItem extends Item {
         RailDefinition def = RailRegistry.getById(selectedId);
         String name = def != null ? def.getDisplayName() : selectedId;
 
-        RailProperty old = core.getProperty();
-        // 道床のブロックと高さは今のレールのものを引き継ぐ (変えるのはモデルだけ)
-        RailProperty next = new RailProperty(selectedId, old.block, old.blockMetadata, old.blockHeight);
+        // Original ItemRail applies the held item's complete property, including ballast.
+        RailProperty next = jp.ngt.rtm.item.ItemRail.getProperty((Object)stack);
+        if(next == null) return;
 
         // 本家と同じ操作。素で重ね、シフトで差し替え。
         if (!player.isShiftKeyDown()) {
@@ -101,11 +101,6 @@ public class RailItem extends Item {
             return;
         }
 
-        if (selectedId.equals(old.railModel)) {
-            player.displayClientMessage(
-                Component.translatable("message.realtrainmodunofficial.rail_model_same"), true);
-            return;
-        }
         core.replaceRail(next);
         player.displayClientMessage(
             Component.translatable("message.realtrainmodunofficial.rail_model_changed", name), true);

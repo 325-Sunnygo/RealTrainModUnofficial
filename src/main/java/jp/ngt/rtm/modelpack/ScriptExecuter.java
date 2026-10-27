@@ -41,6 +41,8 @@ public class ScriptExecuter {
 
     /** 本家 callMethod/getEntityWorld 相当: caller から world と座標を取り込む。 */
     private void bindCaller(Object caller) {
+        this.level = null;
+        this.pos = Vec3.ZERO;
         if (caller instanceof net.minecraft.world.entity.Entity e) {
             if (e.level() instanceof ServerLevel sl) {
                 this.level = sl;
@@ -94,13 +96,13 @@ public class ScriptExecuter {
             return;
         }
         MinecraftServer server = this.level.getServer();
-        if (server == null) {
+        if (server == null || !server.isCommandBlockEnabled()) {
             return;
         }
         try {
             CommandSourceStack source = new CommandSourceStack(
                     CommandSource.NULL,          //出力は捨てる (本家も結果を見ない)
-                    this.pos,
+                    this.pos == null ? Vec3.ZERO : this.pos,
                     Vec2.ZERO,
                     this.level,
                     2,                           //本家 func_70003_b: permLevel <= 2
@@ -156,14 +158,24 @@ public class ScriptExecuter {
     }
 
     /** 本家 getPlayerCoordinates: {チャンクX, Y, チャンクZ}。 */
-    public int[] getPlayerCoordinates() {
-        if (this.pos == null) {
-            return new int[]{0, 0, 0};
-        }
-        return new int[]{
-                net.minecraft.util.Mth.floor(this.pos.x) >> 4,
-                net.minecraft.util.Mth.floor(this.pos.y),
-                net.minecraft.util.Mth.floor(this.pos.z) >> 4};
+    public jp.ngt.mccompat.ChunkCoordinates getPlayerCoordinates() {
+        Vec3 position = this.pos == null ? Vec3.ZERO : this.pos;
+        return new jp.ngt.mccompat.ChunkCoordinates(
+                net.minecraft.util.Mth.floor(position.x) >> 4,
+                net.minecraft.util.Mth.floor(position.y),
+                net.minecraft.util.Mth.floor(position.z) >> 4);
+    }
+
+    public jp.ngt.mccompat.ChunkCoordinates func_71502_e() {
+        return this.getPlayerCoordinates();
+    }
+
+    public void func_145747_a(Object message) {
+        this.addChatMessage(message);
+    }
+
+    public boolean func_70003_b(int level, String command) {
+        return this.canCommandSenderUseCommand(level, command);
     }
 
     /**
@@ -174,22 +186,47 @@ public class ScriptExecuter {
         if (selector == null || name == null) {
             return null;
         }
+        javax.script.ScriptEngine engine = null;
         try {
-            Object engine = selector.getClass().getMethod("getServerScriptEngine").invoke(selector);
-            if (engine instanceof javax.script.ScriptEngine se) {
-                return jp.ngt.ngtlib.io.ScriptUtil.doScriptIgnoreError(se, name, args);
+            Object candidate = selector.getClass().getMethod("getServerScriptEngine").invoke(selector);
+            if (candidate instanceof javax.script.ScriptEngine se) {
+                engine = se;
             }
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            // サーバースクリプトを持たない対象なら何もしない (本家も null を返す)
+        } catch (NoSuchMethodException ignored) {
+            // Legacy selectors expose the engine on their model set instead.
+        } catch (ReflectiveOperationException e) {
+            RealTrainModUnofficial.LOGGER.warn("Could not obtain server script engine", e);
         }
-        return null;
+        if (engine == null && selector instanceof IModelSelector modelSelector
+                && modelSelector.getModelSet() instanceof jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> set) {
+            engine = set.serverSE;
+        }
+        return jp.ngt.ngtlib.io.ScriptUtil.doScriptIgnoreError(engine, name, args);
     }
 
-    /** 本家 execScript: 対象の onUpdate を 1 回呼び、count を進める。 */
-    public void execScript(Object selector) {
+    /** Named events bind the caller without advancing the onUpdate tick counter. */
+    public Object execScript(Object selector, String eventName, Object... args) {
         this.bindCaller(selector);
-        this.callMethod(selector, "onUpdate", selector, this);
-        ++this.count;
+        return this.callMethod(selector, eventName, args);
+    }
+
+    /** The original advances count even if onUpdate is missing or throws. */
+    public void execScript(Object selector) {
+        try {
+            this.execScript(selector, "onUpdate", selector, this);
+        } finally {
+            ++this.count;
+        }
+    }
+
+    /** Shared execution path for loaders that already hold the engine. */
+    public void updateScript(javax.script.ScriptEngine engine, Object caller) {
+        this.bindCaller(caller);
+        try {
+            jp.ngt.ngtlib.io.ScriptUtil.doScriptIgnoreError(engine, "onUpdate", caller, this);
+        } finally {
+            ++this.count;
+        }
     }
 
     /**

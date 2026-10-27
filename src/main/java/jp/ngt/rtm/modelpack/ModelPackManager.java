@@ -41,10 +41,10 @@ public final class ModelPackManager {
             return getScript(s);
         }
         if (resource instanceof jp.ngt.mccompat.ResourceLocation rl) {
-            return getScript(rl.getResourcePath());
+            return getScript(rl.toString());
         }
         if (resource instanceof net.minecraft.resources.ResourceLocation rl) {
-            return getScript(rl.getPath());
+            return getScript(rl.toString());
         }
         return getScript(String.valueOf(resource));
     }
@@ -108,7 +108,17 @@ public final class ModelPackManager {
      * getModelSet("ModelConnector", modelName).getConfig.wirePos で碍子の電線取付点を読む
      * (null ガード無しで参照するため、見つからなくても既定 wirePos を返す非 null が必須)。
      */
-    public ModelSetShim getModelSet(String type, String name) {
+    public jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getModelSet(String type, String name) {
+        if("ModelTrain".equals(type) || "ModelVehicle".equals(type)) {
+            var definition=com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(name);
+            if(definition==null)for(var candidate:com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getAll())if(candidate.getDisplayName().equals(name)) {definition=candidate;break;}
+            if("ModelVehicle".equals(type))return definition==null?new jp.ngt.rtm.modelpack.modelset.ModelSetVehicle():new jp.ngt.rtm.modelpack.modelset.ModelSetVehicle(jp.ngt.rtm.modelpack.cfg.VehicleConfigAdapter.get(definition));
+            return definition==null?new jp.ngt.rtm.modelpack.modelset.ModelSetCompat():new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.get(definition.getId()));
+        }
+        if("ModelRail".equals(type)) {
+            var definition=com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(name);
+            return definition==null?new jp.ngt.rtm.modelpack.modelset.ModelSetRail():new jp.ngt.rtm.rail.util.RailProperty(name,net.minecraft.world.level.block.Blocks.GRAVEL,0,0.0625F).getModelSet();
+        }
         com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def =
             com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry.getByBareName(
                 name, com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.INSULATOR);
@@ -116,13 +126,17 @@ public final class ModelPackManager {
     }
 
     /** getModelSet の戻り値: getConfig.wirePos (double[3]) と getConfig.getName を提供。 */
-    public static final class ModelSetShim {
+    public static final class ModelSetShim extends jp.ngt.rtm.modelpack.modelset.ModelSetBase<ConfigShim> {
         private final ConfigShim config;
+        private final boolean missing;
 
         ModelSetShim(com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def) {
-            this.config = new ConfigShim(def);
+            super(new ConfigShim(def));
+            this.config = new ConfigShim(def);this.missing=def==null;
         }
 
+        public ConfigShim getDummyConfig() {return new ConfigShim(null);}
+        @Override public boolean isDummy() {return missing;}
         public ConfigShim getConfig() {
             return config;
         }

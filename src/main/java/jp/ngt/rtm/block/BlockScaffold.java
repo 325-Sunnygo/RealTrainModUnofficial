@@ -17,6 +17,27 @@ import net.minecraft.world.level.BlockGetter;
  */
 public final class BlockScaffold {
 
+    public static byte getConnectionType(BlockGetter level, int x, int y, int z, Object tile) {
+        if (tile instanceof InstalledObjectBlockEntity be && be.getCategory() == InstalledObjectCategory.STAIR) {
+            return getConnectionType(level, x, y, z, be.getDir());
+        }
+        return getConnectionType(level, x, y, z);
+    }
+
+    public static byte getConnectionType(BlockGetter level, int x, int y, int z) {
+        if (level == null) return 0;
+        BlockPos pos = new BlockPos(x, y, z);
+        InstalledObjectCategory category = categoryAt(level, pos);
+        if (category == InstalledObjectCategory.SCAFFOLD) {
+            return (byte) (dirAt(level, pos) == 0 ? 1 : 2);
+        }
+        if (category == InstalledObjectCategory.STAIR || categoryAt(level, pos.below()) == InstalledObjectCategory.STAIR) {
+            return 3;
+        }
+        return level.getBlockState(pos).isSolidRender(level, pos)
+                || level.getBlockState(pos.below()).isSolidRender(level, pos.below()) ? (byte) 4 : 0;
+    }
+
     /** なし:0 / 足場(Z向き):1 / 足場(X向き):2 / 階段:3 / 立方体:4 */
     public static byte getConnectionType(BlockGetter level, int x, int y, int z, int dir) {
         if (level == null) {

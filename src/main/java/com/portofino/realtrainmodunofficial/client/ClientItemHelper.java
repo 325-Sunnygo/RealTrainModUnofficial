@@ -4,7 +4,6 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents;
 import com.portofino.realtrainmodunofficial.client.screen.FlagSelectScreen;
 import com.portofino.realtrainmodunofficial.client.screen.ModelSelectScreen;
 import com.portofino.realtrainmodunofficial.client.screen.SignSelectGridScreen;
-import com.portofino.realtrainmodunofficial.client.screen.TrainFormationScreen;
 import com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry;
@@ -40,7 +39,7 @@ public final class ClientItemHelper {
      */
     private static void commitSelection(ItemStack stack, ModelSelectScreen.SelectionResult selection) {
         PacketDistributor.sendToServer(new SelectModelPayload(
-            selection.modelId(), selection.dataMapValue(), selection.customName(), selection.color()));
+            selection.modelId(), selection.dataMapValue(), selection.customName(), selection.color(),selection.autoSplit()));
     }
 
     /** 手持ち (メイン→オフ) から選択式アイテムのスタックを探す。引数なし選択画面用。 */
@@ -80,7 +79,7 @@ public final class ClientItemHelper {
             LegacyItemStackBridge.getSelectedDataMap(stack),
             LegacyItemStackBridge.getSelectedCustomName(stack),
             LegacyItemStackBridge.getSelectedColor(stack)
-        ));
+        ).withRailOptions(jp.ngt.rtm.item.ItemRail.getProperty(stack)==null || jp.ngt.rtm.item.ItemRail.getProperty(stack).autoSplit));
     }
 
     /**
@@ -135,19 +134,6 @@ public final class ClientItemHelper {
             LegacyItemStackBridge.getSelectedDataMap(stack),
             LegacyItemStackBridge.getSelectedCustomName(stack),
             LegacyItemStackBridge.getSelectedColor(stack)
-        ));
-    }
-
-    public static void openTrainSelectScreen(TrainFormationScreen formationScreen) {
-        List<ModelSelectScreen.ModelInfo> infos = getVisibleTrainModels();
-        Minecraft.getInstance().setScreen(new ModelSelectScreen(
-            Component.translatable("screen.realtrainmodunofficial.select_train"),
-            infos,
-            selection -> {
-                formationScreen.updateFormationWithVehicle(selection.modelId());
-            },
-            null,
-            ""
         ));
     }
 
@@ -222,28 +208,6 @@ public final class ClientItemHelper {
             LegacyItemStackBridge.getSelectedCustomName(stack),
             LegacyItemStackBridge.getSelectedColor(stack)
         ));
-    }
-
-    /**
-     * 編成の編集画面から呼ぶモデル選択。決めたら編集画面へ戻る。
-     * @param index 差し替える車両の番号。-1 なら末尾へ追加
-     */
-    public static void openTrainSelectForFormation(ItemStack stack, int index) {
-        List<ModelSelectScreen.ModelInfo> infos = getVisibleTrainModels();
-        // 決定でもキャンセルでも編成の編集画面へ戻す (戻り先は画面側が onClose で処理する)
-        Minecraft.getInstance().setScreen(new ModelSelectScreen(
-            Component.translatable("screen.realtrainmodunofficial.select_train"),
-            infos,
-            selection -> com.portofino.realtrainmodunofficial.client.screen.FormationEditScreen
-                .applySelection(stack, index, selection.modelId()),
-            null,
-            ""
-        ).withReturnScreen(() ->
-            new com.portofino.realtrainmodunofficial.client.screen.FormationEditScreen(stack)));
-    }
-
-    public static void openVehicleFormationScreen(ItemStack stack) {
-        Minecraft.getInstance().setScreen(new TrainFormationScreen(stack));
     }
 
     public static void openInstalledObjectSelectScreen(Player player, ItemStack stack, InstalledObjectCategory category) {

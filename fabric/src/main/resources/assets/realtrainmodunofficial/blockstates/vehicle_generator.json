@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "realtrainmodunofficial:block/vehicle_generator"
+    }
+  }
+}

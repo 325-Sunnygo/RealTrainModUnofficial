@@ -11,14 +11,48 @@ import net.minecraft.world.level.Level;
 @SuppressWarnings("unused")
 public class WorldCompat {
     public final Level level;
+    public final ProviderCompat field_73011_w;
+    public final MapStorageCompat field_72988_C;
+    public static final class ProviderCompat {
+        public final int field_76574_g;
+        ProviderCompat(Level level) {field_76574_g=level.dimension().equals(Level.NETHER)?-1:level.dimension().equals(Level.END)?1:0;}
+    }
+    public static final class MapStorageCompat {
+        private final net.minecraft.server.level.ServerLevel level;
+        MapStorageCompat(net.minecraft.server.level.ServerLevel level) {this.level=level;}
+        public jp.ngt.mccompat.world.MapGenStructureData func_75742_a(Class<?> type,String name) {return level.getDataStorage().get(jp.ngt.mccompat.world.MapGenStructureData.factory(name),name);}
+        public void func_75745_a(String name,jp.ngt.mccompat.world.MapGenStructureData data) {level.getDataStorage().set(name,data);data.setDirty();}
+    }
+
+    public final java.util.List<jp.ngt.rtm.rail.TileEntityLargeRailCore> field_147482_g=new java.util.AbstractList<>() {
+        public jp.ngt.rtm.rail.TileEntityLargeRailCore get(int index) {return jp.ngt.rtm.rail.TileEntityLargeRailCore.getLoadedCores(level).get(index);}
+        public int size() {return jp.ngt.rtm.rail.TileEntityLargeRailCore.getLoadedCores(level).size();}
+    };
+    public boolean func_147437_c(int x,int y,int z) {return level.isEmptyBlock(new BlockPos(x,y,z));}
+    public void func_147475_p(int x,int y,int z) {level.removeBlockEntity(new BlockPos(x,y,z));}
+    public ChunkProviderCompat func_72863_F() {return new ChunkProviderCompat(level);}
+    public static final class ChunkProviderCompat {
+        private final Level world;
+        ChunkProviderCompat(Level world) {this.world=world;}
+        public boolean func_73149_a(int x,int z) {return world.hasChunk(x,z);}
+        public ChunkCompat func_73154_d(int x,int z) {return new ChunkCompat(world.getChunk(x,z));}
+    }
+    public static final class ChunkCompat {
+        public final java.util.Map<net.minecraft.core.BlockPos,net.minecraft.world.level.block.entity.BlockEntity> field_150816_i;
+        ChunkCompat(net.minecraft.world.level.chunk.LevelChunk chunk) {field_150816_i=chunk.getBlockEntities();}
+    }
+
     /** 1.7.10 SRG: isRemote */
     public final boolean field_72995_K;
 
     public WorldCompat(Level level) {
         this.level = level;
         this.field_72995_K = level.isClientSide;
+        this.field_73011_w=new ProviderCompat(level);
+        this.field_72988_C=level instanceof net.minecraft.server.level.ServerLevel server?new MapStorageCompat(server):null;
     }
 
+    public boolean func_72899_e(int x,int y,int z) {return y>=level.getMinBuildHeight() && y<level.getMaxBuildHeight() && level.hasChunk(x>>4,z>>4);}
     public Level getLevel() {
         return this.level;
     }
@@ -212,6 +246,7 @@ public class WorldCompat {
      */
     private static net.minecraft.world.level.block.state.BlockState withMeta(
             net.minecraft.world.level.block.Block block, int meta) {
+        if(block instanceof jp.ngt.rtm.rail.BlockLargeRailCore && block.defaultBlockState().hasProperty(jp.ngt.rtm.rail.BlockLargeRailCore.SECTIONED))return block.defaultBlockState().setValue(jp.ngt.rtm.rail.BlockLargeRailCore.SECTIONED,meta==1);
         return jp.ngt.mccompat.init.Blocks.stateFor(block, meta);
     }
 

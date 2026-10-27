@@ -11,14 +11,48 @@ import net.minecraft.world.level.Level;
 @SuppressWarnings("unused")
 public class WorldCompat {
     public final Level level;
+    public final ProviderCompat field_73011_w;
+    public final MapStorageCompat field_72988_C;
+    public static final class ProviderCompat {
+        public final int field_76574_g;
+        ProviderCompat(Level level) {field_76574_g=level.dimension().equals(Level.NETHER)?-1:level.dimension().equals(Level.END)?1:0;}
+    }
+    public static final class MapStorageCompat {
+        private final net.minecraft.server.level.ServerLevel level;
+        MapStorageCompat(net.minecraft.server.level.ServerLevel level) {this.level=level;}
+        public jp.ngt.mccompat.world.MapGenStructureData func_75742_a(Class<?> type,String name) {return level.getDataStorage().get(jp.ngt.mccompat.world.MapGenStructureData.factory(name),name);}
+        public void func_75745_a(String name,jp.ngt.mccompat.world.MapGenStructureData data) {level.getDataStorage().set(name,data);data.setDirty();}
+    }
+
+    public final java.util.List<jp.ngt.rtm.rail.TileEntityLargeRailCore> field_147482_g=new java.util.AbstractList<>() {
+        public jp.ngt.rtm.rail.TileEntityLargeRailCore get(int index) {return jp.ngt.rtm.rail.TileEntityLargeRailCore.getLoadedCores(level).get(index);}
+        public int size() {return jp.ngt.rtm.rail.TileEntityLargeRailCore.getLoadedCores(level).size();}
+    };
+    public boolean func_147437_c(int x,int y,int z) {return level.isEmptyBlock(new BlockPos(x,y,z));}
+    public void func_147475_p(int x,int y,int z) {level.removeBlockEntity(new BlockPos(x,y,z));}
+    public ChunkProviderCompat func_72863_F() {return new ChunkProviderCompat(level);}
+    public static final class ChunkProviderCompat {
+        private final Level world;
+        ChunkProviderCompat(Level world) {this.world=world;}
+        public boolean func_73149_a(int x,int z) {return world.hasChunk(x,z);}
+        public ChunkCompat func_73154_d(int x,int z) {return new ChunkCompat(world.getChunk(x,z));}
+    }
+    public static final class ChunkCompat {
+        public final java.util.Map<net.minecraft.core.BlockPos,net.minecraft.world.level.block.entity.BlockEntity> field_150816_i;
+        ChunkCompat(net.minecraft.world.level.chunk.LevelChunk chunk) {field_150816_i=chunk.getBlockEntities();}
+    }
+
     /** 1.7.10 SRG: isRemote */
     public final boolean field_72995_K;
 
     public WorldCompat(Level level) {
         this.level = level;
         this.field_72995_K = level.isClientSide;
+        this.field_73011_w=new ProviderCompat(level);
+        this.field_72988_C=level instanceof net.minecraft.server.level.ServerLevel server?new MapStorageCompat(server):null;
     }
 
+    public boolean func_72899_e(int x,int y,int z) {return y>=level.getMinBuildHeight() && y<level.getMaxBuildHeight() && level.hasChunk(x>>4,z>>4);}
     public Level getLevel() {
         return this.level;
     }
@@ -115,6 +149,64 @@ public class WorldCompat {
         return e;
     }
 
+    // ===== 1.7.10 ワールド探索/チャンク SRG (NGTO Builder2 の Snowfall ブラシ等) =====
+
+    /**
+     * func_72901_a = rayTraceBlocks(start, end, flag)。
+     * NGTO Builder2 の getLookingPos が視線の当たり判定に使う。
+     * start/end は 1.7.10 Vec3 (jp.ngt Vec3 / Vec3Compat) のいずれでも受ける。
+     */
+    public MovingObjectPosition func_72901_a(Object start, Object end, boolean flag) {
+        net.minecraft.world.phys.Vec3 s = toMcVec(start);
+        net.minecraft.world.phys.Vec3 e = toMcVec(end);
+        if (s == null || e == null) {
+            return null;
+        }
+        // ★Entity 版 ctor は CollisionContext.of(entity) を通り、null だと
+        //   EntityCollisionContext が entity.isDescending() で NPE になる。
+        //   スクリプトの視線判定はエンティティ無しなので empty を使う。
+        net.minecraft.world.level.ClipContext ctx = new net.minecraft.world.level.ClipContext(
+                s, e, net.minecraft.world.level.ClipContext.Block.OUTLINE,
+                net.minecraft.world.level.ClipContext.Fluid.NONE,
+                net.minecraft.world.phys.shapes.CollisionContext.empty());
+        return MovingObjectPosition.of(this.level.clip(ctx));
+    }
+
+    private static net.minecraft.world.phys.Vec3 toMcVec(Object v) {
+        if (v instanceof jp.ngt.ngtlib.math.Vec3 nv) {
+            return new net.minecraft.world.phys.Vec3(nv.getX(), nv.getY(), nv.getZ());
+        }
+        if (v instanceof net.minecraft.world.phys.Vec3 mc) {
+            return mc;
+        }
+        if (v instanceof MovingObjectPosition.Vec3Compat c) {
+            return new net.minecraft.world.phys.Vec3(c.field_72450_a, c.field_72448_b, c.field_72449_c);
+        }
+        return null;
+    }
+
+    /** func_72964_e = getChunkFromChunkCoords。1.7.10 Chunk 互換を返す。 */
+    public ChunkCompat func_72964_e(int chunkX, int chunkZ) {
+        net.minecraft.world.level.chunk.LevelChunk chunk = this.level.getChunk(chunkX, chunkZ);
+        return chunk != null ? new ChunkCompat(chunk) : null;
+    }
+
+    /**
+     * 1.7.10 field_73010_i = playerEntities。
+     * 読むたびに現在のプレイヤーを返す live リスト (size/get を使うスクリプト向け)。
+     */
+    public final java.util.List<PlayerCompat> field_73010_i = new java.util.AbstractList<PlayerCompat>() {
+        @Override
+        public PlayerCompat get(int i) {
+            return PlayerCompat.of(level.players().get(i));
+        }
+
+        @Override
+        public int size() {
+            return level.players().size();
+        }
+    };
+
     // ===== 1.7.10 ブロック操作 SRG (SRB3/NGTO Builder のサーバースクリプトが使用) =====
 
     /** func_147465_d = setBlock(x,y,z, Block, meta, flag) */
@@ -147,11 +239,6 @@ public class WorldCompat {
         }
     }
 
-    private static final String[] COLORS_16 = {
-            "white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
-            "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"
-    };
-
     /**
      * 1.7.10 の「1 ブロック + メタで 16 色」を 1.21 の色別ブロックに読み替える。
      * スクリプトは setBlock(x,y,z, Blocks.field_150399_cn, 14, 3) のように
@@ -159,20 +246,8 @@ public class WorldCompat {
      */
     private static net.minecraft.world.level.block.state.BlockState withMeta(
             net.minecraft.world.level.block.Block block, int meta) {
-        if (meta <= 0) {
-            return block.defaultBlockState();
-        }
-        String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
-        if (path.startsWith("white_")) {
-            String colored = COLORS_16[meta & 15] + path.substring("white".length());
-            net.minecraft.world.level.block.Block b2 = net.minecraft.core.registries.BuiltInRegistries.BLOCK
-                    .getOptional(net.minecraft.resources.ResourceLocation.withDefaultNamespace(colored))
-                    .orElse(null);
-            if (b2 != null) {
-                return b2.defaultBlockState();
-            }
-        }
-        return block.defaultBlockState();
+        if(block instanceof jp.ngt.rtm.rail.BlockLargeRailCore && block.defaultBlockState().hasProperty(jp.ngt.rtm.rail.BlockLargeRailCore.SECTIONED))return block.defaultBlockState().setValue(jp.ngt.rtm.rail.BlockLargeRailCore.SECTIONED,meta==1);
+        return jp.ngt.mccompat.init.Blocks.stateFor(block, meta);
     }
 
     /** func_147468_f = setBlockToAir */
@@ -218,6 +293,14 @@ public class WorldCompat {
      */
     public int func_72805_g(double x, double y, double z) {
         BlockPos pos = new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z));
+        // RTM 設置物のメタは取付面 (1.7.10 の実メタと同じ)。
+        // NGTO Builder の BlockBuilder が「既に同じブロック+メタか」のスキップ判定に使う。
+        // 0 固定だと既設碍子が毎回「別物」に見えて NBT を再適用され、接続が消える。
+        if (this.level.getBlockEntity(pos)
+                instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be
+                && be.getMountFace() >= 0) {
+            return be.getMountFace();
+        }
         return jp.ngt.mccompat.init.Blocks.colorMeta(this.level.getBlockState(pos).getBlock());
     }
 

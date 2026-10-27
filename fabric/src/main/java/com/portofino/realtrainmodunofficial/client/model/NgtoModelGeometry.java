@@ -194,8 +194,6 @@ public final class NgtoModelGeometry {
             }
         }
         Geometry geometry = new Geometry(opaque.toArray(), translucent.toArray());
-        RealTrainModUnofficial.LOGGER.info("[NGTO] {}x{}x{} → 頂点 {} (不透明) / {} (半透明)",
-            sizeX, sizeY, sizeZ, opaque.size() / STRIDE, translucent.size() / STRIDE);
         return geometry.isEmpty() ? null : geometry;
     }
 
@@ -285,7 +283,7 @@ public final class NgtoModelGeometry {
             CompoundTag set = entry.getCompound("Set");
             String name = set.getString("Block");
             int meta = set.getInt("Meta");
-            palette.put(entry.getInt("Id"), LegacyBlocks.toState(name, meta));
+            palette.put(entry.getInt("Id"), jp.ngt.ngtlib.block.LegacyBlockStates.toState(name, meta));
         }
         return palette;
     }

@@ -102,7 +102,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     }
 
     /** 本家 getLightValue: 空 (時刻で減衰) とブロックの明るいほう。 */
-    private static int ambientLightValue(net.minecraft.world.level.Level level, double x, double y, double z) {
+    static int ambientLightValue(net.minecraft.world.level.Level level, double x, double y, double z) {
         BlockPos pos = BlockPos.containing(x, y + 0.5D, z);
         int skyBrightness = Mth.clamp(15 - level.getSkyDarken(), 0, 15);
         int sky = level.getBrightness(net.minecraft.world.level.LightLayer.SKY, pos) * skyBrightness / 15;
@@ -117,11 +117,6 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
 
     @Override
     public boolean shouldRender(TrainEntity entity, Frustum frustum, double camX, double camY, double camZ) {
-        // 軽量化: 車両描画距離が有効なら遠方車両を丸ごと省略 (既定 0 = 無制限)。
-        if (com.portofino.realtrainmodunofficial.RtmuSettings.beyondVehicleRenderDistance(
-                entity.getX(), entity.getY(), entity.getZ(), camX, camY, camZ)) {
-            return false;
-        }
         // Use a square box (halfLength on all horizontal axes) so the train stays
         // visible regardless of rotation. A Z-only offset disappears when the train
         // faces east/west and the camera is slightly off-center.
@@ -211,8 +206,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             boolean nearTrain = cameraDistanceSq < nearThreshold * nearThreshold;
             // ★本家は内装を距離で間引かない。
             // 室内の面そのものが見えているからで、内装を消すと光も消える。
-            boolean distanceCulling =
-                com.portofino.realtrainmodunofficial.RtmuSettings.vehicleRenderDistance > 0;
+            boolean distanceCulling = false;
             boolean renderInterior = ridingThisTrain || !distanceCulling || nearTrain;
             boolean aggressiveDistanceCulling = distanceCulling && !ridingThisTrain
                 && cameraDistanceSq > aggressiveThreshold * aggressiveThreshold;
@@ -236,7 +230,10 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             // 名前に "door" を含むか等の推測はしない (本家に無いし、扉/panel 等の命名で外れる)。
             java.util.Map<String, java.util.List<PartsStep>> leftChains = partsChains(def.getLeftDoors());
             java.util.Map<String, java.util.List<PartsStep>> rightChains = partsChains(def.getRightDoors());
+            var partDrawOrder = com.portofino.realtrainmodunofficial.client.model.LegacyVehiclePartOrder.create(
+                    def.getLeftDoors(),def.getRightDoors());
             MqoModelLoader.GroupTransform doorTransform = new MqoModelLoader.GroupTransform() {
+                @Override public int drawOrder(String groupName) { return partDrawOrder.getOrDefault(groupName,0); }
                 @Override public void apply(PoseStack stack, String groupName) {
                     applyRunningGearTransform(stack, entity, def, model, groupName, renderYaw, partialTicks);
                     if (leftChains.isEmpty() && rightChains.isEmpty()) {
@@ -253,7 +250,8 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                     if (isRunningGearGroup(groupName)) return true;
                     if (leftChains.isEmpty() && rightChains.isEmpty()) {
                         // ドア定義の無いパックは名前推定フォールバックに掛かる可能性がある
-                        return groupName.length() >= 4 && containsDoorWord(groupName);
+                        // ドア定義が無いなら動かす対象も無い (名前推定はしない)。
+                        return false;
                     }
                     return hasPartsTransform(leftChains, groupName) || hasPartsTransform(rightChains, groupName);
                 }
@@ -476,32 +474,13 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             return;
         }
         if (doors == null || doors.isEmpty()) {
-            // JSON にドア定義が無いパック向けの名前推定フォールバック (本家には無い RTMU の補助)
-            applyLegacyDoorFallback(poseStack, groupName,
-                    smoothstep(Mth.clamp(progressTicks / MAX_DOOR_MOVE, 0.0F, 1.0F)), leftSide);
+            // ★定義が無いなら動かさない。本家にドア名を推測する仕組みは無い
+            //   (本家パックはドアの動きをスクリプトで書く)。
             return;
         }
         applyPartsTransform(poseStack, partsChains(doors), groupName, progressTicks);
     }
 
-    private static void applyLegacyDoorFallback(PoseStack poseStack, String groupName, float progress, boolean leftSide) {
-        String normalized = groupName == null ? "" : groupName.toLowerCase(java.util.Locale.ROOT);
-        if (!normalized.contains("door")) {
-            return;
-        }
-        boolean isDoorLeaf = normalized.matches(".*(?:^|_)[0-9]+[lr](?:_|$).*")
-            || normalized.matches(".*(?:^|_)[lr](?:_|$).*");
-        if (!isDoorLeaf) {
-            return;
-        }
-        double slide = 0.72D * progress;
-        boolean opensTowardPositiveZ = normalized.matches(".*[0-9]+l(?:_|$).*")
-            || normalized.contains("_l_")
-            || normalized.endsWith("_l");
-        // Barus Keikyu 系はドア名に train-side 情報を持たないため、まずは対象側の開閉で
-        // 全ドア葉を確実に動かし、葉ごとの L/R だけでスライド方向を決める。
-        poseStack.translate(0.0D, 0.0D, opensTowardPositiveZ ? slide : -slide);
-    }
 
 
     private static float smoothstep(float x) {
@@ -629,105 +608,11 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             .setNormal(nx, ny, nz);
     }
 
-    /**
-     * 連結曲げ用の角度バリアント (末尾 "-NN" で NN>=10、(mx)鏡像サフィックスは先に剥がす) か。
-     * 例: body-90, body-180(mx), bogie1-90, type_1-90。NN<10 (body-1 等のセクション分割) は対象外。
-     */
-    private static boolean isAngleBendVariant(String normalized) {
-        String s = normalized.endsWith("(mx)") ? normalized.substring(0, normalized.length() - 4) : normalized;
-        int dash = s.lastIndexOf('-');
-        if (dash <= 0 || dash == s.length() - 1) return false;
-        for (int i = dash + 1; i < s.length(); i++) {
-            if (!Character.isDigit(s.charAt(i))) return false;
-        }
-        try {
-            return Integer.parseInt(s.substring(dash + 1)) >= 10;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
-
     private static boolean shouldRenderTrainGroup(String groupName, boolean renderInterior,
                                                   boolean aggressiveDistanceCulling, boolean compatibilityHeavy,
                                                   VehicleDefinition def, boolean hasScript, boolean scriptActuallyRunning) {
-        if (groupName == null || groupName.isBlank()) {
-            return true;
-        }
-        String normalized = groupName.toLowerCase(java.util.Locale.ROOT);
-        // 連結曲げ用の角度バリアントメッシュ (body-90 / body-80(mx) / bogie1-90 等、末尾"-NN"でNN>=10)
-        // は RTM が曲げ角に応じ1つだけ描く代替メッシュ。
-        // 描くと翼のように散乱する。
-        if (isAngleBendVariant(normalized)) {
-            return false;
-        }
-        // ★台車/車輪グループは隠さない。
-        // 出し分けない (台車は EntityBogie 側で別途描かれるだけ)。
-        if (normalized.contains("shadow")) {
-            return false;
-        }
-        // _ms / _kage - RTMパックの地面投影シャドウメッシュ (例: body_a_ms, 影ms)
-        if (normalized.endsWith("_ms") || normalized.endsWith("_kage")
-                || normalized.contains("_ms_") || normalized.contains("_kage_")) {
-            return false;
-        }
-        if (normalized.endsWith("_guide") || normalized.endsWith("[obj]")
-                || normalized.endsWith("_atari") || normalized.endsWith(" atari")) {
-            return false;
-        }
-        if (!renderInterior) {
-            if (normalized.contains("seat")
-                || normalized.contains("chair")
-                || normalized.contains("interior")
-                || normalized.contains("inside")
-                || normalized.contains("floor")
-                || normalized.contains("ceiling")
-                || normalized.contains("handrail")
-                || normalized.contains("strap")
-                || normalized.contains("shelf")
-                || normalized.contains("cab")
-                || normalized.contains("desk")
-                || normalized.contains("instrument")
-                || normalized.contains("panel")) {
-                return false;
-            }
-        }
-        // 台車/車輪グループは常に描画する。
-        // 多発するため、確実に見えるようベイクド側からも描画する。
-        if (def.hasScript() && !scriptActuallyRunning
-                && def.getHeadLights().isEmpty() && def.getTailLights().isEmpty()) {
-            // "light" (exact): SL front headlight ( etc.)
-            // "lightf" / "lightb" / "lightr" / "lightl": EMU-style per-direction headlights
-            boolean isLightGroup = normalized.equals("light") || normalized.equals("lightf") || normalized.equals("lightb")
-                    || normalized.equals("lightr") || normalized.equals("lightl")
-                    || normalized.startsWith("light_f") || normalized.startsWith("light_b")
-                    || normalized.startsWith("lightf_") || normalized.startsWith("lightb_")
-                    || normalized.endsWith("_light") || normalized.endsWith("-light");
-            if (isLightGroup) {
-                // Keep the group hidden only when there is no light mode context (def has no way
-                // to know mode here). We allow it to pass and rely on isEmissiveGroup / light-mode
-                // gating inside renderParts to control visibility per-frame.
-                // Only suppress the "shadow"-level legacy groups that truly break when unscripted:
-            }
-        }
-        if (aggressiveDistanceCulling) {
-            if (normalized.contains("wiper")
-                || normalized.contains("coupler")
-                || normalized.contains("connector")
-                || normalized.contains("hoses")
-                || normalized.contains("step")
-                || normalized.contains("pantograph")
-                || normalized.contains("under")
-                || normalized.contains("detail")) {
-                return false;
-            }
-        }
-        if (compatibilityHeavy) {
-            if (aggressiveDistanceCulling && (normalized.contains("cooler")
-                || normalized.contains("fan")
-                || normalized.contains("antenna"))) {
-                return false;
-            }
-        }
+        // The original delegates selection to registered Parts and ResourceState.
+        // Names, distance and a model's size do not implicitly hide authored meshes.
         return true;
     }
 
@@ -793,61 +678,25 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             || (hasManyOverlayFeatures && totalVertices >= 12_000 && batchCount >= 96);
     }
 
+    /**
+     * 前照灯・尾灯の光。本家 {@code RenderVehicleBase.renderLightEffect} へ丸投げする。
+     * ★ここは旧実装 (TrainEntity) の経路。設置される列車は EntityTrain なので
+     *   本命は {@link RtmTrainRenderer} 側。
+     */
     private static void renderConfiguredLights(TrainEntity entity, VehicleDefinition def,
                                                com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model,
                                                PoseStack poseStack, MultiBufferSource buffer, float renderYaw,
                                                boolean ridingThisTrain) {
-        // 「臨場感ライト」(放射状グローのビルボード)はユーザー要望で無効化。
-        // 実際のランプ部品(モデルの発光テクスチャ)はスクリプト/モデル側で描画されるので残る。
-        if (true) return;
         if (def == null) return;
         int mode = entity.getLightMode();
-        boolean interiorOn = entity.isInteriorLightOn();
-        if (mode <= 0 && !interiorOn) return;
-
-        boolean singleTrainActive = def.isSingleTrain() && !entity.isConnected();
-        boolean renderHeadLights = mode == 1 || mode == 3;
-        boolean renderTailLights = mode == 2 || mode == 3;
-        if (singleTrainActive && mode == 1) renderTailLights = true;
-
-        // カメラの right/up ベクトルを列車ローカル座標系に変換してビルボードを実現。
-        // 列車トランスフォームは Y軸回転 + オフセット + スケール。
-        Vector3f billRight = new Vector3f(1, 0, 0);
-        Vector3f billUp    = new Vector3f(0, 1, 0);
-        Quaternionf invYaw = Axis.YP.rotationDegrees(renderYaw).conjugate();
-        Minecraft.getInstance().gameRenderer.getMainCamera().rotation().transform(billRight);
-        Minecraft.getInstance().gameRenderer.getMainCamera().rotation().transform(billUp);
-        invYaw.transform(billRight);
-        invYaw.transform(billUp);
-        billRight.normalize();
-        billUp.normalize();
-
-        VertexConsumer consumer = buffer.getBuffer(RenderType.entityTranslucentEmissive(getGlowTexture()));
-        PoseStack.Pose pose = poseStack.last();
-        Matrix4f mat = pose.pose();
-        Matrix3f normalMatrix = pose.normal();
-
-        if (renderHeadLights) {
-            for (VehicleDefinition.LightDefinition light : def.getHeadLights()) {
-                renderLightGlow(consumer, mat, normalMatrix, light, true, billRight, billUp);
-            }
-        }
-        if (renderTailLights) {
-            for (VehicleDefinition.LightDefinition light : def.getTailLights()) {
-                renderLightGlow(consumer, mat, normalMatrix, light, false, billRight, billUp);
-            }
-        }
-        // 室内灯のビルボードグローは乗車中（=室内視点）のみ描画する。
-        // 外から見るとビルボードが半透明窓や車体越しに滲んで外装まで光って見えるため。
-        if (interiorOn && ridingThisTrain) {
-            for (VehicleDefinition.LightDefinition light : def.getInteriorLights()) {
-                renderLightGlow(consumer, mat, normalMatrix, light, true, billRight, billUp);
-            }
-        }
-        if (def.getHeadLights().isEmpty() && def.getTailLights().isEmpty()
-                && (model == null || !model.hasRenderScript())) {
-            renderLegacyFallbackLights(entity, consumer, mat, normalMatrix, mode, billRight, billUp);
-        }
+        if (mode <= 0) return;
+        boolean free = !entity.isConnected();
+        com.portofino.realtrainmodunofficial.client.render.VehicleLightEffect.render(
+            def, mode, 0, free, free,
+            entity.getX(), entity.getY(), entity.getZ(),
+            entity.getYRot(), entity.getXRot(),
+            ambientLightValue(entity.level(), entity.getX(), entity.getY(), entity.getZ()),
+            poseStack, buffer);
     }
 
     private static void renderLegacyFallbackLights(TrainEntity entity, VertexConsumer consumer, Matrix4f mat,

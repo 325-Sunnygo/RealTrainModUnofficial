@@ -6,6 +6,16 @@ import java.util.Map;
 import java.util.ArrayList;
 
 public class VehicleDefinition {
+    private com.google.gson.JsonObject legacyConfig;
+    public void setLegacyConfig(com.google.gson.JsonObject config) {this.legacyConfig=config.deepCopy();}
+    public com.google.gson.JsonObject getLegacyConfig() {return legacyConfig==null?null:legacyConfig.deepCopy();}
+    public jp.ngt.ngtlib.renderer.model.VecAccuracy getModelAccuracy() {
+        // Original ModelPackManager chooses LOW for every configured value except MEDIUM.
+        var value=legacyConfig==null?null:legacyConfig.get("accuracy");
+        return value==null || value.isJsonNull() || value.getAsString().equals("MEDIUM")
+            ? jp.ngt.ngtlib.renderer.model.VecAccuracy.MEDIUM : jp.ngt.ngtlib.renderer.model.VecAccuracy.LOW;
+    }
+
     public static final int SEAT_TYPE_DISABLED = 0;
     public static final int SEAT_TYPE_DRIVER_CAB = -1;
 

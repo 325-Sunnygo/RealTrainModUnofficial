@@ -81,26 +81,18 @@ public final class MachineScriptRenderers {
                 return INVALID;
             }
             renderer.setScript(se);
+            //どのパックのスクリプトが落ちたか追えるように名前を持たせる
+            renderer.scriptName = def.getId() + " (" + def.getScriptPath() + ")";
             se.put("renderer", renderer);
 
             // ModelObject: テクスチャ + モデルグラフ
-            List<TextureSet> sets = new ArrayList<>();
-            if (def.getTextureOverrides() != null) {
-                for (String path : def.getTextureOverrides().values()) {
-                    int meta = path.indexOf("|ptmeta=");
-                    String clean = meta >= 0 ? path.substring(0, meta) : path;
-                    sets.add(new TextureSet(new Material(new jp.ngt.mccompat.ResourceLocation("minecraft", clean))));
-                }
-            }
-            if (sets.isEmpty()) {
-                sets.add(new TextureSet(new Material(null)));
-            }
-            ModelObject mo = new ModelObject(sets.toArray(new TextureSet[0]));
+            ModelObject mo = new ModelObject(new TextureSet[0]);
             byte[] modelBytes = NGTFileLoader.findAsset("models/" + def.getModelFile());
             if (modelBytes == null) {
                 modelBytes = NGTFileLoader.findAsset(def.getModelFile());
             }
             mo.model = modelBytes != null ? ModelLoader.parse(modelBytes, def.getModelFile()) : new PolygonModel();
+            mo.setTextures(jp.ngt.ngtlib.renderer.model.LegacyTextureLayout.create(mo.model, def.getTextureOverrides()));
 
             // getModelName は本家 config.getName 相当、つまり 素のモデル名
             // ("CrossingGate01R" / "Point01A") を返さなければならない。
@@ -127,8 +119,9 @@ public final class MachineScriptRenderers {
         /** スクリプトが searchBlockAndMeta で真下のブロックから現示を決めるブロック検知型か。 */
         private final boolean blockDetection;
 
-        /** 使い回す記録 (通常パス / 発光パス)。 */
+        /** 使い回す記録 (通常パス / 透過パス / 発光パス)。 */
         private static final ThreadLocal<GLRecorder> SCRATCH0 = ThreadLocal.withInitial(GLRecorder::new);
+        private static final ThreadLocal<GLRecorder> SCRATCH1 = ThreadLocal.withInitial(GLRecorder::new);
         private static final ThreadLocal<GLRecorder> SCRATCH2 = ThreadLocal.withInitial(GLRecorder::new);
 
         // ★焼き込みキャッシュは ObjectMeshCache が持つ (本家 te.glLists 相当)。
@@ -167,7 +160,89 @@ public final class MachineScriptRenderers {
             // (色付きレンズ越しのレール/地形に色を乗せるにはガラスをレールの後に描く必要がある)。
             com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(be);
             try {
+                // ActionParts の ID 解決用に一覧を記録する (色ピッキングは renderInner が行う)。
+                com.portofino.realtrainmodunofficial.client.ActionPartsPicker.record(be, null, this.renderer);
                 return renderInner(be, partialTick, poseStack, buffer, packedLight, packedOverlay, model);
+            } finally {
+                com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(null);
+            }
+        }
+
+        /**
+         * 本家 {@code RenderEntityInstalledObject} 準拠: レール上設置物エンティティ
+         * (ATC / 列車検知器 / 車止め) のスクリプト描画。
+         *
+         * <p>本家は {@code MinecraftForgeClient.getRenderPass()} をそのまま渡し、モデルを
+         * <b>pass 0 (NORMAL) と pass 1 (TRANSPARENT) の 2 回</b>描く。スクリプトはこの pass で
+         * 分岐する。たとえば既定の列車検知器モデル Torii の {@code RenderTorii.js} は
+         * NORMAL で鳥居本体 (hashira/nuki/shimagi/kasagi) だけを描き、TRANSPARENT で
+         * 回転灯・時計・UI を色/α 付きで描く。
+         *
+         * <p>以前はエンティティ経路にスクリプトが無く、素のモデルを 1 回描くだけだったため、
+         * 本来 TRANSPARENT 専用のパーツ (歯車・リング・UI 板) まで素で出て
+         * 「鳥居に余計な物が付いて見える」状態になっていた。
+         *
+         * <p>エンティティは台数が少なく、しかもスクリプトが時刻で回す (回転灯) ため
+         * メッシュ焼き込みはしない。本家も pass ごとに毎フレーム描いている。
+         *
+         * @return true = 描画を担当した (false なら呼び出し側が素モデルで描く)
+         */
+        public boolean renderEntity(jp.ngt.rtm.entity.EntityInstalledObject entity, float partialTick,
+                                    PoseStack poseStack, MultiBufferSource buffer,
+                                    int packedLight, int packedOverlay, MqoModelLoader.MqoModel model) {
+            PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
+            com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(entity);
+            try {
+                GLRecorder rec0 = SCRATCH0.get();
+                rec0.clear();
+                GLRecorder.activate(rec0);
+                try {
+                    this.renderer.currentMatId = 0;
+                    this.renderer.render(entity, jp.ngt.rtm.render.RenderPass.NORMAL.id, partialTick);
+                } finally {
+                    GLRecorder.deactivate();
+                }
+                // スクリプトが何も描かずに落ちた場合は isEmpty ではなく hasGeometry で見る
+                // (行列操作だけ残ると「描画済み」と誤判定して素モデルが出なくなる)。
+                if (!rec0.hasGeometry()) {
+                    return false;
+                }
+
+                GLRecorder rec1 = SCRATCH1.get();
+                rec1.clear();
+                GLRecorder.activate(rec1);
+                try {
+                    this.renderer.currentMatId = 0;
+                    this.renderer.render(entity, jp.ngt.rtm.render.RenderPass.TRANSPARENT.id, partialTick);
+                } finally {
+                    GLRecorder.deactivate();
+                    this.renderer.consumeScriptFailure();
+                }
+
+                // ★ActionParts 対話: 本家 PartsRenderer は描画中に当たりを取る。
+                //   鳥居は ActionParts (monitor_main / key×10) を TRANSPARENT パスで描くため、
+                //   両パスを 1 回の色ピッキングにまとめる。
+                com.portofino.realtrainmodunofficial.client.ActionPartsPicker.record(entity, null, this.renderer);
+                boolean pick = com.portofino.realtrainmodunofficial.client.ActionPartsPicker
+                        .shouldCapture(entity, this.renderer);
+                if (pick) {
+                    com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.begin(this.renderer);
+                }
+                try {
+                    VehicleScriptRenderers.replay(rec0, poseStack, buffer, packedLight, packedOverlay, model, graph,
+                            jp.ngt.rtm.render.RenderPass.NORMAL.id, null);
+                    if (rec1.hasGeometry()) {
+                        // pass1 = 透過。replay 側が window/α ブレンドを有効にする。
+                        VehicleScriptRenderers.replay(rec1, poseStack, buffer, packedLight, packedOverlay, model, graph,
+                                jp.ngt.rtm.render.RenderPass.TRANSPARENT.id, null);
+                    }
+                } finally {
+                    if (pick) {
+                        int pickedId = com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.finish();
+                        com.portofino.realtrainmodunofficial.client.ActionPartsPicker.setHoveredId(entity, pickedId);
+                    }
+                }
+                return true;
             } finally {
                 com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(null);
             }
@@ -213,6 +288,46 @@ public final class MachineScriptRenderers {
             boolean drew = rec0.hasGeometry();
             if (!drew) {
                 return false;
+            }
+
+            // ★色ピッキング: 本家 PartsRenderer は通常描画のたびに当たりを取る。
+            //   焼き込み経路 (ObjectMeshCache) だと再生が焼き直し時にしか走らないため、
+            //   ホバーが出なかった。ピッキング候補のときは焼かずに生 replay して当たりを取る。
+            com.portofino.realtrainmodunofficial.client.ActionPartsHost pickHost =
+                com.portofino.realtrainmodunofficial.client.ActionPartsPicker.hostOf(be);
+            if (pickHost != null && com.portofino.realtrainmodunofficial.client.ActionPartsPicker.shouldCapture(be)) {
+                com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.begin(pickHost);
+                try {
+                    VehicleScriptRenderers.replay(rec0, poseStack, buffer, packedLight, packedOverlay, model, graph);
+                    if (rec2.hasGeometry()) {
+                        VehicleScriptRenderers.replay(rec2, poseStack, buffer, packedLight, packedOverlay, model, graph,
+                                jp.ngt.rtm.render.RenderPass.LIGHT.id, null);
+                    }
+                } finally {
+                    int pickedId = com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.finish();
+                    com.portofino.realtrainmodunofficial.client.ActionPartsPicker.setHoveredId(be, pickedId);
+                }
+                return true;
+            }
+
+            // ★視点依存の光エフェクト (normal 付き renderLightEffect) はカメラを動かすだけで
+            //   形が変わる (本家も毎フレーム円錐を計算する)。これを焼き込みキーに混ぜると、
+            //   ミラーボール/サーチライト等が「毎フレーム別物」になり、形 (pass0) まで焼けなくなる。
+            //   → 視点依存があるときだけ、形 (rec0) を焼いて光 (rec2) は生で描く。
+            if (rec2.isViewDependent()) {
+                int key0 = jp.ngt.ngtlib.renderer.GLRecorder.mixKey(rec0.contentKey());
+                boolean baked0 = ObjectMeshCache.draw(be, poseStack, key0, buf -> {
+                    PoseStack local = new PoseStack();
+                    VehicleScriptRenderers.replay(rec0, local, buf, packedLight, packedOverlay, model, graph);
+                });
+                if (!baked0) {
+                    VehicleScriptRenderers.replay(rec0, poseStack, buffer, packedLight, packedOverlay, model, graph);
+                }
+                if (rec2.hasGeometry()) {
+                    VehicleScriptRenderers.replay(rec2, poseStack, buffer, packedLight, packedOverlay, model,
+                            graph, jp.ngt.rtm.render.RenderPass.LIGHT.id, null);
+                }
+                return true;
             }
 
             // ★本家 RailPartsRenderer.renderRailStatic と同じ流れ:

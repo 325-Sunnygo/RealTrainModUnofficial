@@ -1,0 +1,19 @@
+{
+	"name": "pulley_lift_500mm",
+	"model": {
+		"modelFile": "pulley_lift_500mm.mqoz",
+		"textures": [["default", "textures/mechanism/pulley_lift.png", ""]]
+	},
+	"buttonTexture": "textures/mechanism/button_pulley_lift_500mm.png",
+	"type": "PULLEY",
+	"transmissionRatioON": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"transmissionRatioOFF": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"maxSpeed": 10000.0,
+	"acceleration": 0.0,
+	"radius": 0.25,
+	"teethCount": 0,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479"
+}

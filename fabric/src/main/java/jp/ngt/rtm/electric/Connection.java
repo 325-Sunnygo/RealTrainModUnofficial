@@ -170,6 +170,16 @@ public class Connection {
             this.isVisible = isVisible;
         }
 
+        /** NBT から復元する。未知の値は WIRE 扱い (描ける方に倒す)。 */
+        public static ConnectionType byId(byte id) {
+            for (ConnectionType t : values()) {
+                if (t.id == id) {
+                    return t;
+                }
+            }
+            return WIRE;
+        }
+
         public static ConnectionType getType(int id) {
             for (ConnectionType t : values()) {
                 if (t.id == id) {

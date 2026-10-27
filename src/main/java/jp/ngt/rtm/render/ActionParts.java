@@ -86,7 +86,8 @@ public class ActionParts extends Parts {
     @Override
     public void render(PartsRenderer renderer) {
         if (renderer.currentPass == PASS_PICK) {
-            // RTMU に PICK パスは無い (ActionPartsPicker が代替)。通常描画のみ行う。
+            // CPU selection and the normal pick buffer both preserve the part identifier.
+            jp.ngt.ngtlib.renderer.GL11Facade.glLoadName(this.id);
             super.render(renderer);
             return;
         }

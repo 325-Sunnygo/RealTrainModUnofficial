@@ -43,7 +43,6 @@ public class MiniatureItem extends Item {
      * インベントリや手元で中身を描く (neo mcte)。
      * NeoForge 21.1 の作法。
      */
-    // ★@Override を付けないこと: これは NeoForge が足したメソッドで、バニラには無い
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
         consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {

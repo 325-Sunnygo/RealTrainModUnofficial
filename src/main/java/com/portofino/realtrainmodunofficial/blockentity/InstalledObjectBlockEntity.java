@@ -87,8 +87,6 @@ public class InstalledObjectBlockEntity extends BlockEntity
     private BlockPos wireStart;
     private BlockPos wireEnd;
     private boolean powered;
-    /** リモコン (RemoteItem) のペアリングで無線給電されているか。保存せず毎 tick 外部が設定する。 */
-    private transient boolean remotePowered;
     private int barMoveCount;
     private int lightCount = -1;
     private int tickCountOnActive;
@@ -915,7 +913,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             }
             // 本家 TileEntitySignal.setElectricity 同様、信号機は電気レベル=現示。
             // 現示 (SignalAspect) と electricity の二重管理が「UI で変えた現示と
-            // 配線/変換器/SignalController で変えた現示がバラバラ」の原因だったため、
+            // 配線/変換器で変えた現示がバラバラ」の原因だったため、
             // 信号カテゴリでは常に両方向ミラーして単一状態にする。
             if (getCategory() == InstalledObjectCategory.SIGNAL) {
                 this.signalAspect = com.portofino.realtrainmodunofficial.signal.SignalAspect
@@ -951,18 +949,9 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    /** リモコンの無線給電を設定 (RemoteRedstoneHandler が毎 tick 呼ぶ)。 */
-    public void setRemotePowered(boolean v) {
-        this.remotePowered = v;
-    }
-
-    public boolean isRemotePowered() {
-        return this.remotePowered;
-    }
-
-    /** 隣接レッドストーン入力があるか、またはリモコンで無線給電されているか。 */
+    /** 隣接レッドストーン入力があるか。 */
     private boolean redstoneOn(Level level, BlockPos pos) {
-        return level.getBestNeighborSignal(pos) > 0 || this.remotePowered;
+        return level.getBestNeighborSignal(pos) > 0;
     }
 
     public boolean isPowered() {
@@ -1223,8 +1212,15 @@ public class InstalledObjectBlockEntity extends BlockEntity
     }
 
     /** Legacy 1.7-style scripts sometimes access modelSet directly. */
+    public javax.script.ScriptEngine getServerScriptEngine() {
+        if (this.level == null || this.level.isClientSide()) return null;
+        return com.portofino.realtrainmodunofficial.script.InstalledObjectServerScripts.getEngine(this.getDefinition());
+    }
+
     public ModelSetCompat getModelSet() {
-        return new ModelSetCompat(this);
+        ModelSetCompat set = new ModelSetCompat(this);
+        set.serverSE = this.getServerScriptEngine();
+        return set;
     }
 
     /** 本家 EntityInstalledObject.getModelType は設置物では常に "ModelMachine"。 */
@@ -2146,6 +2142,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
     }
 
     public static final class ModelSetCompat {
+        public javax.script.ScriptEngine serverSE;
         private final InstalledObjectBlockEntity blockEntity;
 
         public ModelSetCompat(InstalledObjectBlockEntity blockEntity) {

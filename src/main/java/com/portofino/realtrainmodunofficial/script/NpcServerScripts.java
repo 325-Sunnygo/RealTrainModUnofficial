@@ -33,7 +33,7 @@ public final class NpcServerScripts {
         if (def == null || !def.hasServerScript()) {
             return;
         }
-        ScriptEngine engine = get(def);
+        ScriptEngine engine = getEngine(def);
         if (engine == null) {
             return;
         }
@@ -44,10 +44,7 @@ public final class NpcServerScripts {
             return;
         }
         try {
-            ((Invocable) engine).invokeFunction("onUpdate", npc, npc.scriptExecuter);
-            npc.scriptExecuter.count++;
-        } catch (NoSuchMethodException e) {
-            FAILED.add(def.getId());
+            npc.scriptExecuter.updateScript(engine, npc);
         } catch (Throwable t) {
             if (FAILED.size() < 256 && FAILED.add(def.getId() + "|" + t)) {
                 RealTrainModUnofficial.LOGGER.warn("[RTMU] NPC サーバースクリプト onUpdate 失敗: {} ({})",
@@ -56,7 +53,7 @@ public final class NpcServerScripts {
         }
     }
 
-    private static ScriptEngine get(NpcDefinition def) {
+    public static ScriptEngine getEngine(NpcDefinition def) {
         if (def == null || !def.hasServerScript() || FAILED.contains(def.getId())) {
             return null;
         }

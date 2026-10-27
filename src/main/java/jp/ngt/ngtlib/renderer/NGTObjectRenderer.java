@@ -1,7 +1,7 @@
 package jp.ngt.ngtlib.renderer;
 
 /**
- * 本家 jp.ngt.ngtlib.renderer.NGTObjectRenderer のスクリプト互換 (最低限 no-op)。
+ * 本家 jp.ngt.ngtlib.renderer.NGTObjectRenderer のスクリプト互換 。
  * NGTO Builder のミニチュアプレビュー用。
  */
 @SuppressWarnings("unused")
@@ -12,5 +12,6 @@ public final class NGTObjectRenderer {
     }
 
     public void renderNGTObject(Object world, Object ngto, boolean translucent, double par4, int pass) {
+        NGTRenderer.renderNGTObject(world,ngto,translucent,(int)par4,pass);
     }
 }

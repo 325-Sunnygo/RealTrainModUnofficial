@@ -1,0 +1,25 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "  S  ",
+    " STS ",
+    "SSTSS",
+    "SSTSS",
+    "SSSSS"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "T": {
+      "item": "minecraft:tnt"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:bullet",
+    "count": 3,
+    "components": {
+      "realtrainmodunofficial:item_variant": 1
+    }
+  }
+}

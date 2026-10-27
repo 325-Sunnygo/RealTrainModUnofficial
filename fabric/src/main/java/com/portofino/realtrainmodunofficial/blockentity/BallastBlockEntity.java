@@ -30,7 +30,6 @@ public class BallastBlockEntity extends BlockEntity {
      * <p>これがチャンクのメッシュへ焼かれるので、描いたあとは毎フレームの負担が無い。
      * レールを敷き直したときは {@code requestModelDataUpdate} で作り直させる。
      */
-    @Override
     public net.neoforged.neoforge.client.model.data.ModelData getModelData() {
         if (this.level == null) {
             return net.neoforged.neoforge.client.model.data.ModelData.EMPTY;

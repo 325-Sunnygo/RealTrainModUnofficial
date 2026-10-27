@@ -16,139 +16,35 @@ public final class NGTRenderHelper {
     private NGTRenderHelper() {
     }
 
-    /** 本家は 1.7.10 の RenderItem を返す。1.21 に相当物が無いので null。 */
-    public static Object getItemRenderer() {
-        return null;
+    /** Legacy world-item entry point records the real native stack. */
+    public static LegacyItemRenderer getItemRenderer() {
+        return LegacyItemRenderer.INSTANCE;
     }
 
-    /** (model, matId, smoothing, objNames) — objNames のグループを現在の変換で描画。 */
-    public static void renderCustomModel(Object... args) {
-        renderNames(collectNames(args, 3), false, args.length > 0 ? args[0] : null);
+    public static void renderCustomModel(Object model, byte material, boolean smoothing, String... names) {
+        renderCustomModelEveryParts(model,material,false,smoothing,names);
     }
-
-    /** 本家 renderCustomModelAll: 全グループを描画。 */
-    public static void renderCustomModelAll(Object... args) {
-        renderNames(null, false, args != null && args.length > 0 ? args[0] : null);
+    public static void renderCustomModelAll(Object model, byte material, boolean smoothing) {
+        renderCustomModelEveryParts(model,material,false,smoothing);
     }
-
-    /** 本家 renderCustomModelExcept: 指定グループ以外を描画。 */
-    public static void renderCustomModelExcept(Object... args) {
-        renderNames(collectNames(args, 3), true, args != null && args.length > 0 ? args[0] : null);
+    public static void renderCustomModelExcept(Object model, byte material, boolean smoothing, String... names) {
+        renderCustomModelEveryParts(model,material,true,smoothing,names);
     }
-
-    /**
-     * 本家 renderCustomModelEveryParts(model, matId, except, smoothing, [mode,] parts...)。
-     * except の位置が引数 2 なので、そこだけ読んで except 判定する。
-     */
-    public static void renderCustomModelEveryParts(Object... args) {
-        boolean except = args != null && args.length > 2 && Boolean.TRUE.equals(toBoolean(args[2]));
-        // (…, except, smoothing, parts...) と (…, except, smoothing, mode, parts...) の両方がある
-        int from = args != null && args.length > 4 && args[4] instanceof Number ? 5 : 4;
-        renderNames(collectNames(args, from), except, args != null && args.length > 0 ? args[0] : null);
+    public static void renderCustomModelEveryParts(Object model, byte material, boolean except, boolean smoothing, String... names) {
+        renderCustomModelEveryParts(model,material,except,smoothing,GL11Facade.GL_TRIANGLES,names);
     }
-
-    private static Boolean toBoolean(Object o) {
-        if (o instanceof Boolean b) {
-            return b;
+    public static void renderCustomModelEveryParts(Object model, byte material, boolean except, boolean smoothing, int mode, String... names) {
+        if (!(model instanceof jp.ngt.ngtlib.renderer.model.IModelNGT polygon)) {
+            throw new IllegalArgumentException("Expected a polygon model");
         }
-        if (o instanceof Number n) {
-            return n.intValue() != 0;
+        IRenderer renderer=PolygonRenderer.INSTANCE;
+        renderer.startDrawing(mode);
+        for(GroupObject group:polygon.getGroupObjects()) {
+            boolean selected=names==null || names.length==0 || (java.util.Arrays.asList(names).contains(group.name) != except);
+            if(!selected) continue;
+            for(Face face:group.faces) if(face.materialId==material) addFace(face,renderer,smoothing);
         }
-        return Boolean.FALSE;
-    }
-
-    /** 引数 from 以降に散らばるグループ名 (可変長 / 配列 / コレクション) を平坦に集める。 */
-    private static java.util.List<String> collectNames(Object[] args, int from) {
-        java.util.List<String> out = new java.util.ArrayList<>();
-        if (args == null) {
-            return out;
-        }
-        for (int i = from; i < args.length; i++) {
-            flattenInto(args[i], out);
-        }
-        return out;
-    }
-
-    private static void flattenInto(Object value, java.util.List<String> out) {
-        if (value == null) {
-            return;
-        }
-        if (value instanceof String s) {
-            if (!s.isEmpty()) {
-                out.add(s);
-            }
-        } else if (value instanceof Object[] arr) {
-            for (Object o : arr) {
-                flattenInto(o, out);
-            }
-        } else if (value instanceof java.util.Collection<?> col) {
-            for (Object o : col) {
-                flattenInto(o, out);
-            }
-        }
-    }
-
-    /**
-     * names を描画する。except なら「names 以外の全グループ」。
-     * except の解決にはモデルのグループ一覧が要るので、model から取れなければ何もしない。
-     */
-    private static void renderNames(java.util.List<String> names, boolean except, Object model) {
-        GLRecorder rec = GLRecorder.active();
-        if (rec == null) {
-            return;
-        }
-        if (!except) {
-            if (names == null) {
-                for (String name : allGroupNames(model)) {
-                    rec.renderParts(name);
-                }
-            } else {
-                for (String name : names) {
-                    rec.renderParts(name);
-                }
-            }
-            return;
-        }
-        java.util.Set<String> skip = new java.util.HashSet<>();
-        if (names != null) {
-            for (String name : names) {
-                skip.add(name.trim().toLowerCase(java.util.Locale.ROOT));
-            }
-        }
-        for (String name : allGroupNames(model)) {
-            if (!skip.contains(name.trim().toLowerCase(java.util.Locale.ROOT))) {
-                rec.renderParts(name);
-            }
-        }
-    }
-
-    /** モデル (PolygonModel か getGroupObjects を持つ何か) から全グループ名を取る。 */
-    private static java.util.List<String> allGroupNames(Object model) {
-        java.util.List<String> out = new java.util.ArrayList<>();
-        List<GroupObject> groups = null;
-        if (model instanceof jp.ngt.ngtlib.renderer.model.PolygonModel pm) {
-            groups = pm.getGroupObjects();
-        } else if (model != null) {
-            try {
-                Object v = model.getClass().getMethod("getGroupObjects").invoke(model);
-                if (v instanceof List<?> list) {
-                    for (Object o : list) {
-                        if (o instanceof GroupObject g) {
-                            out.add(g.name);
-                        }
-                    }
-                    return out;
-                }
-            } catch (ReflectiveOperationException | RuntimeException ignored) {
-                return out;
-            }
-        }
-        if (groups != null) {
-            for (GroupObject g : groups) {
-                out.add(g.name);
-            }
-        }
-        return out;
+        renderer.draw();
     }
 
     /** 本家 addFace: 面の頂点を tessellator へ積む。 */
@@ -161,13 +57,20 @@ public final class NGTRenderHelper {
      * matrix が null なら素の座標。
      */
     public static void addFaceWithMatrix(Face face, Object tessellator, FloatBuffer matrix, int index, boolean smoothing) {
-        if (face == null || !(tessellator instanceof NGTTessellator tess)) {
+        if (face == null || !(tessellator instanceof IRenderer tess)) {
             return;
         }
         TextureCoordinate[] coords = face.getTextureCoordinates();
+        if (!smoothing && face.faceNormal != null) {
+            tess.setNormal(face.faceNormal.getX(), face.faceNormal.getY(), face.faceNormal.getZ());
+        }
         for (int i = 0; i < face.vertices.length; i++) {
             if (face.vertices[i] == null) {
                 continue;
+            }
+            if (smoothing && face.vertexNormals != null && i < face.vertexNormals.length && face.vertexNormals[i] != null) {
+                var normal = face.vertexNormals[i];
+                tess.setNormal(normal.getX(), normal.getY(), normal.getZ());
             }
             float u = coords != null && i < coords.length ? coords[i].getU() : 0.0F;
             float v = coords != null && i < coords.length ? coords[i].getV() : 0.0F;

@@ -123,7 +123,6 @@ item.rtm:autoloading_rifle.name=自动步枪
 item.rtm:sniper_rifle.name=狙击枪
 item.rtm:smg.name=微型冲锋枪 
 item.rtm:amr.name=对物来福枪
-item.rtm:razer_gun.name=雷蛇枪
 item.rtm:magazine_handgun.name=弹仓(手枪)
 item.rtm:magazine_rifle.name=弹仓(来福枪)
 item.rtm:magazine_alr.name=弹仓(自动步枪)

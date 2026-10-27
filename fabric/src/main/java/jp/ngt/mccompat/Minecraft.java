@@ -10,6 +10,20 @@ public final class Minecraft {
     private static final LanguageManagerCompat LANGUAGE_MANAGER = new LanguageManagerCompat();
 
     /** currentScreen (SRG)。refresh で更新。null なら GUI 非表示。 */
+    public int field_71443_c=854,field_71440_d=480;
+    public final GameSettingsCompat field_71474_y=new GameSettingsCompat();
+    public final FontRendererCompat field_71466_p=new FontRendererCompat();
+    public static final class GameSettingsCompat {public int field_74335_Z;}
+    public static final class FontRendererCompat {
+        public boolean func_82883_a() {try {return net.minecraft.client.Minecraft.getInstance().options.forceUnicodeFont().get();}catch(Throwable ignored){return false;}}
+        public int func_78256_a(String text) {try {return net.minecraft.client.Minecraft.getInstance().font.width(text);}catch(Throwable ignored){return text.length()*6;}}
+        public int func_78261_a(String text,float x,float y,int color) {return draw(text,x,y,color,true);}
+        public int func_78276_b(String text,int x,int y,int color) {return draw(text,x,y,color,false);}
+        private int draw(String text,float x,float y,int color,boolean shadow) {
+            var r=jp.ngt.ngtlib.renderer.GLRecorder.active();if(r!=null)r.drawText(text,x,y,color,shadow);
+            return (int)x+func_78256_a(text);
+        }
+    }
     public Object field_71462_r;
     /** thePlayer (SRG)。refresh で更新 (PlayerCompat ラッパー)。 */
     public PlayerCompat field_71439_g;
@@ -94,6 +108,8 @@ public final class Minecraft {
         try {
             net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
             INSTANCE.field_71462_r = mc.screen;
+            INSTANCE.field_71443_c=mc.getWindow().getWidth();INSTANCE.field_71440_d=mc.getWindow().getHeight();
+            INSTANCE.field_71474_y.field_74335_Z=mc.options.guiScale().get();
             // field_71439_g (thePlayer) は絶対に null にしない。
             // 空プレイヤー (PlayerCompat.EMPTY) を入れる。
             if (mc.player != null) {

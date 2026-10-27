@@ -15,10 +15,52 @@ public final class ClientHooks {
     private ClientHooks() {
     }
 
-    /** エディタ画面 (neo mcte)。 */
-    public static void openEditorScreen() {
-        invokeClient("openEditorScreen", new Class<?>[]{});
+    /** 駅コアの駅名編集画面。 */
+    public static void openStationCoreScreen(BlockPos pos) {
+        invokeClient("openStationCoreScreen", new Class<?>[]{BlockPos.class}, pos);
     }
+
+    /** 設置済み貨物のモデル選択画面。 */
+    public static void openCargoModelScreen(int entityId) {
+        invokeClient("openCargoModelScreen", new Class<?>[]{int.class}, entityId);
+    }
+
+    /** 貨物アイテムのモデル選択画面。 */
+    public static void openCargoItemModelScreen(boolean offHand) {
+        invokeClient("openCargoItemModelScreen", new Class<?>[]{boolean.class}, offHand);
+    }
+
+    /** 移動装置の設定画面。 */
+    public static void openMovingMachineScreen(BlockPos pos) {
+        invokeClient("openMovingMachineScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 設置済み NPC のモデル選択画面。 */
+    public static void openNpcModelScreen(int entityId) {
+        invokeClient("openNpcModelScreen", new Class<?>[]{int.class}, entityId);
+    }
+
+    /** NPC アイテムのモデル選択画面。 */
+    public static void openNpcItemModelScreen(boolean offHand) {
+        invokeClient("openNpcItemModelScreen", new Class<?>[]{boolean.class}, offHand);
+    }
+
+    /** 信号変換機の設定画面。 */
+    public static void openSignalConverterScreen(BlockPos pos) {
+        invokeClient("openSignalConverterScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 装飾ブロックの編集画面 (本家 guiIdDecoration)。 */
+    public static void openDecorationEditScreen() {
+        invokeClient("openDecorationEditScreen", new Class<?>[]{});
+    }
+
+    /** NPC の商売画面 (本家 GuiSalesperson)。 */
+    public static void openNpcTradeScreen(int entityId) {
+        invokeClient("openNpcTradeScreen", new Class<?>[]{int.class}, entityId);
+    }
+
+
 
     /** ペインター設定画面 (neo mcte)。 */
     public static void openPainterSettingsScreen(ItemStack stack, boolean offHand) {
@@ -43,15 +85,6 @@ public final class ClientHooks {
         invokeClient("openTrainSelectScreen", new Class<?>[]{Player.class, ItemStack.class}, player, stack);
     }
 
-    public static void openVehicleFormationScreen(ItemStack stack) {
-        invokeClient("openVehicleFormationScreen", new Class<?>[]{ItemStack.class}, stack);
-    }
-
-    /** 編成アイテムの編集画面 (＋ボタンと車両ボタンの並び)。 */
-    public static void openFormationScreen(ItemStack stack) {
-        invokeClient("openFormationScreen", new Class<?>[]{ItemStack.class}, stack);
-    }
-
     public static void openCarSelectScreen(Player player, ItemStack stack) {
         invokeClient("openCarSelectScreen", new Class<?>[]{Player.class, ItemStack.class}, player, stack);
     }
@@ -66,11 +99,6 @@ public final class ClientHooks {
      */
     public static void openEntityModelSelectScreen(Object vehicle) {
         invokeClient("openEntityModelSelectScreen", new Class<?>[]{Object.class}, vehicle);
-    }
-
-    /** SignalControllerMod (masa300) 移植: 設定 GUI */
-    public static void openSignalControllerScreen(Object controller) {
-        invokeClient("openSignalControllerScreen", new Class<?>[]{Object.class}, controller);
     }
 
     /** 本家 GuiChangeOffset: バールで設置物を右クリック → 微調整 GUI */
@@ -88,32 +116,13 @@ public final class ClientHooks {
         invokeClient("openMarkerCantScreen", new Class<?>[]{Object.class}, marker);
     }
 
-    public static void openSignalChangerScreen(BlockPos pos) {
-        invokeClient("openSignalChangerScreen", new Class<?>[]{BlockPos.class}, pos);
-    }
-
-    public static void openSignalReceiverScreen(BlockPos pos) {
-        invokeClient("openSignalReceiverScreen", new Class<?>[]{BlockPos.class}, pos);
-    }
-
-    public static void openSignalValueScreen(BlockPos pos) {
-        invokeClient("openSignalValueScreen", new Class<?>[]{BlockPos.class}, pos);
-    }
-
-    public static void openTrainDetectorScreen(BlockPos pos) {
-        invokeClient("openTrainDetectorScreen", new Class<?>[]{BlockPos.class}, pos);
-    }
-
-    public static void openMarkerConfigScreen(BlockPos pos) {
-        invokeClient("openMarkerConfigScreen", new Class<?>[]{BlockPos.class}, pos);
+    /** 機械の customForm (DataMap) 編集画面。 */
+    public static void openMachineConfigScreen(BlockPos pos) {
+        invokeClient("openMachineConfigScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
     public static void openSpeakerScreen(BlockPos pos) {
         invokeClient("openSpeakerScreen", new Class<?>[]{BlockPos.class}, pos);
-    }
-
-    public static void openScriptBlockScreen(BlockPos pos) {
-        invokeClient("openScriptBlockScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
     /** 看板エディタ: 看板を素手で右クリック (本家 GuiSignboard) */
@@ -141,10 +150,9 @@ public final class ClientHooks {
         invokeClient("toggleCamera", new Class<?>[]{});
     }
 
-    /** 駅ブロック右クリック → 現在のタグを添えて駅設定 GUI を開く (client のみ)。 */
-    public static void openStationScreen(BlockPos pos, int bits, int capacity) {
-        invokeClient("openStationScreen", new Class<?>[]{BlockPos.class, int.class, int.class},
-            pos, bits, capacity);
+    /** カメラ: ブロック右クリックで本家 GuiCamera 相当の画面を開く (本家 ItemCamera.onItemUse)。 */
+    public static void openCameraScreen() {
+        invokeClient("openCameraScreen", new Class<?>[]{});
     }
 
     public static void stopCrossingGateSound(Level level, BlockPos pos) {
@@ -165,6 +173,12 @@ public final class ClientHooks {
      * <p>道床はレールベースのブロックがチャンクメッシュへ焼くが、形はレールコアの線形から
      * 引くので、コアが後から届くとベース側は「コア無し」で焼かれたままになる。
      */
+    public static void invalidateRailMesh(Level level, int x, int y, int z) {
+        invokeClient("invalidateRailMesh",
+            new Class<?>[]{Level.class, int.class, int.class, int.class},
+            level, x, y, z);
+    }
+
     public static void refreshRailBallast(Level level, int x0, int y0, int z0, int x1, int y1, int z1) {
         invokeClient("refreshRailBallast",
             new Class<?>[]{Level.class, int.class, int.class, int.class, int.class, int.class, int.class},

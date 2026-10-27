@@ -117,24 +117,17 @@ public class ItemGun extends Item {
         }
 
         if (!level.isClientSide()) {
-            if (this.gunType == GunType.razer_gun) {
-                if (hasPermission(player)) {
-                    new RazerBullet(player).process(level);
-                    return true;
-                }
-            } else {
-                if (hasPermission(player)) {
-                    EntityBullet bullet = new EntityBullet(level, player, this.gunType.speed, this.gunType.bulletType);
-                    level.addFreshEntity(bullet);
-                    level.playSound(null, player.getX(), player.getY(), player.getZ(),
-                        RealTrainModUnofficialSounds.GUN.get(), SoundSource.PLAYERS, GUN_SOUND_VOLUME, 1.0F);
+            if (hasPermission(player)) {
+                EntityBullet bullet = new EntityBullet(level, player, this.gunType.speed, this.gunType.bulletType);
+                level.addFreshEntity(bullet);
+                level.playSound(null, player.getX(), player.getY(), player.getZ(),
+                    RealTrainModUnofficialSounds.GUN.get(), SoundSource.PLAYERS, GUN_SOUND_VOLUME, 1.0F);
 
-                    if (!player.getAbilities().instabuild) {
-                        //薬莢ドロップ (本家と同じで メタ = 弾種 * 4 + 2)
-                        int variant = this.gunType.bulletType.id * 4 + 2;
-                        player.drop(ItemAmmunition.create(RealTrainModUnofficialItems.BULLET_ITEM.get(), variant),
-                            false, false);
-                    }
+                if (!player.getAbilities().instabuild) {
+                    //薬莢ドロップ (本家と同じで メタ = 弾種 * 4 + 2)
+                    int variant = this.gunType.bulletType.id * 4 + 2;
+                    player.drop(ItemAmmunition.create(RealTrainModUnofficialItems.BULLET_ITEM.get(), variant),
+                        false, false);
                 }
             }
         }
@@ -173,8 +166,6 @@ public class ItemGun extends Item {
             case sniper_rifle -> RealTrainModUnofficialItems.MAGAZINE_SR_ITEM.get();
             case smg -> RealTrainModUnofficialItems.MAGAZINE_SMG_ITEM.get();
             case amr -> RealTrainModUnofficialItems.MAGAZINE_AMR_ITEM.get();
-            //本家はレーザー銃だけ「弾倉 = レーザー銃そのもの」を返す (装填できない)
-            case razer_gun -> RealTrainModUnofficialItems.RAZER_GUN_ITEM.get();
         };
     }
 
@@ -185,8 +176,7 @@ public class ItemGun extends Item {
         autoloading_rifle(BulletType.rifle_7_62mm, 30, 6, 7.5F, true),
         sniper_rifle(BulletType.rifle_7_62mm, 10, 20, 7.5F, false),
         smg(BulletType.handgun_9mm, 30, 6, 4.5F, true),
-        amr(BulletType.rifle_12_7mm, 10, 24, 9.0F, false),
-        razer_gun(BulletType.rifle_12_7mm, 10, 60, 150.0F, false);
+        amr(BulletType.rifle_12_7mm, 10, 24, 9.0F, false);
 
         public final BulletType bulletType;
         public final int maxSize;

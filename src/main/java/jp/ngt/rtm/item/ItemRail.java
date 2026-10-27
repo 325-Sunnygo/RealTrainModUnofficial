@@ -102,6 +102,16 @@ public class ItemRail extends Item {
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(nbt));
     }
 
+    public boolean isSelectedItemAutoSplitEnabled() {
+        var item=net.minecraft.client.Minecraft.getInstance().player;
+        if(item==null)return true;var property=getProperty(item.getMainHandItem());return property==null || property.autoSplit;
+    }
+    public void setSelectedItemAutoSplitEnabled(boolean enabled) {
+        var player=net.minecraft.client.Minecraft.getInstance().player;if(player==null)return;
+        var stack=player.getMainHandItem();var property=getProperty(stack);if(property==null)property=getDefaultProperty();
+        writePropToItem(new RailProperty(property.railModel,property.block,property.blockMetadata,property.blockHeight,enabled),stack);
+    }
+
     public static RailProperty getDefaultProperty() {
         return new RailProperty("1067mm_Wood", net.minecraft.world.level.block.Blocks.GRAVEL, 0, 0.0625F);
     }
@@ -147,11 +157,17 @@ public class ItemRail extends Item {
             if (model == null || model.isEmpty()) {
                 com.portofino.realtrainmodunofficial.rail.RailDefinition def =
                         com.portofino.realtrainmodunofficial.rail.RailRegistry.getSelected();
-                model = def != null ? def.getId() : "";
+                model = def != null ? def.getId() : getDefaultProperty().railModel;
             }
-            //★ここで砂利を決め打ちしてはいけない。
-            //  defaultBallast を持たないレール (Advanced Rails 等) にまで砂利が敷かれる。
-            //  道床はレール定義に書いてある物からだけ選ぶ (BlockMarker.propertyFor と同じ規則)。
+            // Full Property data preserves custom metadata and height, including variants
+            // with the same block ID. A model change retains the item's ballast.
+            RailProperty saved=getProperty(stack);
+            if(saved!=null) {
+                RailProperty selected=new RailProperty(model==null || model.isEmpty()?saved.railModel:model,
+                        saved.block,saved.blockMetadata,saved.blockHeight,saved.autoSplit);
+                jp.ngt.rtm.rail.BlockMarker.setLastUsedProperty(selected);
+                return selected;
+            }
             String ballastId = stack.get(
                     com.portofino.realtrainmodunofficial.RealTrainModUnofficialComponents.SELECTED_BALLAST.get());
             RailProperty prop = jp.ngt.rtm.rail.BlockMarker.propertyFor(

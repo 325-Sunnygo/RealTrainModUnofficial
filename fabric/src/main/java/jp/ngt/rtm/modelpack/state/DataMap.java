@@ -90,6 +90,33 @@ public class DataMap {
     }
 
     /**
+     * 本家 (1.12 系) DataMap: 配列。未設定は空配列。
+     * スクリプトは {@code posList.length} / {@code posList[i]} で使うため
+     * {@code Object[]} で返す (Nashorn は Java 配列の length と添字をそのまま扱える)。
+     */
+    public Object[] getArray(String key) {
+        Object v = this.map.get(key);
+        if (v instanceof Object[] arr) {
+            return arr;
+        }
+        if (v instanceof java.util.Collection<?> col) {
+            return col.toArray();
+        }
+        return new Object[0];
+    }
+
+    public void setArray(String key, Object value, int flag) {
+        Object stored = value;
+        if (value instanceof java.util.Collection<?> col) {
+            stored = col.toArray();
+        }
+        this.map.put(key, stored);
+        if (this.shouldSync(flag)) {
+            this.pendingSync.put(key, stored);
+        }
+    }
+
+    /**
      * 本家 getHex: 16 進で持つ整数 (主に色)。
      * 内部表現は int だが、getArg では "Hex" 型として 0x 付きで出す必要があるため
      * 専用のキー集合で型を覚えておく。

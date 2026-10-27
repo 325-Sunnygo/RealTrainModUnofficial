@@ -79,9 +79,13 @@ public class CustomIconItemModel implements BakedModel {
         return this.original.getTransforms();
     }
 
-    // ★applyTransform は NeoForge が BakedModel に足したメソッドで、バニラには無い。
-    // バニラの ItemRenderer は代わりに getTransforms を読むので、
-    // 上の getTransforms が元のモデルへ委譲していれば位置と大きさは同じになる。
+    public BakedModel applyTransform(ItemDisplayContext context, PoseStack poseStack,
+                                     boolean applyLeftHandTransform) {
+        // 位置と大きさはバニラのアイテムと同じにしたいので元のモデルの変換を使う。
+        // ただし戻すのは自分 (元を返すと isCustomRenderer が false になり自前描画に来ない)。
+        this.original.getTransforms().getTransform(context).apply(applyLeftHandTransform, poseStack);
+        return this;
+    }
 
     /**
      * 元のモデルの皮。ItemOverrides だけ差し替える。
@@ -151,7 +155,11 @@ public class CustomIconItemModel implements BakedModel {
             return this.original.getTransforms();
         }
 
-        // applyTransform は NeoForge 拡張。理由は上の同名メソッドの注記を参照。
+        public BakedModel applyTransform(ItemDisplayContext context, PoseStack poseStack,
+                                         boolean applyLeftHandTransform) {
+            this.original.getTransforms().getTransform(context).apply(applyLeftHandTransform, poseStack);
+            return this;
+        }
 
         /** 使わないが interface の既定実装が要求する。 */
         @SuppressWarnings("unused")

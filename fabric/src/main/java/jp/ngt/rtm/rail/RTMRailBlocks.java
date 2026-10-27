@@ -41,6 +41,9 @@ public final class RTMRailBlocks {
     // 本家: RTMBlock.markerSwitch (markerType=1)
     public static final DeferredHolder<Block, BlockMarker> MARKER_SWITCH =
             REGISTER.register("marker_switch", () -> new BlockMarker(1, BlockBehaviour.Properties.of()));
+    // 本家: RTMBlock.markerStraight (markerType=10)。レンチ mode 2 が置く「直線マーカー」。
+    public static final DeferredHolder<Block, BlockMarker> MARKER_STRAIGHT =
+            REGISTER.register("marker_straight", () -> new BlockMarker(10, BlockBehaviour.Properties.of()));
 
     private RTMRailBlocks() {
     }

@@ -8,8 +8,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * シム: NeoForge のチケット式強制ロードをバニラの setChunkForced で近似する。
- * 所有者別のチケット管理は持たない。
+ * Fabric では所有エンティティごとにバニラの region ticket を保持する。
+ * /forceload の永続設定を変更せず、複数車両が同じチャンクを共有できる。
  */
 public class TicketController {
 
@@ -29,15 +29,22 @@ public class TicketController {
         }
     }
 
+    private final net.minecraft.server.level.TicketType<UUID> type;
+
     public TicketController(ResourceLocation id) {
+        this.type = net.minecraft.server.level.TicketType.create(id.toString(), UUID::compareTo);
     }
 
     public TicketController(ResourceLocation id, LoadingValidationCallback callback) {
+        this(id);
     }
 
     public boolean forceChunk(ServerLevel level, Entity owner, int chunkX, int chunkZ,
                               boolean add, boolean ticking) {
-        level.setChunkForced(chunkX, chunkZ, add);
+        var chunk = new net.minecraft.world.level.ChunkPos(chunkX, chunkZ);
+        int radius = ticking ? 2 : 0;
+        if (add) level.getChunkSource().addRegionTicket(type, chunk, radius, owner.getUUID());
+        else level.getChunkSource().removeRegionTicket(type, chunk, radius, owner.getUUID());
         return true;
     }
 }

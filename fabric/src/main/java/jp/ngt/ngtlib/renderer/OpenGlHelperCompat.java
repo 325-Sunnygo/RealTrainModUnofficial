@@ -13,18 +13,11 @@ public final class OpenGlHelperCompat {
 
     /** func_148821_a = glBlendFunc(srcRGB, dstRGB, srcAlpha, dstAlpha) */
     public static void func_148821_a(int srcRgb, int dstRgb, int srcAlpha, int dstAlpha) {
-        try {
-            RenderSystem.blendFuncSeparate(srcRgb, dstRgb, srcAlpha, dstAlpha);
-        } catch (Throwable ignored) {
-            // 描画スレッド外から呼ばれても落とさない
-        }
+        LegacyRenderState.current().blendSeparate(srcRgb,dstRgb,srcAlpha,dstAlpha);
     }
 
     /** func_148824_a = glBlendFunc の後始末 (既定へ戻す)。 */
     public static void func_148824_a() {
-        try {
-            RenderSystem.defaultBlendFunc();
-        } catch (Throwable ignored) {
-        }
+        LegacyRenderState.current().blendSeparate(770,771,1,0);
     }
 }

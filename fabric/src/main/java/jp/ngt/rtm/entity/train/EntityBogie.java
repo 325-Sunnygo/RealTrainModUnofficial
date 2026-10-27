@@ -285,24 +285,14 @@ public class EntityBogie extends Entity {
         RailMap rm = this.currentRailMap;
         int pIndex = 0;
         if (frontBogie == null || this.prevPosIndex == -1) {
-            pIndex = rm.getNearlestPoint(this.split, px, pz);
+            pIndex = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findNearestPointAround(rm,this.split,this.prevPosIndex,px,pz,speed);
         } else {
             // 移動範囲を制限して、「台車からの距離は同じでも位置は真逆」な点の検出を防ぐ
             int indexInc = (int) ((Math.abs(speed) + 0.25F) * (float) SPLITS_PER_METER);
             int indexMin = Math.max(this.prevPosIndex - indexInc, 0);
             int indexMax = Math.min(this.prevPosIndex + indexInc, this.split);
-            double[] fp = frontBogie.getPosBuf();
-            double dif = Double.MAX_VALUE;
-            double tlSq = trainLength * trainLength;
-            for (int i = indexMin; i < indexMax; ++i) {
-                double[] pxz = rm.getRailPos(this.split, i);
-                double lenTemp = distanceSq(pxz[1], py, pxz[0], fp[0], fp[1], fp[2]);
-                double difTemp = Math.abs(lenTemp - tlSq);
-                if (difTemp < dif) {
-                    dif = difTemp;
-                    pIndex = i;//理想の台車間距離と実際の距離の差が最も小さくなる点を求める
-                }
-            }
+            pIndex=jp.ngt.rtm.entity.train.util.LegacyBogieSearch.trailingIndex(
+                rm,this.split,indexMin,indexMax,py,frontBogie.getPosBuf(),trainLength);
         }
         this.prevPosIndex = pIndex;
 
@@ -349,7 +339,12 @@ public class EntityBogie extends Entity {
 
     /** @return 移動先にレールがあればtrue */
     private boolean resetRailObj(double px, double py, double pz) {
-        TileEntityLargeRailCore coreObj = this.getRail(px, py, pz);
+        TileEntityLargeRailCore coreObj = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findCrossedConnectedCore(level(),currentRailObj,currentRailMap,split,prevPosIndex,getX(),getZ(),px,pz,movingYaw);
+        if(coreObj==null) {
+            coreObj=this.getRail(px,py,pz);
+            if(coreObj!=null)coreObj=jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.keepCurrentSectionCore(currentRailObj,coreObj);
+        }
+        if(coreObj==null)coreObj=jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedCore(level(),currentRailObj,currentRailMap,split,prevPosIndex,getX(),getZ(),px,pz,movingYaw);
 
         if (coreObj == null) {
             return false;
@@ -371,10 +366,11 @@ public class EntityBogie extends Entity {
                     return true;
                 }
 
+                RailMap previousMap=this.currentRailMap;
                 this.currentRailObj = coreObj;
                 this.currentRailMap = railMap;
                 this.split = (int) (this.currentRailMap.getLength() * (double) SPLITS_PER_METER);
-                this.prevPosIndex = -1;
+                this.prevPosIndex = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedEntryIndex(previousMap,railMap,this.split);
                 this.onChangeRail(coreObj);
             }
 
@@ -387,12 +383,8 @@ public class EntityBogie extends Entity {
         // 新しいレールの反響音指定を引き継ぎ、継ぎ目カウントを最初から数え直す
         this.reverbSound = newRail != null && newRail.isReberbSound();
         this.jointIndex = 0;
+        // 継ぎ目は<b>音だけ</b>。車体を揺らす入力は持たない (上を参照)
         this.playJointSound();
-        // レール継ぎ目のガタン — 車体サスペンションへ入力 (RTMU オリジナル)
-        EntityTrainBase train = this.getTrain();
-        if (train != null && train.bogieController != null) {
-            train.bogieController.onRailJoint(this, train.getSpeed());
-        }
     }
 
     /** 既定のジョイント音 (パックが sound_Joint を指定しない場合)。 */
@@ -525,6 +517,12 @@ public class EntityBogie extends Entity {
     }
 
     protected void updatePosAndRotationClient() {
+        // ★ここに遅延バッファを入れてはいけない。
+        // バニラは移動パケットに回転が無いとき lerpTo へ entity.lerpTargetYRot()
+        // (= クライアント自身の現在値) を渡す (ClientPacketListener:630)。
+        // それを標本として貯めると<b>自分の出力を遅れて再生し続ける閉ループ</b>になり、
+        // 回転パケットが止まった瞬間 (カーブを抜けた直後) に小刻みに揺れる。
+        // 台車の姿勢はレールから直に求める (snapToRailArc / RtmBogieRenderer)。
         if (this.carPosRotationInc > 0) {
             float d0 = 1.0F / (float) this.carPosRotationInc;
             this.setYRot(this.getYRot() + Mth.wrapDegrees(this.carYaw - this.getYRot()) * d0);
@@ -553,7 +551,7 @@ public class EntityBogie extends Entity {
      * サーバ #updateBogiePos と同じレール取得・サンプリングを行うが、
      * 台車の物理状態フィールド (currentRailObj/currentRailMap/split/prevPosIndex) は
      * 一切変更しない。
-     * @return レール弧上の {x, y, z}。レール未検出時は null (呼び出し側で弦へフォールバック)。
+     * @return {x, y, z, ヨー, ピッチ, カント}。レール未検出時は null (呼び出し側で弦へフォールバック)。
      */
     public double[] snapToRailArc(double cx, double cy, double cz) {
         TileEntityLargeRailCore coreObj = this.getRail(cx, cy, cz);
@@ -577,7 +575,19 @@ public class EntityBogie extends Entity {
         int pIndex = railMap.getNearlestPoint(railSplit, cx, cz);
         double[] posZX = railMap.getRailPos(railSplit, pIndex);//{z, x}
         double py = railMap.getRailHeight(railSplit, pIndex) + EntityTrainBase.TRAIN_HEIGHT;
-        return new double[]{posZX[1], py, posZX[0]};
+        // ★姿勢もレールから求める。
+        // パケット由来の姿勢は 1.4 度に量子化されていて、しかも回転が止まると
+        // 自分の値が返ってくる (lerpTargetYRot) ので滑らかにできない。
+        // レールは連続な曲線なので、そこから取れば刻みも遅れも無い。
+        // 式はサーバー側 updateBogiePos と同じ (向きの 180 度反転もそこで解決する)。
+        float railYaw = Mth.wrapDegrees(railMap.getRailRotation(railSplit, pIndex));
+        float bogieYaw = fixBogieYaw(this.getYRot(), railYaw);
+        float bogiePitch = fixBogiePitch(railMap.getRailPitch(railSplit, pIndex), railYaw, bogieYaw);
+        float cant = railMap.getCant(railSplit, pIndex);
+        if (Math.abs(Mth.wrapDegrees(railYaw - bogieYaw)) > 90.0F) {
+            cant *= -1.0F;
+        }
+        return new double[]{posZX[1], py, posZX[0], bogieYaw, bogiePitch, cant};
     }
 
     @Override

@@ -27,21 +27,18 @@ public class RealTrainModUnofficialClient {
     static void onClientSetup(FMLClientSetupEvent event) {
         // クライアントのセットアップ・コード
         com.portofino.realtrainmodunofficial.script.TrainScriptSystem.getInstance().initialize();
-        VehicleModelPackManager.INSTANCE.initialize(Minecraft.getInstance().getResourceManager());
+        // Fabric invokes this before Minecraft creates the resource manager.
+        // The reload listener installed by RtmuFabricClientInit performs initialization.
         PackRequirementWarnings.refresh();
-        // オンライン連携 (GitHub アップデート確認 + 公式サイトの BAN リスト)。バックグラウンドで実行。
+        // オンライン連携 (GitHub アップデート確認)。バックグラウンドで実行。
         com.portofino.realtrainmodunofficial.online.RtmuOnlineServices.init();
         // RTMU 設定 (自動カント/自動高さ) をファイルから読み込む。
-        RtmuSettings.load();
     }
 
     /** ワールド入室時に RTMU 設定をサーバーへ同期 (敷設時・乗客上限でサーバーが参照するため)。 */
     @SubscribeEvent
     static void onLoggingIn(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingIn event) {
-        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-            new com.portofino.realtrainmodunofficial.network.RtmuSettingsPayload(
-                RtmuSettings.autoCant, RtmuSettings.autoHeightLevel, RtmuSettings.maxPassengers));
-    }
+            }
 
     /**
      * ワールドを抜けたら看板まわりのキャッシュを捨てる。

@@ -1,0 +1,19 @@
+{
+	"name": "decelerator_05",
+	"model": {
+		"modelFile": "decelerator.mqoz",
+		"textures": [["default", "textures/mechanism/motor.png", ""]],
+		"rendererPath": "scripts/RenderMotor.js"
+	},
+	"buttonTexture": "textures/mechanism/button_decelerator_05.png",
+	"type": "TRANSMISSION",
+	"transmissionRatioON": [0.05, 0.0, 0.0, 0.0, 0.0],
+	"transmissionRatioOFF": [0.05, 0.0, 0.0, 0.0, 0.0],
+	"maxSpeed": 10000.0,
+	"acceleration": 0.0,
+	"radius": 0.0,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479"
+}

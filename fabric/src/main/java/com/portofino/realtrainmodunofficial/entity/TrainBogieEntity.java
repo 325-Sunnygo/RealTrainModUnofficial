@@ -235,9 +235,7 @@ public final class TrainBogieEntity extends Entity {
 
     private static boolean isHoldingTrainPlacementItem(Player player) {
         return player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
-            || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get())
-            || player.getMainHandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get())
-            || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_VEHICLE_ITEM.get());
+            || player.getOffhandItem().is(RealTrainModUnofficialItems.TRAIN_ITEM.get());
     }
 
     @Override

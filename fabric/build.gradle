@@ -139,3 +139,58 @@ tasks.withType(JavaCompile).configureEach {
 
 //★NeoForge 版の jar を上書きしないよう、Modrinth プロファイルへの自動配置はしない。
 //同じ mods フォルダへ入れると二重ロードになる。動作確認は Fabric 専用プロファイルへ手で入れる。
+
+// Isolated compatibility smoke test; never uses the player's instance directory.
+loom {
+    runs {
+        compatClient {
+            client()
+            runDir 'build/compat-client'
+        }
+        compatServer {
+            server()
+            runDir 'build/compat-server'
+            programArg '--nogui'
+        }
+    }
+}
+
+// Legacy RTM filenames may contain uppercase characters; modern resource IDs may not.
+// Keep source names intact and canonicalize only the packaged asset paths.
+tasks.named('processResources', ProcessResources).configure {
+    includeEmptyDirs = false
+    doFirst { delete destinationDir }
+    eachFile { details ->
+        if (details.path.startsWith('assets/')) details.path = details.path.toLowerCase(Locale.ROOT)
+    }
+    filesMatching(['assets/*/models/block/**/*.json', 'assets/*/models/item/**/*.json', 'assets/*/blockstates/**/*.json']) {
+        filter { String line ->
+            line.replaceAll(/"([^"\n]*[:\/][^"\n]*)"/) { all, value -> '"' + value.toLowerCase(Locale.ROOT) + '"' }
+        }
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    includeEmptyDirs = false
+    eachFile { details ->
+        if (details.path.startsWith('assets/')) details.path = details.path.toLowerCase(Locale.ROOT)
+    }
+}
+
+
+sourceSets.test.java {
+    srcDir '../src/test/java'
+    exclude '**/gametest/**'
+    exclude '**/LegacyTextureUploadRegression.java'
+    exclude '**/LegacyE259ScriptRegression.java'
+    exclude '**/LegacyInventoryRegression.java'
+    exclude '**/LegacyExternalScriptRegression.java'
+    exclude '**/LegacyAsyncSelectionRegression.java'
+    exclude '**/LegacyProductionBlendRegression.java'
+}
+tasks.register('legacyScriptRegression', JavaExec) {
+    group='verification'
+    classpath=sourceSets.test.runtimeClasspath
+    mainClass='com.portofino.realtrainmodunofficial.script.LegacyRuntimeRegression'
+    dependsOn tasks.named('testClasses')
+}

@@ -44,10 +44,21 @@ public final class ScriptUtil {
         return se;
     }
 
-    /** JavaScriptの実行 */
+    /** JavaScriptの実行 (本家 ScriptUtil.doScript(String) と同じ名前無し実行)。 */
     public static ScriptEngine doScript(String s) {
+        return doScript(s, "<unnamed script>");
+    }
+
+    /**
+     * 本家 ScriptUtil.doScript(String, String) 完全移植。
+     * 本家は ScriptEngine.FILENAME を設定してから mozilla_compat を読み、本文を評価する。
+     * FILENAME は Nashorn のスタックトレース/行番号表示に使われるため、
+     * 欠落するとエラー箇所が "<eval>" になり原因が追えなくなる。
+     */
+    public static ScriptEngine doScript(String s, String fileName) {
         ScriptEngine se = createEngine();
         try {
+            se.put(ScriptEngine.FILENAME, fileName);
             if (se.toString().contains("Nashorn") || se.getClass().getName().contains("nashorn")) {
                 // Java8ではimportPackageが使えないので、その対策 (本家コメントのまま)
                 se.eval("load(\"nashorn:mozilla_compat.js\");");
@@ -60,27 +71,28 @@ public final class ScriptUtil {
             }
             return se;
         } catch (ScriptException e) {
-            throw new RuntimeException("Script exec error" + "\n" + s, e);
+            throw new RuntimeException("Script exec error in " + fileName, e);
         }
     }
 
+    /**
+     * 本家 ScriptUtil.doScript(ResourceLocation) 完全移植。
+     * パック内スクリプトを NGTText.getText(rl, true) で読み、そのパスを FILENAME にして実行する。
+     */
+    public static ScriptEngine doScript(jp.ngt.mccompat.ResourceLocation resource) {
+        return doScript(NGTText.getText(resource, true), resource.getResourcePath());
+    }
+
+    /** 本家 (実 ResourceLocation) 版。Java 側から本家シグネチャで呼ぶ用。 */
+    public static ScriptEngine doScript(net.minecraft.resources.ResourceLocation resource) {
+        return doScript(NGTText.getText(resource, true), resource.getPath());
+    }
+
     public static Object doScriptFunction(ScriptEngine se, String func, Object... args) {
-        // 軽量化作業の計測点。
-        // 1 箇所で総実行時間を取れる (doScriptIgnoreError もこれを経由する)。
-        if (!com.portofino.realtrainmodunofficial.perf.RtmuProfiler.enabled) {
-            try {
-                return ((Invocable) se).invokeFunction(func, args);
-            } catch (NoSuchMethodException | ScriptException e) {
-                throw new RuntimeException("Script exec error : " + func, e);
-            }
-        }
-        long t0 = System.nanoTime();
         try {
             return ((Invocable) se).invokeFunction(func, args);
         } catch (NoSuchMethodException | ScriptException e) {
             throw new RuntimeException("Script exec error : " + func, e);
-        } finally {
-            com.portofino.realtrainmodunofficial.perf.RtmuProfiler.addScriptCall(System.nanoTime() - t0);
         }
     }
 
@@ -88,27 +100,14 @@ public final class ScriptUtil {
      * そのスクリプトに関数が定義されているか。
      * Nashorn は function foo{} をグローバルに束縛するので、束縛を引けば分かる。
      */
-    /**
-     * 関数の有無の記録 (エンジンごと)。
-     * ★「無い」と断定するのは実際に呼んで NoSuchMethodException が出たときだけ。
-     */
-    private static final java.util.Map<ScriptEngine, java.util.Map<String, Boolean>> FUNCTION_CACHE =
-        java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
-
-    private static java.util.Map<String, Boolean> tableOf(ScriptEngine se) {
-        return FUNCTION_CACHE.computeIfAbsent(se, k -> new java.util.concurrent.ConcurrentHashMap<>());
-    }
-
-    /**
-     * その関数を呼びに行く価値があるか。
-     * 過去に「無い」と確定したものだけ false。未確認は true (呼んで確かめる)。
-     */
+    /** Inspect the current binding: scripts can install callbacks after their first tick. */
     public static boolean hasFunction(ScriptEngine se, String func) {
         if (se == null || func == null) {
             return false;
         }
-        Boolean known = tableOf(se).get(func);
-        return known == null || known;
+        Object value = se.get(func);
+        return value instanceof org.openjdk.nashorn.api.scripting.JSObject function
+                && function.isFunction();
     }
 
     /** 同じ失敗を何度もログに流さないための記録 (種類ごとに 1 回)。 */
@@ -117,29 +116,22 @@ public final class ScriptUtil {
 
     /**
      * 失敗しても続行するスクリプト呼び出し。
-     * 定義されていないと分かっている関数は呼ばない。
+     * 関数は後から定義され得るため、呼び出すたびに現在の定義を使う。
      */
     public static Object doScriptIgnoreError(ScriptEngine se, String func, Object... args) {
         if (se == null || func == null) {
             return null;
         }
-        java.util.Map<String, Boolean> table = tableOf(se);
-        if (Boolean.FALSE.equals(table.get(func))) {
-            return null;
-        }
         try {
             Object result = doScriptFunction(se, func, args);
-            table.put(func, Boolean.TRUE);
             return result;
         } catch (Exception e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
             if (cause instanceof NoSuchMethodException) {
-                // ここで初めて「無い」と確定する。以後は呼ばない。
-                table.put(func, Boolean.FALSE);
+                // 未定義のイベントは無視する。後から定義された場合は次回呼び出す。
                 return null;
             }
             // 中身のエラーは関数が「ある」証拠。次も呼ぶ。ログは種類ごとに 1 回。
-            table.put(func, Boolean.TRUE);
             String key = func + "|" + cause;
             if (LOGGED_FAILURES.size() < 256 && LOGGED_FAILURES.add(key)) {
                 NGTLog.debug("[ScriptUtil] %s failed: %s", func, String.valueOf(cause));

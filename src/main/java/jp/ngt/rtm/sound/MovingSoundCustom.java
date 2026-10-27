@@ -19,7 +19,7 @@ public abstract class MovingSoundCustom<T> extends MovingSoundBase {
         this.entity = entity;
         this.looping = repeat;
         // 本家: volume = range / 16
-        this.setVolume(range / 16.0F);
+        this.volume = range / 16.0F;
     }
 
     @Override
@@ -40,7 +40,7 @@ public abstract class MovingSoundCustom<T> extends MovingSoundBase {
     }
 
     public void setVolume(float par1) {
-        this.prevVolume = Math.max(par1, 0.0F);
+        this.prevVolume = Math.max(par1 * jp.ngt.rtm.RTMConfig.trainSoundVol, 0.0F);
     }
 
     public void setPitch(float par1) {

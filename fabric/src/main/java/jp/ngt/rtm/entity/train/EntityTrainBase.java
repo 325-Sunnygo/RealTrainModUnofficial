@@ -109,9 +109,11 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     @Override
     public TrainConfig getConfig() {
         if (this.configCache == null) {
+            //★速度性能は<b>パックの JSON</b> (KaizPatchX TrainConfig の maxSpeed /
+            //  accelerateion / accelerateions / deccelerations) だけで決まる。
+            //  以前は運転席 GUI で 1 両ずつ決める作りで DataMap の値を被せていたが、
+            //  「本家 RTM で出る速度にする」ため撤去した (旧ワールドの設定値も無視する)。
             this.configCache = jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.get(this.getModelName());
-            // 運転席GUI で設定した速度性能を被せる (未設定なら既定のまま)
-            this.applyConfiguredPerformance(this.configCache);
         }
         return this.configCache;
     }
@@ -130,7 +132,40 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      * TODO(Phase 4): ModelSetTrainClient の本実装。
      */
     public jp.ngt.rtm.modelpack.modelset.ModelSetCompat getModelSet() {
-        return new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(this.getConfig());
+        jp.ngt.rtm.modelpack.modelset.ModelSetCompat set =
+                new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(this.getConfig());
+        set.serverSE = this.getServerScriptEngine();
+        return set;
+    }
+
+    /**
+     * 本家 ModelSetBase.serverSE 相当。サーバースクリプト (Server_*.js) の engine。
+     * 未ロード / クライアント側では null。TrainSpeedManager の可変加減速フックが使う。
+     */
+    private com.portofino.realtrainmodunofficial.script.SoundScriptExecutor legacySoundUpdater;
+
+    @net.neoforged.api.distmarker.OnlyIn(net.neoforged.api.distmarker.Dist.CLIENT)
+    public com.portofino.realtrainmodunofficial.script.SoundScriptExecutor getSoundUpdater() {
+        if (this.legacySoundUpdater == null) this.legacySoundUpdater =
+                new com.portofino.realtrainmodunofficial.script.SoundScriptExecutor(this);
+        return this.legacySoundUpdater;
+    }
+
+    public javax.script.ScriptEngine getServerScriptEngine() {
+        // ★本家 ModelSetBase.serverSE 相当: エンジンは「モデルセット (定義) ごとに 1 個」で
+        //   全インスタンスが共有する。RTMU は以前エンティティごとに別エンジンを作っていた。
+        if (this.level().isClientSide()) {
+            return null;
+        }
+        com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry entry = this.serverScriptEntry();
+        return entry == null ? null : entry.engine();
+    }
+
+    /** この車両のモデル定義に対応する共有サーバースクリプト (無ければ null)。 */
+    private com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry serverScriptEntry() {
+        com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
+                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
+        return com.portofino.realtrainmodunofficial.script.CarServerScripts.get(def);
     }
 
     /**
@@ -369,67 +404,6 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     // ---- 運転席GUI (ドアタブ) で設定する速度性能 ----
     // JSON からは読まなくなったので、車両ごとの設定はここに持つ。
 
-    /** DataMap キー: 最高速度 (km/h)。0 = 既定。 */
-    private static final String KEY_MAX_SPEED = "RTMU_MaxSpeed";
-    /** DataMap キー: 加速度 (km/h/s)。0 = 既定。 */
-    private static final String KEY_ACCEL = "RTMU_Accel";
-
-    /** ブロック/tick → km/h。 */
-    private static final float TO_KMH = 72.0F;
-
-    /** 設定された最高速度 (km/h)。0 なら未設定 (= 設定の既定値を使う)。 */
-    public int getConfiguredMaxSpeedKmh() {
-        return this.getResourceState().getDataMap().getInt(KEY_MAX_SPEED);
-    }
-
-    /** 設定された加速度 (km/h/s ×100 で保持)。0 なら未設定。 */
-    public int getConfiguredAccelCentiKmhS() {
-        return this.getResourceState().getDataMap().getInt(KEY_ACCEL);
-    }
-
-    /** サーバー側: 最高速度を設定する (0 で既定へ戻す)。編成全体へ配る。 */
-    public void setConfiguredMaxSpeedKmh(int kmh) {
-        int v = Math.max(0, Math.min(1000, kmh));
-        this.getResourceState().getDataMap().setInt(KEY_MAX_SPEED, v,
-                jp.ngt.rtm.modelpack.state.DataMap.SYNC_FLAG | jp.ngt.rtm.modelpack.state.DataMap.SAVE_FLAG);
-        this.configCache = null;
-    }
-
-    /** サーバー側: 加速度を設定する (km/h/s ×100、0 で既定へ戻す)。 */
-    public void setConfiguredAccelCentiKmhS(int centi) {
-        int v = Math.max(0, Math.min(10000, centi));
-        this.getResourceState().getDataMap().setInt(KEY_ACCEL, v,
-                jp.ngt.rtm.modelpack.state.DataMap.SYNC_FLAG | jp.ngt.rtm.modelpack.state.DataMap.SAVE_FLAG);
-        this.configCache = null;
-    }
-
-    /**
-     * 設定値を TrainConfig へ反映する。getConfig から毎回呼ばれる。
-     * 最高速度はノッチ段数ぶんを等間隔で割り振る (本家の既定 0.36/0.72/…/1.80 と同じ作り方)。
-     */
-    private void applyConfiguredPerformance(TrainConfig cfg) {
-        if (cfg == null) {
-            return;
-        }
-        int maxKmh = this.getConfiguredMaxSpeedKmh();
-        if (maxKmh > 0 && cfg.maxSpeed != null && cfg.maxSpeed.length > 0) {
-            float top = maxKmh / TO_KMH;
-            int n = cfg.maxSpeed.length;
-            for (int i = 0; i < n; ++i) {
-                cfg.maxSpeed[i] = top * (i + 1) / n;
-            }
-        }
-        int accelCenti = this.getConfiguredAccelCentiKmhS();
-        if (accelCenti > 0) {
-            // km/h/s → ブロック/tick^2
-            float a = (accelCenti / 100.0F) / TO_KMH / 20.0F;
-            cfg.accelerateion = a;
-            if (cfg.accelerateions != null) {
-                java.util.Arrays.fill(cfg.accelerateions, a);
-            }
-        }
-    }
-
     public void setModelName(String name) {
         this.entityData.set(DATA_MODEL_NAME, name == null ? "" : name);
         this.configCache = null;
@@ -541,7 +515,8 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 try {
                     this.formation.onRemovedTrain(this);
                 } catch (IndexOutOfBoundsException e) {
-                    e.printStackTrace();
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                        "[RTMU] 編成からの車両除去に失敗", e);
                 }
             }
         }
@@ -556,9 +531,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     /** スクリプトの読み込みを 1 度だけ試すためのフラグ (無い車両で毎 tick 探しに行かない)。 */
     private boolean attemptedSoundScriptLoad;
 
-    /** 車両パックのサーバースクリプト (serverScriptPath, Server_*.js)。サーバー専用。 */
-    private javax.script.ScriptEngine serverScriptEngine;
-    private boolean attemptedServerScriptLoad;
+
 
     @Override
     public void tick() {
@@ -606,36 +579,16 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
      * 方向幕・種別・trainType 等を決める。
      */
     private void tickServerScript() {
-        this.ensureServerScriptLoaded();
-        if (this.serverScriptEngine == null) {
-            return;
+        // ★本家 EntityVehicleBase (サーバー側 tick): rider 更新のあと
+        //   executer.execScript(this) → updateBlockCollisionState → updateMovement の順で呼ぶ。
+        //   RTMU も共有エンジン経由で同じ経路に統一した (エンジンは定義ごとに 1 個)。
+        com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry entry = this.serverScriptEntry();
+        if (entry != null) {
+            entry.onUpdate(this);
         }
-        // ★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
-        // 以前は「停車中は 4tick に 1 回」に間引いていたが、停車中こそスクリプトが
-        // パンタ・ドア・方向幕を動かす。
-        com.portofino.realtrainmodunofficial.script.TrainScriptSystem
-                .invokeServerScriptOnUpdate(this.serverScriptEngine, this, this.scriptExecuter);
     }
 
-    private void ensureServerScriptLoaded() {
-        if (this.attemptedServerScriptLoad) {
-            return;
-        }
-        this.attemptedServerScriptLoad = true;
-        com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
-                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
-        if (def == null || !def.hasServerScript()) {
-            return;
-        }
-        try {
-            this.serverScriptEngine =
-                    com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadServerScriptForVehicle(def);
-        } catch (Throwable t) {
-            // 専用サーバー等で client パッケージのモデルローダが読めなくても列車 tick を巻き込まない。
-            com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER
-                    .warn("Failed to load train server script for {}: {}", this.getModelName(), t.toString());
-        }
-    }
+
 
     /**
      * サーバー: DataMap の flag=1 書き込み (ATSA の HUD 情報等) をクライアントへ配信する。
@@ -757,6 +710,8 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         } else {
             com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
         }
+        // 本家 SoundUpdaterTrain.update: ATS チャイム/ベル (制御車が signal=1 で走行中にループ)。
+        this.getSoundUpdater().updateAts();
     }
 
     @Override
@@ -1140,11 +1095,6 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return new net.minecraft.world.phys.Vec3(w.x, w.y + 0.15D, w.z);
     }
 
-    /** 乗客 NPC (RTMU に統合済み) か。統合後は同一 jar なので型で直接判定できる。 */
-    private static boolean isRtmuPassenger(Entity rider) {
-        return rider instanceof com.portofino.rtmupassenger.entity.PassengerEntity;
-    }
-
     @Override
     protected void positionRider(Entity rider, Entity.MoveFunction move) {
         if (this.hasPassenger(rider)) {
@@ -1156,11 +1106,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 sv = sv.rotateAroundX(this.getXRot());
                 sv = sv.rotateAroundY(this.getYRot());
                 // 旧 EntityFloor 搭乗時の実効高さ (floorY + 0.15) に合わせる。
-                // 乗客 NPC (rtmupassenger) は座り位置が高すぎたので下げる (プレイヤーの着席は不変)。
                 double seatY = this.getY() + sv.getY() + 0.15D;
-                if (isRtmuPassenger(rider)) {
-                    seatY -= 0.35D;
-                }
                 move.accept(rider,
                         this.getX() + sv.getX(),
                         seatY,
@@ -1261,6 +1207,37 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             }
         }
         return InteractionResult.SUCCESS;
+    }
+
+    /**
+     * 運転台へ乗せる (本家の運転士アイテムと同じ処理)。
+     * 自動運転アドオン (RTMU-AutoDrive) が運転士を自動で乗務させるために使う。
+     *
+     * @param direction 進行方向 (getTrainDirection と同じ 0/1)
+     */
+    public void boardDriverSeat(Entity entity, int direction) {
+        this.mountEntityToTrain(entity, direction);
+    }
+
+    /**
+     * この編成が<b>終点に着いている</b>か。自動運転アドオンが立てる。
+     *
+     * <p>立っている間、乗客 NPC は<b>降りるだけで乗ってこない</b>
+     * (終点で乗せると、消える列車に乗せることになる)。
+     */
+    private boolean terminating;
+
+    public boolean isTerminating() {
+        return this.terminating;
+    }
+
+    public void setTerminating(boolean value) {
+        this.terminating = value;
+    }
+
+    /** 運転台が空いているか (本家 interactTrain の driverSeatFree と同じ判定)。 */
+    public boolean isDriverSeatFree() {
+        return this.getPassengers().stream().allMatch(this::hasSeat);
     }
 
     private void mountEntityToTrain(Entity entity, int direction) {
@@ -1615,12 +1592,21 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
         if (DATA_ROLL.equals(key) && this.level().isClientSide) {
             this.vehicleRoll = this.entityData.get(DATA_ROLL);
+            this.motionBuffer.setLatestRotation(this.vehicleYaw, this.vehiclePitch, this.vehicleRoll);
         }
         if (DATA_YAW.equals(key) && this.level().isClientSide) {
-            this.vehicleYaw = this.entityData.get(DATA_YAW);
+            float yaw = this.entityData.get(DATA_YAW);
+            this.vehicleYaw = yaw;
+            this.motionBuffer.setLatestRotation(this.vehicleYaw, this.vehiclePitch, this.vehicleRoll);
+            // ★実姿勢が届いた時点で即座に向ける。tick を待つと 1 フレームだけ
+            //   スポーンパケットの粗い yaw (だいたい 0 = 横向き) で描かれてしまう。
+            if (!this.isClientRotInit()) {
+                this.snapClientRotation(yaw, this.entityData.get(DATA_PITCH));
+            }
         }
         if (DATA_PITCH.equals(key) && this.level().isClientSide) {
             this.vehiclePitch = this.entityData.get(DATA_PITCH);
+            this.motionBuffer.setLatestRotation(this.vehicleYaw, this.vehiclePitch, this.vehicleRoll);
         }
         if (DATA_MODEL_NAME.equals(key)) {
             this.configCache = null;

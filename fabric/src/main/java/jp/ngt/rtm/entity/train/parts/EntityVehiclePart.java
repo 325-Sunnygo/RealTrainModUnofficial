@@ -177,7 +177,7 @@ public abstract class EntityVehiclePart extends Entity {
      * 押し出せず、取り残されたまま復帰できない。
      */
     public void onAddedToLevel() {
-        // NeoForge 拡張の onAddedToLevel はバニラに無いので super 呼び出しは不要
+        
         this.registerToVehicle();
     }
 
