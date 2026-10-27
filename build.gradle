@@ -1,6 +1,7 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
+    id 'com.gradleup.shadow' version '8.3.6'
     id 'net.neoforged.gradle.userdev' version '7.0.192'
 }
 
@@ -146,6 +147,8 @@ def buildE257DefaultPack = tasks.register('buildE257DefaultPack', Zip) {
 }
 
 tasks.named('jar', Jar).configure {
+    archiveClassifier = 'unshaded'
+    destinationDirectory = layout.buildDirectory.dir('intermediates/rtmu')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     dependsOn buildE257DefaultPack
     // 開発用プリフライトは頒布物に含めない。
@@ -168,17 +171,48 @@ tasks.named('jar', Jar).configure {
         into 'assets/realtrainmodunofficial/bundled_packs/vehicle'
         rename { 'e257_defaultpack_readme.txt' }
     }
-    from {
-        configurations.jsRuntime
-                .filter { it.isDirectory() || it.name.endsWith('.jar') }
-                .collect { it.isDirectory() ? it : zipTree(it) }
-    } {
-        exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'module-info.class', '**/module-info.class'
-        // ASM は NeoForge がモジュールパスで提供済み。同梱すると本番で
-        // ResolutionException (org.objectweb.asm.tree の二重エクスポート) になる。
-        exclude 'org/objectweb/**'
+}
+
+// Ship one mod JAR with dependencies isolated from other Java modules.
+// Start with the normal mod JAR so its metadata, assets and bundled packs are retained.
+tasks.named('shadowJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar).configure {
+    dependsOn tasks.named('jar')
+    from { zipTree(tasks.named('jar').get().archiveFile.get().asFile) }
+    configurations = [project.configurations.jsRuntime]
+    archiveClassifier = ''
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    filesMatching('META-INF/services/**') { duplicatesStrategy = DuplicatesStrategy.INCLUDE }
+    mergeServiceFiles()
+    relocate 'com.fasterxml.jackson', 'com.portofino.realtrainmodunofficial.jackson'
+    relocate 'gnu.trove', 'com.portofino.realtrainmodunofficial.trove'
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'module-info.class', '**/module-info.class'
+    exclude 'META-INF/versions/**/com/fasterxml/**'
+    exclude 'org/objectweb/**'
+}
+tasks.named('assemble').configure { dependsOn tasks.named('shadowJar') }
+// A plain `jar` request must also produce the distributable, relocated JAR.
+tasks.named('jar').configure { finalizedBy tasks.named('shadowJar') }
+
+tasks.register('verifyRelocatedDependencies') {
+    dependsOn tasks.named('shadowJar')
+    doLast {
+        def file = tasks.named('shadowJar').get().archiveFile.get().asFile
+        def zip = new java.util.zip.ZipFile(file)
+        try {
+            def names = zip.entries().collect { it.name }
+            def bad = names.findAll { it.endsWith('.class') &&
+                (it.startsWith('com/fasterxml/jackson/') || it.startsWith('gnu/trove/') ||
+                 (it.startsWith('META-INF/versions/') && (it.contains('/com/fasterxml/') || it.contains('/realtrainmodunofficial/jackson/')))) }
+            if (!bad.empty) throw new GradleException("Unrelocated classes: ${bad.take(5)}")
+            if (!names.contains('com/portofino/realtrainmodunofficial/jackson/databind/ObjectMapper.class') ||
+                !names.contains('com/portofino/realtrainmodunofficial/trove/set/hash/TIntHashSet.class') ||
+                !names.contains('META-INF/services/com.portofino.realtrainmodunofficial.jackson.core.JsonFactory'))
+                throw new GradleException('Relocated classes or Jackson service descriptor missing')
+            logger.lifecycle('Verified relocated Jackson, Trove and ServiceLoader metadata')
+        } finally { zip.close() }
     }
 }
+tasks.named('check').configure { dependsOn tasks.named('verifyRelocatedDependencies') }
 
 // Windows: ModrinthApp の rtmu プロファイル (APPDATA 配下)。他OSは従来パスにフォールバック。
 // ビルドした jar を、この mod が既に入っている Modrinth プロファイル<b>すべて</b>へ配る。
@@ -235,8 +269,8 @@ tasks.register('scriptPreflight', JavaExec) {
 }
 
 tasks.register('copyJarToModrinthMods') {
-    dependsOn tasks.named('jar')
-    def jarFile = tasks.named('jar').flatMap { it.archiveFile }
+    dependsOn tasks.named('shadowJar')
+    def jarFile = tasks.named('shadowJar').flatMap { it.archiveFile }
     def targets = deployTargets
     inputs.file(jarFile)
     onlyIf { !targets.isEmpty() }
@@ -256,7 +290,7 @@ tasks.register('copyJarToModrinthMods') {
     }
 }
 
-tasks.named('jar').configure {
+tasks.named('shadowJar').configure {
     finalizedBy(tasks.named('copyJarToModrinthMods'))
 }
 
