@@ -79,13 +79,9 @@ public final class MqoModelLoader {
     }
     private static final String TEXTURE_META_SEPARATOR = "|ptmeta=";
     /** MQO マテリアルの col(r g b a)。4番目がアルファ(不透明度)。RTM はガラス等をこの a<1 で半透明にする。 */
-    /**
-     * パース済みモデルのメモリキャッシュ。
-     * ★RTMU 独自の LRU + バイト上限による追い出しは撤去した。
-     *   永続化は fixRTM 方式のディスクキャッシュが担うので、メモリ側は単純なマップでよい。
-     */
-    private static final java.util.concurrent.ConcurrentHashMap<String, MqoModel> MODEL_CACHE =
-        new java.util.concurrent.ConcurrentHashMap<>();
+    /** Original configured weight limit and recent-use protection. */
+    private static final com.portofino.realtrainmodunofficial.util.ConfiguredModelCache<MqoModel> MODEL_CACHE =
+        new com.portofino.realtrainmodunofficial.util.ConfiguredModelCache<>(MqoModel::estimateMemoryBytes,MqoModel::closeGpuResources);
     private static final Set<String> FAILED_MODEL_KEYS = ConcurrentHashMap.newKeySet();
     private static final Map<String, String> SOUND_SCRIPT_SOURCE_CACHE = new ConcurrentHashMap<>();
     private static final Map<String, TextureInfo> TEXTURE_INFO_CACHE = new ConcurrentHashMap<>();
@@ -109,6 +105,7 @@ public final class MqoModelLoader {
         return merged;
     }
 
+    public static void invalidateModels() {MODEL_CACHE.clear();FAILED_MODEL_KEYS.clear();SOUND_SCRIPT_SOURCE_CACHE.clear();TEXTURE_INFO_CACHE.clear();SCRIPT_TEXTURE_CACHE.clear();RESOURCE_SEARCH_CACHE.clear();sharedPackCandidates=null;}
     private MqoModelLoader() {
     }
 
@@ -789,11 +786,7 @@ public final class MqoModelLoader {
         if (key == null || model == null) {
             return;
         }
-        MqoModel previous = MODEL_CACHE.put(key, model);
-        if (previous != null && previous != model) {
-            // 差し替え時は古いモデルの GPU VBO を解放する (同じオブジェクトなら閉じない)。
-            previous.closeGpuResources();
-        }
+        MODEL_CACHE.put(key, model);
     }
 
     private static Path resolveFilePathInPack(Path root, String relative) throws java.io.IOException {

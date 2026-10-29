@@ -183,6 +183,8 @@ public class RealTrainModUnofficial {
         output.accept(RealTrainModUnofficialItems.HOT_STOVE_BRICK_ITEM.get()); //hotStoveBrick
         output.accept(RealTrainModUnofficialItems.BRICK_SLAB_ITEM.get());      //brickSlab
         // --- RTMItem.init() (INDUSTRY) ---
+        output.accept(RealTrainModUnofficialItems.MIRROR_ITEM.get());
+        output.accept(RealTrainModUnofficialItems.MIRROR_CUBE_ITEM.get());
         //bucket_liquid: 本家 getSubItems と同じで 銑鉄 / 鋼鉄 の満タンを出す
         for (jp.ngt.rtm.entity.fluid.FluidType type : jp.ngt.rtm.item.ItemBucketLiquid.FLUID_LIST) {
             output.accept(jp.ngt.rtm.item.ItemBucketLiquid.getItem(

@@ -149,6 +149,8 @@ public class RtmuFabricClientInit implements ClientModInitializer {
     private static void registerCutoutBlocks() {
         var cutout = net.minecraft.client.renderer.RenderType.cutout();
         net.minecraft.world.level.block.Block[] blocks = {
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks.MIRROR.get(),
+            com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks.MIRROR_CUBE.get(),
             jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get(),
             jp.ngt.rtm.rail.RTMRailBlocks.MARKER_SWITCH.get(),
             com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks.MARKER.get(),

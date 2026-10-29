@@ -14,7 +14,16 @@ import java.util.concurrent.ConcurrentHashMap;
  * パック内 .mqo/.mqoz を PolygonModel (グループ/面/頂点グラフ) として読む。
  */
 public final class ModelLoader {
-    private static final Map<String, PolygonModel> CACHE = new ConcurrentHashMap<>();
+    private static final com.portofino.realtrainmodunofficial.util.ConfiguredModelCache<PolygonModel> CACHE =
+        new com.portofino.realtrainmodunofficial.util.ConfiguredModelCache<>(ModelLoader::estimateMemoryBytes,model -> {});
+    private static long estimateMemoryBytes(PolygonModel model) {
+        long bytes=256L+model.vertices.size()*32L+model.materials.size()*160L;
+        for(var group:model.groupObjects)for(var face:group.faces) {
+            bytes+=80L+face.vertices.length*8L+(face.uvs==null?0:face.uvs.length*4L)
+                +(face.vertexNormals==null?0:face.vertexNormals.length*40L);
+        }
+        return bytes;
+    }
 
     private ModelLoader() {
     }

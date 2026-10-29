@@ -9,7 +9,8 @@ public final class RealTrainModUnofficialNetwork {
 
     /** Registers custom payload handlers used by the mod. */
     public static void registerPayloadHandlers(RegisterPayloadHandlersEvent event) {
-        PayloadRegistrar registrar = event.registrar("1");
+        PayloadRegistrar registrar = event.registrar("2");
+        registrar.playBidirectional(ServerModelPackPayload.TYPE,ServerModelPackPayload.STREAM_CODEC,ServerModelPackPayload::handle);
         registrar.playToServer(SelectModelPayload.TYPE, SelectModelPayload.STREAM_CODEC, SelectModelPayload::handleOnServer);
         registrar.playToServer(MiniatureSettingsPayload.TYPE, MiniatureSettingsPayload.STREAM_CODEC, MiniatureSettingsPayload::handleOnServer);
         registrar.playToServer(MiniatureLoadPayload.TYPE, MiniatureLoadPayload.STREAM_CODEC, MiniatureLoadPayload::handleOnServer);

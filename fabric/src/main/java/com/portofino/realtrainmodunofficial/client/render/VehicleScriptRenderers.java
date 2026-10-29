@@ -53,6 +53,7 @@ public final class VehicleScriptRenderers {
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
     private static final Scripted INVALID = new Scripted(null, null, null, "<invalid>");
 
+    public static void invalidateAll() {CACHE.clear();FLAT_GROUP_CACHE.clear();}
     private VehicleScriptRenderers() {
     }
 

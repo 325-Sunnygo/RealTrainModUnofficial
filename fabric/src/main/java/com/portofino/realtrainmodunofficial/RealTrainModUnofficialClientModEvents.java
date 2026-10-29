@@ -132,6 +132,7 @@ public final class RealTrainModUnofficialClientModEvents {
         );
 
 
+        event.registerBlockEntityRenderer(RealTrainModUnofficialBlockEntities.MIRROR.get(),com.portofino.realtrainmodunofficial.client.mirror.MirrorBlockRenderer::new);
         // 装飾ブロック (本家 RenderDecoration)
         event.registerBlockEntityRenderer(
             com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities.DECORATION.get(),
@@ -239,6 +240,7 @@ public final class RealTrainModUnofficialClientModEvents {
     public static void registerShaders(net.neoforged.neoforge.client.event.RegisterShadersEvent event)
             throws java.io.IOException {
         com.portofino.realtrainmodunofficial.client.camera.CameraPostProcessor.registerShaders(event);
+        com.portofino.realtrainmodunofficial.client.mirror.MirrorResolve.register(event);
         com.portofino.realtrainmodunofficial.client.render.LegacyRenderTypes.register(event);
     }
 

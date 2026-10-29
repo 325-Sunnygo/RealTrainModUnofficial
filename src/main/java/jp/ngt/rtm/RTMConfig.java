@@ -2,7 +2,7 @@ package jp.ngt.rtm;
 
 /**
  * 本家 jp.ngt.rtm.RTMConfig の段階的移植 (レール関連のみ)。
- * TODO: NeoForge Config への接続。既定値は本家と同一。
+ * RTMConfigOptions defines the original keys and connects platform configuration.
  */
 @SuppressWarnings("unused")
 public final class RTMConfig {
@@ -37,10 +37,10 @@ public final class RTMConfig {
     public static float trainHornSoundRange = 96.0F;
     public static float crossingGateSoundRange = 32.0F;
 
-    public static boolean gunBreakBlock;
+    public static boolean gunBreakBlock = true;
     public static boolean deleteBat;
     public static boolean useServerModelPack;
-    public static boolean versionCheck;
+    public static boolean versionCheck = true;
     /** モデルのスムージング (法線平均化)。 */
     public static boolean smoothing = true;
     public static boolean use1122Marker;

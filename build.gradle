@@ -194,9 +194,11 @@ tasks.named('assemble').configure { dependsOn tasks.named('shadowJar') }
 tasks.named('jar').configure { finalizedBy tasks.named('shadowJar') }
 
 tasks.register('verifyRelocatedDependencies') {
+    def shadedArtifact = tasks.named('shadowJar').flatMap { it.archiveFile }
     dependsOn tasks.named('shadowJar')
-    doLast {
-        def file = tasks.named('shadowJar').get().archiveFile.get().asFile
+    inputs.file(shadedArtifact)
+    doLast { task ->
+        def file = shadedArtifact.get().asFile
         def zip = new java.util.zip.ZipFile(file)
         try {
             def names = zip.entries().collect { it.name }
@@ -208,7 +210,7 @@ tasks.register('verifyRelocatedDependencies') {
                 !names.contains('com/portofino/realtrainmodunofficial/trove/set/hash/TIntHashSet.class') ||
                 !names.contains('META-INF/services/com.portofino.realtrainmodunofficial.jackson.core.JsonFactory'))
                 throw new GradleException('Relocated classes or Jackson service descriptor missing')
-            logger.lifecycle('Verified relocated Jackson, Trove and ServiceLoader metadata')
+            task.logger.lifecycle('Verified relocated Jackson, Trove and ServiceLoader metadata')
         } finally { zip.close() }
     }
 }
@@ -424,7 +426,7 @@ tasks.register('legacyTextureUploadRegression', JavaExec) {
 // Keep source names intact and canonicalize only the packaged asset paths.
 tasks.named('processResources', ProcessResources).configure {
     includeEmptyDirs = false
-    doFirst { delete destinationDir }
+    doFirst { task -> task.destinationDir.deleteDir() }
     eachFile { details ->
         if (details.path.startsWith('assets/')) details.path = details.path.toLowerCase(Locale.ROOT)
     }

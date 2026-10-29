@@ -186,6 +186,8 @@ public class RealTrainModUnofficial {
         output.accept(RealTrainModUnofficialItems.HOT_STOVE_BRICK_ITEM.get()); //hotStoveBrick
         output.accept(RealTrainModUnofficialItems.BRICK_SLAB_ITEM.get());      //brickSlab
         // --- RTMItem.init() (INDUSTRY) ---
+        output.accept(RealTrainModUnofficialItems.MIRROR_ITEM.get());
+        output.accept(RealTrainModUnofficialItems.MIRROR_CUBE_ITEM.get());
         //bucket_liquid: 本家 getSubItems と同じで 銑鉄 / 鋼鉄 の満タンを出す
         for (jp.ngt.rtm.entity.fluid.FluidType type : jp.ngt.rtm.item.ItemBucketLiquid.FLUID_LIST) {
             output.accept(jp.ngt.rtm.item.ItemBucketLiquid.getItem(
@@ -267,6 +269,13 @@ public class RealTrainModUnofficial {
             LOGGER.warn("Failed to set log level for rtmu: {}", t.toString());
         }
 
+        modContainer.registerConfig(net.neoforged.fml.config.ModConfig.Type.COMMON, RTMUConfig.SPEC);
+        modEventBus.addListener(RTMUConfig::onConfig);
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.entity.EntityJoinLevelEvent event) -> {
+            if (jp.ngt.rtm.RTMConfig.deleteBat && event.getEntity() instanceof net.minecraft.world.entity.ambient.Bat) event.setCanceled(true);
+        });
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event) ->
+            com.portofino.realtrainmodunofficial.modelpack.transfer.ServerPackSender.forget(event.getEntity().getUUID()));
         modEventBus.addListener(this::commonSetup);
         modEventBus.addListener(this::registerNetwork);
         // 本家 RTM のチャンクローダー (列車の State_ChunkLoader) 用チケットコントローラ

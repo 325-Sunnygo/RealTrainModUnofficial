@@ -33,6 +33,12 @@ public class RtmuFabricInit implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        try {
+            jp.ngt.rtm.RTMConfigOptions.loadLegacy(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("RTM.cfg"));
+        } catch (java.io.IOException e) { throw new IllegalStateException("Could not load RTM configuration", e); }
+        net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents.ENTITY_LOAD.register((entity, world) -> {
+            if (jp.ngt.rtm.RTMConfig.deleteBat && entity instanceof net.minecraft.world.entity.ambient.Bat) entity.discard();
+        });
         ModContainer container = new ModContainer();
 
         // ★本体の生成 = レジストリ登録。NeoForge では @Mod のコンストラクタが担っていた所。

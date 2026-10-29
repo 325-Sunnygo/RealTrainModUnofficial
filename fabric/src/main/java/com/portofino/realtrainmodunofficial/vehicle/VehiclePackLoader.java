@@ -1,5 +1,7 @@
 package com.portofino.realtrainmodunofficial.vehicle;
 
+import com.portofino.realtrainmodunofficial.util.OrderedPackTasks;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -33,9 +35,11 @@ public class VehiclePackLoader {
         if (loaded) return;
         loaded = true;
         LOADED.clear();
-        loadFromModJar();
-        loadFromExternalDirectories();
-        loadFromGameDirectories();
+        try(var tasks=OrderedPackTasks.begin()) {
+            loadFromModJar();
+            loadFromExternalDirectories();
+            loadFromGameDirectories();
+        }
         VehicleRegistry.setDefinitions(LOADED);
     }
 
@@ -65,7 +69,7 @@ public class VehiclePackLoader {
                             return;
                         }
                         try {
-                            parseTrainJson(Files.readAllBytes(p), RealTrainModUnofficial.MODID, p.getFileName().toString());
+                            OrderedPackTasks.read(p,bytes->parseTrainJson(bytes, RealTrainModUnofficial.MODID, p.getFileName().toString()));
                             if (isTrain) {
                                 trains[0]++;
                             } else {
@@ -95,6 +99,8 @@ public class VehiclePackLoader {
 
     private static void loadFromGameDirectories() {
         try {
+            var active=com.portofino.realtrainmodunofficial.modelpack.transfer.ServerPackStorage.activeDirectory();
+            if(active!=null && Files.isDirectory(active))scanPackRoot(active);
             Path gameDir = FMLPaths.GAMEDIR.get();
             if (Files.exists(gameDir)) {
                 scanPackRoot(gameDir);
@@ -239,7 +245,7 @@ public class VehiclePackLoader {
             stream.filter(path -> Files.isRegularFile(path) && path.getFileName().toString().toLowerCase().endsWith(".json"))
                 .forEach(path -> {
                     try {
-                        parseTrainJson(Files.readAllBytes(path), packName, normalize(packDir.relativize(path).toString()));
+                        OrderedPackTasks.read(path,bytes->parseTrainJson(bytes,packName,normalize(packDir.relativize(path).toString())));
                     } catch (Exception e) {
                         RealTrainModUnofficial.LOGGER.warn("Failed to load vehicle pack json {} in {}", path, packName, e);
                     }
@@ -315,6 +321,9 @@ public class VehiclePackLoader {
     }
 
     private static void parseTrainJson(byte[] bytes, String packName, String sourcePath) {
+        OrderedPackTasks.submit(()->parseTrainJsonNow(bytes,packName,sourcePath));
+    }
+    private static void parseTrainJsonNow(byte[] bytes,String packName,String sourcePath) {
         try {
             JsonElement el = JsonParser.parseString(PackTextDecoder.decodeJson(bytes));
             if (!el.isJsonObject()) return;
@@ -543,7 +552,7 @@ public class VehiclePackLoader {
             definition.setTypeSign(typeSignNames, typeSignTexture, typeSigns);
             definition.setSpeedProfile(notchAccelerations, decelerations,
                     useVariableAcceleration, useVariableDeceleration);
-            LOADED.add(definition);
+            OrderedPackTasks.publish(definition, LOADED::add);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse train json {} in {}: {}", sourcePath, packName, e.getMessage());
         }

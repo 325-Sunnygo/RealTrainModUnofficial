@@ -1,0 +1,22 @@
+{
+  "variants": {
+    "facing=up": {
+      "model": "realtrainmodunofficial:block/mirror_up"
+    },
+    "facing=down": {
+      "model": "realtrainmodunofficial:block/mirror_down"
+    },
+    "facing=north": {
+      "model": "realtrainmodunofficial:block/mirror_north"
+    },
+    "facing=south": {
+      "model": "realtrainmodunofficial:block/mirror_south"
+    },
+    "facing=west": {
+      "model": "realtrainmodunofficial:block/mirror_west"
+    },
+    "facing=east": {
+      "model": "realtrainmodunofficial:block/mirror_east"
+    }
+  }
+}

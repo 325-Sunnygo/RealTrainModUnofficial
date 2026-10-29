@@ -384,5 +384,8 @@
   "gui.npc.can_not_sell": "Not enough items",
   "gui.npc.have_money": "Money",
   "usage.realtrainmodunofficial.connector_in": "Inputs the signal into the attached block",
-  "usage.realtrainmodunofficial.connector_out": "Outputs the signal from the attached block"
+  "usage.realtrainmodunofficial.connector_out": "Outputs the signal from the attached block",
+  "block.realtrainmodunofficial.mirror": "Mirror",
+  "block.realtrainmodunofficial.mirror_cube": "Mirror Cube",
+  "message.version": "A new version of %s is available"
 }

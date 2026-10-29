@@ -41,6 +41,9 @@ public final class LegacyRuntimeRegression {
         LegacyRenderApiRegression.main(args);
         LegacySelectionRegression.main(args);
         LegacyImmediateRegression.main(args);
+        LegacyConfigRegression.main(args);
+        LegacyConfigRuntimeRegression.main(args);
+        LegacyRemainingConfigRegression.main(args);
         LegacyRailAndAlphaRegression.main(args);
         ScriptEngine engine = ScriptUtil.createEngine();
         ScriptExecuter executer = new ScriptExecuter();

@@ -1,5 +1,7 @@
 package com.portofino.realtrainmodunofficial.rail;
 
+import com.portofino.realtrainmodunofficial.util.OrderedPackTasks;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -35,9 +37,11 @@ public class RailPackLoader {
         LOADED.clear();
         // jar 同梱の本家レール定義。以前は loadFromModJar がどこからも呼ばれておらず
         // (デッドコード)、既定レールが 1 つも登録されていなかった。
+        try(var tasks=OrderedPackTasks.begin()) {
         loadFromModJar();
         loadFromExternalDirectories();
         loadFromGameDirectories();
+        }
         RailRegistry.setDefinitions(LOADED);
     }
 
@@ -72,7 +76,7 @@ public class RailPackLoader {
                     .filter(p -> isRailJson(p.getFileName().toString().toLowerCase(Locale.ROOT)))
                     .forEach(p -> {
                         try {
-                            parseRailJson(Files.readAllBytes(p), RealTrainModUnofficial.MODID);
+                            OrderedPackTasks.read(p,bytes->parseRailJson(bytes,RealTrainModUnofficial.MODID));
                             count[0]++;
                         } catch (Exception e) {
                             RealTrainModUnofficial.LOGGER.warn("Failed to load bundled rail {}", p.getFileName(), e);
@@ -98,6 +102,8 @@ public class RailPackLoader {
 
     private static void loadFromGameDirectories() {
         try {
+            var active=com.portofino.realtrainmodunofficial.modelpack.transfer.ServerPackStorage.activeDirectory();
+            if(active!=null && Files.isDirectory(active))loadArchiveDirectory(active);
             Path gameDir = FMLPaths.GAMEDIR.get();
             if (Files.isDirectory(gameDir)) {
                 loadArchiveDirectory(gameDir);
@@ -151,6 +157,7 @@ public class RailPackLoader {
     }
 
     public static synchronized void reload() {
+        VIRTUAL_PACKS.clear();
         loaded = false;
         load();
     }
@@ -219,6 +226,9 @@ public class RailPackLoader {
     }
 
     private static void parseRailJson(byte[] bytes, String packName) {
+        OrderedPackTasks.submit(()->parseRailJsonNow(bytes,packName));
+    }
+    private static void parseRailJsonNow(byte[] bytes,String packName) {
         try {
             JsonElement el = JsonParser.parseString(PackTextDecoder.decodeJson(bytes));
             if (!el.isJsonObject()) return;
@@ -290,8 +300,8 @@ public class RailPackLoader {
             } else if ((ballast & 1) == 0) {
                 ++ballast;
             }
-            LOADED.add(new RailDefinition(id, displayName, packName, packName, modelFile, scriptPath,
-                buttonTexture, tex, offset, scale, ballast, ballastBlockId, ballastSets));
+            OrderedPackTasks.publish(new RailDefinition(id, displayName, packName, packName, modelFile, scriptPath,
+                buttonTexture, tex, offset, scale, ballast, ballastBlockId, ballastSets), LOADED::add);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse rail json in {}: {}", packName, e.getMessage());
         }
@@ -460,6 +470,8 @@ public class RailPackLoader {
         if (packName == null || packName.isBlank()) return null;
         Path virtual = VIRTUAL_PACKS.get(packName);
         if (virtual != null && Files.exists(virtual)) return virtual;
+        var active=com.portofino.realtrainmodunofficial.modelpack.transfer.ServerPackStorage.activeDirectory();
+        if(active!=null && !packName.contains("/") && !packName.contains("\\") && Files.exists(active.resolve(packName)))return active.resolve(packName);
         String normalizedPackName = normalize(packName);
         String leafPackName = normalizedPackName.contains("/")
             ? normalizedPackName.substring(normalizedPackName.lastIndexOf('/') + 1)

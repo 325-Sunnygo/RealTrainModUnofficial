@@ -12,6 +12,10 @@ public class RealTrainModUnofficialBlockEntities {
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
         DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, RealTrainModUnofficial.MODID);
 
+    public static final DeferredHolder<BlockEntityType<?>,BlockEntityType<jp.ngt.rtm.block.tileentity.TileEntityMirror>> MIRROR =
+        BLOCK_ENTITY_TYPES.register("mirror",()->BlockEntityType.Builder.of(jp.ngt.rtm.block.tileentity.TileEntityMirror::new,
+            RealTrainModUnofficialBlocks.MIRROR.get(),RealTrainModUnofficialBlocks.MIRROR_CUBE.get()).build(null));
+
     // 旧 Remaster マーカーは本家 BlockMarker/TileEntityMarker へエイリアス済み。
     // (legacy_marker ブロックの BE は jp.ngt.rtm.rail.RTMRailBlockEntities.MARKER が持つ)
 

@@ -35,12 +35,14 @@ public final class LegacyTextureUploadRegression {
                 var url=LegacyTextureUploadRegression.class.getResource(path);
                 return url==null?java.util.Optional.empty():java.util.Optional.of(new net.minecraft.server.packs.resources.Resource(pack,url::openStream));
             };
-            for(String shaderName:new String[]{"legacy_entity","rtm_dof","rtm_accum","rtm_blit"}) {
+            for(String shaderName:new String[]{"legacy_entity","rtm_dof","rtm_accum","rtm_blit","mirror_resolve"}) {
                 var format=shaderName.equals("legacy_entity")?com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY:com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_TEX;
                 var shader=new net.minecraft.client.renderer.ShaderInstance(provider,
                         net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("realtrainmodunofficial",shaderName),format);
                 programs.add(shader);
-                if(!shaderName.equals("legacy_entity")) {
+                if(shaderName.equals("mirror_resolve")) {
+                    var field=com.portofino.realtrainmodunofficial.client.mirror.MirrorResolve.class.getDeclaredField("shader");field.setAccessible(true);field.set(null,shader);
+                } else if(!shaderName.equals("legacy_entity")) {
                     String fieldName=shaderName.equals("rtm_dof")?"dofShader":shaderName.equals("rtm_accum")?"accumShader":"blitShader";
                     var field=com.portofino.realtrainmodunofficial.client.camera.CameraPostProcessor.class.getDeclaredField(fieldName);
                     field.setAccessible(true);field.set(null,shader);
@@ -51,7 +53,7 @@ public final class LegacyTextureUploadRegression {
                 var shader=new net.minecraft.client.renderer.ShaderInstance(provider,vanilla[0],com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY);programs.add(shader);
                 var field=net.minecraft.client.renderer.GameRenderer.class.getDeclaredField(vanilla[1]);field.setAccessible(true);field.set(null,shader);
             }
-            System.out.println("Actual Minecraft ShaderInstance initialization: seven render/camera/fallback programs passed");
+            System.out.println("Actual Minecraft ShaderInstance initialization: eight render/camera/mirror/fallback programs passed");
             CameraFramebufferRegression.run();
             LegacyMatrixPlaybackRegression.run();
             LegacyProductionBlendRegression.run(programs.get(0));

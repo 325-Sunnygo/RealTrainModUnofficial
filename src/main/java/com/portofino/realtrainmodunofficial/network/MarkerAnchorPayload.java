@@ -50,6 +50,8 @@ public record MarkerAnchorPayload(BlockPos markerPos, CompoundTag railPositionTa
             if (rp == null) {
                 return;
             }
+            if(rp.blockX!=payload.markerPos().getX()||rp.blockY!=payload.markerPos().getY()||rp.blockZ!=payload.markerPos().getZ())return;
+            if(payload.railPositionTag().contains("MarkerState"))marker.setMarkerState(payload.railPositionTag().getInt("MarkerState")&63);
             marker.setMarkerRP(rp);
             marker.setChanged();
             // 本家 PacketMarkerRPClient: RP 適用後は updateRailMap のみ。

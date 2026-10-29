@@ -19,8 +19,7 @@ public final class CrossingGateSoundManager {
     private static final ResourceLocation CROSSING_SOUND_ID = ResourceLocation.fromNamespaceAndPath("rtm", "block.crossing_gate");
     private static final Map<String, LoopingCrossingSound> ACTIVE = new ConcurrentHashMap<>();
     /** 踏切音が聞こえる最大距離(ブロック)。これより遠いと鳴らさない/停止する(=どこでも聞こえる不具合対策)。 */
-    private static final double MAX_AUDIBLE_DISTANCE = 48.0D;
-    private static final double MAX_AUDIBLE_DISTANCE_SQ = MAX_AUDIBLE_DISTANCE * MAX_AUDIBLE_DISTANCE;
+    private static double maximumDistance() { return jp.ngt.rtm.RTMConfig.crossingGateSoundRange; }
 
     private CrossingGateSoundManager() {
     }
@@ -37,7 +36,7 @@ public final class CrossingGateSoundManager {
         double dx = (pos.getX() + 0.5D) - player.getX();
         double dy = (pos.getY() + 0.5D) - player.getY();
         double dz = (pos.getZ() + 0.5D) - player.getZ();
-        return (dx * dx + dy * dy + dz * dz) <= MAX_AUDIBLE_DISTANCE_SQ;
+        return (dx * dx + dy * dy + dz * dz) <= maximumDistance() * maximumDistance() && maximumDistance() > 0;
     }
 
     /** プレイヤーとの距離に応じた音量(近=1.0、FULL_VOLUME_DISTANCE超で線形減衰、MAXで0)。 */
@@ -50,13 +49,16 @@ public final class CrossingGateSoundManager {
         double dy = (pos.getY() + 0.5D) - player.getY();
         double dz = (pos.getZ() + 0.5D) - player.getZ();
         double dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (dist <= FULL_VOLUME_DISTANCE) {
+        double maximum = maximumDistance();
+        if (maximum <= 0 || dist >= maximum) return 0F;
+        double fullVolume = Math.min(FULL_VOLUME_DISTANCE, maximum * 0.25D);
+        if (dist <= fullVolume) {
             return 1.0F;
         }
-        if (dist >= MAX_AUDIBLE_DISTANCE) {
+        if (dist >= maximum) {
             return 0.0F;
         }
-        double t = (dist - FULL_VOLUME_DISTANCE) / (MAX_AUDIBLE_DISTANCE - FULL_VOLUME_DISTANCE);
+        double t = (dist - fullVolume) / (maximum - fullVolume);
         return (float) (1.0D - t);
     }
 

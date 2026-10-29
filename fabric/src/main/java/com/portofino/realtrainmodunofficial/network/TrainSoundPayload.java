@@ -11,7 +11,11 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-public record TrainSoundPayload(int trainEntityId, String soundId, float volume, float pitch) implements CustomPacketPayload {
+public record TrainSoundPayload(int trainEntityId, String soundId, float volume, float pitch, float range) implements CustomPacketPayload {
+    public TrainSoundPayload(int id,String sound,float volume,float pitch) { this(id,sound,volume,pitch,16F); }
+    public TrainSoundPayload {
+        if(!Float.isFinite(range) || range<0 || range>256)throw new IllegalArgumentException("Invalid sound range");
+    }
     public static final Type<TrainSoundPayload> TYPE = new Type<>(
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "train_sound")
     );
@@ -25,6 +29,8 @@ public record TrainSoundPayload(int trainEntityId, String soundId, float volume,
         TrainSoundPayload::volume,
         ByteBufCodecs.FLOAT,
         TrainSoundPayload::pitch,
+        ByteBufCodecs.FLOAT,
+        TrainSoundPayload::range,
         TrainSoundPayload::new
     );
 
@@ -38,11 +44,14 @@ public record TrainSoundPayload(int trainEntityId, String soundId, float volume,
      * legacySoundId は本家の書式 ("rtm:sounds/train/lever.ogg" 等) でよい。
      */
     public static void broadcast(net.minecraft.world.entity.Entity train, String legacySoundId, float volume, float pitch) {
-        if (train == null || train.level().isClientSide() || legacySoundId == null || legacySoundId.isBlank()) {
+        broadcast(train,legacySoundId,volume,pitch,16F);
+    }
+    public static void broadcast(net.minecraft.world.entity.Entity train,String legacySoundId,float volume,float pitch,float range) {
+        if (train == null || train.level().isClientSide() || legacySoundId == null || legacySoundId.isBlank() || range<=0) {
             return;
         }
         net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
-            train, new TrainSoundPayload(train.getId(), legacySoundId, volume, pitch));
+            train, new TrainSoundPayload(train.getId(), legacySoundId, volume, pitch,range));
     }
 
     public static void handleOnClient(TrainSoundPayload payload, IPayloadContext context) {
@@ -54,10 +63,10 @@ public record TrainSoundPayload(int trainEntityId, String soundId, float volume,
             // 旧 TrainEntity / 本家系 EntityTrainBase のどちらでも鳴らす
             // (以前は TrainEntity 決め打ちで、実際に出る本家系の列車では黙って捨てていた)
             net.minecraft.world.entity.Entity entity = minecraft.level.getEntity(payload.trainEntityId());
-            if (LegacyScriptSoundManager.isTrain(entity)) {
+            if (LegacyScriptSoundManager.isTrain(entity) || entity instanceof jp.ngt.rtm.entity.train.EntityBogie) {
                 // サーバー発の離散イベント音 (レバー/警笛/緩解音等): 抑制なしで送られた回数だけ鳴らす
                 // (連続ノッチ操作のガタガタ音は本家挙動。スクリプト用の抑制を通すと欠落する)
-                LegacyScriptSoundManager.playLegacyId(entity, payload.soundId(), payload.volume(), payload.pitch(), false, true);
+                LegacyScriptSoundManager.playLegacyId(entity, payload.soundId(), payload.volume(), payload.pitch(), false, true,payload.range());
             }
         });
     }

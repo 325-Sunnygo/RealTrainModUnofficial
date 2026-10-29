@@ -32,10 +32,11 @@ public final class RtmuOnlineServices {
 
     /** クライアントセットアップから 1 回呼ぶ。ネットワークはバックグラウンドで行う。 */
     public static void init() {
-        if (started) {
+        if (started || !jp.ngt.rtm.RTMConfig.versionCheck) {
             return;
         }
         started = true;
+        jp.ngt.ngtlib.util.VersionChecker.checkVersion();
         Thread t = new Thread(RtmuOnlineServices::checkUpdate, "RTMU-Online-Check");
         t.setDaemon(true);
         t.start();
@@ -43,7 +44,7 @@ public final class RtmuOnlineServices {
 
     /** 新しいバージョンがあるか。あればバージョン文字列、なければ null。 */
     public static String getUpdateLatestVersion() {
-        return updateLatestVersion;
+        return jp.ngt.rtm.RTMConfig.versionCheck?updateLatestVersion:null;
     }
 
     public static String getUpdateUrl() {
@@ -59,6 +60,7 @@ public final class RtmuOnlineServices {
     }
 
     private static void checkUpdate() {
+        if (!jp.ngt.rtm.RTMConfig.versionCheck) return;
         try {
             HttpRequest req = HttpRequest.newBuilder(URI.create(GITHUB_LATEST_API))
                     .timeout(Duration.ofSeconds(10))

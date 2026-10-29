@@ -10,6 +10,24 @@ import java.util.*;
 @GameTestHolder("realtrainmodunofficial")
 @PrefixGameTestTemplate(false)
 public final class LegacyRailWorldGameTests {
+    @GameTest(template="signal_attachment_empty",timeoutTicks=100)
+    public static void originalConfigBindings(GameTestHelper helper) throws Exception {
+        var settings = jp.ngt.rtm.RTMConfigOptions.readLegacy(net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get().resolve("RTM.cfg"));
+        helper.assertTrue(settings.size()==24,"RTM.cfg was not generated with every original setting");
+        for (var option : jp.ngt.rtm.RTMConfigOptions.ALL) {
+            Object expected = option.validate(settings.get(option));
+            net.neoforged.neoforge.common.ModConfigSpec.ConfigValue<?> configured = com.portofino.realtrainmodunofficial.RTMUConfig.SPEC.getValues().get(java.util.List.of(option.category(),option.key().replace('.', '_')));
+            helper.assertTrue(option.validate(configured.get()).equals(expected),"Native settings screen disagrees with RTM.cfg: "+option.field());
+            Object actual = jp.ngt.rtm.RTMConfig.class.getField(option.field()).get(null);
+            if (expected instanceof Boolean) helper.assertTrue(expected.equals(actual),"Config was not bound: "+option.field());
+            else {
+                double value=((Number)expected).doubleValue();
+                if(option.field().equals("trainSoundVol") || option.field().equals("gunSoundVol"))value/=100;
+                helper.assertTrue(Math.abs(value-((Number)actual).doubleValue())<.00001,"Config was not bound: "+option.field());
+            }
+        }
+        helper.succeed();
+    }
     @GameTest(template="signal_attachment_empty",timeoutTicks=400)
     public static void e259SpawnPose(GameTestHelper helper) throws Exception {
         String pack=System.getProperty("rtmu.e259Pack","");if(pack.isBlank()){helper.succeed();return;}
@@ -30,6 +48,56 @@ public final class LegacyRailWorldGameTests {
             train.discard();for(int i=0;i<2;i++)if(train.getBogie(i)!=null)train.getBogie(i).discard();
             com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.setDefinitions(saved);helper.succeed();
         });
+    }
+    @GameTest(template="signal_attachment_empty",timeoutTicks=200,batch="config_consumers")
+    public static void modelPackLoadModesStable(GameTestHelper helper) {
+        int original=jp.ngt.rtm.RTMConfig.loadSpeed;
+        java.util.List<String> expected=null;
+        try {
+            for(int mode:new int[]{1,2,3}) {
+                jp.ngt.rtm.RTMConfig.loadSpeed=mode;
+                com.portofino.realtrainmodunofficial.vehicle.VehiclePackLoader.reload();
+                com.portofino.realtrainmodunofficial.rail.RailPackLoader.reload();
+                com.portofino.realtrainmodunofficial.installedobject.InstalledObjectPackLoader.reload();
+                var actual=new ArrayList<String>();
+                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getAll().forEach(d->actual.add("vehicle:"+d.getId()));
+                com.portofino.realtrainmodunofficial.rail.RailRegistry.getAll().forEach(d->actual.add("rail:"+d.getId()));
+                com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry.getAll().forEach(d->actual.add("installed:"+d.getId()));
+                helper.assertTrue(!actual.isEmpty(),"parallel pack loading lost built-in definitions");
+                if(expected==null)expected=actual;else helper.assertTrue(expected.equals(actual),"pack definitions/order changed with load speed "+mode);
+            }
+        }finally{jp.ngt.rtm.RTMConfig.loadSpeed=original;}
+        helper.succeed();
+    }
+    @GameTest(template="signal_attachment_empty",timeoutTicks=200,batch="config_consumers")
+    public static void markerPanelStateAndLimitsSync(GameTestHelper helper) {
+        var level=helper.getLevel();var origin=helper.absolutePos(BlockPos.ZERO).offset(3000,140,3000);
+        var end=origin.offset(0,0,16);level.getChunkAt(origin);level.getChunkAt(end);
+        level.setBlockAndUpdate(origin,RTMRailBlocks.MARKER.get().defaultBlockState());
+        level.setBlockAndUpdate(end,RTMRailBlocks.MARKER.get().defaultBlockState());
+        var a=(TileEntityMarker)level.getBlockEntity(origin);var b=(TileEntityMarker)level.getBlockEntity(end);
+        a.setMarkerRP(new RailPosition(origin.getX(),origin.getY(),origin.getZ(),(byte)0));
+        b.setMarkerRP(new RailPosition(end.getX(),end.getY(),end.getZ(),(byte)4));
+        a.setMarkersPos(List.of(new int[]{origin.getX(),origin.getY(),origin.getZ()},new int[]{end.getX(),end.getY(),end.getZ()}));
+        var player=new net.minecraft.server.level.ServerPlayer(level.getServer(),level,new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(),"rtmu-config-test"),net.minecraft.server.level.ClientInformation.createDefault());player.setPos(origin.getX()+.5,origin.getY()+1,origin.getZ()+.5);
+        var context=(net.neoforged.neoforge.network.handling.IPayloadContext)java.lang.reflect.Proxy.newProxyInstance(LegacyRailWorldGameTests.class.getClassLoader(),new Class<?>[]{net.neoforged.neoforge.network.handling.IPayloadContext.class},(proxy,method,args)->{
+            if(method.getName().equals("player"))return player;
+            if(method.getName().equals("enqueueWork")){((Runnable)args[0]).run();return java.util.concurrent.CompletableFuture.completedFuture(null);}
+            return null;
+        });
+        int flags=MarkerState.LINE1.set(MarkerState.LINE2.set(0,true),true);
+        for(var marker:List.of(a,b)) {
+            var tag=marker.getMarkerRP().writeToNBT();tag.putInt("MarkerState",flags);tag.putFloat("Const_Limit_HP",5.2F);
+            com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload.handleOnServer(new com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload(marker.getBlockPos(),tag),context);
+        }
+        for(var marker:List.of(a,b)) {
+            helper.assertTrue(marker.getMarkerState()==flags&&!marker.fitNeighbor,"marker display/snapping state not synchronized");
+            helper.assertTrue(Math.abs(marker.getMarkerRP().constLimitHP-5.2F)<.0001,"construction limit edit was lost");
+            var saved=marker.saveWithFullMetadata(level.registryAccess());
+            var restored=(TileEntityMarker)net.minecraft.world.level.block.entity.BlockEntity.loadStatic(marker.getBlockPos(),marker.getBlockState(),saved,level.registryAccess());
+            helper.assertTrue(restored.getMarkerState()==flags&&!restored.fitNeighbor,"marker state changed after save/load");
+        }
+        helper.succeed();
     }
     private static RailPosition point(int x,int z,int direction) {
         var rp=new RailPosition(x,80,z,(byte)direction);rp.setPosition(x+0.5,80.0625,z);rp.anchorLengthHorizontal=24;rp.anchorYaw=direction*45;return rp;

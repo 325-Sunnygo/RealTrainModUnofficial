@@ -17,6 +17,8 @@ public final class ShaderCompat {
 
     /** フレーム頭で 1 回呼ぶ。切り替わったら #epoch が動く。 */
     public static void refresh() {
+        // A secondary sky view temporarily uses Iris's vanilla pipeline. This is not a user shader toggle.
+        if(com.portofino.realtrainmodunofficial.client.mirror.MirrorRenderer.rendering())return;
         boolean now = isShaderPackInUse();
         if (now != cachedActive) {
             cachedActive = now;
@@ -26,7 +28,7 @@ public final class ShaderCompat {
 
     /** 直近の #refresh 時点でシェーダーパックが有効か (リフレクション無し)。 */
     public static boolean active() {
-        return cachedActive;
+        return cachedActive&&!com.portofino.realtrainmodunofficial.client.mirror.IrisMirrorView.vanillaView();
     }
 
     public static int epoch() {

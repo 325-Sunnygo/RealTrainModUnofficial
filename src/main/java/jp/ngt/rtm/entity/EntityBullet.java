@@ -369,7 +369,9 @@ public class EntityBullet extends Projectile {
                 this.discard();
             }
         } else if (this.landingBlock != null && this.getCanBreakBlock()) {
-            if (this.isBreakableBlock(bullet, state, pos, doMobGriefing)) {
+            if (!jp.ngt.rtm.RTMConfig.gunBreakBlock) {
+                this.level().levelEvent(2001, pos, Block.getId(state));
+            } else if (this.isBreakableBlock(bullet, state, pos, doMobGriefing)) {
                 if (!this.level().isClientSide()) {
                     this.level().destroyBlock(pos, false);
                     this.discard();

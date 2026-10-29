@@ -121,7 +121,7 @@ public class ItemGun extends Item {
                 EntityBullet bullet = new EntityBullet(level, player, this.gunType.speed, this.gunType.bulletType);
                 level.addFreshEntity(bullet);
                 level.playSound(null, player.getX(), player.getY(), player.getZ(),
-                    RealTrainModUnofficialSounds.GUN.get(), SoundSource.PLAYERS, GUN_SOUND_VOLUME, 1.0F);
+                    RealTrainModUnofficialSounds.GUN.get(), SoundSource.PLAYERS, GUN_SOUND_VOLUME * jp.ngt.rtm.RTMConfig.gunSoundVol, 1.0F);
 
                 if (!player.getAbilities().instabuild) {
                     //薬莢ドロップ (本家と同じで メタ = 弾種 * 4 + 2)

@@ -48,6 +48,11 @@ public final class LegacyScriptSoundManager {
         return Mth.clamp(p, 0.05F, 4.0F);
     }
 
+    public static float rangeVolume(float volume,float master,double distance,float range) {
+        if(!(range>0) || !Float.isFinite(range) || !Double.isFinite(distance))return 0;
+        return safeVolume(volume*master,8F)*(float)Math.max(0,1-Math.max(0,distance)/range);
+    }
+
     private LegacyScriptSoundManager() {
     }
 
@@ -116,9 +121,10 @@ public final class LegacyScriptSoundManager {
 
     public static void playLegacyId(Entity train, String legacySoundId, float volume, float pitch,
                                     boolean looping, boolean bypassOneShotSuppression) {
-        if (legacySoundId == null || legacySoundId.isBlank()) {
-            return;
-        }
+        playLegacyId(train,legacySoundId,volume,pitch,looping,bypassOneShotSuppression,jp.ngt.rtm.RTMConfig.trainRunningSoundRange);
+    }
+    public static void playLegacyId(Entity train,String legacySoundId,float volume,float pitch,boolean looping,boolean bypassOneShotSuppression,float range) {
+        if (legacySoundId == null || legacySoundId.isBlank()) return;
         String namespace = "rtm";
         String soundName = legacySoundId;
         int separator = legacySoundId.indexOf(':');
@@ -126,7 +132,7 @@ public final class LegacyScriptSoundManager {
             namespace = legacySoundId.substring(0, separator);
             soundName = legacySoundId.substring(separator + 1);
         }
-        play(train, namespace, soundName, volume, pitch, looping, bypassOneShotSuppression);
+        play(train, namespace, soundName, volume, pitch, looping, bypassOneShotSuppression,range);
     }
 
     public static void play(Entity train, String namespace, String soundName, float volume, float pitch, boolean looping) {
@@ -150,6 +156,9 @@ public final class LegacyScriptSoundManager {
      */
     public static void play(Entity train, String namespace, String soundName, float volume, float pitch,
                             boolean looping, boolean bypassOneShotSuppression) {
+        play(train,namespace,soundName,volume,pitch,looping,bypassOneShotSuppression,jp.ngt.rtm.RTMConfig.trainRunningSoundRange);
+    }
+    public static void play(Entity train,String namespace,String soundName,float volume,float pitch,boolean looping,boolean bypassOneShotSuppression,float audibleRange) {
         if (train == null || !train.level().isClientSide()) {
             return;
         }
@@ -167,29 +176,19 @@ public final class LegacyScriptSoundManager {
         // サーバー発の離散イベント音 (レバー音・警笛など) は追跡せず毎回そのまま鳴らす
         // (本家もこれらは SoundUpdater ではなく都度 playSound)。
         if (!looping && (bypassOneShotSuppression || notchSound)) {
-            minecraft.getSoundManager().play(new SimpleSoundInstance(
-                soundId,
-                SoundSource.NEUTRAL,
-                safeVolume(volume, 8.0F),
-                safePitch(pitch),
-                SoundInstance.createUnseededRandom(),
-                false,
-                0,
-                SoundInstance.Attenuation.LINEAR,
-                train.getX(),
-                train.getY(),
-                train.getZ(),
-                false
-            ));
+            TrainScriptSound once=new TrainScriptSound(train,soundId,false);
+            once.update(volume,pitch,notchSound?16F:audibleRange);
+            if(notchSound || audibleRange>0)minecraft.getSoundManager().play(once);
             return;
         }
+        if (!(audibleRange>0)) { stop(train,soundId); return; }
         // ---- 本家 SoundUpdaterVehicle.playSound の忠実移植 ----
         // 既に登録済み (playingSounds 相当) なら、ループ/一発音を問わず音量・ピッチ更新のみ。
         // 一発音は鳴り終わっても登録が残るので、毎 tick 呼ばれても再発火しない (= 本家のラッチ)。
         String key = key(train.getUUID(), soundId);
         TrainScriptSound sound = ACTIVE.get(key);
         if (sound != null && !sound.isStopped()) {
-            sound.update(volume, pitch);
+            sound.update(volume, pitch,audibleRange);
             return;
         }
         if (sound != null) {
@@ -199,12 +198,12 @@ public final class LegacyScriptSoundManager {
         // 新規作成: サニタイズ後の音量が 0 以下なら登録も再生もしない。
         // NaN/±Infinity や fadeIn 開始点の 0 で「音量0のまま SoundEngine にスキップされ、
         // チャンネルが無いのに ACTIVE に居座って二度と復活しない」のを防ぐ。
-        float sanVol = safeVolume(volume, 1.0F);
+        float sanVol = safeVolume(volume * jp.ngt.rtm.RTMConfig.trainSoundVol, 1.0F);
         if (sanVol <= 0.0F) {
             return;
         }
         sound = new TrainScriptSound(train, soundId, looping);
-        sound.update(volume, pitch);
+        sound.update(volume, pitch,audibleRange);
         ACTIVE.put(key, sound);
         minecraft.getSoundManager().play(sound);
         // 消えた列車の登録をたまに掃除 (ラッチは isStopped=false なので消えない)
@@ -497,13 +496,11 @@ public final class LegacyScriptSoundManager {
         /** 最後にスクリプトから再生要求された時刻 (ms)。ループ音の鳴りっぱなし対策に使う。 */
         private volatile long lastRequestMs;
 
-        // 列車の車体音の可聴距離。実際の減衰は sounds.json の attenuation_distance=45
-        // (ExternalSoundPackBridge が生成時に付与) × max(音量,1) で決まり、45 ブロックかけて
-        // 線形にゼロへ落ちる。SoundEvent の range は減衰計算に使われないが、値は合わせておく。
-        private static final float TRAIN_SOUND_RANGE = 45.0F;
+        private float requestedVolume;
+        private float range;
 
         private TrainScriptSound(Entity train, ResourceLocation soundId, boolean repeat) {
-            super(SoundEvent.createFixedRangeEvent(soundId, TRAIN_SOUND_RANGE),
+            super(SoundEvent.createVariableRangeEvent(soundId),
                     SoundSource.NEUTRAL, SoundInstance.createUnseededRandom());
             this.train = train;
             this.repeat = repeat;
@@ -512,23 +509,27 @@ public final class LegacyScriptSoundManager {
             this.volume = 0.0F;
             this.pitch = 1.0F;
             this.relative = false;
+            this.attenuation=SoundInstance.Attenuation.NONE;
             this.lastRequestMs = System.currentTimeMillis();
             this.x = train.getX();
             this.y = train.getY();
             this.z = train.getZ();
         }
 
-        private void update(float volume, float pitch) {
-            // 実減衰距離は max(音量,1.0) × attenuation_distance(45)。音量を 1.0 に制限すると
-            // きっかり 45 ブロックで線形にゼロへ落ちる (音量>1 は近くの大きさを変えず範囲だけ
-            // 伸ばすため、制限しても近距離の聞こえ方は変わらない)。ループ・一発音とも。
-            float maxVol = 1.0F;
-            this.volume = safeVolume(volume, maxVol);
-            this.pitch = safePitch(pitch);
-            this.lastRequestMs = System.currentTimeMillis();
-            this.x = train.getX();
-            this.y = train.getY();
-            this.z = train.getZ();
+        private void update(float volume,float pitch,float range) {
+            this.range=Math.max(0,Math.min(256,Float.isFinite(range)?range:0));
+            this.requestedVolume=safeVolume(volume,8F);
+            this.pitch=safePitch(pitch);
+            this.lastRequestMs=System.currentTimeMillis();
+            refreshVolume();
+        }
+        @Override public boolean canStartSilent() { return true; }
+        private void refreshVolume() {
+            this.x=train.getX();this.y=train.getY();this.z=train.getZ();
+            var mc=Minecraft.getInstance();
+            var listener=mc.gameRenderer==null?null:mc.gameRenderer.getMainCamera();
+            double distance=listener==null?0:listener.getPosition().distanceTo(train.position());
+            this.volume=rangeVolume(requestedVolume,jp.ngt.rtm.RTMConfig.trainSoundVol,distance,range);
         }
 
         private void requestStop() {
@@ -552,9 +553,7 @@ public final class LegacyScriptSoundManager {
                 stop();
                 return;
             }
-            this.x = train.getX();
-            this.y = train.getY();
-            this.z = train.getZ();
+            refreshVolume();
         }
     }
 }

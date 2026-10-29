@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"rtmu_smoke","version":"1","environment":"client","entrypoints":{"client":["com.portofino.realtrainmodunofficial.fabric.SmokeClientEntrypoint"]}}

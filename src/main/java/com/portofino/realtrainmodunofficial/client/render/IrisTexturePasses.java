@@ -17,6 +17,8 @@ public final class IrisTexturePasses {
         if(white==null){white=ResourceLocation.fromNamespaceAndPath("realtrainmodunofficial","shader_white");var image=new NativeImage(1,1,false);image.setPixelRGBA(0,0,-1);DynamicTextureRegistry.register(white,image);}return white;
     }
     public static boolean accepts(float alpha,int function,float reference) {
+        alpha = Math.round(Math.clamp(alpha, 0F, 1F) * 255F);
+        reference = Math.round(Math.clamp(reference, 0F, 1F) * 255F);
         return switch(function){case 512->false;case 513->alpha<reference;case 514->alpha==reference;
             case 515->alpha<=reference;case 516->alpha>reference;case 517->alpha!=reference;case 518->alpha>=reference;default->true;};
     }

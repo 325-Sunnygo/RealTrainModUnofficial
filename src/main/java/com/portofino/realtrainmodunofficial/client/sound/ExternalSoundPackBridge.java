@@ -127,7 +127,7 @@ public final class ExternalSoundPackBridge {
             gameDir.resolve("config").resolve("realtrainmodunofficial").resolve("rail_packs")
         );
         Set<Path> unique = new LinkedHashSet<>();
-        for (Path root : roots) {
+        for (Path root : com.portofino.realtrainmodunofficial.modelpack.transfer.ServerPackStorage.withActiveRoot(roots)) {
             if (!Files.isDirectory(root)) {
                 continue;
             }

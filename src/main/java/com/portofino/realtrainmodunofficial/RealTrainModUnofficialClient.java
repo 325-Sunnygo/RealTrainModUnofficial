@@ -37,7 +37,8 @@ public class RealTrainModUnofficialClient {
     /** ワールド入室時に RTMU 設定をサーバーへ同期 (敷設時・乗客上限でサーバーが参照するため)。 */
     @SubscribeEvent
     static void onLoggingIn(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingIn event) {
-            }
+        com.portofino.realtrainmodunofficial.client.ServerPackClient.begin();
+    }
 
     /**
      * ワールドを抜けたら看板まわりのキャッシュを捨てる。
@@ -46,6 +47,8 @@ public class RealTrainModUnofficialClient {
      */
     @SubscribeEvent
     static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
+        com.portofino.realtrainmodunofficial.client.ServerPackClient.end();
+        com.portofino.realtrainmodunofficial.client.mirror.MirrorRenderer.clear();
         com.portofino.realtrainmodunofficial.client.signboard.FontImage.clearCache();
         com.portofino.realtrainmodunofficial.client.signboard.tt.TimeTableManager.INSTANCE.invalidate();
     }

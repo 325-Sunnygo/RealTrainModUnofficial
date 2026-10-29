@@ -40,31 +40,18 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             return;
         }
 
-        // レンチの「アンカー移動」モード中のみアンカー線を表示し、線を右クリックで掴んで編集
-        // (coreMarker はクライアントで null のことがあるため RailMaps の有無で判定)
-        if (marker.getRailMaps() != null && marker.getRailMaps().length > 0 && marker.getMarkerRP() != null) {
-            if (isAnchorWrenchHeld()) {
-                this.changeAnchor(marker);
-                this.updateHover(marker);
-                this.renderAnchor(marker, poseStack, buffer);
-            } else if (editingMarker == marker) {
-                // モードを離れたら編集中断
-                marker.editMode = 0;
-                editingMarker = null;
-                TileEntityMarker.clientEditingMarker = null;
-            }
+        if(RTMConfig.use1122Marker)MarkerPanel.render(marker,poseStack,buffer,font);
+        RailMap[] maps=marker.getRailMaps();
+        if(maps!=null&&maps.length>0&&marker.getMarkerRP()!=null) {
+            boolean anchors=RTMConfig.use1122Marker?(marker.getState(MarkerState.LINE1)||marker.getState(MarkerState.LINE2)):(marker.getDisplayMode()==2||isAnchorWrenchHeld());
+            if(anchors) {
+                changeAnchor(marker);updateHover(marker);
+                if(RTMConfig.use1122Marker)renderAnchor(marker,poseStack,buffer);else renderLegacyAnchor(marker,poseStack,buffer);
+            } else if(editingMarker==marker){marker.editMode=0;editingMarker=null;TileEntityMarker.clientEditingMarker=null;}
+            if(RTMConfig.use1122Marker?marker.getState(MarkerState.LINE1):(marker.getDisplayMode()==2||isAnchorWrenchHeld()))renderLine(marker,maps,poseStack,buffer);
+            if(RTMConfig.use1122Marker?marker.getState(MarkerState.GRID):marker.getDisplayMode()==1)renderGrid(marker,poseStack,buffer);
         }
-
-        if (!marker.displayDistance || !marker.getState(MarkerState.DISTANCE)) {
-            return;
-        }
-
-        this.renderDistanceMark(marker, markerBlock, state, poseStack, buffer);
-
-        RailMap[] maps = marker.getRailMaps();
-        if (maps != null && maps.length > 0) {
-            this.renderLine(marker, maps, poseStack, buffer);
-        }
+        if(marker.displayDistance&&(!RTMConfig.use1122Marker||marker.getState(MarkerState.DISTANCE)))renderDistanceMark(marker,markerBlock,state,poseStack,buffer);
     }
 
     // ---- 本家 RenderMarkerBlock1122: アンカー編集 (線を右クリックで掴んで動かす) ----
@@ -76,7 +63,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         VERTICAL(0xFF8800),
         CANT_EDGE(0xFF00FF),
         CANT_CENTER(0xFF00FF),
-        HEIGHT(0xFF1E00);
+        HEIGHT(0xFF1E00),
+        CONST_LIMIT_HP(0x1060FF),CONST_LIMIT_HN(0x1060FF),CONST_LIMIT_WP(0x1060FF),CONST_LIMIT_WN(0x1060FF);
 
         public final int color;
 
@@ -111,14 +99,27 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                         == com.portofino.realtrainmodunofficial.item.RtmWrenchItem.MODE_ANCHOR;
     }
 
+    private static int legacyMode;
+    public static boolean onLegacyNumberKey(int key,int action) {
+        Minecraft mc=Minecraft.getInstance();
+        if(RTMConfig.use1122Marker || mc.screen!=null || !isAnchorWrenchHeld() || key<org.lwjgl.glfw.GLFW.GLFW_KEY_0 || key>org.lwjgl.glfw.GLFW.GLFW_KEY_3)return false;
+        if(action==org.lwjgl.glfw.GLFW.GLFW_PRESS || action==org.lwjgl.glfw.GLFW.GLFW_REPEAT) {
+            legacyMode=key-org.lwjgl.glfw.GLFW.GLFW_KEY_0;
+            if(editingMarker!=null)editingMarker.editMode=legacyMode;
+        }
+        return true;
+    }
+    private static void beginLegacyEdit(TileEntityMarker marker,Minecraft mc) {
+        marker.editMode=legacyMode;marker.startPlayerPitch=mc.player.getXRot();marker.startPlayerYaw=mc.player.getYHeadRot();
+        marker.startMarkerHeight=marker.getMarkerRP().height;editingMarker=marker;TileEntityMarker.clientEditingMarker=marker;
+    }
     public static boolean onRightClick() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
             return false;
         }
-        if (!isAnchorWrenchHeld()) {
-            return false;
-        }
+        if (MarkerPanel.click())return true;
+        if (!RTMConfig.use1122Marker&&!isAnchorWrenchHeld())return false;
         if (editingMarker != null) {
             // 確定 → RailPosition をサーバーへ (本家 PacketMarkerRPClient)
             TileEntityMarker marker = editingMarker;
@@ -126,13 +127,19 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             editingMarker = null;
             TileEntityMarker.clientEditingMarker = null;
             if (!marker.isRemoved() && marker.getMarkerRP() != null) {
-                sendAnchor(marker.getBlockPos(), marker.getMarkerRP());
-                RailPosition opposite = getOppositeRailStatic(marker);
-                if (opposite != null) {
-                    sendAnchor(new net.minecraft.core.BlockPos(opposite.blockX, opposite.blockY, opposite.blockZ), opposite);
+                var core=marker.getCoreMarker();if(core==null)core=marker;
+                for(var position:core.getAllRP()) {
+                    var tag=position.writeToNBT();tag.putInt("MarkerState",core.getMarkerState());
+                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(new com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload(new net.minecraft.core.BlockPos(position.blockX,position.blockY,position.blockZ),tag));
                 }
             }
             return true;
+        }
+        if(!RTMConfig.use1122Marker && legacyMode>0 && mc.level!=null
+                && mc.hitResult instanceof net.minecraft.world.phys.BlockHitResult hit
+                && mc.level.getBlockEntity(hit.getBlockPos()) instanceof TileEntityMarker marker
+                && marker.getMarkerRP()!=null && marker.getRailMaps()!=null) {
+            beginLegacyEdit(marker,mc);return true;
         }
         // マーカーブロック自体を狙っている場合はブロック操作 (レンチのマーカー操作等) を優先。
         // その他のブロックは「線より手前」にある場合のみ優先 (背景の地面越しには掴める)。
@@ -151,7 +158,8 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 && System.nanoTime() - hoveredNanos < 200_000_000L && !hoveredMarker.isRemoved()) {
             // 掴む
             TileEntityMarker marker = hoveredMarker;
-            marker.editMode = hoveredElement.ordinal();
+            if(!RTMConfig.use1122Marker && legacyMode==0)return false;
+            marker.editMode = RTMConfig.use1122Marker?hoveredElement.ordinal():legacyMode;
             marker.startPlayerPitch = mc.player.getXRot();
             marker.startPlayerYaw = mc.player.getYHeadRot();
             marker.startMarkerHeight = marker.getMarkerRP() != null ? marker.getMarkerRP().height : 0;
@@ -160,11 +168,6 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             return true;
         }
         return false;
-    }
-
-    private static void sendAnchor(net.minecraft.core.BlockPos pos, RailPosition rp) {
-        net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                new com.portofino.realtrainmodunofficial.network.MarkerAnchorPayload(pos, rp.writeToNBT()));
     }
 
     /** 本家 renderAnchorLine (isPickMode): カーソルが乗っている線をレイ-線分距離で判定 */
@@ -180,16 +183,17 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         net.minecraft.world.phys.Vec3 eye = mc.player.getEyePosition();
         net.minecraft.world.phys.Vec3 look = mc.player.getViewVector(1.0F);
 
-        // ユーザー要望: 掴めるのは緑 (水平) の線のみ
-        MarkerElement best = MarkerElement.NONE;
-        double bestDist = Double.MAX_VALUE;
-        double bestEyeDist = Double.MAX_VALUE;
-        for (net.minecraft.world.phys.Vec3[] seg : anchorSegments(marker, rp, MarkerElement.HORIZONTIAL)) {
-            double[] d = raySegmentDistance(eye, look, seg[0], seg[1]);
-            if (d[0] < bestDist) {
-                bestDist = d[0];
-                bestEyeDist = d[1];
-                best = MarkerElement.HORIZONTIAL;
+        MarkerElement best=MarkerElement.NONE;
+        double bestDist=Double.MAX_VALUE,bestEyeDist=Double.MAX_VALUE;
+        for(var element:MarkerElement.values()) {
+            if(element==MarkerElement.NONE)continue;
+            if(RTMConfig.use1122Marker) {
+                if(element.ordinal()>=6&&!marker.getState(MarkerState.LINE2))continue;
+                if(element.ordinal()<6&&!marker.getState(MarkerState.LINE1))continue;
+            } else if(element!=MarkerElement.HORIZONTIAL)continue;
+            for(var segment:anchorSegments(marker,rp,element)) {
+                double[] d=raySegmentDistance(eye,look,segment[0],segment[1]);
+                if(d[0]<bestDist){bestDist=d[0];bestEyeDist=d[1];best=element;}
             }
         }
         double threshold = 0.2D + bestEyeDist * 0.01D;
@@ -213,13 +217,13 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         switch (elm) {
             case HEIGHT -> out.add(new net.minecraft.world.phys.Vec3[]{base, base.add(0.0D, 1.0D, 0.0D)});
             case HORIZONTIAL -> {
-                float len = displayLen(rp);
+                float len = RTMConfig.use1122Marker?rp.anchorLengthHorizontal:displayLen(rp);
                 out.add(new net.minecraft.world.phys.Vec3[]{base,
                         base.add(Mth.sin(yawRad) * len, 0.0D, Mth.cos(yawRad) * len)});
             }
             case VERTICAL -> {
                 float pitchRad = rp.anchorPitch * Mth.DEG_TO_RAD;
-                float len = rp.anchorLengthVertical < 0.0F ? -5.0F : 5.0F;
+                float len = RTMConfig.use1122Marker?rp.anchorLengthVertical:(rp.anchorLengthVertical<0?-5:5);
                 double h = Mth.cos(pitchRad) * len;
                 out.add(new net.minecraft.world.phys.Vec3[]{base,
                         base.add(Mth.sin(yawRad) * h, Mth.sin(pitchRad) * len, Mth.cos(yawRad) * h)});
@@ -241,8 +245,18 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                     out.add(new net.minecraft.world.phys.Vec3[]{mid[0], mid[0].subtract(mid[1])});
                 }
             }
-            default -> {
+            case CONST_LIMIT_HP,CONST_LIMIT_HN,CONST_LIMIT_WP,CONST_LIMIT_WN -> {
+                float x0=rp.constLimitWN,x1=rp.constLimitWP,y0=rp.constLimitHN,y1=rp.constLimitHP;
+                switch(elm) {
+                    case CONST_LIMIT_HP -> y0=y1;
+                    case CONST_LIMIT_HN -> y1=y0;
+                    case CONST_LIMIT_WP -> x0=x1;
+                    case CONST_LIMIT_WN -> x1=x0;
+                    default -> {}
+                }
+                out.add(new net.minecraft.world.phys.Vec3[]{base.add(x0*Mth.cos(yawRad),y0,-x0*Mth.sin(yawRad)),base.add(x1*Mth.cos(yawRad),y1,-x1*Mth.sin(yawRad))});
             }
+            default -> {}
         }
         return out;
     }
@@ -322,6 +336,20 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         }
         float pitchDif = mc.player.getXRot() - marker.startPlayerPitch;
 
+        if(curElm.ordinal()>=6) {
+            float yawDif=mc.player.getYHeadRot()-marker.startPlayerYaw;
+            var maps=marker.getRailMaps();if(maps==null||maps.length==0)return;
+            for(var map:maps)for(var target:new RailPosition[]{map.getStartRP(),map.getEndRP()}) {
+                switch(curElm) {
+                    case CONST_LIMIT_HP -> target.constLimitHP=Math.max(1.9F,3-pitchDif/10);
+                    case CONST_LIMIT_HN -> target.constLimitHN=Math.min(0,-pitchDif/10);
+                    case CONST_LIMIT_WP -> target.constLimitWP=Math.max(.49F,1.5F-yawDif/10);
+                    case CONST_LIMIT_WN -> target.constLimitWN=Math.min(-.49F,-1.5F-yawDif/10);
+                    default -> {}
+                }
+            }
+            marker.onChangeRailShape();return;
+        }
         if (curElm == MarkerElement.HEIGHT) {
             int height = marker.startMarkerHeight + (int) (-pitchDif / 1.0F);
             height = Mth.clamp(height, 0, 15);
@@ -335,8 +363,14 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
         if (curElm == MarkerElement.CANT_EDGE) {
             float cantLimit = 80.0F;
             float cant = Mth.clamp(pitchDif, -cantLimit, cantLimit);
+            if(!RTMConfig.use1122Marker) {
+                var hit=mc.player.pick(128,0,true);
+                if(hit.getType()!=net.minecraft.world.phys.HitResult.Type.BLOCK)return;
+                var delta=hit.getLocation().subtract(rp.posX,rp.posY,rp.posZ);
+                cant=Mth.wrapDegrees((float)Math.toDegrees(Math.atan2(delta.x,delta.z))-rp.anchorYaw);
+            }
             RailPosition neighborRP = this.getNeighborRail(marker);
-            if (neighborRP != null && marker.fitNeighbor) {
+            if (neighborRP != null && marker.getState(MarkerState.FIT_NEIGHBOR)) {
                 cant = -neighborRP.cantEdge;
             }
             rp.cantEdge = cant;
@@ -395,7 +429,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             float length = (float) (dx / Math.sin(dirRad));
             float yaw = (float) Math.toDegrees(dirRad);
             if (curElm == MarkerElement.HORIZONTIAL) {
-                if (neighborRP != null && marker.fitNeighbor) {
+                if (neighborRP != null && marker.getState(MarkerState.FIT_NEIGHBOR)) {
                     yaw = Mth.wrapDegrees(neighborRP.anchorYaw + 180.0F);
                 }
                 rp.anchorYaw = yaw;
@@ -403,7 +437,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 rp.anchorManual = true;
             } else if (curElm == MarkerElement.VERTICAL) {
                 float pitch = Mth.wrapDegrees(yaw - rp.anchorYaw);
-                if (neighborRP != null && marker.fitNeighbor) {
+                if (neighborRP != null && marker.getState(MarkerState.FIT_NEIGHBOR)) {
                     pitch = -neighborRP.anchorPitch;
                 } else if (fitOpposite) {
                     double dy = targetVec.y - rp.posY;
@@ -507,29 +541,49 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
      * アンカー線の描画 — ユーザー要望で緑 (水平) のみ。
      * 通常は 5 ブロック固定、掴んでいる間は実際の制御長まで伸びる (本家同様)。
      */
-    private void renderAnchor(TileEntityMarker marker, PoseStack poseStack, MultiBufferSource buffer) {
-        RailPosition rp = marker.getMarkerRP();
-        if (rp == null) {
-            return;
+    private void renderLegacyAnchor(TileEntityMarker marker,PoseStack pose,MultiBufferSource buffer) {
+        var rp=marker.getMarkerRP();if(rp==null)return;
+        var lines=buffer.getBuffer(AnchorRenderTypes.THICK_LINES);
+        pose.pushPose();pose.translate(rp.posX-marker.getBlockPos().getX(),rp.posY-marker.getBlockPos().getY(),rp.posZ-marker.getBlockPos().getZ());
+        pose.pushPose();pose.mulPose(new Quaternionf().rotationY(rp.anchorYaw*Mth.DEG_TO_RAD));
+        drawLine(lines,pose,0,0,0,0,0,rp.anchorLengthHorizontal,legacyMode==0||legacyMode==1?0x00ff20:0x007f10);
+        pose.pushPose();pose.mulPose(new Quaternionf().rotationX(-rp.anchorPitch*Mth.DEG_TO_RAD));
+        drawLine(lines,pose,0,0,0,0,0,rp.anchorLengthVertical,legacyMode==0||legacyMode==2?0xff8800:0x7f4400);pose.popPose();
+        pose.mulPose(new Quaternionf().rotationZ(rp.cantEdge*Mth.DEG_TO_RAD));
+        drawLine(lines,pose,-1,0,0,1,0,0,legacyMode==0||legacyMode==3?0xff00ff:0x7f007f);pose.popPose();
+        pose.mulPose(Minecraft.getInstance().gameRenderer.getMainCamera().rotation());pose.scale(.03F,-.03F,.03F);
+        String[] labels={"key=0 None","key=1 Horizontal","key=2 Vertical","key=3 Cant"};
+        for(int i=0;i<labels.length;i++)font.drawInBatch(labels[i],0,-10F*(i+1),0xffffffff,false,pose.last().pose(),buffer,Font.DisplayMode.NORMAL,0,0xf000f0);
+        pose.popPose();
+    }
+
+    private void renderAnchor(TileEntityMarker marker,PoseStack pose,MultiBufferSource buffer) {
+        var rp=marker.getMarkerRP();if(rp==null)return;
+        var active=editingMarker==marker?MarkerElement.values()[marker.editMode]:(hoveredMarker==marker?hoveredElement:MarkerElement.NONE);
+        var lines=buffer.getBuffer(AnchorRenderTypes.THICK_LINES);
+        for(var element:MarkerElement.values()) {
+            if(element==MarkerElement.NONE)continue;
+            if(element.ordinal()<6&&!marker.getState(MarkerState.LINE1))continue;
+            if(element.ordinal()>=6&&!marker.getState(MarkerState.LINE2))continue;
+            for(var segment:anchorSegments(marker,rp,element)) {
+                var a=segment[0].subtract(marker.getBlockPos().getX(),marker.getBlockPos().getY(),marker.getBlockPos().getZ());
+                var b=segment[1].subtract(marker.getBlockPos().getX(),marker.getBlockPos().getY(),marker.getBlockPos().getZ());
+                drawLine(lines,pose,(float)a.x,(float)a.y,(float)a.z,(float)b.x,(float)b.y,(float)b.z,colorOf(element,active));
+            }
         }
-        boolean editing = editingMarker == marker && marker.editMode == MarkerElement.HORIZONTIAL.ordinal();
-        boolean active = editing || (hoveredMarker == marker && hoveredElement == MarkerElement.HORIZONTIAL);
-
-        VertexConsumer lines = buffer.getBuffer(AnchorRenderTypes.THICK_LINES);
-
-        double ox = rp.posX - marker.getBlockPos().getX();
-        double oy = rp.posY - marker.getBlockPos().getY();
-        double oz = rp.posZ - marker.getBlockPos().getZ();
-
-        // 掴んでいる間は制御長そのまま (視線先まで伸びる)、通常は displayLen (未編集=5固定/編集済み=実長)
-        float len = editing ? rp.anchorLengthHorizontal : displayLen(rp);
-
-        poseStack.pushPose();
-        poseStack.translate(ox, oy, oz);
-        poseStack.mulPose(new Quaternionf().rotationY(rp.anchorYaw * Mth.DEG_TO_RAD));
-        drawLine(lines, poseStack, 0, 0, 0, 0, 0, len,
-                colorOf(MarkerElement.HORIZONTIAL, active ? MarkerElement.HORIZONTIAL : MarkerElement.NONE));
-        poseStack.popPose();
+        pose.pushPose();pose.translate(rp.posX-marker.getBlockPos().getX(),rp.posY-marker.getBlockPos().getY()+1.4,rp.posZ-marker.getBlockPos().getZ());
+        pose.mulPose(Minecraft.getInstance().gameRenderer.getMainCamera().rotation());pose.scale(.04F,-.04F,.04F);
+        String[] values={""+rp.height,""+rp.anchorYaw,""+rp.anchorPitch,""+rp.cantEdge,""+rp.cantCenter};
+        for(int i=0;i<values.length;i++)font.drawInBatch(values[i],3,6*i,0xFFFFFFFF,false,pose.last().pose(),buffer,Font.DisplayMode.NORMAL,0,0xF000F0);
+        pose.popPose();
+    }
+    private void renderGrid(TileEntityMarker marker,PoseStack pose,MultiBufferSource buffer) {
+        var grid=marker.getGrid();if(grid==null)return;
+        var lines=buffer.getBuffer(AnchorRenderTypes.THICK_LINES);var base=marker.getBlockPos();
+        for(var cell:grid)for(int axis=0;axis<3;axis++)for(int a=0;a<2;a++)for(int b=0;b<2;b++) {
+            float[] p={cell[0]-base.getX(),cell[1]-base.getY(),cell[2]-base.getZ()};p[(axis+1)%3]+=a;p[(axis+2)%3]+=b;
+            float[] q=p.clone();q[axis]++;drawLine(lines,pose,p[0],p[1],p[2],q[0],q[1],q[2],0x000000);
+        }
     }
 
     private static int colorOf(MarkerElement elm, MarkerElement active) {
@@ -590,6 +644,13 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
             float moveZ = i * 10.0F;
             for (int k = -1; k <= 1; k++) {
                 float moveX = moveZ * k;
+                if (!RTMConfig.markerDistanceMoreRealPosition) {
+                    quads.addVertex(m, -0.4F + moveX, 0.01F, 0.4F + moveZ).setColor(r,g,b,1F);
+                    quads.addVertex(m, -0.4F + moveX, 0.01F, -0.4F + moveZ).setColor(r,g,b,1F);
+                    quads.addVertex(m, 0.4F + moveX, 0.01F, -0.4F + moveZ).setColor(r,g,b,1F);
+                    quads.addVertex(m, 0.4F + moveX, 0.01F, 0.4F + moveZ).setColor(r,g,b,1F);
+                    continue;
+                }
                 // 横棒 (幅 0.8 / 奥行 0.2)
                 quads.addVertex(m, -0.4F + moveX, 0.01F, -0.4F + moveZ).setColor(r, g, b, 1.0F);
                 quads.addVertex(m, -0.4F + moveX, 0.01F, -0.6F + moveZ).setColor(r, g, b, 1.0F);
@@ -612,7 +673,7 @@ public class MarkerBlockEntityRenderer implements BlockEntityRenderer<TileEntity
                 float moveX = moveZ * k;
                 poseStack.pushPose();
                 //目盛りを 0.5 手前へ寄せたのでテキストも合わせる
-                poseStack.translate(moveX, 2.5F, moveZ - 0.5F);
+                poseStack.translate(moveX, 2.5F, moveZ - (RTMConfig.markerDistanceMoreRealPosition ? 0.5F : 0F));
                 // 親の向き回転を打ち消してからカメラビルボード (バニラのネームタグ方式)
                 poseStack.mulPose(new Quaternionf().rotationY(-dir * Mth.DEG_TO_RAD));
                 poseStack.mulPose(cameraRot);

@@ -321,7 +321,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             case "play_horn" -> {
                 VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
                 if (def != null && !def.getHornSound().isBlank()) {
-                    TrainSoundPayload.broadcast(train, def.getHornSound(), 1.0F, 1.0F);
+                    TrainSoundPayload.broadcast(train, def.getHornSound(), 1.0F, 1.0F,jp.ngt.rtm.RTMConfig.trainHornSoundRange);
                     jp.ngt.rtm.entity.npc.macro.MacroRecorder.recHorn(player);
                 }
             }
@@ -380,7 +380,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
         if (definition == null || definition.getHornSound().isBlank()) {
             return;
         }
-        broadcastTrainSound(sourceTrain, definition.getHornSound(), 1.0F, 1.0F);
+        TrainSoundPayload.broadcast(sourceTrain, definition.getHornSound(), 1.0F, 1.0F,jp.ngt.rtm.RTMConfig.trainHornSoundRange);
     }
 
     private static void broadcastTrainSound(TrainEntity sourceTrain, String soundId, float volume, float pitch) {

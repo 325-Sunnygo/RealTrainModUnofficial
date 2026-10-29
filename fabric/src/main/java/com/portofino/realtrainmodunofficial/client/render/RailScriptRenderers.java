@@ -52,6 +52,7 @@ public final class RailScriptRenderers {
      */
     private static final Map<String, GLRecorder> SUB_CACHE = new ConcurrentHashMap<>();
 
+    public static void invalidateAll() {CACHE.clear();PLAIN_CACHE.clear();SUB_CACHE.clear();LIGHT_SIGNATURES.clear();RailMeshCache.clear();}
     private RailScriptRenderers() {
     }
 
@@ -73,7 +74,7 @@ public final class RailScriptRenderers {
             // ★ //include の展開と FQN remap は全経路で共通 (PackScriptSource.prepare)。
             // 以前この経路だけ prepare を通しておらず、include を使うレール/架線/設置物パックが
             // 「スクリプトはあるのに何も描かない」状態になっていた。
-            ScriptEngine se = ScriptUtil.doScript(PRELUDE + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, def.getScriptPath()));
+            ScriptEngine se = ScriptUtil.doScript(PRELUDE + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, def.getScriptPath()), def.getScriptPath());
             Object rcName = se.get("renderClass");
             if (rcName == null) {
                 RealTrainModUnofficial.LOGGER.warn("Rail script has no renderClass: {}", def.getId());
@@ -301,11 +302,6 @@ public final class RailScriptRenderers {
             // その独自パイプラインは道床/枕木/レールを RTMU が名前で勝手に振り分けており
             // (RailGroup.BASE + renderSwitchPoint)、分岐で道床や枕木が抜ける原因になっていた。
             BlockPos pos = be.getBlockPos();
-            // スクリプトが分岐を描かないパック (AR 等は isSwitchRail で早期 return):
-            // 記録が空だったコアは旧パイプラインに任せる (端トリミング付き)
-            if (isSwitch && this.scriptSkippedSwitches.contains(pos) && !be.shouldRerenderRail) {
-                return false;
-            }
             GLRecorder rec = this.staticCache.get(pos);
             // 明るさは記録に焼き込まれるので、光が変わったら記録ごと作り直す (lightChanged 参照)
             boolean lightChanged = lightChanged(pos, be, maps);
@@ -334,7 +330,9 @@ public final class RailScriptRenderers {
                         // の順で、可動部を焼き込みに含めない。
                     }
                 } catch (Throwable t) {
-                    RealTrainModUnofficial.LOGGER.warn("Rail script render failed at {}", pos, t);
+                    if (loggedFailures.add(pos)) RealTrainModUnofficial.LOGGER.warn("Rail script render failed at {}", pos, t);
+                    this.staticCache.remove(pos);
+                    return true;
                 } finally {
                     GLRecorder.deactivate();
                     this.renderer.currentRailIndex = 0;
@@ -344,35 +342,11 @@ public final class RailScriptRenderers {
                 be.shouldRerenderRail = false;
             }
 
-            // 分岐: レール本体は本家どおり renderRailDynamic (トング可動) が描く。
-            // movement (転てつ状態) が変わらない限り記録を再利用する。
-            // ★可動部は全レール共通で焼き込みの外。
-            GLRecorder dyn = null;
-            if (isSwitch) {
-                long dynKey = computeSwitchDynKey((TileEntityLargeRailSwitchCore) be);
-                // ★敷設し直し (rebuilt) は線形そのものが変わっている。トング位置 (movement) が
-                //   同じでも可動部の記録を作り直す。これが無いと「同じ場所に分岐を敷き直したのに
-                //   可動部だけ最初に敷いた経路で描かれる」(静的側だけ shouldRerenderRail で
-                //   更新され、動的側はキー一致で古い記録が残るため)。
-                DynEntry cached = rebuilt ? null : this.dynamicCache.get(pos);
-                if (cached != null && cached.key == dynKey) {
-                    dyn = cached.rec;
-                } else {
-                    dyn = recordDynamic(be, model, partialTick, pos);
-                    this.dynamicCache.put(pos, new DynEntry(dynKey, dyn));
-                }
-            } else {
-                dyn = recordDynamic(be, model, partialTick, pos);
-            }
-
-            boolean staticDrew = !rec.isEmpty();
-            boolean dynDrew = dyn != null && !dyn.isEmpty();
-            if (isSwitch && !staticDrew && !dynDrew) {
-                // スクリプトが分岐で何も描かなかった → 旧パイプラインで描かせる
-                this.scriptSkippedSwitches.add(pos);
-                return false;
-            }
-            this.scriptSkippedSwitches.remove(pos);
+            // Reference RailPartsRenderer executes dynamic geometry every frame,
+            // outside the static display list. Empty output is valid script behavior.
+            GLRecorder dyn = recordDynamic(be, model, partialTick, pos);
+            boolean staticDrew = rec.hasGeometry();
+            boolean dynDrew = dyn != null && dyn.hasGeometry();
             if (staticDrew) {
                 // 静的部分 (レール本体・枕木・バラスト) はレール 1 本 = 1 メッシュに焼いて
                 // GPU に置きっぱなしにする (本家のディスプレイリスト相当)。
@@ -382,29 +356,12 @@ public final class RailScriptRenderers {
                 }
             }
             if (dynDrew) {
-                // ★可動部 (トング) も焼き込みへ。
-                // 本家 renderRail は renderRailDynamic を焼き込みの外で毎フレーム実行する。
-                final GLRecorder dynRec = dyn;
-                int dynBakeKey = 31 * dynRec.contentKey() + packedLight;
-                boolean dynBaked = ObjectMeshCache.draw(be, poseStack, dynBakeKey,
-                        buf -> replayForCapture(dynRec, new PoseStack(), buf,
-                                packedLight, packedOverlay, model));
-                if (!dynBaked) {
-                    replay(dyn, poseStack, buffer, packedLight, packedOverlay, model);
-                }
+                replay(dyn, poseStack, buffer, packedLight, packedOverlay, model);
             }
             return true;
         }
 
-        /** スクリプトが描画を拒否した分岐コア (毎フレームのスクリプト再実行を避けるキャッシュ)。 */
-        private final java.util.Set<BlockPos> scriptSkippedSwitches =
-                java.util.concurrent.ConcurrentHashMap.newKeySet();
-
-        /** 分岐の動的描画 (トング) 記録キャッシュ。転てつ movement が変わったら再記録。 */
-        private final java.util.Map<BlockPos, DynEntry> dynamicCache = new java.util.concurrent.ConcurrentHashMap<>();
-
-        private record DynEntry(long key, GLRecorder rec) {
-        }
+        private final java.util.Set<BlockPos> loggedFailures = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
         /** 本家 renderRailDynamic 相当。焼き込みには載せず、その場で 1 フレーム分だけ記録する。 */
         private GLRecorder recordDynamic(TileEntityLargeRailCore be,
@@ -422,45 +379,14 @@ public final class RailScriptRenderers {
                 this.renderer.modelGroupNames = model.getOriginalGroupNames();
                 this.renderer.renderRailDynamic(be, 0.0D, 0.0D, 0.0D, partialTick, 0);
             } catch (Throwable t) {
-                RealTrainModUnofficial.LOGGER.warn("Rail dynamic script failed at {}", pos, t);
+                if (loggedFailures.add(pos)) RealTrainModUnofficial.LOGGER.warn("Rail dynamic script failed at {}", pos, t);
+                return null;
             } finally {
                 GLRecorder.deactivate();
             }
             return dyn;
         }
 
-        private static long computeSwitchDynKey(TileEntityLargeRailSwitchCore be) {
-            long key = 1L;
-            jp.ngt.rtm.rail.util.SwitchType st = be.getSwitch();
-            if (st != null) {
-                jp.ngt.rtm.rail.util.Point[] points = st.getPoints();
-                if (points != null) {
-                    for (jp.ngt.rtm.rail.util.Point p : points) {
-                        key = key * 31L + (p == null ? 0 : Float.floatToIntBits(p.getMovement()));
-                    }
-                }
-            }
-            // ★線形も鍵に含める。同位置に敷き直してトング位置 (movement) が一致しても、
-            //   経路が変わっていれば記録を作り直す。
-            jp.ngt.rtm.rail.util.RailPosition[] positions = be.getRailPositions();
-            if (positions != null) {
-                for (jp.ngt.rtm.rail.util.RailPosition rp : positions) {
-                    if (rp == null) {
-                        key = key * 31L;
-                        continue;
-                    }
-                    key = key * 31L + Double.doubleToLongBits(rp.posX);
-                    key = key * 31L + Double.doubleToLongBits(rp.posY);
-                    key = key * 31L + Double.doubleToLongBits(rp.posZ);
-                    key = key * 31L + rp.direction;
-                    key = key * 31L + rp.height;
-                    key = key * 31L + rp.blockX;
-                    key = key * 31L + rp.blockY;
-                    key = key * 31L + rp.blockZ;
-                }
-            }
-            return key;
-        }
 
     }
 

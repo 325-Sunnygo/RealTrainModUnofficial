@@ -83,7 +83,7 @@ public class MacroExecutor {
     private void execHorn(EntityTrainBase train) {
         VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
         if (def != null && !def.getHornSound().isBlank()) {
-            TrainSoundPayload.broadcast(train, def.getHornSound(), 1.0F, 1.0F);
+            TrainSoundPayload.broadcast(train, def.getHornSound(), 1.0F, 1.0F,jp.ngt.rtm.RTMConfig.trainHornSoundRange);
         }
     }
 

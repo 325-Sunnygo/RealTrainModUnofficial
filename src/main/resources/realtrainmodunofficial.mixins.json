@@ -9,7 +9,12 @@
     "CameraMixin",
     "MouseHandlerMixin",
     "SoundBufferAccessor",
-    "SoundBufferLibraryMixin"
+    "SoundBufferLibraryMixin",
+    "LegacySoundChannelMixin",
+    "LegacyMarkerKeysMixin",
+    "MirrorTargetMixin",
+    "MirrorLevelTargetsMixin",
+    "MirrorFrustumMixin"
   ],
   "injectors": {
     "defaultRequire": 1

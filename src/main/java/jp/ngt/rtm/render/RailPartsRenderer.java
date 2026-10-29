@@ -37,8 +37,14 @@ public class RailPartsRenderer extends PartsRenderer {
                 tile.getBlockPos().getZ() + rp.posZ - rp.blockZ};
     }
 
-    public int getBrightness(net.minecraft.world.level.Level level, int x, int y, int z) {
-        return level == null ? 0 : brightnessAt(level, x, y, z);
+    /** One Nashorn-visible signature: mixed (Level,int...) and (Object,double...)
+     * overloads are ambiguous for JavaScript coordinates. Keep the reference rail
+     * renderer's integer-coordinate conversion and brightness sampling.
+     */
+    @Override
+    public int getBrightness(Object world, double x, double y, double z) {
+        return world instanceof net.minecraft.world.level.Level level
+                ? brightnessAt(level, (int) x, (int) y, (int) z) : 0;
     }
 
     public void setBrightness(int brightness) {
@@ -95,14 +101,14 @@ public class RailPartsRenderer extends PartsRenderer {
     }
 
     public void renderRailStatic(TileEntityLargeRailCore tile, double x, double y, double z, float partialTicks, int pass) {
-        if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "renderRailStatic", tile, x, y, z, partialTicks, pass);
+        if (ScriptUtil.hasFunction(this.script, "renderRailStatic")) {
+            ScriptUtil.doScriptFunction(this.script, "renderRailStatic", tile, x, y, z, partialTicks, pass);
         }
     }
 
     public void renderRailDynamic(TileEntityLargeRailCore tile, double x, double y, double z, float partialTicks, int pass) {
-        if (this.script != null) {
-            ScriptUtil.doScriptIgnoreError(this.script, "renderRailDynamic", tile, x, y, z, partialTicks, pass);
+        if (ScriptUtil.hasFunction(this.script, "renderRailDynamic")) {
+            ScriptUtil.doScriptFunction(this.script, "renderRailDynamic", tile, x, y, z, partialTicks, pass);
         }
     }
 

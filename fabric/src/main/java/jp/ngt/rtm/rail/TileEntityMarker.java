@@ -25,7 +25,7 @@ import java.util.List;
  * 本家 jp.ngt.rtm.rail.TileEntityMarker (KaizPatchX) の忠実移植。
  * NBT: RP / MarkerState (本家キーのまま)。
  */
-public class TileEntityMarker extends BlockEntity implements jp.ngt.mccompat.LoadAwareBlockEntity {
+public class TileEntityMarker extends BlockEntity {
     private RailPosition rp;
 
     public boolean displayDistance = true;//同期必要なし
@@ -82,7 +82,7 @@ public class TileEntityMarker extends BlockEntity implements jp.ngt.mccompat.Loa
         if (nbt.contains("RP") && this != clientEditingMarker) {
             this.rp = RailPosition.readFromNBT(nbt.getCompound("RP"));
         }
-        this.markerState = nbt.getInt("MarkerState");
+        this.setMarkerState(nbt.getInt("MarkerState"));
         // コアマーカー座標 (クライアントの getCoreMarker 解決に必須)
         if (nbt.contains("StartY")) {
             this.startX = nbt.getInt("StartX");
@@ -133,7 +133,6 @@ public class TileEntityMarker extends BlockEntity implements jp.ngt.mccompat.Loa
     }
 
     public void onLoad() {
-        
         MarkerManager.add(this);
     }
 
@@ -405,6 +404,7 @@ public class TileEntityMarker extends BlockEntity implements jp.ngt.mccompat.Loa
 
     public void setMarkerState(int markerState) {
         this.markerState = markerState;
+        this.fitNeighbor=MarkerState.FIT_NEIGHBOR.get(markerState);
     }
 
     public boolean getState(MarkerState state) {
@@ -423,14 +423,14 @@ public class TileEntityMarker extends BlockEntity implements jp.ngt.mccompat.Loa
             if (marker != null) {
                 marker.setState(state, data);
             } else if (state == MarkerState.DISTANCE) {
-                this.markerState = state.set(this.markerState, data);
+                this.setMarkerState(state.set(this.markerState, data));
             }
         } else {
-            this.markerState = state.set(this.markerState, data);
+            this.setMarkerState(state.set(this.markerState, data));
             this.markerPosList.stream()
                     .map(pos -> this.level.getBlockEntity(new BlockPos(pos[0], pos[1], pos[2])))
                     .filter(TileEntityMarker.class::isInstance).map(TileEntityMarker.class::cast)
-                    .forEach(marker -> marker.markerState = this.markerState);
+                    .forEach(marker -> marker.setMarkerState(this.markerState));
         }
     }
 

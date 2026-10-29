@@ -159,7 +159,7 @@ loom {
 // Keep source names intact and canonicalize only the packaged asset paths.
 tasks.named('processResources', ProcessResources).configure {
     includeEmptyDirs = false
-    doFirst { delete destinationDir }
+    doFirst { task -> task.destinationDir.deleteDir() }
     eachFile { details ->
         if (details.path.startsWith('assets/')) details.path = details.path.toLowerCase(Locale.ROOT)
     }

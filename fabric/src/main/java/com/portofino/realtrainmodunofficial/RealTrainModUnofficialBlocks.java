@@ -11,6 +11,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public class RealTrainModUnofficialBlocks {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(RealTrainModUnofficial.MODID);
 
+    public static final DeferredBlock<jp.ngt.rtm.block.BlockMirror> MIRROR = BLOCKS.register("mirror",()->new jp.ngt.rtm.block.BlockMirror(jp.ngt.rtm.block.BlockMirror.MirrorType.Mono_Panel));
+    public static final DeferredBlock<jp.ngt.rtm.block.BlockMirror> MIRROR_CUBE = BLOCKS.register("mirror_cube",()->new jp.ngt.rtm.block.BlockMirror(jp.ngt.rtm.block.BlockMirror.MirrorType.Hexa_Cube));
+
     public static final DeferredBlock<CrossingGateBlock> CROSSING_GATE
         = BLOCKS.register("crossing_gate", () -> new CrossingGateBlock());
 

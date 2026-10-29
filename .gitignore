@@ -50,3 +50,6 @@ build_err.txt
 
 # 乗客simは本体へ統合済み。旧サブプロジェクトはコミットしない
 passenger/
+
+# Runtime logs can contain local paths and player/server information.
+/logs/

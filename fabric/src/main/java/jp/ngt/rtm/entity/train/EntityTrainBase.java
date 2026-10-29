@@ -697,7 +697,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
         // 軽量化: カメラから遠い (可聴距離外の) 列車はサウンド処理を毎tick回さない。
         // 距離で毎tick Nashorn / 走行音 tick を回すのは無駄。
-        if (com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.beyondCameraRange(this, 96.0)) {
+        if (com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.beyondCameraRange(this, Math.max(96.0,jp.ngt.rtm.RTMConfig.trainRunningSoundRange))) {
             return;
         }
 
@@ -1448,7 +1448,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         if (sound == null || sound.isBlank()) {
             return;
         }
-        com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(this, sound, 1.0F, 1.0F);
+        com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(this, sound, 1.0F, 1.0F,jp.ngt.rtm.RTMConfig.trainBrakeReleaseSoundRange);
     }
 
     public boolean setNotch(int par1) {

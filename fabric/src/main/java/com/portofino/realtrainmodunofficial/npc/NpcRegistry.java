@@ -1,5 +1,7 @@
 package com.portofino.realtrainmodunofficial.npc;
 
+import com.portofino.realtrainmodunofficial.util.OrderedPackTasks;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
@@ -63,7 +65,7 @@ public final class NpcRegistry {
             serverScriptPath = str(obj.getAsJsonObject("model"), "serverScriptPath");
         }
         definition.setServerScriptPath(serverScriptPath);
-        LOADING.add(definition);
+        OrderedPackTasks.publish(definition, LOADING::add);
         return true;
     }
 

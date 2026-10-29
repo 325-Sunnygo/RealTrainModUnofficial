@@ -196,7 +196,7 @@ public final class RailDrawQueue {
     private static java.lang.reflect.Field shaderLightDirsField;
     private static boolean shaderLightDirsFailed;
 
-    static Vector3f[] currentShaderLights() {
+    public static Vector3f[] currentShaderLights() {
         if (shaderLightDirsFailed) {
             return null;
         }

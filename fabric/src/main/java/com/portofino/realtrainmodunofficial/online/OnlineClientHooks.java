@@ -18,6 +18,25 @@ public final class OnlineClientHooks {
     private OnlineClientHooks() {
     }
 
+    private static final java.util.Set<String> NOTIFIED=new java.util.HashSet<>();
+    private static Object notifiedLevel;
+    @SubscribeEvent
+    public static void notifyPackUpdates(net.neoforged.neoforge.client.event.ClientTickEvent.Post event) {
+        var mc=Minecraft.getInstance();
+        if(notifiedLevel!=mc.level){NOTIFIED.clear();notifiedLevel=mc.level;}
+        if(mc.player==null)return;
+        for(var update:jp.ngt.ngtlib.util.VersionChecker.getUpdates()) {
+            if(!NOTIFIED.add(update.name()+"\n"+update.version()))continue;
+            var message=net.minecraft.network.chat.Component.translatable("message.version",update.name()).append(" : "+update.version());
+            try {
+                var uri=java.net.URI.create(update.homepage());
+                if("https".equalsIgnoreCase(uri.getScheme())||"http".equalsIgnoreCase(uri.getScheme()))
+                    message.append(net.minecraft.network.chat.Component.literal("  Download here").withStyle(style->style.withColor(net.minecraft.ChatFormatting.GOLD).withUnderlined(true).withClickEvent(new net.minecraft.network.chat.ClickEvent(net.minecraft.network.chat.ClickEvent.Action.OPEN_URL,uri.toString()))));
+            }catch(RuntimeException ignored){}
+            mc.player.displayClientMessage(message,false);
+        }
+    }
+
     /** タイトル画面右上にアップデート通知を出す。 */
     @SubscribeEvent
     public static void onScreenRender(ScreenEvent.Render.Post event) {

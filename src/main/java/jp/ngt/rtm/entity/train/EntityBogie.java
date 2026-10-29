@@ -410,7 +410,7 @@ public class EntityBogie extends Entity {
             return;
         }
 
-        if (this.level().isClientSide()) {
+        if (!this.level().isClientSide()) {
             float maxSpeed = cfg.maxSpeed != null && cfg.maxSpeed.length > 0
                     ? cfg.maxSpeed[cfg.maxSpeed.length - 1] : 1.8F;
             // 速いほど高いピッチ (1.0〜1.5)
@@ -423,8 +423,7 @@ public class EntityBogie extends Entity {
                 sound = this.reverbSound ? JOINT_SOUND_REVERB : JOINT_SOUND;
             }
             // 継ぎ目音は離散イベント: 登録制ラッチを通さず毎回鳴らす
-            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
-                    .playLegacyId(this, sound, 1.0F, pitch, false, true);
+            com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(this,sound,1.0F,pitch,jp.ngt.rtm.RTMConfig.trainJointSoundRange);
         }
 
         int size = cfg.jointDelay[bogieId].length;

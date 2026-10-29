@@ -32,7 +32,7 @@ public class CargoRenderer<T extends EntityCargoWithModel> extends EntityRendere
             return;
         }
         MqoModelLoader.MqoModel model = MqoModelLoader.loadModelFromPack(
-            def.getPackName(), def.getModelFile(), def.getTextureOverrides(), null, true);
+            def.getPackName(), def.getModelFile(), def.getTextureOverrides(), null, jp.ngt.rtm.RTMConfig.smoothing);
         if (model == null) {
             return;
         }

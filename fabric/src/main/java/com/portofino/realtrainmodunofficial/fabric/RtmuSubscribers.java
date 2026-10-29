@@ -32,6 +32,7 @@ public final class RtmuSubscribers {
         "com.portofino.realtrainmodunofficial.client.camera.CameraClientEvents",
         "com.portofino.realtrainmodunofficial.client.render.BallastModelHook",
         "com.portofino.realtrainmodunofficial.client.render.RailDrawQueue",
+        "com.portofino.realtrainmodunofficial.client.mirror.MirrorRenderer",
         "com.portofino.realtrainmodunofficial.online.OnlineClientHooks",
     };
 

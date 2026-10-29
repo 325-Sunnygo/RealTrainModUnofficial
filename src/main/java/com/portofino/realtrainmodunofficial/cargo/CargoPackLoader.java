@@ -1,5 +1,7 @@
 package com.portofino.realtrainmodunofficial.cargo;
 
+import com.portofino.realtrainmodunofficial.util.OrderedPackTasks;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
@@ -42,11 +44,11 @@ public final class CargoPackLoader {
      */
     public static synchronized boolean tryParse(JsonObject obj, String lowerFile, String packName) {
         if (lowerFile.startsWith("modelcontainer_")) {
-            LOADED.add(parseContainer(obj, lowerFile, packName));
+            OrderedPackTasks.publish(parseContainer(obj, lowerFile, packName), LOADED::add);
             return true;
         }
         if (lowerFile.startsWith("modelfirearm_")) {
-            LOADED.add(parseFirearm(obj, lowerFile, packName));
+            OrderedPackTasks.publish(parseFirearm(obj, lowerFile, packName), LOADED::add);
             return true;
         }
         return false;

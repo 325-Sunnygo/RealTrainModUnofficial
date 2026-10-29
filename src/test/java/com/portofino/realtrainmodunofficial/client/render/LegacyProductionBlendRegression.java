@@ -71,6 +71,21 @@ public final class LegacyProductionBlendRegression {
             }
             }
             }
+            shaderActive.setBoolean(null,false);
+            IrisTexturePasses.forget(loc); LegacyRenderTypes.forgetTexture(loc);
+            var opaqueImage=new NativeImage(1,1,false);opaqueImage.setPixelRGBA(0,0,0xff000000);manager.register(loc,new DynamicTexture(opaqueImage));
+            for(float interpolatedAlpha:new float[]{Math.nextDown(1F),1F,Math.nextUp(1F)}) {
+                target.setClearColor(0,1,0,1);target.clear(Minecraft.ON_OSX);target.bindWrite(true);
+                RenderSystem.setShaderColor(1,1,1,interpolatedAlpha);
+                var type=LegacyRenderTypes.vehicle(RenderType.entityCutout(loc),loc,false,false,true,VertexFormat.Mode.TRIANGLES);
+                var builder=Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES,DefaultVertexFormat.NEW_ENTITY);
+                for(float[] v:new float[][]{{-1,-1},{3,-1},{-1,3}})builder.addVertex(v[0],v[1],0).setColor(255,255,255,255).setUv(.5F,.5F).setOverlay(OverlayTexture.NO_OVERLAY).setLight(LightTexture.FULL_BRIGHT).setNormal(0,0,1);
+                type.draw(builder.buildOrThrow());
+                var pixels=org.lwjgl.BufferUtils.createByteBuffer(16*16*4);GL11.glReadPixels(0,0,16,16,GL11.GL_RGBA,GL11.GL_UNSIGNED_BYTE,pixels);
+                for(int i=0;i<256;i++)if((pixels.get(i*4+1)&255)!=0)throw new AssertionError("Opaque alpha roundoff discarded pixel "+i+" with alpha "+interpolatedAlpha);
+            }
+            RenderSystem.setShaderColor(1,1,1,1);
+            System.out.println("Actual legacy alpha rounding: 768 opaque pixels survive below/equal/above-one float roundoff");
             shaderActive.setBoolean(null,true);
             if (LegacyRenderTypes.shaderPackProgram(false,true,false) != LegacyRenderTypes.shaderPackProgram(false,true,true)
                     || LegacyRenderTypes.shaderPackProgram(false,true,false) == LegacyRenderTypes.shaderPackProgram(true,false,true))
@@ -101,6 +116,37 @@ public final class LegacyProductionBlendRegression {
             System.out.println("Shader fallback smooth triangles / ordinary unlit entity / camera isolation: 5 passed");
             System.out.println("Actual normal/Iris-fallback RenderType/BufferUploader alpha and depth: "+checks+" passed");
             LegacyE259ScriptRegression.run();
+            var skyTarget=new TextureTarget(16,16,true,Minecraft.ON_OSX);
+            var worldTarget=new TextureTarget(16,16,true,Minecraft.ON_OSX);
+            var resolvedTarget=new TextureTarget(16,16,true,Minecraft.ON_OSX);
+            try {
+                skyTarget.setClearColor(0,0,1,1);skyTarget.clear(Minecraft.ON_OSX);
+                for(boolean geometry:new boolean[]{false,true})for(boolean black:new boolean[]{false,true}) {
+                    worldTarget.setClearColor(black?0:1,0,0,1);worldTarget.bindWrite(true);
+                    RenderSystem.depthMask(true);worldTarget.clear(Minecraft.ON_OSX);worldTarget.bindWrite(true);GL11.glClearDepth(geometry?.4:1);GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);GL11.glClearDepth(1);
+                    com.portofino.realtrainmodunofficial.client.mirror.MirrorResolve.draw(skyTarget,worldTarget,worldTarget.getDepthTextureId(),resolvedTarget);
+                    var pixel=org.lwjgl.BufferUtils.createByteBuffer(4);GL11.glReadPixels(8,8,1,1,GL11.GL_RGBA,GL11.GL_UNSIGNED_BYTE,pixel);
+                    int red=pixel.get(0)&255,blue=pixel.get(2)&255;
+                    if(black&&!geometry){if(blue!=255||red!=0)throw new AssertionError("Mirror sky was blacked out");}
+                    else if(black){if(red!=0||blue!=0)throw new AssertionError("Mirror erased black opaque geometry");}
+                    else if(red!=255||blue!=0)throw new AssertionError("Mirror lost colored or translucent geometry");
+                    if(!GL11.glGetBoolean(GL11.GL_DEPTH_WRITEMASK))throw new AssertionError("Mirror resolve leaked depth mask");
+                }
+            } finally {skyTarget.destroyBuffers();worldTarget.destroyBuffers();resolvedTarget.destroyBuffers();}
+            System.out.println("Mirror GPU resolve: sky, black geometry, colored/translucent surfaces and depth-state restoration passed");
+            var imageClass=Class.forName("com.portofino.realtrainmodunofficial.client.mirror.MirrorRenderer$Image");
+            var constructor=imageClass.getDeclaredConstructor(int.class);constructor.setAccessible(true);
+            var targetField=imageClass.getDeclaredField("target");targetField.setAccessible(true);
+            for(int size:new int[]{256,512,2048}) {
+                try(var reflection=(AutoCloseable)constructor.newInstance(size)) {
+                    var reflectionTarget=(TextureTarget)targetField.get(reflection);
+                    if(reflectionTarget.width!=size||reflectionTarget.height!=size)throw new AssertionError("Mirror resolution ignored");
+                    reflectionTarget.setClearColor(.25F,.5F,.75F,1);reflectionTarget.clear(Minecraft.ON_OSX);reflectionTarget.bindWrite(true);
+                    var pixel=org.lwjgl.BufferUtils.createByteBuffer(4);GL11.glReadPixels(size/2,size/2,1,1,GL11.GL_RGBA,GL11.GL_UNSIGNED_BYTE,pixel);
+                    if(Math.abs((pixel.get(1)&255)-128)>1)throw new AssertionError("Mirror framebuffer is not readable");
+                }
+            }
+            System.out.println("Mirror GPU framebuffers: 256/512/2048 allocation, readback and disposal passed");
         } finally {target.destroyBuffers();light.close();overlay.close();set(Minecraft.class,null,"instance",null);}
     }
 }

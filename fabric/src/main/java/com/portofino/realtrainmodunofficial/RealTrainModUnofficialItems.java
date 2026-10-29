@@ -16,7 +16,11 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 
 public class RealTrainModUnofficialItems {
 
+
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(RealTrainModUnofficial.MODID);
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> MIRROR_ITEM=ITEMS.register("mirror",()->new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.MIRROR.get(),new net.minecraft.world.item.Item.Properties()));
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> MIRROR_CUBE_ITEM=ITEMS.register("mirror_cube",()->new net.minecraft.world.item.BlockItem(RealTrainModUnofficialBlocks.MIRROR_CUBE.get(),new net.minecraft.world.item.Item.Properties()));
+
 
     public static final DeferredItem<InstalledObjectItem> CROSSING_GATE_ITEM = ITEMS.register(
         "crossing_gate", () -> new InstalledObjectItem(InstalledObjectCategory.CROSSING)

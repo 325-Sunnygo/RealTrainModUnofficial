@@ -34,6 +34,7 @@ public final class NGTFileLoader {
     private record AssetRef(Path container, String entryName) {
     }
 
+    public static synchronized void invalidateAssets() {index=null;CONTENT_CACHE.clear();MISSING_CACHE.clear();TEXTURE_CACHE.clear();}
     private NGTFileLoader() {
     }
 
@@ -284,6 +285,8 @@ public final class NGTFileLoader {
         for (String sub : new String[]{"vehicle_packs", "rail_packs", "packs", "nested_pack_cache"}) {
             out.add(cfg.resolve(sub).toFile());
         }
+        var active=com.portofino.realtrainmodunofficial.modelpack.transfer.ServerPackStorage.activeDirectory();
+        if(active!=null)out.add(active.toFile());
         return out;
     }
 
@@ -412,10 +415,43 @@ public final class NGTFileLoader {
         }
     }
 
+    /** All pack metadata, including archives with identical pack.json entry names. */
+    public static List<byte[]> readPackMetadata() {
+        var result=new ArrayList<byte[]>();
+        for(Path container:collectContainers()) {
+            try {
+                if(Files.isDirectory(container)) {
+                    try(var files=Files.walk(container,12)) {
+                        for(Path path:files.filter(Files::isRegularFile).filter(p->p.getFileName().toString().equals("pack.json")).toList())
+                            if(Files.size(path)<=65536)result.add(Files.readAllBytes(path));
+                    }
+                } else if(com.portofino.realtrainmodunofficial.pack.PackConsent.isAllowed(container)) {
+                    try(var zip=openZip(container)) {
+                        var entries=zip.entries();
+                        while(entries.hasMoreElements()) {
+                            var entry=entries.nextElement();String name=entry.getName().replace('\\','/');
+                            if(!entry.isDirectory()&&(name.equals("pack.json")||name.endsWith("/pack.json")))
+                                try(var input=zip.getInputStream(entry)){var bytes=input.readNBytes(65537);if(bytes.length<=65536)result.add(bytes);}
+                        }
+                    }
+                }
+            }catch(IOException|RuntimeException failure){NGTLog.debug("Skipped unreadable pack metadata: "+container.getFileName());}
+        }
+        return result;
+    }
+
     private static List<Path> collectContainers() {
         List<Path> out = new ArrayList<>();
-        Path gameDir = FMLPaths.GAMEDIR.get();
+        Path gameDir;
+        try{gameDir=FMLPaths.GAMEDIR.get();}catch(IllegalStateException notInitialized){return out;}
+        if(gameDir==null)return out;
+        var active=com.portofino.realtrainmodunofficial.modelpack.transfer.ServerPackStorage.activeDirectory();
+        if(active!=null)addZips(out,active);
         addZips(out, gameDir.resolve("mods"));
+        addZips(out, gameDir.resolve("mods/modelpacks"));
+        addZips(out, gameDir.resolve("content"));
+        addZips(out, gameDir.resolve("vehicle_packs"));
+        addZips(out, gameDir.resolve("modelpacks"));
         addZips(out, com.portofino.realtrainmodunofficial.DefaultAssetsFolder.get());
         Path cfg = gameDir.resolve("config").resolve("realtrainmodunofficial");
         for (String sub : new String[]{"vehicle_packs", "rail_packs", "packs", "nested_pack_cache"}) {

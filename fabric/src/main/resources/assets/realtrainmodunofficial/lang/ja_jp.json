@@ -386,5 +386,8 @@
   "gui.npc.can_not_sell": "品物が足りません",
   "gui.npc.have_money": "所持金",
   "usage.realtrainmodunofficial.connector_in": "取付け先ブロックへ信号入力",
-  "usage.realtrainmodunofficial.connector_out": "取付け先ブロックから信号出力"
+  "usage.realtrainmodunofficial.connector_out": "取付け先ブロックから信号出力",
+  "block.realtrainmodunofficial.mirror": "鏡",
+  "block.realtrainmodunofficial.mirror_cube": "ミラーブロック",
+  "message.version": "%s の新しいバージョンがあります"
 }

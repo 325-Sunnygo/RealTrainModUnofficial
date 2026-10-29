@@ -1,5 +1,7 @@
 package com.portofino.realtrainmodunofficial.installedobject;
 
+import com.portofino.realtrainmodunofficial.util.OrderedPackTasks;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -44,8 +46,10 @@ public final class InstalledObjectPackLoader {
         LOADED.clear();
         com.portofino.realtrainmodunofficial.cargo.CargoPackLoader.begin();
         com.portofino.realtrainmodunofficial.npc.NpcRegistry.begin();
-        try {
+        try(var tasks=OrderedPackTasks.begin()) {
             loadFromModJar();
+            var active=com.portofino.realtrainmodunofficial.modelpack.transfer.ServerPackStorage.activeDirectory();
+            if(active!=null && Files.isDirectory(active))loadArchiveDirectory(active);
             loadDirectoryPacks(FMLPaths.GAMEDIR.get());
             loadArchiveDirectory(FMLPaths.GAMEDIR.get());
             Path modsDir = FMLPaths.GAMEDIR.get().resolve("mods");
@@ -116,7 +120,7 @@ public final class InstalledObjectPackLoader {
                     .filter(p -> isSupportedJson(normalize(p.getFileName().toString())))
                     .forEach(path -> {
                         try {
-                            parse(normalize(path.getFileName().toString()), Files.readAllBytes(path), packName);
+                            OrderedPackTasks.read(path,bytes->parse(normalize(path.getFileName().toString()),bytes,packName));
                         } catch (Exception e) {
                             RealTrainModUnofficial.LOGGER.warn("Failed to load built-in installed object definition {}", path.getFileName(), e);
                         }
@@ -131,8 +135,7 @@ public final class InstalledObjectPackLoader {
                         .filter(p -> isSupportedJson(normalize(p.getFileName().toString())))
                         .forEach(path -> {
                             try {
-                                parse(normalize(path.getFileName().toString()),
-                                    Files.readAllBytes(path), packName);
+                                OrderedPackTasks.read(path,bytes->parse(normalize(path.getFileName().toString()),bytes,packName));
                             } catch (Exception e) {
                                 RealTrainModUnofficial.LOGGER.warn(
                                     "Failed to load built-in flag definition {}", path.getFileName(), e);
@@ -151,8 +154,7 @@ public final class InstalledObjectPackLoader {
                         .filter(p -> isSupportedJson(normalize(p.getFileName().toString())))
                         .forEach(path -> {
                             try {
-                                parse(normalize(path.getFileName().toString()),
-                                    Files.readAllBytes(path), packName);
+                                OrderedPackTasks.read(path,bytes->parse(normalize(path.getFileName().toString()),bytes,packName));
                             } catch (Exception e) {
                                 RealTrainModUnofficial.LOGGER.warn(
                                     "Failed to load built-in signboard definition {}", path.getFileName(), e);
@@ -304,7 +306,7 @@ public final class InstalledObjectPackLoader {
                     String relative = normalize(packDir.relativize(path).toString());
                     try {
                         if (isSupportedJson(relative)) {
-                            parse(relative, Files.readAllBytes(path), packName);
+                            OrderedPackTasks.read(path,bytes->parse(relative,bytes,packName));
                         } else if (isRrsTexture(relative)) {
                             registerRailroadSign(relative, packName);
                         }
@@ -334,13 +336,13 @@ public final class InstalledObjectPackLoader {
         String texture = normalized.substring(index);
         String name = leaf(texture).replace(".png", "");
         String id = InstalledObjectCategory.RAILROAD_SIGN.name().toLowerCase(Locale.ROOT) + ":" + packName + ":" + name;
-        LOADED.add(new InstalledObjectDefinition(
+        OrderedPackTasks.publish(new InstalledObjectDefinition(
             id, name, packName, InstalledObjectCategory.RAILROAD_SIGN,
             // モデルは無い。板とポールは BER が直接描く (本家 RenderRailroadSign と同じ)。
             "", "", texture, Map.of(),
             Vec3.ZERO, 1.0F, false,
             1.0F, 1.0F, 0.125F, texture, "", "",
-            Map.of(), List.of(), Vec3.ZERO, 1, 0));
+            Map.of(), List.of(), Vec3.ZERO, 1, 0), LOADED::add);
     }
 
     /**
@@ -351,12 +353,12 @@ public final class InstalledObjectPackLoader {
         boolean hasInput = LOADED.stream().anyMatch(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT);
         boolean hasOutput = LOADED.stream().anyMatch(d -> d.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT);
         if (!hasInput) {
-            LOADED.add(builtinConnector(InstalledObjectCategory.CONNECTOR_INPUT, "Input01", "textures/connector/input.png",
-                    "textures/connector/button_Input01.png"));
+            OrderedPackTasks.publish(builtinConnector(InstalledObjectCategory.CONNECTOR_INPUT, "Input01", "textures/connector/input.png",
+                    "textures/connector/button_Input01.png"), LOADED::add);
         }
         if (!hasOutput) {
-            LOADED.add(builtinConnector(InstalledObjectCategory.CONNECTOR_OUTPUT, "Output01", "textures/connector/output.png",
-                    "textures/connector/button_Output01.png"));
+            OrderedPackTasks.publish(builtinConnector(InstalledObjectCategory.CONNECTOR_OUTPUT, "Output01", "textures/connector/output.png",
+                    "textures/connector/button_Output01.png"), LOADED::add);
         }
     }
 
@@ -409,7 +411,7 @@ public final class InstalledObjectPackLoader {
                     Map.of(), List.of(), Vec3.ZERO, 1, 1);
             def.setFlagParams(new InstalledObjectDefinition.FlagParams(
                     texture, width, height, resolutionU, resolutionV, poleLength));
-            LOADED.add(def);
+            OrderedPackTasks.publish(def, LOADED::add);
         } catch (Exception e) {
             com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
                     "[RTMU] 旗記述子を読めません: {} ({})", file, e.toString());
@@ -447,6 +449,9 @@ public final class InstalledObjectPackLoader {
     }
 
     private static void parse(String path, byte[] bytes, String packName) {
+        OrderedPackTasks.submit(()->parseNow(path,bytes,packName));
+    }
+    private static void parseNow(String path,byte[] bytes,String packName) {
         try {
             JsonElement element = JsonParser.parseString(PackTextDecoder.decodeJson(bytes));
             if (!element.isJsonObject()) {
@@ -620,7 +625,7 @@ public final class InstalledObjectPackLoader {
             def.setDoCulling(getBoolean(obj, "doCulling", false));
             //本家 OrnamentConfig.conveyorSpeed (足場/エスカレーターが乗った物を押す速さ)
             def.setConveyorSpeed(getFloat(obj, "conveyorSpeed", 0.0F));
-            LOADED.add(def);
+            OrderedPackTasks.publish(def, LOADED::add);
         } catch (Exception e) {
             RealTrainModUnofficial.LOGGER.warn("Failed to parse installed object json {} in {}: {}", path, packName, e.getMessage());
         }
@@ -668,7 +673,7 @@ public final class InstalledObjectPackLoader {
             (int) getDouble(obj, "color", 0.0),
             (int) getDouble(obj, "lightValue", 0.0)
         );
-        LOADED.add(def);
+        OrderedPackTasks.publish(def, LOADED::add);
     }
 
     private static String normalizeSignboardTexture(String texture) {
