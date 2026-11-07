@@ -243,7 +243,19 @@ public class TrainControlScreen extends Screen {
 
     /** このパックが持つ方向幕のコマ数。0 なら方向幕なし。 */
     private int rollsignCount() {
-        return train.getResourceState().getResourceSet().getConfig().rollsignNames.length;
+        String[] names = rollsignNamesSafe();
+        return names == null ? 0 : names.length;
+    }
+
+    private String[] rollsignNamesSafe() {
+        try {
+            var state = train == null ? null : train.getResourceState();
+            var set = state == null ? null : state.getResourceSet();
+            var config = set == null ? null : set.getConfig();
+            return config == null ? null : config.rollsignNames;
+        } catch (Throwable ignored) {
+            return null;
+        }
     }
 
     private String destinationLabel() {
@@ -284,11 +296,11 @@ public class TrainControlScreen extends Screen {
             case "mascon_power" -> train.stepMascon(1);
             case "mascon_brake" -> train.stepMascon(-1);
             case "next_destination" -> {
-                int count = Math.max(1, train.getResourceState().getResourceSet().getConfig().rollsignNames.length);
+                int count = Math.max(1, rollsignCount());
                 train.setDestinationIndex((train.getDestinationIndex() + 1) % count);
             }
             case "prev_destination" -> {
-                int count = Math.max(1, train.getResourceState().getResourceSet().getConfig().rollsignNames.length);
+                int count = Math.max(1, rollsignCount());
                 train.setDestinationIndex(Math.floorMod(train.getDestinationIndex() - 1, count));
             }
             case "next_sound" -> train.setSoundIndex(resolveNextSoundIndex(1));

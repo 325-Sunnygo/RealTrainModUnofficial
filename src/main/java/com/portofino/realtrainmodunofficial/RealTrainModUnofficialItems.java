@@ -159,6 +159,18 @@ public class RealTrainModUnofficialItems {
         "signal_converter_wireless", () -> new com.portofino.realtrainmodunofficial.item.SignalConverterItem(4)
     );
 
+    // SignalControllerMod (masa300) 移植: 信号制御器 + 位置設定ツール×2
+    public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_CONTROLLER_ITEM = ITEMS.register(
+        "signal_controller", () -> new net.minecraft.world.item.BlockItem(
+            RealTrainModUnofficialBlocks.SIGNAL_CONTROLLER.get(), new net.minecraft.world.item.Item.Properties())
+    );
+    public static final DeferredItem<jp.masa.signalcontrollermod.ItemPosSettingTool> POS_SETTING_TOOL_0 = ITEMS.register(
+        "pos_setting_tool_0", () -> new jp.masa.signalcontrollermod.ItemPosSettingTool(0)
+    );
+    public static final DeferredItem<jp.masa.signalcontrollermod.ItemPosSettingTool> POS_SETTING_TOOL_1 = ITEMS.register(
+        "pos_setting_tool_1", () -> new jp.masa.signalcontrollermod.ItemPosSettingTool(1)
+    );
+
     // ---- 本家 ItemInstalledObject のうち未移植だった設置物 ----
     // 本家 installed_object meta 0: ガラスの蛍光灯 (BlockFluorescent)。置くだけで光源 15。
     public static final DeferredItem<InstalledObjectItem> FLUORESCENT_ITEM = ITEMS.register(

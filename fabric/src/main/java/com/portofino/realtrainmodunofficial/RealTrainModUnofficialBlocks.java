@@ -53,6 +53,11 @@ public class RealTrainModUnofficialBlocks {
             net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()
                 .strength(1.5F).sound(net.minecraft.world.level.block.SoundType.STONE)));
 
+    /** SignalControllerMod (masa300) 移植: 信号制御器 (閉塞信号の自動制御) */
+    public static final DeferredBlock<jp.masa.signalcontrollermod.SignalController> SIGNAL_CONTROLLER
+        = BLOCKS.register("signal_controller", () -> new jp.masa.signalcontrollermod.SignalController(
+            net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()));
+
     // ───── 本家 RTM_工業 タブのブロック (RTMBlock.init と同じ並び) ─────
 
     /** 本家 steel_material: ただの鋼のブロック。 */

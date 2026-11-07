@@ -14,6 +14,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -130,6 +131,17 @@ public class TileEntityMarker extends BlockEntity {
     @Override
     public ClientboundBlockEntityDataPacket getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override
+    public void setLevel(Level level) {
+        super.setLevel(level);
+        // Fabric の BLOCK_ENTITY_LOAD はチャンク読込時しか呼ばれないため、
+        // 設置直後のマーカーはここで登録する。登録しないと MarkerManager が空のままになり、
+        // 2 本目のマーカーを右クリックしてもレールが敷けない。
+        if (level != null) {
+            MarkerManager.add(this);
+        }
     }
 
     @Override

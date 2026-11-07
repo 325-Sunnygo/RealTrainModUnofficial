@@ -387,5 +387,9 @@
   "usage.realtrainmodunofficial.connector_out": "Outputs the signal from the attached block",
   "block.realtrainmodunofficial.mirror": "Mirror",
   "block.realtrainmodunofficial.mirror_cube": "Mirror Cube",
-  "message.version": "A new version of %s is available"
+  "message.version": "A new version of %s is available",
+  "block.realtrainmodunofficial.signal_controller": "Signal Controller",
+  "item.realtrainmodunofficial.signal_controller": "Signal Controller",
+  "item.realtrainmodunofficial.pos_setting_tool_0": "Pos Setting Tool (Next Signal)",
+  "item.realtrainmodunofficial.pos_setting_tool_1": "Pos Setting Tool (Display Pos)"
 }

@@ -608,13 +608,93 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             .setNormal(nx, ny, nz);
     }
 
+    /**
+     * 焼き込みフォールバック時のグループ選別。
+     *
+     * <p>スクリプトが未ロード/失敗のとき、全ての authored グループを描くと
+     * 連結曲げ用の代替メッシュ (body-90 / body-180 等) まで重なり、車体が反転して
+     * 見えることがある。本家は使用する Parts だけを登録するので、フォールバックでは
+     * 代替メッシュ/影/ガイドを従来どおり除外する。
+     */
     private static boolean shouldRenderTrainGroup(String groupName, boolean renderInterior,
                                                   boolean aggressiveDistanceCulling, boolean compatibilityHeavy,
                                                   VehicleDefinition def, boolean hasScript, boolean scriptActuallyRunning) {
-        // The original delegates selection to registered Parts and ResourceState.
-        // Names, distance and a model's size do not implicitly hide authored meshes.
+        if (groupName == null || groupName.isBlank()) {
+            return true;
+        }
+        String normalized = groupName.toLowerCase(java.util.Locale.ROOT);
+        // 連結曲げ用の角度バリアントメッシュは 1 つだけ使う代替形状。
+        if (isAngleBendVariant(normalized)) {
+            return false;
+        }
+        if (normalized.contains("shadow")) {
+            return false;
+        }
+        if (normalized.endsWith("_ms") || normalized.endsWith("_kage")
+                || normalized.contains("_ms_") || normalized.contains("_kage_")) {
+            return false;
+        }
+        if (normalized.endsWith("_guide") || normalized.endsWith("[obj]")
+                || normalized.endsWith("_atari") || normalized.endsWith(" atari")) {
+            return false;
+        }
+        if (!renderInterior) {
+            if (normalized.contains("seat")
+                || normalized.contains("chair")
+                || normalized.contains("interior")
+                || normalized.contains("inside")
+                || normalized.contains("floor")
+                || normalized.contains("ceiling")
+                || normalized.contains("handrail")
+                || normalized.contains("strap")
+                || normalized.contains("shelf")
+                || normalized.contains("cab")
+                || normalized.contains("desk")
+                || normalized.contains("instrument")
+                || normalized.contains("panel")) {
+                return false;
+            }
+        }
+        if (aggressiveDistanceCulling) {
+            if (normalized.contains("wiper")
+                || normalized.contains("coupler")
+                || normalized.contains("connector")
+                || normalized.contains("hoses")
+                || normalized.contains("step")
+                || normalized.contains("pantograph")
+                || normalized.contains("under")
+                || normalized.contains("detail")) {
+                return false;
+            }
+        }
+        if (compatibilityHeavy) {
+            if (aggressiveDistanceCulling && (normalized.contains("cooler")
+                || normalized.contains("fan")
+                || normalized.contains("antenna"))) {
+                return false;
+            }
+        }
         return true;
     }
+
+    /**
+     * 連結曲げ用の角度バリアント (末尾 "-NN" で NN>=10、(mx)鏡像サフィックスは先に剥がす) か。
+     * 例: body-90, body-180(mx), bogie1-90, type_1-90。NN<10 は対象外。
+     */
+    private static boolean isAngleBendVariant(String normalized) {
+        String s = normalized.endsWith("(mx)") ? normalized.substring(0, normalized.length() - 4) : normalized;
+        int dash = s.lastIndexOf('-');
+        if (dash <= 0 || dash == s.length() - 1) return false;
+        for (int i = dash + 1; i < s.length(); i++) {
+            if (!Character.isDigit(s.charAt(i))) return false;
+        }
+        try {
+            return Integer.parseInt(s.substring(dash + 1)) >= 10;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
 
     /**
      * 台車冗長描画: TrainBogieEntity が機能しない場合の保険として、本体描画と同じ

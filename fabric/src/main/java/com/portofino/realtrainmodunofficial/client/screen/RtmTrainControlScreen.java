@@ -126,7 +126,8 @@ public class RtmTrainControlScreen extends Screen {
                 int x = left + 4 + (i % 3) * 56;
                 int y = top + 4 + (i / 3) * 24;
                 int index = i;
-                int value = train.getResourceState().getDataMap().getInt("Button" + i);
+                int value = train.getResourceState() == null ? 0
+                        : train.getResourceState().getDataMap().getInt("Button" + i);
                 List<String> optionList = options.get(i);
                 // スライダー型: customButtons のエントリを ["slider:名前"] と書くと
                 // 0-100% のスライダーになる (値は DataMap Button{i}、0=未設定は 100% 扱い)
@@ -148,7 +149,17 @@ public class RtmTrainControlScreen extends Screen {
     }
 
     private String[] rollsignNames() {
-        return train.getConfig().rollsignNames;
+        // N2100 など rollsignNames を持たないパックでは null が返る。
+        // インベントリキーでこの画面を開いた瞬間に NPE で落ちないよう空配列へ落とす。
+        jp.ngt.rtm.modelpack.cfg.TrainConfig config = null;
+        try {
+            config = train == null ? null : train.getConfig();
+        } catch (Throwable ignored) {
+        }
+        if (config == null || config.rollsignNames == null) {
+            return new String[0];
+        }
+        return config.rollsignNames;
     }
 
     private Button addButton(int x, int y, int w, String label, String action, int value) {
@@ -262,9 +273,13 @@ public class RtmTrainControlScreen extends Screen {
             int next = (index < options.size() && !options.get(index).isEmpty())
                     ? (current + 1) % options.get(index).size()
                     : (current == 0 ? 1 : 0);
-            train.getResourceState().getDataMap().setInt("Button" + index, next, 0);
+            if (train.getResourceState() != null) {
+                train.getResourceState().getDataMap().setInt("Button" + index, next, 0);
+            }
         } else if ("set_custom_button".equals(action)) {
-            train.getResourceState().getDataMap().setInt("Button" + ((value >>> 8) & 0xFF), value & 0xFF, 0);
+            if (train.getResourceState() != null) {
+                train.getResourceState().getDataMap().setInt("Button" + ((value >>> 8) & 0xFF), value & 0xFF, 0);
+            }
         }
         PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), action, value));
         // スライダーはドラッグ中に毎回 applyValue が呼ばれる — 再構築すると
@@ -294,7 +309,9 @@ public class RtmTrainControlScreen extends Screen {
         protected void applyValue() {
             // 0 は「未設定=100%」の予約値なので最低 1
             int percent = Math.max(1, currentPercent());
-            train.getResourceState().getDataMap().setInt("Button" + this.index, percent, 0);
+            if (train.getResourceState() != null) {
+                train.getResourceState().getDataMap().setInt("Button" + this.index, percent, 0);
+            }
             PacketDistributor.sendToServer(new TrainControlPayload(
                     train.getId(), "set_custom_button", (this.index << 8) | percent));
         }
@@ -308,6 +325,11 @@ public class RtmTrainControlScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
+        // 列車が撤去/アンロードされた後に残った画面で NPE を起こさない。
+        if (this.train == null || this.train.isRemoved()) {
+            this.onClose();
+            return;
+        }
         // スライダードラッグ中に再構築するとドラッグ状態が失われる
         if (this.isDragging()) {
             return;

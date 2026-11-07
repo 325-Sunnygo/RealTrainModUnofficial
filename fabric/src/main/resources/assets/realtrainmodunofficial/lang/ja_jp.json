@@ -389,5 +389,9 @@
   "usage.realtrainmodunofficial.connector_out": "取付け先ブロックから信号出力",
   "block.realtrainmodunofficial.mirror": "鏡",
   "block.realtrainmodunofficial.mirror_cube": "ミラーブロック",
-  "message.version": "%s の新しいバージョンがあります"
+  "message.version": "%s の新しいバージョンがあります",
+  "block.realtrainmodunofficial.signal_controller": "シグナルコントローラー",
+  "item.realtrainmodunofficial.signal_controller": "シグナルコントローラー",
+  "item.realtrainmodunofficial.pos_setting_tool_0": "座標設定ツール (Next Signal)",
+  "item.realtrainmodunofficial.pos_setting_tool_1": "座標設定ツール (Display Pos)"
 }

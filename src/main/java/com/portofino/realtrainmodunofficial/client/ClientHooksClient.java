@@ -60,6 +60,14 @@ public final class ClientHooksClient {
         ClientItemHelper.openInstalledObjectSelectScreen(player, stack, category);
     }
 
+    /** SignalControllerMod (masa300) 移植: 設定 GUI */
+    public static void openSignalControllerScreen(Object controller) {
+        if (controller instanceof jp.masa.signalcontrollermod.TileEntitySignalController te) {
+            Minecraft.getInstance().setScreen(
+                new com.portofino.realtrainmodunofficial.client.screen.SignalControllerScreen(te));
+        }
+    }
+
     /** 本家 GuiChangeOffset: バールで設置物を右クリック → 微調整 GUI */
     public static void openChangeOffsetScreen(Object blockEntity) {
         if (blockEntity instanceof InstalledObjectBlockEntity be) {

@@ -277,8 +277,49 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         }
     }
 
-    /** BasicVehiclePartsRenderer registers every authored body/part group. */
+    /**
+     * 焼き込みフォールバック時のグループ選別。
+     *
+     * <p>スクリプトがまだ非同期コンパイル中/読込失敗のとき、全ての authored グループを
+     * 描くと連結曲げ用の代替メッシュ (body-90 / body-180 等) まで重なって描かれ、
+     * 車体が反転・散乱して見える。本家でも実際に使う Parts だけを登録するため、
+     * フォールバックでは従来どおり代替メッシュ/影/ガイドを除外する。
+     */
     private static boolean shouldRenderGroup(String groupName) {
-        return true;
+        if (groupName == null || groupName.isBlank()) {
+            return true;
+        }
+        String n = groupName.toLowerCase(java.util.Locale.ROOT);
+        // パックが持つ偽の影ポリゴン (半透明かつ深度を書くためレールが透ける)
+        if (n.contains("影") || n.contains("shadow")) {
+            return false;
+        }
+        if (n.endsWith("_ms") || n.endsWith("_kage") || n.contains("_ms_") || n.contains("_kage_")) {
+            return false;
+        }
+        if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) {
+            return false;
+        }
+        // 連結曲げ用の角度バリアント (body-90 / body-180(mx) / bogie1-90 等)
+        return !isAngleBendVariant(n);
+    }
+
+    /** 末尾 "-NN" で NN>=10 の角度バリアントか ((mx) 鏡像サフィックスは先に剥がす)。 */
+    private static boolean isAngleBendVariant(String normalized) {
+        String s = normalized.endsWith("(mx)") ? normalized.substring(0, normalized.length() - 4) : normalized;
+        int dash = s.lastIndexOf('-');
+        if (dash <= 0 || dash == s.length() - 1) {
+            return false;
+        }
+        for (int i = dash + 1; i < s.length(); i++) {
+            if (!Character.isDigit(s.charAt(i))) {
+                return false;
+            }
+        }
+        try {
+            return Integer.parseInt(s.substring(dash + 1)) >= 10;
+        } catch (NumberFormatException e) {
+            return false;
+        }
     }
 }

@@ -129,10 +129,20 @@ public final class LegacyModelRegression {
                 .getDeclaredMethod("shouldRenderTrainGroup", String.class, boolean.class, boolean.class,
                         boolean.class, Class.forName("com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition"), boolean.class, boolean.class);
         trainFilter.setAccessible(true);
-        for (String name : List.of("shadow", "body_shadow", "影", "影ms", "body_ms", "body_kage", "body_ms_0", "body_kage_0", "door_guide", "panel[obj]", "body_atari", "body atari", "body-90", "body-180(mx)", "floor", "under_detail")) {
-            check((boolean) modernFilter.invoke(null, name), "RTM renderer preserves " + name);
+        // Baked fallback (script pending/failed) must not draw angle-bend alternates or
+        // shadow/guide helper meshes: drawing body-90/body-180 together makes the train
+        // look flipped. Normal authored parts still render.
+        for (String name : List.of("shadow", "body_shadow", "影", "影ms", "body_ms", "body_kage",
+                "body_ms_0", "body_kage_0", "door_guide", "panel[obj]", "body_atari", "body atari",
+                "body-90", "body-180(mx)")) {
+            check(!(boolean) modernFilter.invoke(null, name), "RTM fallback hides helper mesh " + name);
+            check(!(boolean) trainFilter.invoke(null, name, true, false, false, null, false, false),
+                    "train fallback hides helper mesh " + name);
+        }
+        for (String name : List.of("floor", "under_detail", "body", "door_LF")) {
+            check((boolean) modernFilter.invoke(null, name), "RTM fallback keeps authored part " + name);
             check((boolean) trainFilter.invoke(null, name, true, false, false, null, false, false),
-                    "train renderer preserves " + name);
+                    "train fallback keeps authored part " + name);
         }
         float[] storedTriangles=com.portofino.realtrainmodunofficial.client.model.LegacyModelGeometry.flatten(model.groupObjects.get(0),false);
         int[] submitted=com.portofino.realtrainmodunofficial.client.model.LegacyTriangleSubmission.indices(storedTriangles);

@@ -58,5 +58,8 @@ public final class RealTrainModUnofficialNetwork {
             CargoModelPayload::handleOnServer);
         registrar.playToServer(StationNamePayload.TYPE, StationNamePayload.STREAM_CODEC,
             StationNamePayload::handleOnServer);
+        // SignalControllerMod (masa300) 移植: 設定 GUI → サーバー反映
+        registrar.playToServer(SignalControllerPayload.TYPE, SignalControllerPayload.STREAM_CODEC,
+            SignalControllerPayload::handleOnServer);
     }
 }

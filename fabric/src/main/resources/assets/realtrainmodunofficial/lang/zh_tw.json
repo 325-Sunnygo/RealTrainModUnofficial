@@ -174,5 +174,9 @@
   "gui.npc.can_not_sell": "物品不足",
   "gui.npc.have_money": "持有金額",
   "usage.realtrainmodunofficial.connector_in": "向安裝目標方塊輸入信號",
-  "usage.realtrainmodunofficial.connector_out": "從安裝目標方塊輸出信號"
+  "usage.realtrainmodunofficial.connector_out": "從安裝目標方塊輸出信號",
+  "block.realtrainmodunofficial.signal_controller": "號誌控制器",
+  "item.realtrainmodunofficial.signal_controller": "號誌控制器",
+  "item.realtrainmodunofficial.pos_setting_tool_0": "座標設定工具 (Next Signal)",
+  "item.realtrainmodunofficial.pos_setting_tool_1": "座標設定工具 (Display Pos)"
 }

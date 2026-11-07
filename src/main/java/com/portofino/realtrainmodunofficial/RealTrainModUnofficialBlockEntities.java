@@ -58,6 +58,12 @@ public class RealTrainModUnofficialBlockEntities {
             jp.ngt.rtm.electric.TileEntitySignalConverter::new,
             RealTrainModUnofficialBlocks.SIGNAL_CONVERTER.get()).build(null));
 
+    /** SignalControllerMod (masa300) 移植: 信号制御器 */
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.masa.signalcontrollermod.TileEntitySignalController>> SIGNAL_CONTROLLER =
+        BLOCK_ENTITY_TYPES.register("signal_controller", () -> BlockEntityType.Builder.of(
+            jp.masa.signalcontrollermod.TileEntitySignalController::new,
+            RealTrainModUnofficialBlocks.SIGNAL_CONTROLLER.get()).build(null));
+
     /** 本家 TileEntitySlot (液体の吸込口)。 */
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<jp.ngt.rtm.block.tileentity.TileEntitySlot>> SLOT =
         BLOCK_ENTITY_TYPES.register("slot", () -> BlockEntityType.Builder.of(

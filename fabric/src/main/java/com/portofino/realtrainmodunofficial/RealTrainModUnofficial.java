@@ -230,7 +230,10 @@ public class RealTrainModUnofficial {
 
     /** Neo MCTE タブの中身。main タブ末尾から呼ぶ。 */
     private static void acceptNeoMcteTab(net.minecraft.world.item.CreativeModeTab.Output output) {
-        // ★アイテムの登録自体は残してある (機能は消さない)。
+        // SignalControllerMod (masa300) 移植: 信号制御器と位置設定ツール
+        output.accept(RealTrainModUnofficialItems.SIGNAL_CONTROLLER_ITEM.get());
+        output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_0.get());
+        output.accept(RealTrainModUnofficialItems.POS_SETTING_TOOL_1.get());
     }
 
     /**

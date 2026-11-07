@@ -174,5 +174,9 @@
   "gui.npc.can_not_sell": "물건이 부족합니다",
   "gui.npc.have_money": "소지금",
   "usage.realtrainmodunofficial.connector_in": "부착된 블록으로 신호 입력",
-  "usage.realtrainmodunofficial.connector_out": "부착된 블록에서 신호 출력"
+  "usage.realtrainmodunofficial.connector_out": "부착된 블록에서 신호 출력",
+  "block.realtrainmodunofficial.signal_controller": "신호 제어기",
+  "item.realtrainmodunofficial.signal_controller": "신호 제어기",
+  "item.realtrainmodunofficial.pos_setting_tool_0": "좌표 설정 도구 (Next Signal)",
+  "item.realtrainmodunofficial.pos_setting_tool_1": "좌표 설정 도구 (Display Pos)"
 }
