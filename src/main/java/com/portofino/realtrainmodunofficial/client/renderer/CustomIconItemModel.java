@@ -16,12 +16,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 
-/**
- * customIconTexture が設定されているときだけ、アイテムの描画を
- * CustomIconItemRenderer へ回すためのモデル。
- * 仕組み: 1.21 のアイテム描画は「焼き上がったモデルが isCustomRenderer を
- * 返したら IClientItemExtensions の描画器を使う」という作りになっている。
- */
+/** customIconTexture が設定されているときだけ、アイテムの描画を CustomIco… */
 public class CustomIconItemModel implements BakedModel {
 
     private final BakedModel original;
@@ -83,15 +78,11 @@ public class CustomIconItemModel implements BakedModel {
     public BakedModel applyTransform(ItemDisplayContext context, PoseStack poseStack,
                                      boolean applyLeftHandTransform) {
         // 位置と大きさはバニラのアイテムと同じにしたいので元のモデルの変換を使う。
-        // ただし戻すのは自分 (元を返すと isCustomRenderer が false になり自前描画に来ない)。
         this.original.applyTransform(context, poseStack, applyLeftHandTransform);
         return this;
     }
 
-    /**
-     * 元のモデルの皮。ItemOverrides だけ差し替える。
-     * これがレジストリに載るモデルになる。
-     */
+    /** 元のモデルの皮。ItemOverrides だけ差し替える。 これがレジストリに載るモデルになる。 */
     private static final class Wrapper implements BakedModel {
         private final BakedModel original;
         private final CustomIconItemModel custom;
@@ -138,7 +129,7 @@ public class CustomIconItemModel implements BakedModel {
 
         @Override
         public boolean isCustomRenderer() {
-            return false;   //既定はバニラ描画。差し替えは overrides が決める
+            return false;   // 既定はバニラ描画。差し替えは overrides が決める
         }
 
         @Override

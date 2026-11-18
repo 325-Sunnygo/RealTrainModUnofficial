@@ -6,7 +6,7 @@ import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.renderer.*;
 import net.minecraft.resources.ResourceLocation;
 
-/** Resolve reflected geometry over the legacy sky without copying the main camera's image. */
+/** Resolve reflected geometry over the legacy sky wi… */
 public final class MirrorResolve {
     private static ShaderInstance shader;
     private MirrorResolve(){}

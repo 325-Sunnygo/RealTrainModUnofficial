@@ -6,10 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * 本家 jp.ngt.rtm.rail.util.RailMaker (KaizPatchX) の忠実移植。
- * fixRTMRailMapVersion >= 1 の N字分岐は SwitchTypeSingleCrossFixRTMV1 を使用 (KaizPatchX 準拠)。
- */
+/** 本家 jp.ngt.rtm.rail.util.RailMaker (KaizPatchX) の忠… */
 public final class RailMaker {
     // see RailMapBasic.fixRTMRailMapVersion
     public final int fixRTMRailMapVersion;
@@ -28,7 +25,7 @@ public final class RailMaker {
         this.fixRTMRailMapVersion = fixRTMRailMapVersion;
     }
 
-    /** @deprecated use #RailMaker(Level, RailPosition[], int) */
+    /** @deprecated use #RailMaker(Level, RailPosition[],… */
     @Deprecated
     public RailMaker(Level world, RailPosition[] par2) {
         this(world, par2, 0);
@@ -38,15 +35,13 @@ public final class RailMaker {
         this(world, new ArrayList<>(Arrays.asList(par2)), fixRTMRailMapVersion);
     }
 
-    /** スクリプト互換: WorldCompat + List/配列 (SRB3 等が entity.field_70170_p を渡す)。 */
+    /** スクリプト互換: WorldCompat + List/配列 (SRB3 等が entity.fi… */
     public RailMaker(Object world, Object positions, int fixRTMRailMapVersion) {
         this.worldObj = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
         List<RailPosition> list = new ArrayList<>();
         collectRailPositions(positions, list, 0);
         if (list.isEmpty()) {
             // ここが空だと getSwitch は必ず失敗する。
-            // 「An error occurred while generating rails」とだけ出すため、
-            // 元のレールを消したあとに生成だけ失敗して線路ごと消える。
             jp.ngt.ngtlib.io.NGTLog.debug("[RailMaker] レール位置が 1 つも取れなかった: %s",
                 positions == null ? "null" : positions.getClass().getName());
         }
@@ -54,10 +49,7 @@ public final class RailMaker {
         this.fixRTMRailMapVersion = fixRTMRailMapVersion;
     }
 
-    /**
-     * スクリプトから渡された「レール位置の集まり」を取り出す。
-     * ★JS 配列に対応することが要点。
-     */
+    /** スクリプトから渡された「レール位置の集まり」を取り出す。 ★JS 配列に対応することが要点。 */
     private static void collectRailPositions(Object src, List<RailPosition> out, int depth) {
         if (src == null || depth > 4) {
             return;
@@ -75,15 +67,14 @@ public final class RailMaker {
                 collectRailPositions(o, out, depth + 1);
             }
         } else if (src instanceof java.util.Map<?, ?> m) {
-            // Nashorn の JS 配列/オブジェクトはここに来る (ScriptObject implements Map)。
-            // JS 配列の要素は values に添字順で並ぶ。
+            // Nashorn の JS 配列/オブジェクトはここに来る (ScriptObject implem…
             for (Object o : m.values()) {
                 collectRailPositions(o, out, depth + 1);
             }
         }
     }
 
-    // ===== Remaster 暫定互換コンストラクタ (旧コードは world を渡さない。Phase 1 の BE 差し替え後に削除予定) =====
+    // ===== Remaster 暫定互換コンストラクタ (旧コードは world を渡さない。
 
     /** @deprecated Remaster 独自。本家に存在しない。 */
     @Deprecated
@@ -115,7 +106,7 @@ public final class RailMaker {
                 }
             } else if (i0 == 4) {
                 for (int i = 0; i < this.rpList.size(); ++i) {
-                    for (int j = i + 1; j < this.rpList.size(); ++j)//全組み合わせ(重複なし)
+                    for (int j = i + 1; j < this.rpList.size(); ++j)// 全組み合わせ(重複なし)
                     {
                         if (this.rpList.get(i).direction == this.rpList.get(j).direction) {
                             return new SwitchType.SwitchScissorsCross(fixRTMRailMapVersion);
@@ -130,10 +121,7 @@ public final class RailMaker {
     }
 
     public SwitchType getSwitch() {
-        // ★SuperRailBuilder3 は分岐生成をこの経路で行い、例外を JS 側で握りつぶして
-        // 「An error occurred while generating rails」とだけ表示する。
-        // その結果、元のレールを消したあとに生成が失敗して線路ごと消えるのに
-        // ログには何も残らなかった。ここで必ず記録してから投げ直す。
+        // ★SuperRailBuilder3 は分岐生成をこの経路で行い、例外を JS 側で握りつぶして…
         try {
             SwitchType type = this.getSwitchType();
             if (type == null) {
@@ -143,16 +131,14 @@ public final class RailMaker {
                     this.rpList.stream().mapToInt(rp -> (rp.switchType == 1) ? 1 : 0).sum());
                 return null;
             }
-            List<RailPosition> switchList = new ArrayList<>();//分岐あり
-            List<RailPosition> normalList = new ArrayList<>();//分岐なし
+            List<RailPosition> switchList = new ArrayList<>();// 分岐あり
+            List<RailPosition> normalList = new ArrayList<>();// 分岐なし
             this.rpList.forEach(rp -> (rp.switchType == 1 ? switchList : normalList).add(rp));
 
             if (type.init(switchList, normalList)) {
                 return type;
             }
-            //★どの向きの組み合わせで落ちたかまで残す。
-            //  SwitchScissorsCross.init は「角度差 45 度超の組が 4 つ」を要求するので、
-            //  向きが分かればマーカーの置き方の問題か RTMU の向き計算の問題かを切り分けられる。
+            // ★どの向きの組み合わせで落ちたかまで残す。
             StringBuilder dirs = new StringBuilder();
             this.rpList.forEach(rp -> dirs.append(String.format("(%d,%d,%d dir=%d sw=%d) ",
                     rp.blockX, rp.blockY, rp.blockZ, rp.direction, rp.switchType)));

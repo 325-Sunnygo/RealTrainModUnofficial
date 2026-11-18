@@ -23,12 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.w3c.dom.Node;
 
-/**
- * 方向幕 (rollsign) / 種別幕などのテクスチャに アニメーション GIF を直接使えるようにする。
- * Minecraft の NativeImage#read は PNG しか読めないので、GIF は ImageIO で
- * フレーム分解 (部分フレーム・透過・disposal を合成して各フレームをフル画像に coalesce) し、
- * DynamicTexture 1 枚に毎 tick 現在フレームを貼り替えて再生する。
- */
+/** 方向幕 (rollsign) / 種別幕などのテクスチャに アニメーション GIF を直接使えるよ… */
 public final class GifTextures {
 
     /** テクスチャの中身を開くための供給子 (パック zip / フォルダから)。 */
@@ -46,16 +41,13 @@ public final class GifTextures {
         ResourceLocation location;
         DynamicTexture texture;
         NativeImage[] frames;
-        int[] cumulativeMs;   //各フレーム終了時刻の累積 (ms)
+        int[] cumulativeMs;   // 各フレーム終了時刻の累積 (ms)
         int totalMs;
         long startMillis;
         int shownFrame = -1;
     }
 
-    /**
-     * .gif パックテクスチャを (必要なら) 登録し、その ResourceLocation を返す。
-     * デコードに失敗したら null (呼び出し側は静止テクスチャ経路へフォールバックする)。
-     */
+    /** .gif パックテクスチャを (必要なら) 登録し、その ResourceLocation を返す。 */
     public static ResourceLocation resolve(String cacheKey, StreamOpener opener) {
         Entry existing = CACHE.get(cacheKey);
         if (existing != null) {
@@ -150,8 +142,7 @@ public final class GifTextures {
                     g.drawImage(frame, fm.x, fm.y, null);
                     g.dispose();
                     coalesced.add(deepCopy(canvas));
-                    delaysMs.add(Math.max(20, fm.delayMs)); //0 は多くのビューアで最低速度に丸める
-                    // disposal: 2=背景で塗り潰す, 3=直前に戻す, それ以外=そのまま
+                    delaysMs.add(Math.max(20, fm.delayMs)); // 0 は多くのビューアで最低速度に丸める disposal: 2=背景で塗り潰す, 3=直前に戻す,…
                     if (fm.disposal == 2) {
                         clearRegion(canvas, fm.x, fm.y, frame.getWidth(), frame.getHeight());
                     } else if (fm.disposal == 3 && before != null) {
@@ -221,7 +212,7 @@ public final class GifTextures {
         int x;
         int y;
         int delayMs;
-        int disposal; //0/1=none, 2=restoreToBackgroundColor, 3=restoreToPrevious
+        int disposal; // 0/1=none, 2=restoreToBackgroundColor, 3=restoreTo…
     }
 
     private static FrameMeta frameMeta(IIOMetadata meta) {
@@ -235,7 +226,7 @@ public final class GifTextures {
             }
             Node gce = child(root, "GraphicControlExtension");
             if (gce != null) {
-                fm.delayMs = attrInt(gce, "delayTime", 0) * 10; //センチ秒 → ミリ秒
+                fm.delayMs = attrInt(gce, "delayTime", 0) * 10; // センチ秒 → ミリ秒
                 String disposal = attrStr(gce, "disposalMethod");
                 fm.disposal = switch (disposal == null ? "" : disposal) {
                     case "restoreToBackgroundColor" -> 2;
@@ -298,7 +289,7 @@ public final class GifTextures {
         }
     }
 
-    /** BufferedImage(ARGB) → NativeImage(RGBA)。int の R と B を入れ替える。 */
+    /** BufferedImage(ARGB) → NativeImage(RGBA)。 */
     private static NativeImage toNativeImage(BufferedImage img) {
         int w = img.getWidth();
         int h = img.getHeight();
@@ -310,7 +301,7 @@ public final class GifTextures {
                 int r = (argb >>> 16) & 0xFF;
                 int gg = (argb >>> 8) & 0xFF;
                 int b = argb & 0xFF;
-                // NativeImage の RGBA int は 0xAABBGGRR (little-endian の R,G,B,A)
+                // NativeImage の RGBA int は 0xAABBGGRR (little-endia…
                 int abgr = (a << 24) | (b << 16) | (gg << 8) | r;
                 out.setPixelRGBA(x, y, abgr);
             }

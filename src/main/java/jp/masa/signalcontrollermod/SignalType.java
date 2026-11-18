@@ -1,10 +1,6 @@
 package jp.masa.signalcontrollermod;
 
-/**
- * SignalControllerMod (作者: masa300, https://github.com/masa300/SignalControllerMod)
- * の 1.21.1 移植。ロジックは原作のまま。
- * 信号の現示段数タイプ (2灯式A/B, 3灯式, 4灯式A/B, 5灯式A/B, 6灯式)。
- */
+/** SignalControllerMod (作者: masa300, https://github.… */
 public enum SignalType {
     signal2a {
         public int upSignalLevel(int signalLevel) {

@@ -12,12 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 装飾ブロックのモデル登録 (C2S)。本家 PacketNotice "decoration:json" の移植。
- * サーバーが保存して全クライアントへ {@link DecorationSyncPayload} で配る。
- * 本家 GuiDecorationBlock.saveModel は同時に手持ちアイテムへモデル名を書くので、
- * ここでもメインハンドの装飾ブロックにモデル名を書き戻す。
- */
+/** 装飾ブロックのモデル登録 (C2S)。本家 PacketNotice "decoration:js… */
 public record DecorationRegisterPayload(String json) implements CustomPacketPayload {
 
     public static final Type<DecorationRegisterPayload> TYPE = new Type<>(

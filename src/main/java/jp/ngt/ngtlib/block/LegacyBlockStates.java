@@ -15,13 +15,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 
-/**
- * 1.7.10 のブロック名 + メタ を 1.21 の BlockState に変換する共通処理。
- * 本家 .ngto (NGTObject) の IdList パレットと、NGTO Builder のブロック解決から使う。
- *
- * <p>1.7.10 は「色違い・種類違い = 同じブロックのメタ違い」だったので、
- * 色メタ・木種メタ・階段メタをここで 1.21 の別ブロック/状態へ読み替える。
- */
+/** 1.7.10 のブロック名 + メタ を 1.21 の BlockState に変換する共通処理。 */
 public final class LegacyBlockStates {
     private LegacyBlockStates() {
     }
@@ -45,8 +39,7 @@ public final class LegacyBlockStates {
     private static BlockState resolve(String rawName, int meta) {
         String name = rawName.contains(":") ? rawName.substring(rawName.indexOf(':') + 1) : rawName;
         name = name.toLowerCase(Locale.ROOT);
-        // ★空気を先に返す。byName は「AIR が返ってきたら未知」と見なすので、
-        // ここを通さないとパレットの空気が石になり、車体が中身の詰まった塊になる。
+        // ★空気を先に返す。byName は「AIR が返ってきたら未知」と見なすので、 ここを通さないとパ…
         if (name.equals("air") || name.equals("cave_air") || name.equals("void_air")) {
             return Blocks.AIR.defaultBlockState();
         }

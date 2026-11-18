@@ -2,7 +2,7 @@ package jp.ngt.mccompat.world;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.world.level.saveddata.SavedData;
-/** The original concrete Features NBT container, backed by per-dimension SavedData. */
+/** The original concrete Features NBT container, bac… */
 public final class MapGenStructureData extends SavedData {
     private final jp.ngt.mccompat.nbt.NBTTagCompound features;
     public MapGenStructureData(String name) {this(new CompoundTag());}

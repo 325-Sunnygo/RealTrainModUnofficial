@@ -1,10 +1,6 @@
 package jp.ngt.ngtlib.renderer.model;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.model.TextureCoordinate。
- * RTMU の Face は UV を float[] で持つため、スクリプトが
- * face.textureCoordinates[i].getU と書けるようにするビュー。
- */
+/** 本家 jp.ngt.ngtlib.renderer.model.TextureCoordinate。 */
 public class TextureCoordinate {
     private float u;
     private float v;

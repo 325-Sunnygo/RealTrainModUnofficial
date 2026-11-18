@@ -45,9 +45,7 @@ public class VehiclePackLoader {
 
 
     private static void loadFromModJar() {
-        // 本家の既定モデルを全て同梱する方針にしたので、列車 (ModelTrain_*) も自動車
-        // (ModelVehicle_*) も jar 内の assets/minecraft/models/json から読む。
-        // (以前は「デフォルト列車/c-toki 等を出さない」という要望で列車だけ除外していた)
+        // 本家の既定モデルを全て同梱する方針にしたので、列車 (ModelTrain_*) も自動車 (Mo…
         try {
             var modFileEntry = ModList.get().getModFileById(RealTrainModUnofficial.MODID);
             if (modFileEntry == null) return;
@@ -131,29 +129,20 @@ public class VehiclePackLoader {
                     if (isGeneratedSoundPack(path)) {
                         return;
                     }
-                    // ユーザー要望により RTM 公式車両アセット (RTM-Official-Assets.zip 等) からは
-                    // 車両定義をロードしない。 信号 / レール / 自動車などは別 loader が読む。
+                    // ユーザー要望により RTM 公式車両アセット (RTM-Official-Assets.zip 等…
                     String lowerName = path.getFileName().toString().toLowerCase(Locale.ROOT);
                     if (lowerName.contains("rtm-official-assets")) {
                         return;
                     }
-                    // KaizPatchX-compat.zip は RTM 公式デフォルト車両 / c-toki / df200 /
-                    //  /  / chiki7000 / MechaCentipede / RocketSled 等 40 種) の
-                    // 定義を内包しており、これが車両選択にデフォルト車両として大量に残る原因。
-                    // ユーザー要望「デフォルト車両を全部消す」に従い車両定義をロードしない。
+                    // KaizPatchX-compat.zip は RTM 公式デフォルト車両 / c-toki /…
                     if (lowerName.contains("kaizpatchx")) {
                         return;
                     }
-                    // 自分自身の mod jar はスキップする。jar 内蔵の RTM デフォルト車両
-                    // / c-toki /  等) は loadFromModJar で意図的に読み込まない
-                    // 方針だが、mods/ を scanPackRoot が走査すると mod jar 自体がアーカイブとして
-                    // 読まれ、バンドルされた models/json/ModelTrain_*.json が復活していた
-                    // (ユーザー報告「や大井川 c-toki のデフォルト車両が残る」)。
+                    // 自分自身の mod jar はスキップする。
                     if (lowerName.contains("realtrainmodunofficial")) {
                         return;
                     }
                     // README 同意ゲート: 未同意/拒否のパックはロードしない (タイトル画面で同意を取る)。
-                    // zip のみ対象 (ディレクトリ展開パックは README 同梱の概念が無いので従来どおり)。
                     if (!Files.isDirectory(path)
                             && !com.portofino.realtrainmodunofficial.pack.PackConsent.isAllowed(path)) {
                         return;
@@ -198,10 +187,7 @@ public class VehiclePackLoader {
         }
     }
 
-    /**
-     * エントリ名が Shift-JIS の zip (Windows 製の日本語名パック) は UTF-8 では読めないので、
-     * その場合だけ Shift-JIS で開き直す。
-     */
+    /** エントリ名が Shift-JIS の zip (Windows 製の日本語名パック) は UTF-… */
     private static void loadVehicleZip(Path zipPath) throws Exception {
         String packName = zipPath.getFileName().toString();
         com.portofino.realtrainmodunofficial.util.PackZip.readWithFallback(
@@ -329,8 +315,6 @@ public class VehiclePackLoader {
             if (!el.isJsonObject()) return;
             JsonObject obj = el.getAsJsonObject();
             // ★本家 KaizPatchX のスキーマは 2 種類ある。それぞれの項目名をそのまま使う。
-            //   ModelTrain   : trainName / trainType (EC/DC/…) / trainModel2
-            //   ModelVehicle : name / vehicleType (Car/Plane/Ship) / model   ← 自動車はこちら
             boolean sourceLooksLikeVehicle = isVehicleJsonPath(sourcePath);
             String id = sourceLooksLikeVehicle
                 ? getString(obj, "name")
@@ -356,8 +340,6 @@ public class VehiclePackLoader {
             }
             String soundScriptPath = getString(obj, "soundScriptPath");
             // ★車両種別 (アイテムの振り分けに使う)。
-            //   ModelVehicle: vehicleType (Car/Plane/Ship)
-            //   ModelTrain  : trainType (EC/DC/EL/DL/SL/CC/TC/N) — 無いパックは電車扱いに落ちる
             String vehicleType = sourceLooksLikeVehicle
                 ? firstNonBlank(getString(obj, "vehicleType"), "Car")
                 : firstNonBlank(getString(obj, "trainType"), "");
@@ -416,15 +398,15 @@ public class VehiclePackLoader {
                 }
             }
 
-            // seatPos: integer values in 1/16-block units → divide by 16
+            // seatPos: integer values in 1/16-block units → div…
             List<Vec3> seats = new ArrayList<>();
             appendSeatArray(trainModel, "seatPos", seats);
             appendSeatArray(obj, "seatPos", seats);
-            // seatPosF: float values already in block units → no division
+            // seatPosF: float values already in block units → n…
             appendRawArray(trainModel, "seatPosF", seats);
             appendRawArray(obj, "seatPosF", seats);
 
-            // playerPos / playerPosF: float values already in block units → no division
+            // playerPos / playerPosF: float values already in b…
             List<Vec3> playerPositions = new ArrayList<>();
             appendRawArray(trainModel, "playerPos", playerPositions);
             appendRawArray(obj, "playerPos", playerPositions);
@@ -440,9 +422,6 @@ public class VehiclePackLoader {
             List<VehicleDefinition.DoorAnimationDefinition> leftDoors = parseDoorAnimations(obj, trainModel, "door_left");
             List<VehicleDefinition.DoorAnimationDefinition> rightDoors = parseDoorAnimations(obj, trainModel, "door_right");
             // ★速度性能は JSON から読まない。運転席GUI (ドアタブ) で車両ごとに設定する。
-            // 空リスト = 既定値 (EntityTrainBase / TrainConfig.init の 0.36〜1.80) を使う。
-            //★KaizPatchX TrainConfig の項目そのまま。ここを読まないと全車両が既定速度になる
-            //  (以前は運転席 GUI で 1 両ずつ決める作りだった)。
             List<Float> notchMaxSpeeds = parseFloatList(obj, trainModel, "maxSpeed");
             List<Float> notchAccelerations = parseFloatList(obj, trainModel, "accelerateions");
             List<Float> decelerations = parseFloatList(obj, trainModel, "deccelerations");
@@ -451,7 +430,7 @@ public class VehiclePackLoader {
             List<List<String>> customButtonOptions = parseCustomButtonOptions(obj, trainModel);
             String rollsignTexture = getString(obj, "rollsignTexture");
             List<VehicleDefinition.RollsignDefinition> rollsigns = parseRollsigns(obj, trainModel);
-            // 種別幕 (方向幕と同じ書式・別項目)。typeSignNames / typeSignTexture / typeSigns。
+            // 種別幕 (方向幕と同じ書式・別項目)。typeSignNames / typeSignTextur…
             List<String> typeSignNames = parseStringList(obj, trainModel, "typeSignNames");
             String typeSignTexture = null;
             List<VehicleDefinition.RollsignDefinition> typeSigns = parseSignPanels(obj, trainModel, "typeSigns");
@@ -466,13 +445,13 @@ public class VehiclePackLoader {
             String soundDecelerationStop = getString(obj, "sound_D_S");
             String soundBrakeRelease = getString(obj, "sound_BrakeRelease");
             String soundBrakeRelease2 = getString(obj, "sound_BrakeRelease2");
-            // 本家 SoundUpdaterTrain: ATS チャイム/ベル (signal=1 の走行中にループで鳴る)。
+            // 本家 SoundUpdaterTrain: ATS チャイム/ベル (signal=1 の走行中に…
             String soundAtsChime = getString(obj, "sound_ATSChime");
             String soundAtsBell = getString(obj, "sound_ATSBell");
             String soundDoorOpen = getString(obj, "sound_DoorOpen");
             String soundDoorClose = getString(obj, "sound_DoorClose");
             List<String> announcementSounds = parseAnnouncementSounds(obj, trainModel);
-            //★本家のキーは綴りミスのまま accelerateion。0 = 既定 (0.001736)。
+            // ★本家のキーは綴りミスのまま accelerateion。0 = 既定 (0.001736)。
             float acceleration = parseFloat(obj, "accelerateion", 0.0F);
             boolean useVariableAcceleration = parseBoolean(obj, "useVariableAcceleration", false);
             boolean useVariableDeceleration = parseBoolean(obj, "useVariableDeceleration", false);
@@ -484,7 +463,7 @@ public class VehiclePackLoader {
             boolean singleTrain = parseBoolean(obj, "isSingleTrain", false);
 
             String serverScriptPath = getString(obj, "serverScriptPath");
-            // 本家 ModelConfig.guiScriptPath / guiTexture (運転台 GUI スクリプト)。
+            // 本家 ModelConfig.guiScriptPath / guiTexture (運転台 GU…
             String guiScriptPath = getString(obj, "guiScriptPath");
             String guiTexture = getString(obj, "guiTexture");
             VehicleDefinition definition = new VehicleDefinition(
@@ -533,8 +512,7 @@ public class VehiclePackLoader {
             definition.setServerScriptPath(serverScriptPath);
             definition.setGuiScriptPath(guiScriptPath);
             definition.setGuiTexture(guiTexture);
-            // 本家 KaizPatchX の customIconTexture。持ち物欄でのアイテムの絵を差し替える。
-            // 車両 (自動車) も設置物と同じく「1 つのアイテムで中身を選ぶ」ので同じ扱いにする。
+            // 本家 KaizPatchX の customIconTexture。
             definition.setCustomIconTexture(getString(obj, "customIconTexture"));
             // 本家 sound_Announcement の表示名 ([[名前, 音]] の名前側)
             definition.setAnnouncementNames(parseAnnouncementNames(obj, trainModel));
@@ -558,10 +536,7 @@ public class VehiclePackLoader {
         }
     }
 
-    /**
-     * 本家 slotPos: [[x, y, z, seatType], ...] (ブロック単位、seatType 省略時は 2=座席)。
-     * trainModel2 側と JSON ルートの両方を読む。
-     */
+    /** 本家 slotPos: [[x, y, z, seatType], ...] (ブロック単位、se… */
     private static java.util.List<float[]> parseSlotPositions(JsonObject trainModel, JsonObject obj) {
         // ★本家は JSON のルートのみ (入れ子 trainModel は見ない)。
         java.util.List<float[]> out = new ArrayList<>();
@@ -681,10 +656,7 @@ public class VehiclePackLoader {
         appendVehicleParts(obj.getAsJsonArray(key), out);
     }
 
-    /**
-     * 本家 BasicVehiclePartsRenderer.getParts と同じ読み取り。
-     * childParts を再帰で辿り、transform は全要素を並び順のまま保持する。
-     */
+    /** 本家 BasicVehiclePartsRenderer.getParts と同じ読み取り。 */
     private static void appendVehicleParts(JsonArray array, List<VehicleDefinition.DoorAnimationDefinition> out) {
         for (JsonElement element : array) {
             if (!element.isJsonObject()) continue;
@@ -710,12 +682,7 @@ public class VehiclePackLoader {
         }
     }
 
-    /**
-     * 本家 VehicleParts.transform: 要素数 3 = 平行移動、4 = 回転。
-     * 長さをそのまま保持する — 4 要素を平行移動として読むと
-     * {angle, vecX, vecY, vecZ} が translate(angle, vecX, vecY) になり、
-     * 回転式のドア (プラグドア・バス扉) が明後日の方向へ飛ぶ。
-     */
+    /** 本家 VehicleParts.transform: 要素数 3 = 平行移動、4 = 回転。 */
     private static List<float[]> parseVehiclePartsTransforms(JsonObject door) {
         if (door == null || !door.has("transform") || !door.get("transform").isJsonArray()) {
             return List.of();
@@ -750,7 +717,7 @@ public class VehiclePackLoader {
 
 
     private static List<Float> parseFloatList(JsonObject root, JsonObject trainModel, String key) {
-        // ★本家 TrainConfig は JSON のルートを見る (入れ子 trainModel は見ない)。
+        // ★本家 TrainConfig は JSON のルートを見る (入れ子 trainModel は見…
         JsonArray array = null;
         if (root != null && root.has(key) && root.get(key).isJsonArray()) {
             array = root.getAsJsonArray(key);
@@ -769,7 +736,7 @@ public class VehiclePackLoader {
     }
 
     private static List<String> parseStringList(JsonObject root, JsonObject trainModel, String key) {
-        // ★本家 TrainConfig は JSON のルートを見る (入れ子 trainModel は見ない)。
+        // ★本家 TrainConfig は JSON のルートを見る (入れ子 trainModel は見…
         JsonArray array = null;
         if (root != null && root.has(key) && root.get(key).isJsonArray()) {
             array = root.getAsJsonArray(key);
@@ -780,8 +747,7 @@ public class VehiclePackLoader {
         List<String> values = new ArrayList<>();
         for (JsonElement element : array) {
             try {
-                // ★空文字コマも保持する。
-                // (=生の JSON 配列長。末尾やコマ間の "" も1コマとして数える) でテクスチャを縦分割する。
+                // ★空文字コマも保持する。 (=生の JSON 配列長。
                 if (element != null && element.isJsonPrimitive()) {
                     values.add(element.getAsString());
                 }
@@ -909,7 +875,7 @@ public class VehiclePackLoader {
         return parseSignPanels(root, trainModel, "rollsigns");
     }
 
-    /** rollsigns / typeSigns など、uv+pos で定義された幕パネル配列を読む (種別幕でも流用)。 */
+    /** rollsigns / typeSigns など、uv+pos で定義された幕パネル配列を読む (… */
     private static List<VehicleDefinition.RollsignDefinition> parseSignPanels(JsonObject root, JsonObject trainModel, String key) {
         JsonArray array = null;
         if (trainModel != null && trainModel.has(key) && trainModel.get(key).isJsonArray()) {
@@ -1021,7 +987,7 @@ public class VehiclePackLoader {
         return values.length < minLength ? new float[0] : values;
     }
 
-    /** seatPos: integer values in 1/16-block units, divide by 16 */
+    /** seatPos: integer values in 1/16-block units, divi… */
     private static void appendSeatArray(JsonObject obj, String key, List<Vec3> out) {
         if (!obj.has(key) || !obj.get(key).isJsonArray()) return;
         for (JsonElement e : obj.getAsJsonArray(key)) {
@@ -1061,7 +1027,7 @@ public class VehiclePackLoader {
         }
     }
 
-    /** playerPos / seatPosF / bogiePos: float values already in block units, no division */
+    /** playerPos / seatPosF / bogiePos: float values alr… */
     private static void appendRawArray(JsonObject obj, String key, List<Vec3> out) {
         if (obj == null || !obj.has(key) || !obj.get(key).isJsonArray()) return;
         for (JsonElement e : obj.getAsJsonArray(key)) {
@@ -1096,11 +1062,7 @@ public class VehiclePackLoader {
         return List.copyOf(sounds);
     }
 
-    /**
-     * 本家 sound_Announcement は [[表示名, 音声パス], ...]。表示名 (要素0) を取り出す。
-     * 名前が無い書き方 (文字列だけ等) の場合はそのエントリを空文字にして、
-     * 表示側で「アナウンス N」にフォールバックさせる。
-     */
+    /** 本家 sound_Announcement は [[表示名, 音声パス], ...]。 */
     private static List<String> parseAnnouncementNames(JsonObject obj, JsonObject trainModel) {
         List<String> names = new ArrayList<>();
         appendAnnouncementNames(trainModel, names);
@@ -1117,8 +1079,7 @@ public class VehiclePackLoader {
             return;
         }
         for (JsonElement entry : element.getAsJsonArray()) {
-            // 音声が取れないエントリは parseAnnouncementSounds 側でも捨てられるので、
-            // 名前リストとインデックスがずれないよう同じ条件で揃える。
+            // 音声が取れないエントリは parseAnnouncementSounds 側でも捨てられるので、…
             String sound = extractAnnouncementSound(entry);
             if (sound == null || sound.isBlank()) {
                 continue;
@@ -1260,10 +1221,7 @@ public class VehiclePackLoader {
         return readScriptContent(definition, definition == null ? null : definition.getScriptPath());
     }
 
-    /**
-     * 任意パスのスクリプト読込 (rendererPath / guiScriptPath / soundScriptPath 共通)。
-     * 解決規則 (パック内 → 前提パック横断索引) は rendererPath と同一。
-     */
+    /** 任意パスのスクリプト読込 (rendererPath / guiScriptPath / soun… */
     public static String readScriptContent(VehicleDefinition definition, String path) {
         if (definition == null || path == null || path.isBlank()) {
             return null;
@@ -1308,15 +1266,10 @@ public class VehiclePackLoader {
             RealTrainModUnofficial.LOGGER.warn("Failed to read vehicle script {} from pack {}", path, definition.getPackName(), e);
         }
         // 自パックに無い / パック解決失敗: 前提・ベーススクリプトパックを横断して探す。
-        // (例: JRCT_Keiyo が車両を定義し、実体スクリプト scripts/Render_script_jre233_mi.js は
-        // 前提の JR-CommuterTrainPack 側にある、という分割構成。
         return readScriptFromGlobalIndex(scriptPath);
     }
 
-    /**
-     * 車両スクリプトを全ロード済みパック横断の資産索引 (NGTFileLoader) から読む。
-     * rendererPath が前提/ベーススクリプトパックのファイルを指す分割構成のフォールバック。
-     */
+    /** 車両スクリプトを全ロード済みパック横断の資産索引 (NGTFileLoader) から読む。 */
     private static String readScriptFromGlobalIndex(String scriptPath) {
         if (scriptPath == null || scriptPath.isBlank()) {
             return null;

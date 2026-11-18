@@ -3,7 +3,7 @@ import jp.ngt.rtm.rail.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import java.util.*;
-/** KaizPatchX chunk-boundary sampling, bisection and unique core placement. */
+/** KaizPatchX chunk-boundary sampling, bisection and… */
 public final class RailChunkSectioner {
     private static final double EPS=1E-7;
     private RailChunkSectioner() {}

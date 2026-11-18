@@ -7,10 +7,7 @@ import java.util.Map;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * IBlockState 互換シム。
- * 信号機のブロック検知スクリプトが、色ガラス等の判定にこの形を使う:
- */
+/** IBlockState 互換シム。 信号機のブロック検知スクリプトが、色ガラス等の判定にこの形を使… */
 public final class BlockStateCompat {
 
     private final BlockState state;
@@ -24,7 +21,7 @@ public final class BlockStateCompat {
         return this.state;
     }
 
-    /** func_177230_c = getBlock。色別ブロックは白色版へ正規化する (base+meta 照合のため)。 */
+    /** func_177230_c = getBlock。 */
     public Block func_177230_c() {
         return this.state == null ? null : jp.ngt.mccompat.init.Blocks.canonical(this.state.getBlock());
     }
@@ -33,11 +30,7 @@ public final class BlockStateCompat {
         return func_177230_c();
     }
 
-    /**
-     * func_177228_b = getProperties。
-     * 本家は ImmutableMap<IProperty, Comparable> を返し、スクリプトは
-     * .values.toArray[0].func_176765_a で先頭プロパティのメタを読む。
-     */
+    /** func_177228_b = getProperties。 */
     public Map<String, MetaValue> func_177228_b() {
         Map<String, MetaValue> map = new LinkedHashMap<>();
         map.put("meta", new MetaValue(
@@ -49,7 +42,7 @@ public final class BlockStateCompat {
         return func_177228_b();
     }
 
-    /** func_177230_c で取った Block と直接比較されることがあるため equals も通す。 */
+    /** func_177230_c で取った Block と直接比較されることがあるため equals も… */
     @Override
     public boolean equals(Object o) {
         if (this == o) {

@@ -12,10 +12,7 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Equipable;
 
-/**
- * NPC の装備画面。本家 {@code ContainerNPC} (guiIdNPC) の簡易移植。
- * スロットは 手持ち 1 + 防具 4。閉じると NPC 本体の装備へ書き戻し、AI を組み直す。
- */
+/** NPC の装備画面。本家 ContainerNPC (guiIdNPC) の簡易移植。 */
 public class NpcMenu extends AbstractContainerMenu {
     private static final EquipmentSlot[] ARMOR = {
         EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET
@@ -40,9 +37,9 @@ public class NpcMenu extends AbstractContainerMenu {
             }
         }
 
-        //手持ち
+        // 手持ち
         this.addSlot(new Slot(this.equipment, 0, 26, 54));
-        //防具 (頭→足)
+        // 防具 (頭→足)
         for (int i = 0; i < ARMOR.length; ++i) {
             final EquipmentSlot armorSlot = ARMOR[i];
             this.addSlot(new Slot(this.equipment, 1 + i, 80, 18 + i * 18) {
@@ -58,7 +55,7 @@ public class NpcMenu extends AbstractContainerMenu {
                 }
             });
         }
-        //プレイヤー
+        // プレイヤー
         for (int row = 0; row < 3; ++row) {
             for (int col = 0; col < 9; ++col) {
                 this.addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 102 + row * 18));

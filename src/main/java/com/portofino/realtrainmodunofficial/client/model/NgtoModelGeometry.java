@@ -33,14 +33,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.Half;
 
-/**
- * 本家の .ngto (NGTObject) 車両モデルを読む。
- * NGTO はポリゴンモデルではなくボクセル (ブロックを並べた構造物) で、本家は
- * NGTOModel が「ブロックをそのまま描く」ことで車両にしている。
- */
+/** 本家の .ngto (NGTObject) 車両モデルを読む。 */
 public final class NgtoModelGeometry {
 
-    /** 1 頂点あたり x, y, z, nx, ny, nz, u, v。MqoModelLoader.Batch と同じ並び。 */
+    /** 1 頂点あたり x, y, z, nx, ny, nz, u, v。 */
     public static final int STRIDE = 8;
 
     private NgtoModelGeometry() {
@@ -62,10 +58,7 @@ public final class NgtoModelGeometry {
     public record Part(String name, float[] opaque, float[] translucent) {
     }
 
-    /**
-     * .ngtz は「.ngto を並べた素の zip」(本家 NGTZ)。
-     * エントリ名から .ngto を取った物がパーツ名で、スクリプトはこの名前で部分描画する。
-     */
+    /** .ngtz は「.ngto を並べた素の zip」(本家 NGTZ)。 */
     public static List<Part> buildParts(byte[] fileBytes, String modelFile, float scale) {
         if (!isNgtz(modelFile)) {
             Geometry single = build(fileBytes, scale);
@@ -132,10 +125,9 @@ public final class NgtoModelGeometry {
         }
         float offX = sizeX * 0.5F;
         float offZ = sizeZ * 0.5F;
-        // 本家 NGTOParts.render は glScalef(scale) → glTranslatef(-x/2, 0, -z/2) の順。
-        // = 形状も中心寄せも scale 倍。ここで焼き込む (描画側では掛けない)。
+        // 本家 NGTOParts.render は glScalef(scale) → glTransla…
         float unit = scale > 0.0F ? scale : 1.0F;
-        // 同じ BlockState の焼き済みモデルは使い回す (65000 ボクセル分の getBlockModel を避ける)
+        // 同じ BlockState の焼き済みモデルは使い回す (65000 ボクセル分の getBloc…
         Map<BlockState, BakedModel> models = new HashMap<>();
         Map<BlockState, Boolean> translucentCache = new HashMap<>();
 
@@ -158,8 +150,6 @@ public final class NgtoModelGeometry {
                         } else {
                             BlockState neighbor = cells[index(nx, ny, nz, sizeY, sizeZ)];
                             // ★バニラ Block.shouldRenderFace と同じ判定にする。
-                            // 以前は「隣が塞いでいなければ描く」だけだったので、ガラス同士の
-                            // 接面など同じ位置に 2 枚出て z ファイティング (チカチカ) していた。
                             if (state.skipRendering(neighbor, dir)) {
                                 open = false;
                             } else if (!neighbor.canOcclude()) {
@@ -227,7 +217,7 @@ public final class NgtoModelGeometry {
         }
     }
 
-    /** 外側 NBT → ByteData(gzip) → 内側 NBT。ByteData が無ければそのまま。 */
+    /** 外側 NBT → ByteData(gzip) → 内側 NBT。 */
     private static CompoundTag readNgto(byte[] bytes) {
         if (bytes == null || bytes.length == 0) {
             return null;
@@ -251,7 +241,7 @@ public final class NgtoModelGeometry {
         }
     }
 
-    /** BData (1 バイト/セル・-128 オフセット) か IData/Blocks (int/セル)。 */
+    /** BData (1 バイト/セル・-128 オフセット) か IData/Blocks (int/セ… */
     private static int[] readCellIds(CompoundTag root, int expected) {
         if (root.contains("IData", Tag.TAG_INT_ARRAY)) {
             return root.getIntArray("IData");
@@ -288,10 +278,7 @@ public final class NgtoModelGeometry {
         return palette;
     }
 
-    /**
-     * 1.7.10 のブロック名 + メタ を 1.21 の BlockState にする。
-     * 1.7.10 は「色違い = 同じブロックのメタ違い」だったので、色付き系はメタが色番号。
-     */
+    /** 1.7.10 のブロック名 + メタ を 1.21 の BlockState にする。 */
     private static final class LegacyBlocks {
         private static final Map<String, BlockState> CACHE = new HashMap<>();
 
@@ -312,8 +299,7 @@ public final class NgtoModelGeometry {
         private static BlockState resolve(String rawName, int meta) {
             String name = rawName.contains(":") ? rawName.substring(rawName.indexOf(':') + 1) : rawName;
             name = name.toLowerCase(Locale.ROOT);
-            // ★空気を先に返す。byName は「AIR が返ってきたら未知」と見なすので、
-            // ここを通さないとパレットの空気が石になり、車体が中身の詰まった塊になる。
+            // ★空気を先に返す。byName は「AIR が返ってきたら未知」と見なすので、 ここを通さないとパ…
             if (name.equals("air") || name.equals("cave_air") || name.equals("void_air")) {
                 return Blocks.AIR.defaultBlockState();
             }

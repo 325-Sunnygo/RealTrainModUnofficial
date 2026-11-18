@@ -26,10 +26,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * ミニチュアアイテム (neo mcte)。本家 MCTE ItemMiniature 相当。
- * 操作:
- */
+/** ミニチュアアイテム (neo mcte)。本家 MCTE ItemMiniature 相当。 操作: */
 public class MiniatureItem extends Item {
 
     /** 取り込み範囲の上限 (負荷対策)。 */
@@ -39,10 +36,7 @@ public class MiniatureItem extends Item {
         super(new Properties().stacksTo(1));
     }
 
-    /**
-     * インベントリや手元で中身を描く (neo mcte)。
-     * NeoForge 21.1 の作法。
-     */
+    /** インベントリや手元で中身を描く (neo mcte)。 NeoForge 21.1 の作法。 */
     @Override
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
@@ -59,10 +53,7 @@ public class MiniatureItem extends Item {
         });
     }
 
-    /**
-     * 何もない所を右クリック: 設定画面を開く (本家 MCTE と同じ)。
-     * Screen は client 専用なので必ず ClientHooks 経由。
-     */
+    /** 何もない所を右クリック: 設定画面を開く (本家 MCTE と同じ)。 */
     @Override
     public net.minecraft.world.InteractionResultHolder<ItemStack> use(
             Level level, Player player, net.minecraft.world.InteractionHand hand) {
@@ -126,7 +117,7 @@ public class MiniatureItem extends Item {
             level.setBlock(target, RealTrainModUnofficialBlocks.MINIATURE.get().defaultBlockState(), 3);
             if (level.getBlockEntity(target) instanceof MiniatureBlockEntity be) {
                 be.setMiniatureTag(tag);
-                // 本家 TileEntityMiniature.setRotation 相当。プレイヤーの向きで正面を決める。
+                // 本家 TileEntityMiniature.setRotation 相当。
                 be.setPlacement(snapYaw(player.getYRot()), (byte) face.get3DDataValue());
             }
         }
@@ -137,10 +128,7 @@ public class MiniatureItem extends Item {
         return InteractionResult.CONSUME;
     }
 
-    /**
-     * Mode=ORIGINAL: 中身を実ブロックとして原寸で展開する。
-     * 本家 setOriginalBlocks 相当。ブロックエンティティの NBT も復元する。
-     */
+    /** Mode=ORIGINAL: 中身を実ブロックとして原寸で展開する。 */
     private static int expandOriginal(Level level, BlockPos origin, NGTObject ngto) {
         int placed = 0;
         for (BlockSet set : ngto.blockList) {

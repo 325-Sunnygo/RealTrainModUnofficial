@@ -16,10 +16,7 @@ import net.minecraft.world.phys.BlockHitResult;
 
 import javax.annotation.Nullable;
 
-/**
- * SignalControllerMod (作者: masa300, https://github.com/masa300/SignalControllerMod)
- * の SignalController ブロック 1.21.1 移植。右クリックで設定 GUI。
- */
+/** SignalControllerMod (作者: masa300, https://github.… */
 public class SignalController extends BaseEntityBlock {
     public static final MapCodec<SignalController> CODEC = simpleCodec(props -> new SignalController(props));
 

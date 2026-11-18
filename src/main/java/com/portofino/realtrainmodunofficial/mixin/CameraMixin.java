@@ -11,12 +11,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-/**
- * フリーカメラ (FreeCameraController) 用: Camera.setup の末尾でカメラ位置と
- * 向きを自由位置に上書きする。
- * ViewportEvent.ComputeCameraAngles イベントは setup 内で position を確定させる前に
- * 発火するため、そこで位置を上書きしても直後に setPosition(entity位置) で戻されてしまう。
- */
+/** フリーカメラ (FreeCameraController) 用: Camera.setup の末尾… */
 @Mixin(Camera.class)
 public abstract class CameraMixin {
 

@@ -1,9 +1,6 @@
 package jp.ngt.ngtlib.renderer;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.NGTObjectRenderer のスクリプト互換 。
- * NGTO Builder のミニチュアプレビュー用。
- */
+/** 本家 jp.ngt.ngtlib.renderer.NGTObjectRenderer のスクリプ… */
 @SuppressWarnings("unused")
 public final class NGTObjectRenderer {
     public static final NGTObjectRenderer INSTANCE = new NGTObjectRenderer();

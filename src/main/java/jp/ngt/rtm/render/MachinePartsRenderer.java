@@ -4,10 +4,7 @@ import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEnti
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
-/**
- * 本家 jp.ngt.rtm.render.MachinePartsRenderer (KaizPatchX) の移植。
- * 踏切等の設置物スクリプト (RenderCrossingGate01.js 等) が renderClass に指定する。
- */
+/** 本家 jp.ngt.rtm.render.MachinePartsRenderer (KaizPa… */
 public class MachinePartsRenderer extends TileEntityPartsRenderer {
 
     public MachinePartsRenderer(String... par1) {
@@ -21,13 +18,10 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
                 return (float) be.getBarMoveCount() / 90.0F;
             }
             if (be.getCategory() == InstalledObjectCategory.TICKET_GATE) {
-                // 本家 MachinePartsRenderer: canThrough ? 0 : 1 — 通れる(開)=0, 閉=1。
-                // MQO のデフォルトポーズが「開」で、state>0 の回転で「閉」になる。
+                // 本家 MachinePartsRenderer: canThrough ? 0 : 1 — 通れる…
                 return be.isTicketGateOpen() ? 0.0F : 1.0F;
             }
             // 本家 MachinePartsRenderer: 転轍機は isActivated ? 1 : 0。
-            // RenderPoint01.js が (count * 60 - 30) 度だけレバーを X 軸回転させるので、
-            // OFF で -30 度、ON で +30 度に倒れる。
             if (be.getCategory() == InstalledObjectCategory.POINT) {
                 return be.isPointActivated() ? 1.0F : 0.0F;
             }
@@ -48,10 +42,7 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
         return -1;
     }
 
-    /**
-     * 本家 MachinePartsRenderer.getLodState: 転轍機だけ move の符号を返す (move > 0 ? 1 : -1)。
-     * RenderPoint01.js は state < 0 のとき本体 (body3) を +2.75 ずらす。
-     */
+    /** 本家 MachinePartsRenderer.getLodState: 転轍機だけ move の… */
     public int getLodState(Object tile) {
         if (tile instanceof InstalledObjectBlockEntity be
                 && be.getCategory() == InstalledObjectCategory.POINT) {
@@ -99,15 +90,7 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
         }
     }
 
-    /**
-     * 本家 TileEntityPartsRenderer.getMetadata = 設置物のブロック meta。
-     * 本家 ItemInstalledObject は照明/スピーカー/看板/碍子の meta に
-     * <b>クリックした面 (0-5)</b> を入れるので、RTMU では保存してある取付面を返す。
-     * <p>
-     * ★ここが 0 固定だと RenderSearchLight.js / RenderSpeaker.js の
-     * 「壁付け (meta 2-5) のときは樽の pitch を -90 して打ち消す」分岐が働かず、
-     * BER の面回転 90 度と樽の 90 度が二重に掛かってモデルが斜めに傾く。
-     */
+    /** 本家 TileEntityPartsRenderer.getMetadata = 設置物のブロック… */
     @Override
     public int getMetadata(Object tile) {
         if (tile instanceof InstalledObjectBlockEntity) {
@@ -116,7 +99,7 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
         return super.getMetadata(tile);
     }
 
-    /** 取付面 (本家 meta)。未設定の古い設置物は BER と同じく 1 (上向き=面回転なし) 扱い。 */
+    /** 取付面 (本家 meta)。未設定の古い設置物は BER と同じく 1 (上向き=面回転なし) 扱… */
     private static int mountFaceOf(Object tile) {
         if (tile instanceof InstalledObjectBlockEntity be) {
             int face = be.getMountFace();
@@ -125,7 +108,7 @@ public class MachinePartsRenderer extends TileEntityPartsRenderer {
         return 0;
     }
 
-    /** 本家getNormal: 機器の向きベクトル。本家 TileEntityLight.getNormal と同じく meta で回す。 */
+    /** 本家getNormal: 機器の向きベクトル。 */
     public jp.ngt.ngtlib.math.Vec3 getNormal(Object tile, float x, float y, float z, float pitch, float yaw) {
         jp.ngt.ngtlib.math.Vec3 vec = new jp.ngt.ngtlib.math.Vec3(x, y, z);
         rotateVec(vec, mountFaceOf(tile), pitch, yaw);

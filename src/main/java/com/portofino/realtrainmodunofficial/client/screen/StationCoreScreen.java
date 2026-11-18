@@ -11,10 +11,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/**
- * 駅名の編集。本家 {@code jp.ngt.rtm.gui.GuiStation} の移植。
- * 本家と同じで「駅名 1 行 + 完了 / キャンセル」だけ。
- */
+/** 駅名の編集。本家 jp.ngt.rtm.gui.GuiStation の移植。 */
 public class StationCoreScreen extends Screen {
     private final BlockPos pos;
     private final String initialName;

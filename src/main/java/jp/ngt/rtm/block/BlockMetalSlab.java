@@ -16,12 +16,7 @@ import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-/**
- * 鋼材 (薄板)。本家 {@code jp.ngt.rtm.block.BlockMetalSlab} の移植。
- *
- * <p>本家はメタで温度 (15→0) を持ち、ランダム tick で 1 ずつ下がる。
- * 温度が残っている間は乗ると焼ける。冷えたら金ノコで鋼インゴットにできる。
- */
+/** 鋼材 (薄板)。本家 jp.ngt.rtm.block.BlockMetalSlab の移植。 */
 public class BlockMetalSlab extends Block {
     public static final MapCodec<BlockMetalSlab> CODEC = simpleCodec(p -> new BlockMetalSlab());
     /** 本家のメタ。0 = 冷えている。 */

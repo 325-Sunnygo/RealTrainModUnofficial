@@ -9,10 +9,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 import java.util.Arrays;
 import java.util.EnumSet;
 
-/**
- * 本家 jp.ngt.rtm.entity.ai.EntityAIDrivingWithSignal の移植。
- * 列車に乗っている運転士が、信号現示に応じた速度までノッチを自動操作する。
- */
+/** 本家 jp.ngt.rtm.entity.ai.EntityAIDrivingWithSignal… */
 public class DrivingWithSignalGoal extends Goal {
 
     protected static final int UPDATE_INTERVAL = 4;
@@ -23,12 +20,12 @@ public class DrivingWithSignalGoal extends Goal {
 
     public DrivingWithSignalGoal(EntityMotorman motorman) {
         this.motorman = motorman;
-        this.setFlags(EnumSet.of(Flag.MOVE)); //本家 setMutexBits(1)
+        this.setFlags(EnumSet.of(Flag.MOVE)); // 本家 setMutexBits(1)
     }
 
     @Override
     public boolean canUse() {
-        //別 mod が運転を握っている間は本家 AI を止める (打ち消し合って動かなくなる)
+        // 別 mod が運転を握っている間は本家 AI を止める (打ち消し合って動かなくなる)
         if (this.motorman.isExternallyDriven()) {
             return false;
         }
@@ -53,7 +50,7 @@ public class DrivingWithSignalGoal extends Goal {
 
     @Override
     public boolean requiresUpdateEveryTick() {
-        return true; //間引きは自前の cooldown で行う
+        return true; // 間引きは自前の cooldown で行う
     }
 
     @Override
@@ -72,11 +69,7 @@ public class DrivingWithSignalGoal extends Goal {
         this.train.setNotch(notch);
     }
 
-    /**
-     * 本家 getSuitableNotch。
-     * @param par1 目標の速度
-     * @param par2 現在の速度
-     */
+    /** 本家 getSuitableNotch。 */
     private EnumNotch getSuitableNotch(float par1, float par2) {
         float gap = par1 - par2;
         if (gap > 0.0F) {

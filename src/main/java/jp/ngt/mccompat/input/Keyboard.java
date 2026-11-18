@@ -3,10 +3,7 @@ package jp.ngt.mccompat.input;
 import net.minecraft.client.Minecraft;
 import org.lwjgl.glfw.GLFW;
 
-/**
- * LWJGL2 org.lwjgl.input.Keyboard のスクリプト互換 (GLFW ベース)。
- * SRB3/NGTO Builder が isKeyDown + KEY_* 定数を使用する。
- */
+/** LWJGL2 org.lwjgl.input.Keyboard のスクリプト互換 (GLFW ベー… */
 public final class Keyboard {
     private Keyboard() {
     }
@@ -38,10 +35,7 @@ public final class Keyboard {
     public static final int KEY_O = 24;
     public static final int KEY_P = 25;
     public static final int KEY_RETURN = 28;
-    /**
-     * KEY_NONE = 0。本家 LWJGL2 の「キー未割り当て」。
-     * NGTO Builder 2 の InputManager が修飾キーの初期値に使う。
-     */
+    /** KEY_NONE = 0。本家 LWJGL2 の「キー未割り当て」。 */
     public static final int KEY_NONE = 0;
 
     public static final int KEY_LCONTROL = 29;
@@ -89,10 +83,7 @@ public final class Keyboard {
         }
     }
 
-    /**
-     * 本家 Keyboard.getKeyName。操作説明の表示に使う (NGTO Builder 2 のヘルプ表示)。
-     * GLFW のキー名を返し、取れないものは LWJGL2 のコード番号を文字列で返す。
-     */
+    /** 本家 Keyboard.getKeyName。 */
     public static String getKeyName(int lwjgl2Key) {
         if (lwjgl2Key == KEY_NONE) {
             return "NONE";

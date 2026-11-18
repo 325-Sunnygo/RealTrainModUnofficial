@@ -13,18 +13,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/**
- * 信号変換機の設定。本家 {@code jp.ngt.rtm.gui.GuiSignalConverter} の移植。
- *
- * <p>本家と同じ配置 (比較演算子ボタン 30x20、値の欄 40x20 を y=60 と y=100)、
- * 同じラベル、同じ値域:
- * <ul>
- *   <li>RSIn … "Output signal level" / "RS_ON"(0〜127) / "RS_OFF"(0〜127)</li>
- *   <li>RSOut … "Input signal level" と比較演算子 (欄は 1 つ、0〜127)</li>
- *   <li>Wireless … "Channel"(0〜32767) / "Chunk Load Range"(0〜25)</li>
- *   <li>Increment/Decrement … 本家は<b>画面を開かない</b> (設定を持たない)</li>
- * </ul>
- */
+/** 信号変換機の設定。本家 jp.ngt.rtm.gui.GuiSignalConverter の移植。 */
 public class SignalConverterScreen extends Screen {
     private final BlockPos pos;
     private final SignalConverterType type;
@@ -45,7 +34,7 @@ public class SignalConverterScreen extends Screen {
     protected void init() {
         int hw = this.width / 2;
 
-        //本家: 完了 / キャンセル
+        // 本家: 完了 / キャンセル
         this.addRenderableWidget(Button.builder(CommonComponents.GUI_DONE, b -> {
             this.sendPacket();
             this.onClose();
@@ -55,7 +44,7 @@ public class SignalConverterScreen extends Screen {
 
         int i0 = 0;
         if (this.type == SignalConverterType.RSOut) {
-            //本家: 比較演算子ボタン (== / > / >= / < / <= / !=) を x = w/2-36, y = 60, 30x20
+            // 本家: 比較演算子ボタン (== / > / >= / < / <= / !=) を x = w/…
             this.addRenderableWidget(Button.builder(
                 Component.literal(TileEntitySignalConverter.ComparatorType.getType(this.comparatorIndex).operator),
                 b -> {
@@ -72,7 +61,7 @@ public class SignalConverterScreen extends Screen {
         this.valueTrue.setValue(Integer.toString(this.initial[0]));
         this.addRenderableWidget(this.valueTrue);
 
-        //本家: 2 つ目の欄が出るのは RSIn と Wireless だけ
+        // 本家: 2 つ目の欄が出るのは RSIn と Wireless だけ
         if (this.type == SignalConverterType.RSIn || this.type == SignalConverterType.Wireless) {
             this.valueFalse = new EditBox(this.font, hw - 20 + i0, 100, 40, 20, Component.literal("signal1"));
             this.valueFalse.setMaxLength(5);
@@ -89,7 +78,7 @@ public class SignalConverterScreen extends Screen {
             if (fields[i] == null) {
                 continue;
             }
-            //本家: 無線はチャンネル 0〜32767 / チャンク範囲 0〜25、それ以外は 0〜127
+            // 本家: 無線はチャンネル 0〜32767 / チャンク範囲 0〜25、それ以外は 0〜127
             int max = 127;
             if (this.type == SignalConverterType.Wireless) {
                 max = i == 1 ? 25 : 32767;
@@ -112,7 +101,7 @@ public class SignalConverterScreen extends Screen {
         return Math.max(min, Math.min(max, value));
     }
 
-    /** 本家 sendPacket: RSIn / Wireless 以外は 2 つ目の値を 0 にして送る。 */
+    /** 本家 sendPacket: RSIn / Wireless 以外は 2 つ目の値を 0 にして送… */
     private void sendPacket() {
         int[] ia = this.formatSignalLevel();
         if (this.type != SignalConverterType.RSIn && this.type != SignalConverterType.Wireless) {
@@ -136,7 +125,7 @@ public class SignalConverterScreen extends Screen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
         int hw = this.width / 2;
-        //本家 drawScreen のラベル (位置も本家のまま)
+        // 本家 drawScreen のラベル (位置も本家のまま)
         if (this.type == SignalConverterType.RSIn) {
             graphics.drawCenteredString(this.font, "Output signal level", hw, 30, 0xFFFFFF);
             graphics.drawCenteredString(this.font, "RS_ON", hw, 45, 0xFFFFFF);
@@ -161,7 +150,7 @@ public class SignalConverterScreen extends Screen {
             return;
         }
         SignalConverterType type = converter.getConverterType();
-        //本家 BlockSignalConverter.onBlockActivated: Increment/Decrement は画面を開かない
+        // 本家 BlockSignalConverter.onBlockActivated: Increme…
         if (type == SignalConverterType.Increment || type == SignalConverterType.Decrement) {
             return;
         }

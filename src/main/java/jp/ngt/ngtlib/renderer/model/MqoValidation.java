@@ -1,5 +1,5 @@
 package jp.ngt.ngtlib.renderer.model;
-/** Prevent a damaged model from silently becoming an incomplete graph. */
+/** Prevent a damaged model from silently becoming an… */
 final class MqoValidation {
     private MqoValidation() {}
     static void validate(String text,String filename) {

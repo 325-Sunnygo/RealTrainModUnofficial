@@ -14,10 +14,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * モデル選択画面 → サーバーの確定。
- * カスタム名 (State.Name) と色 (State.Color) も運ぶ。
- */
+/** モデル選択画面 → サーバーの確定。 カスタム名 (State.Name) と色 (State.C… */
 public record SelectModelPayload(String modelId, String dataMapValue, String customName, int color,boolean autoSplit)
         implements CustomPacketPayload {
     public static final Type<SelectModelPayload> TYPE = new Type<>(
@@ -60,8 +57,7 @@ public record SelectModelPayload(String modelId, String dataMapValue, String cus
             String safeName = payload.customName() == null ? "" : payload.customName();
             int color = payload.color();
 
-            // 専用サーバー保険: アイテムのコンポーネントが同期・保持されなくても選択が効くよう、
-            // サーバー側にプレイヤーごとの選択を控える (設置側が null のとき拾う)。
+            // 専用サーバー保険: アイテムのコンポーネントが同期・保持されなくても選択が効くよう、 サーバー側に…
             com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.set(player.getUUID(), safeModelId);
 
             for (InteractionHand hand : InteractionHand.values()) {

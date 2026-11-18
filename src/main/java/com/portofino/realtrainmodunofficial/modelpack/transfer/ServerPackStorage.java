@@ -5,7 +5,7 @@ import java.nio.file.*;
 import java.security.*;
 import java.util.*;
 
-/** Shared, bounded file transfer. Only explicitly named ModelPack_*.zip archives are served. */
+/** Shared, bounded file transfer. */
 public final class ServerPackStorage {
     public static final int CHUNK=16384,MAX_FILES=128;
     public static final long MAX_FILE=128L*1024*1024,MAX_TOTAL=512L*1024*1024;

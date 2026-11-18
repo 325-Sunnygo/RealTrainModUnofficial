@@ -1,17 +1,6 @@
 package jp.ngt.rtm.modelpack;
 
-/**
- * 本家 {@code jp.ngt.rtm.modelpack.IModelSelector} の移植。
- *
- * <p>スクリプトが受け取る「モデルを持つ主体」(列車/車両/設置物) の共通 API。
- * 本家は {@code ResourceState}/{@code ModelSetBase} を型で要求するが、RTMU では
- * 実装クラスごとに ResourceState の型が異なる ({@code ResourceState} /
- * {@code ResourceStateCompat}) ため、戻り値は {@code Object} にして
- * どちらでも実装できるようにしている (スクリプトは動的型付けなので影響なし)。
- *
- * <p>一部のメソッドは {@code default} 実装にして、既存クラスへ無改修で
- * {@code implements IModelSelector} を付けられるようにしている。
- */
+/** 本家 jp.ngt.rtm.modelpack.IModelSelector の移植。 */
 public interface IModelSelector {
 
     /** 本家 getResourceState。 */
@@ -38,6 +27,6 @@ public interface IModelSelector {
         return false;
     }
 
-    /** 本家 getModelSet。RTMU は {@code ModelSetCompat} (= ModelSetBase 派生) を返す。 */
+    /** 本家 getModelSet。RTMU は ModelSetCompat (= ModelSetB… */
     Object getModelSet();
 }

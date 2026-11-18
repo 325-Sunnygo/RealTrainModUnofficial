@@ -17,13 +17,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-/**
- * 有限セル式の液体。本家 (ngtlib) {@code BlockLiquidBase} の移植。
- *
- * <p>本家はメタ 0〜15 で量を持つ (0 = 1 単位、15 = 満杯 16 単位)。
- * 5 tick ごとに下 → 横 4 方向へ 1 単位ずつ流れ、周囲のブロックを溶かす。
- * 1.21 にメタが無いので {@code AMOUNT} プロパティで同じ値を持つ。
- */
+/** 有限セル式の液体。本家 (ngtlib) BlockLiquidBase の移植。 */
 public abstract class BlockLiquidBase extends Block {
 
     /** 本家のメタ。量 (0 = 1 単位 … 15 = 満杯)。 */
@@ -164,14 +158,10 @@ public abstract class BlockLiquidBase extends Block {
         this.meltBlock(level, pos.relative(face));
     }
 
-    /**
-     * 本家 meltBlock。1.21 に Material が無いので同等の分類で移植:
-     * 可燃物/土/柔らかい石 → 発火、ガラス/氷/雪 → 消滅、TNT → 起爆、
-     * 岩盤・水・溶岩・自分たち → 何もしない。
-     */
+    /** 本家 meltBlock。1.21 に Material が無いので同等の分類で移植: 可燃物/土… */
     protected void meltBlock(ServerLevel level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
-        //本家 RTMMaterial.fireproof = 耐火レンガ/熱風炉レンガ
+        // 本家 RTMMaterial.fireproof = 耐火レンガ/熱風炉レンガ
         if (state.isAir() || state.is(Blocks.BEDROCK)
                 || state.is(Blocks.WATER) || state.is(Blocks.LAVA)
                 || state.getBlock() instanceof BlockLiquidBase

@@ -4,10 +4,7 @@ import jp.ngt.mccompat.PlayerCompat;
 import jp.ngt.mccompat.WorldCompat;
 import net.minecraft.client.Minecraft;
 
-/**
- * 本家 jp.ngt.ngtlib.util.MCWrapperClient のスクリプト互換。
- * getPlayer は PlayerCompat ラッパーを返す (SRB3 等が SRG フィールドを直接読むため)。
- */
+/** 本家 jp.ngt.ngtlib.util.MCWrapperClient のスクリプト互換。 */
 @SuppressWarnings("unused")
 public final class MCWrapperClient {
     private MCWrapperClient() {
@@ -28,10 +25,7 @@ public final class MCWrapperClient {
         return level != null ? new WorldCompat(level) : null;
     }
 
-    /**
-     * 本家 (1.7.10) {@code MCWrapperClient.playSound}: クライアントで音を鳴らす。
-     * RTM 公式スクリプト (RenderTank.js の砲撃音など) が使う。
-     */
+    /** 本家 (1.7.10) MCWrapperClient.playSound: クライアントで音を鳴… */
     public static void playSound(Object world, String name, double x, double y, double z,
                                  float volume, float pitch, boolean distanceDelay) {
         try {
@@ -50,10 +44,7 @@ public final class MCWrapperClient {
         }
     }
 
-    /**
-     * 本家 (1.7.10) {@code MCWrapperClient.spawnParticle}。
-     * 1.7.10 の EnumParticleTypes 名を 1.21 の ParticleTypes へ読み替える。
-     */
+    /** 本家 (1.7.10) MCWrapperClient.spawnParticle。 */
     public static void spawnParticle(Object world, String name, double x, double y, double z,
                                      double speedX, double speedY, double speedZ) {
         try {
@@ -105,10 +96,7 @@ public final class MCWrapperClient {
         return type instanceof net.minecraft.core.particles.ParticleOptions options ? options : null;
     }
 
-    /**
-     * 本家 {@code MCWrapperClient.execCommand}: チャットコマンドを実行する。
-     * 本家は "/" を前置して送る (引数に "/" が無い前提)。
-     */
+    /** 本家 MCWrapperClient.execCommand: チャットコマンドを実行する。 */
     public static void execCommand(String command) {
         try {
             Minecraft mc = Minecraft.getInstance();

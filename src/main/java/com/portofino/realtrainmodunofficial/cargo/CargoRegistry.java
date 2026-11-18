@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 読み込んだ貨物定義の索引。{@code VehicleRegistry} と同じ作り。 */
+/** 読み込んだ貨物定義の索引。VehicleRegistry と同じ作り。 */
 public final class CargoRegistry {
 
     private static final Map<String, CargoDefinition> BY_ID = new LinkedHashMap<>();
@@ -30,7 +30,7 @@ public final class CargoRegistry {
         if (def != null) {
             return def;
         }
-        //本家は拡張子や大文字小文字の揺れを許すので、素の名前でも引けるようにする
+        // 本家は拡張子や大文字小文字の揺れを許すので、素の名前でも引けるようにする
         for (CargoDefinition candidate : BY_ID.values()) {
             if (candidate.getId().equalsIgnoreCase(id)
                 || candidate.getDisplayName().equalsIgnoreCase(id)) {

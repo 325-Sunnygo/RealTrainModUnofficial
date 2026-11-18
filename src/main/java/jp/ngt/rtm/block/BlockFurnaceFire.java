@@ -21,13 +21,7 @@ import net.minecraft.world.phys.AABB;
 
 import java.util.List;
 
-/**
- * 炉の火 / 排ガス。本家 {@code BlockFurnaceFire} の移植。
- *
- * <p>炉の火に鉄鉱石 + コークス (2:1) を投げ込むと、下へ辿って銑鉄 (pig_iron_l) が湧く。
- * 排ガスは炉の火と入れ替わりながら上へ抜けて消える。熱風炉レンガはこの排ガスから熱を溜める。
- * 床が耐火レンガ以外の固体なら火事になる。
- */
+/** 炉の火 / 排ガス。本家 BlockFurnaceFire の移植。 */
 public class BlockFurnaceFire extends BlockLiquidBase {
 
     /** true = 炉の火 (光る)。false = 排ガス。 */
@@ -53,7 +47,7 @@ public class BlockFurnaceFire extends BlockLiquidBase {
         }
         int meta = now.getValue(AMOUNT);
         if (this.fire) {
-            //本家: メタ 0 で床が耐火レンガ系でない固体なら発火
+            // 本家: メタ 0 で床が耐火レンガ系でない固体なら発火
             if (meta == 0) {
                 BlockState below = level.getBlockState(pos.below());
                 if (!(below.getBlock() instanceof BlockFireBrick)
@@ -62,7 +56,7 @@ public class BlockFurnaceFire extends BlockLiquidBase {
                 }
             }
         } else {
-            //排ガス: 上が炉の火なら入れ替わって上昇、上が空気なら 1/10 で減衰して消える
+            // 排ガス: 上が炉の火なら入れ替わって上昇、上が空気なら 1/10 で減衰して消える
             BlockPos above = pos.above();
             BlockState aboveState = level.getBlockState(above);
             if (aboveState.getBlock() instanceof BlockFurnaceFire aboveFire && aboveFire.fire) {
@@ -104,7 +98,7 @@ public class BlockFurnaceFire extends BlockLiquidBase {
                 burn = false;
             }
             if ((sizeCoke > 0 || sizeIron > 0) && !level.isClientSide()) {
-                //同じマスに落ちている相方 (コークス) をかき集める
+                // 同じマスに落ちている相方 (コークス) をかき集める
                 List<ItemEntity> list = level.getEntitiesOfClass(ItemEntity.class,
                     new AABB(pos.getX(), pos.getY(), pos.getZ(),
                         pos.getX() + 1.0D, pos.getY() + 1.0D, pos.getZ() + 1.0D));

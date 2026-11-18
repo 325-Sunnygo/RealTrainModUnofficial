@@ -13,18 +13,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
-/**
- * 貨物パック ({@code ModelContainer_*.json} / {@code ModelFirearm_*.json}) の読み込み。
- *
- * <p>★走査はしない。{@code InstalledObjectPackLoader} が mod の jar・同梱パック・
- * 外部パックの json を<b>すべて</b>舐めているので、そこから該当ファイルだけ渡してもらう。
- * 走査を二重に書くとローダーごとの差 (ModList/FabricLoader) がもう一組増える。
- */
+/** 貨物パック (ModelContainer_*.json / ModelFirearm_*.jso… */
 public final class CargoPackLoader {
 
     private static final List<CargoDefinition> LOADED = new ArrayList<>();
 
-    /** 読み込みの開始。{@code InstalledObjectPackLoader.load()} の頭で呼ぶ。 */
+    /** 読み込みの開始。InstalledObjectPackLoader.load() の頭で呼ぶ。 */
     public static synchronized void begin() {
         LOADED.clear();
     }
@@ -37,11 +31,7 @@ public final class CargoPackLoader {
         RealTrainModUnofficial.LOGGER.info("[RTMU] 貨物パック: コンテナ {} / 火砲 {}", container, firearm);
     }
 
-    /**
-     * このファイルが貨物パックなら読んで true。違うなら false。
-     *
-     * @param lowerFile 小文字にしたファイル名 (例 {@code modelcontainer_c20ft.json})
-     */
+    /** このファイルが貨物パックなら読んで true。違うなら false。 */
     public static synchronized boolean tryParse(JsonObject obj, String lowerFile, String packName) {
         if (lowerFile.startsWith("modelcontainer_")) {
             OrderedPackTasks.publish(parseContainer(obj, lowerFile, packName), LOADED::add);
@@ -84,14 +74,7 @@ public final class CargoPackLoader {
         return def;
     }
 
-    /**
-     * モデルとテクスチャを取る。本家は<b>2 つの書式</b>がある:
-     * <ul>
-     *   <li>旧: {@code containerModel} / {@code containerTexture} が直に入る</li>
-     *   <li>新: {@code model: { modelFile, textures: [[名前, パス, ""], ...] }}</li>
-     * </ul>
-     * ★新形式を見落とすと C20FT_NC / Phalanx / SeaRAM / 18MRL が読めない。
-     */
+    /** モデルとテクスチャを取る。本家は2 つの書式がある: <ul> 旧: containerModel… */
     private static String resolveModel(JsonObject obj, String legacyModelKey, String legacyTextureKey,
                                        Map<String, String> textureOut) {
         JsonObject model = obj.has("model") && obj.get("model").isJsonObject()
@@ -167,7 +150,7 @@ public final class CargoPackLoader {
         return out;
     }
 
-    /** {@code modelPartsX: {objects:[...], pos:[x,y,z]}} の pos を取る。 */
+    /** modelPartsX: {objects:[...], pos:[x,y,z]} の pos を… */
     private static Vec3 getPartsPos(JsonObject obj, String key) {
         if (!obj.has(key) || !obj.get(key).isJsonObject()) {
             return Vec3.ZERO;

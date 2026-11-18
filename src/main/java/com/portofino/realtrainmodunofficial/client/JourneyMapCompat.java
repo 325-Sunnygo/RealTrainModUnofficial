@@ -3,13 +3,7 @@ package com.portofino.realtrainmodunofficial.client;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
-/**
- * JourneyMap のミニマップを選択画面を開いている間だけ一時的に無効化するソフト依存ヘルパー。
- * JourneyMap のミニマップは RenderGuiEvent.Pre で自前のリスナーが無条件に描画しており、
- * hideGui も NeoForge のイベントキャンセルも無視するため、RTMU 側からは
- * MiniMapProperties.enabled (ミニマップのオン/オフ) をリフレクションで一時的に false に
- * するしか消す方法が無い。JourneyMap 未導入時や API 変更時は静かに無効化する (try/catch)。
- */
+/** JourneyMap のミニマップを選択画面を開いている間だけ一時的に無効化するソフト依存ヘルパー。 */
 public final class JourneyMapCompat {
     private static Boolean savedEnabled;
     private static boolean unavailable;

@@ -2,7 +2,7 @@ package jp.ngt.ngtlib.renderer;
 
 import java.nio.ByteBuffer;
 
-/** Convert the four repeated center vertices required by BufferBuilder into native points. */
+/** Convert the four repeated center vertices require… */
 public final class LegacyPointVertices {
     private LegacyPointVertices() {}
     public static void compact(ByteBuffer source,ByteBuffer destination,int stride,int points) {

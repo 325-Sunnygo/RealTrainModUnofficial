@@ -10,7 +10,7 @@ public class VehicleDefinition {
     public void setLegacyConfig(com.google.gson.JsonObject config) {this.legacyConfig=config.deepCopy();}
     public com.google.gson.JsonObject getLegacyConfig() {return legacyConfig==null?null:legacyConfig.deepCopy();}
     public jp.ngt.ngtlib.renderer.model.VecAccuracy getModelAccuracy() {
-        // Original ModelPackManager chooses LOW for every configured value except MEDIUM.
+        // Original ModelPackManager chooses LOW for every c…
         var value=legacyConfig==null?null:legacyConfig.get("accuracy");
         return value==null || value.isJsonNull() || value.getAsString().equals("MEDIUM")
             ? jp.ngt.ngtlib.renderer.model.VecAccuracy.MEDIUM : jp.ngt.ngtlib.renderer.model.VecAccuracy.LOW;
@@ -31,10 +31,7 @@ public class VehicleDefinition {
         }
     }
 
-    /**
-     * 本家 VehicleBaseConfig.VehicleParts と同じ形。
-     * ドア・パンタグラフなど「開度 (0..1) に応じて動く部品」の定義。
-     */
+    /** 本家 VehicleBaseConfig.VehicleParts と同じ形。 */
     public record DoorAnimationDefinition(List<String> objects, Vec3 closedPosition, Vec3 openTranslation,
                                           List<float[]> transforms, List<DoorAnimationDefinition> childParts) {
         public DoorAnimationDefinition {
@@ -55,10 +52,7 @@ public class VehicleDefinition {
     private final String packName;
     private final String modelFile;
     private final String buttonTexture;
-    /**
-     * 本家 KaizPatchX の customIconTexture (ModelConfig)。
-     * 持ち物欄のアイテムの絵をこの画像に差し替える。未設定 (空) ならバニラのアイテムモデル。
-     */
+    /** 本家 KaizPatchX の customIconTexture (ModelConfig)。 */
     private String customIconTexture = "";
     private final Map<String, String> textureOverrides;
     private final Vec3 modelOffset;
@@ -104,9 +98,9 @@ public class VehicleDefinition {
     private String soundBrakeRelease = "";
     /** 本家 sound_BrakeRelease2: 同上 (弱、ノッチ -1 以外から戻したとき)。 */
     private String soundBrakeRelease2 = "";
-    /** 本家 SoundUpdaterTrain: ATS チャイム (signal=1 で走行中に鳴る、ループ)。 */
+    /** 本家 SoundUpdaterTrain: ATS チャイム (signal=1 で走行中に鳴る、… */
     private String soundAtsChime = "";
-    /** 本家 SoundUpdaterTrain: ATS ベル (signal=1 で走行中に鳴る、ループ)。 */
+    /** 本家 SoundUpdaterTrain: ATS ベル (signal=1 で走行中に鳴る、ルー… */
     private String soundAtsBell = "";
 
     public String getSoundAtsChime() {
@@ -125,8 +119,7 @@ public class VehicleDefinition {
         this.soundAtsChime = chime == null ? "" : chime;
         this.soundAtsBell = bell == null ? "" : bell;
     }
-    /**
-     */
+    
     private String soundDoorOpen = "";
     private String soundDoorClose = "";
     private final boolean doCulling;
@@ -417,8 +410,7 @@ public class VehicleDefinition {
         this.serverScriptPath = path == null ? "" : path;
     }
 
-    // ---- 本家 ModelConfig.guiScriptPath / guiTexture (KaizPatchX) ----
-    // 運転台 GUI をスクリプトで描く機能。guiSE の renderGui(entity, gui) が呼ばれる。
+    // ---- 本家 ModelConfig.guiScriptPath / guiTexture (K…
     private String guiScriptPath = "";
     private String guiTexture = "";
 
@@ -443,7 +435,7 @@ public class VehicleDefinition {
         this.guiTexture = texture == null ? "" : texture;
     }
 
-    /** 本家 slotPos: {x, y, z, seatType} (ブロック単位)。Loader が JSON 読込後に設定。 */
+    /** 本家 slotPos: {x, y, z, seatType} (ブロック単位)。 */
     private java.util.List<float[]> slotPositions = java.util.List.of();
 
     public java.util.List<float[]> getSlotPositions() {
@@ -498,12 +490,7 @@ public class VehicleDefinition {
         return !leftDoors.isEmpty() || !rightDoors.isEmpty();
     }
 
-    /**
-     * KaizPatchX TrainConfig の速度まわりの残り項目。
-     * accelerateions … ノッチ段ごとの加速度 (段数は maxSpeed と同じ)
-     * deccelerations … ブレーキ 9 段 (0=抑速〜8=非常)
-     * useVariableAcceleration/Deceleration … サーバースクリプトで加減速を出す
-     */
+    /** KaizPatchX TrainConfig の速度まわりの残り項目。 */
     private List<Float> notchAccelerations = List.of();
     private List<Float> decelerations = List.of();
     private boolean useVariableAcceleration;
@@ -565,9 +552,7 @@ public class VehicleDefinition {
         return rollsigns;
     }
 
-    // --- RTMU 追加: 種別幕 (方向幕/rollsign とは別レイヤー) ---
-    // 既存の巨大コンストラクタを崩さないよう、構築後に setTypeSign で注入する
-    // (setWireAttachPos と同じ後付けパターン)。パネル定義は rollsign と同じ RollsignDefinition を流用。
+    // --- RTMU 追加: 種別幕 (方向幕/rollsign とは別レイヤー) --- 既存の巨大…
     private List<String> typeSignNames = List.of();
     private String typeSignTexture = "";
     private List<RollsignDefinition> typeSigns = List.of();
@@ -610,10 +595,7 @@ public class VehicleDefinition {
         return announcementSounds;
     }
 
-    /**
-     * 本家 sound_Announcement の表示名 ([[表示名, 音声パス], ...] の表示名側)。
-     * announcementSounds と同じ順・同じ長さ。名前未指定のエントリは空文字。
-     */
+    /** 本家 sound_Announcement の表示名 ([[表示名, 音声パス], ...] の表… */
     public List<String> getAnnouncementNames() {
         return announcementNames;
     }

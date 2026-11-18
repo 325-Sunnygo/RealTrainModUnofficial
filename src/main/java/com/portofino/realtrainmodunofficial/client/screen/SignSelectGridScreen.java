@@ -16,10 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.function.Consumer;
 
-/**
- * 本家 RTM (KaizPatchX GuiSelectTexture) 式の、標識/看板などの選択画面。
- * テクスチャ(ボタン画像)をグリッドに敷き詰めて並べる。
- */
+/** 本家 RTM (KaizPatchX GuiSelectTexture) 式の、標識/看板などの選… */
 @OnlyIn(Dist.CLIENT)
 public class SignSelectGridScreen extends Screen {
     public record Item(String id, String displayName, String packName, String buttonTexture) {}
@@ -100,13 +97,12 @@ public class SignSelectGridScreen extends Screen {
 
     @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float pt) {
-        // モデル選択画面と同様、ぼかしも全面暗転もしない (暗転はタイルにも被って暗く見える指摘があったため)。
+        // モデル選択画面と同様、ぼかしも全面暗転もしない (暗転はタイルにも被って暗く見える指摘があったため…
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
         // モデル選択画面と同じく、全画面「半透明の黒」を先頭で 1 回だけ敷く。
-        // renderBackground に置くと super.render の再呼び出しでタイルの上にも重なって暗くなるため。
         g.fill(0, 0, width, height, 0xB0000000);
         g.drawString(font, getTitle(), 12, 8, 0xFFFFFF, true);
 
@@ -139,7 +135,7 @@ public class SignSelectGridScreen extends Screen {
         } else if (hovered) {
             g.fill(left, top, left + TILE_W, top + TILE_H, 0x33FFFFFF);
         }
-        // 本家 GuiSelectTexture 式: 画像全体をアスペクト比保持でタイルに収めて中央に描く (見切れ防止)。
+        // 本家 GuiSelectTexture 式: 画像全体をアスペクト比保持でタイルに収めて中央に描く…
         PackButtonTextureCache.ButtonTextureInfo info =
             PackButtonTextureCache.get(it.packName(), it.buttonTexture());
         if (info != null && info.width() > 0 && info.height() > 0) {

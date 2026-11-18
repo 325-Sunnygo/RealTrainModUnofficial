@@ -51,11 +51,7 @@ public final class ExternalSoundPackBridge {
     private ExternalSoundPackBridge() {
     }
 
-    /**
-     * 生成サウンドパックを作り直す (パック同意状態が変わった後などに呼ぶ)。
-     * 生成パックはリソースパックとして扱われるため、ファイルを作り直すだけでは
-     * SoundManager には反映されない。
-     */
+    /** 生成サウンドパックを作り直す (パック同意状態が変わった後などに呼ぶ)。 */
     public static void rebuild() {
         rebuildGeneratedPack();
     }
@@ -103,8 +99,6 @@ public final class ExternalSoundPackBridge {
             }
             writeMergedSoundsJson(mergedSoundDefs);
             // 中身が空でも pack.mcmeta を書いて有効なパックとして常に返す。
-            // 起動時に同意済みの音パックが 1 つも無くても pack が登録され、後からタイトル画面で
-            // README 同意 → #rebuild + reloadResourcePacks したときに新しい音を足せる。
             writePackMeta();
             return GENERATED_PACK_ROOT;
         } catch (Exception e) {
@@ -239,8 +233,7 @@ public final class ExternalSoundPackBridge {
                 if (parts.length < 3) {
                     continue;
                 }
-                // 名前空間は小文字化必須(MC のリソース名前空間は小文字のみ)。RTM パックには
-                // "sound_MasaCrossings" 等の大文字名前空間があり、そのままだと MC が読めず音が鳴らない。
+                // 名前空間は小文字化必須(MC のリソース名前空間は小文字のみ)。
                 String namespace = parts[1].toLowerCase(Locale.ROOT);
                 if (lower.equals("assets/" + namespace + "/sounds.json")) {
                     try (InputStream input = zipFile.getInputStream(entry)) {
@@ -274,10 +267,7 @@ public final class ExternalSoundPackBridge {
         return lowered;
     }
 
-    /**
-     * ResourceLocation のパスに使えない文字 (空白・大文字・記号) を安全化する。
-     * 1.21 のリソースパスは [a-z0-9/._-] のみ許可。
-     */
+    /** ResourceLocation のパスに使えない文字 (空白・大文字・記号) を安全化する。 */
     public static String sanitizeSoundPath(String s) {
         if (s == null) {
             return "";
@@ -320,13 +310,10 @@ public final class ExternalSoundPackBridge {
         target.add(eventKey, event);
     }
 
-    /**
-     * レガシー音の可聴距離 (ブロック)。
-     * 「音がすぐ消える」ため、45 ブロックかけて線形に減衰させる。
-     */
+    /** レガシー音の可聴距離 (ブロック)。 「音がすぐ消える」ため、45 ブロックかけて線形に減衰させる。 */
     private static final int LEGACY_ATTENUATION_DISTANCE = 45;
 
-    /** "ns:path" の音参照を attenuation_distance 付きのオブジェクト形式にする。 */
+    /** "ns:path" の音参照を attenuation_distance 付きのオブジェクト形式に… */
     private static JsonObject soundReferenceWithRange(String name) {
         JsonObject sound = new JsonObject();
         sound.addProperty("name", name);
@@ -399,9 +386,7 @@ public final class ExternalSoundPackBridge {
         if (raw == null || raw.isBlank()) {
             return raw;
         }
-        // 既に "ns:path" 形式ならその名前空間を小文字化、無ければ与えられた名前空間を前置(小文字)。
-        // RTM パックの sounds.json は "sound_MasaCrossings:machine/..." のように大文字名前空間を
-        // 含むことがあり、小文字化しないと MC が .ogg を見つけられず無音になる。
+        // 既に "ns:path" 形式ならその名前空間を小文字化、無ければ与えられた名前空間を前置(小文字…
         int colon = raw.indexOf(':');
         String ns = colon >= 0 ? raw.substring(0, colon) : namespace;
         String path = colon >= 0 ? raw.substring(colon + 1) : raw;
@@ -411,10 +396,7 @@ public final class ExternalSoundPackBridge {
         return sanitizeSoundPath(ns) + ":" + sanitizeSoundPath(path);
     }
 
-    /**
-     * 生成パックに含まれるレガシー音の名前空間 (sound_mugenlib, rtm 等)。
-     * LegacyStereoDownmix が「どの音をモノラル化するか」の判定に使う。
-     */
+    /** 生成パックに含まれるレガシー音の名前空間 (sound_mugenlib, rtm 等)。 */
     private static final java.util.Set<String> GENERATED_NAMESPACES = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public static java.util.Set<String> generatedNamespaces() {

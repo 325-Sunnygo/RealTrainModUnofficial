@@ -322,6 +322,7 @@ tasks.withType(ProcessResources).configureEach {
     exclude 'assets/rtm/advancements/drive_train.json'
     exclude 'assets/rtm/textures/items/large_rail*.png'
     exclude 'assets/rtm/textures/train/**'
+    // 本家 RenderSeat の座席テクスチャだけは RtmFloorRenderer が使うので除外から外す
     exclude 'assets/realtrainmodunofficial/bundled_packs/**'
     exclude 'assets/realtrainmodunofficial/vehicle_packs/**'
     exclude 'assets/realtrainmodunofficial/models/car/**'

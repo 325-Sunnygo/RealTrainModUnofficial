@@ -4,10 +4,7 @@ import net.minecraft.client.Minecraft;
 
 import javax.annotation.Nullable;
 
-/**
- * 本家 jp.ngt.rtm.block.tt.StationTimeTable の移植。
- * 「どの時刻表の・どの駅の・どの番線か」という看板ごとの視点。
- */
+/** 本家 jp.ngt.rtm.block.tt.StationTimeTable の移植。 */
 public final class StationTimeTable {
     private static final int SECONDS_PER_DAY = 86400;
 
@@ -74,10 +71,7 @@ public final class StationTimeTable {
         return isValid() ? timeTable.ttData[rowIndex].length : 0;
     }
 
-    /**
-     * 本家 getMatchTrainIndex: 現在時刻以降に発車する最初の列車の index。
-     * 該当なしなら getSize (= 空白テキストの index)。
-     */
+    /** 本家 getMatchTrainIndex: 現在時刻以降に発車する最初の列車の index。 */
     public int getMatchTrainIndex(int trackFilter) {
         if (!isValid()) {
             return 0;
@@ -97,7 +91,7 @@ public final class StationTimeTable {
         return getSize();
     }
 
-    /** 本家: useRealTime なら現実時間、そうでなければマイクラ時間 (6000tick ずらして 0時基準)。 */
+    /** 本家: useRealTime なら現実時間、そうでなければマイクラ時間 (6000tick ずら… */
     private int currentTimeOfDaySeconds() {
         if (timeTable != null && timeTable.useRealTime) {
             return (int) (System.currentTimeMillis() / 1000L % SECONDS_PER_DAY);

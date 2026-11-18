@@ -14,14 +14,14 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Sends a small rail preview endpoint offset from the client to the server. */
+/** Sends a small rail preview endpoint offset from t… */
 public record RailPreviewAdjustPayload(int dx, int dy, int dz) implements CustomPacketPayload {
     /** Payload type used by the network channel. */
     public static final Type<RailPreviewAdjustPayload> TYPE = new Type<>(
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "rail_preview_adjust")
     );
 
-    /** Codec used to serialize preview adjustment packets. */
+    /** Codec used to serialize preview adjustment packet… */
     public static final StreamCodec<ByteBuf, RailPreviewAdjustPayload> STREAM_CODEC = StreamCodec.composite(
         ByteBufCodecs.INT,
         RailPreviewAdjustPayload::dx,
@@ -37,7 +37,7 @@ public record RailPreviewAdjustPayload(int dx, int dy, int dz) implements Custom
         return TYPE;
     }
 
-    /** Applies the preview adjustment to the rail item held by the sending player. */
+    /** Applies the preview adjustment to the rail item h… */
     public static void handleOnServer(RailPreviewAdjustPayload payload, IPayloadContext context) {
         context.enqueueWork(() -> {
             Player player = context.player();

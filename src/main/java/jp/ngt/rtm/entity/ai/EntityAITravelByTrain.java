@@ -15,14 +15,7 @@ import net.minecraft.world.phys.AABB;
 import java.util.EnumSet;
 import java.util.List;
 
-/**
- * 乗客 NPC の「電車で移動する」AI。本家 {@code EntityAITravelByTrain} +
- * {@code NPCAIEnterStation / NPCAIRideTrain / NPCAILeaveStation / NPCAISerachTurnstile} の移植。
- *
- * <p>改札を探して切符 (手持ちの TicketItem) を使って入場 → 停車中の列車の空き床
- * (EntityFloor) へ座る → 数分乗る → 降りて改札から出場、を繰り返す。
- * 本家との差: 改札は RTMU の設置物 (TICKET_GATE) を探し、activateTicketGate で開ける。
- */
+/** 乗客 NPC の「電車で移動する」AI。本家 EntityAITravelByTrain + NP… */
 public class EntityAITravelByTrain extends Goal {
 
     public static final int WAIT_COEFFICIENT = 20;
@@ -61,7 +54,7 @@ public class EntityAITravelByTrain extends Goal {
         } else if (this.activeTask == this.aiRideTrain && this.npc.isPassenger()
                 && this.npc.getVehicle() instanceof EntityFloor floor
                 && floor.getVehicle() != null && floor.getVehicle().getSpeed() == 0.0F) {
-            //停車した: 1/4 で乗り続け、3/4 で降りて出場
+            // 停車した: 1/4 で乗り続け、3/4 で降りて出場
             this.npc.stopRiding();
             if (this.npc.getRandom().nextInt(4) == 0) {
                 this.activeTask = this.aiRideTrain;
@@ -87,7 +80,7 @@ public class EntityAITravelByTrain extends Goal {
                 }
             } else if (this.activeTask == this.aiRideTrain) {
                 if (this.npc.isPassenger()) {
-                    //乗車成功: (1〜20) x 400tick 待つ
+                    // 乗車成功: (1〜20) x 400tick 待つ
                     this.count = (this.npc.getRandom().nextInt(WAIT_COEFFICIENT) + 1) * TO_MINUTES;
                     return false;
                 }
@@ -135,7 +128,7 @@ public class EntityAITravelByTrain extends Goal {
             BlockPos origin = npc.blockPosition();
             int range = 32;
             double distance = Double.MAX_VALUE;
-            //本家: 32x24x32 の総当たり。BE 走査に置き換える (同じ範囲)
+            // 本家: 32x24x32 の総当たり。BE 走査に置き換える (同じ範囲)
             for (BlockPos pos : BlockPos.betweenClosed(
                     origin.offset(-range, -8, -range), origin.offset(range, 16, range))) {
                 if (npc.level().getBlockEntity(pos) instanceof InstalledObjectBlockEntity be
@@ -188,7 +181,7 @@ public class EntityAITravelByTrain extends Goal {
         }
     }
 
-    /** 本家 NPCAIEnterStation/NPCAILeaveStation: 開けた改札を通り抜ける。 */
+    /** 本家 NPCAIEnterStation/NPCAILeaveStation: 開けた改札を通り抜… */
     private class EnterStation extends SearchTurnstile {
         private boolean passed;
 
@@ -205,7 +198,7 @@ public class EntityAITravelByTrain extends Goal {
             }
             boolean flag = super.canContinueToUse();
             if (!flag && this.openedTurnstile) {
-                //改札の向こう側 (2〜3m 先) へ歩き抜ける
+                // 改札の向こう側 (2〜3m 先) へ歩き抜ける
                 double vecX = this.targetBlockPos.getX() + 0.5D - npc.getX();
                 double vecY = this.targetBlockPos.getY() - npc.getY();
                 double vecZ = this.targetBlockPos.getZ() + 0.5D - npc.getZ();

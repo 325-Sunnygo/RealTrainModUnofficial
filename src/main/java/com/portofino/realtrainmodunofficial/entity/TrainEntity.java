@@ -41,7 +41,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSelector {
-    /** 本家 EntityVehicleBase:43 相当。車両ごとに永続する ScriptExecuter (count を進める)。 */
+    /** 本家 EntityVehicleBase:43 相当。 */
     public final jp.ngt.rtm.modelpack.ScriptExecuter scriptExecuter = new jp.ngt.rtm.modelpack.ScriptExecuter();
 
 
@@ -91,8 +91,6 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     private static final EntityDataAccessor<Boolean> INTERIOR_LIGHT_ON =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.BOOLEAN);
     // 前後(端)台車のワールド位置を「エンティティ位置からのオフセット」でサーバー→クライアント同期する。
-    // クライアントは movement(travelAlongRail)を走らせずレールマップも持たないため、これが無いと
-    // 台車を剛体(弦上)で描画してカーブでレールからズレる。サーバーの実台車位置を同期して正確に描く。
     private static final EntityDataAccessor<Float> FRONT_BOGIE_DX =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> FRONT_BOGIE_DY =
@@ -108,8 +106,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     /** 端台車のワールド位置同期が有効か(サーバーがレール上に乗っている間のみ true)。 */
     private static final EntityDataAccessor<Boolean> BOGIE_SYNC_VALID =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.BOOLEAN);
-    // 端台車のレール接線ヨー(度)もサーバーから同期する。クライアントで毎フレーム探索計算すると
-    // 別レールを拾う/180°反転で「一瞬明日の方向」になるため、サーバーのアンカー接線を正とする(RTM同様)。
+    // 端台車のレール接線ヨー(度)もサーバーから同期する。
     private static final EntityDataAccessor<Float> FRONT_BOGIE_YAW =
         SynchedEntityData.defineId(TrainEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> REAR_BOGIE_YAW =
@@ -118,16 +115,14 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     private static final float ACCEL = 0.012f;
     private static final float BRAKE = 0.013f; // 減速度
     private static final float MAX_SPEED = 2.0f;
-    // 慣性の法則: 力行/制動を解いたあとも勢いが長く続くよう、転がり抵抗と
-    // 空気抵抗を実車に近い小さい値に抑える。FRICTION は等比減衰、DRAG_* は
-    // notch<=0 の時にだけ働く線形抵抗。
+    // 慣性の法則: 力行/制動を解いたあとも勢いが長く続くよう、転がり抵抗と 空気抵抗を実車に近い小さい…
     private static final float FRICTION = 0.9997f;
     private static final float DRAG_BASE = 0.00012f;
     private static final float DRAG_SPEED_FACTOR = 0.00018f;
-    // 本家RTM(EnumNotch)準拠: 力行 P1-P5(5段)、ブレーキ B1-B7 + 非常EB(-8) = 8段。
+    // 本家RTM(EnumNotch)準拠: 力行 P1-P5(5段)、ブレーキ B1-B7 + 非常E…
     private static final int MAX_POWER_NOTCH = 5;
     private static final int MAX_BRAKE_NOTCH = 8;
-    // 本家EnumNotch: 力行ノッチごとの最高速 (P_n = 0.36*n)。ブレーキ各段の減速度。
+    // 本家EnumNotch: 力行ノッチごとの最高速 (P_n = 0.36*n)。
     private static final float RTM_POWER_SPEED_PER_NOTCH = 0.36F;
     private static final float MOVEMENT_SMOOTHING = 0.22f;
     private static final double RAIL_SEARCH_RADIUS = 12.0D;
@@ -136,7 +131,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     private static final double BOGIE_INTERACT_HALF_HEIGHT = 1.1D;
     private static final double BOGIE_INTERACT_HALF_LENGTH = 1.18D;
     private static final double RTM_VEHICLE_Y_OFFSET = 1.1875D;
-    /** BogieRenderer 描画台車(MQO台車モデル車両)の高さ微調整。MSE 等で台車がレールに少し埋まるのを補正。 */
+    /** BogieRenderer 描画台車(MQO台車モデル車両)の高さ微調整。 */
     private static final double BOGIE_RENDER_LIFT = 0.18D;
     private static final double DEFAULT_HALF_WIDTH = 1.35D;
     private static final double DEFAULT_HALF_HEIGHT = 2.2D;
@@ -146,7 +141,6 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     private static final double RAIL_CONNECTION_MAX_DISTANCE_SQ = 0.25D;
     private static final float RAIL_CONNECTION_MAX_YAW_DIFF = 20.0F;
     // 1tickの本体中心移動の許容上限(=移動距離 + この余裕)。
-    // 逆向き継ぎ目等でのレール選択不安定によるワープとみなし棄却する。
     private static final double RAIL_TELEPORT_TOLERANCE = 3.0D;
     // 0.74 → +0.1 = 0.84。
     private static final double EXTRA_TRAIN_BODY_LIFT = 0.84D;
@@ -154,8 +148,6 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     // モデル原点より低い床下パーツがレールと干渉しない高さ。
     private static final double RAIL_HEIGHT_OFFSET = 1.09D;
     // RTM 本家はレール基準で車体中心を 1.1875 上げて描画する。
-    // この実装では sampleRail 側で RAIL_HEIGHT_OFFSET を先に足しているため、
-    // ここでは残り分だけを加算して車体と台車の相対位置を本家に合わせる。
     private static final double TRAIN_BODY_HEIGHT_OFFSET = (RTM_VEHICLE_Y_OFFSET - RAIL_HEIGHT_OFFSET) + EXTRA_TRAIN_BODY_LIFT;
     private static final double BOGIE_HITBOX_HEIGHT_OFFSET = 0.25D + EXTRA_BOGIE_LIFT;
     public static final double BOGIE_VISUAL_LIFT = 0.39D;
@@ -165,6 +157,12 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     private final Map<UUID, Integer> seatAssignments = new HashMap<>();
     private final Map<String, String> scriptData = new HashMap<>();
     private boolean scriptDataDirty = false;
+
+    /** 本家 EntityVehicleBase の ResourceState。 */
+    private final jp.ngt.rtm.modelpack.state.ResourceState resourceState =
+            new jp.ngt.rtm.modelpack.state.ResourceState(this::getVehicleId, this::modelSetForScript,
+                    new TrainScriptDataMap(this));
+    private jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> dataFormatterSet;
     private UUID coupledFollowerUuid;
     private UUID coupledLeaderUuid;
     private int coupledFollowerThisSide = -1;
@@ -197,12 +195,11 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     private final float[] bogieYawMemory = new float[2];
     private final float[] bogiePitchMemory = new float[2];
     // クライアント描画で台車をレール追従させる際の RailMap キャッシュ(全探索を避ける)。
-    // bogieIndex を 0/1 の extreme side に正規化したインデックスで保持。
     private final RailMap[] clientBogieRailMap = new RailMap[2];
-    // 台車レール追従の水平オフセット(本体ローカル)を平滑化して保持。探索が一瞬失敗しても
-    // 直前値を維持し、台車が一瞬剛体位置へ戻って「外れて見える」のを防ぐ。
+    // 台車レール追従の水平オフセット(本体ローカル)を平滑化して保持。
     private UUID activeDriverUuid;
     private int activeDriverTicks;
+    private final jp.ngt.rtm.entity.ClientMotionBuffer motionBuffer = new jp.ngt.rtm.entity.ClientMotionBuffer();
     private int clientLerpSteps;
     private double clientLerpX;
     private double clientLerpY;
@@ -210,14 +207,12 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     private double clientLerpYRot;
     private double clientLerpXRot;
     // クライアント: 同期された端台車オフセット(エンティティ相対)の前tick/現tick値。
-    // tick段付きを無くすため、描画時に partialTicks で補間する(本家RTMの台車補間に相当)。
     private Vec3 clientRearBogieOffPrev = Vec3.ZERO;
     private Vec3 clientRearBogieOffCurr = Vec3.ZERO;
     private Vec3 clientFrontBogieOffPrev = Vec3.ZERO;
     private Vec3 clientFrontBogieOffCurr = Vec3.ZERO;
     private boolean clientBogieOffInit;
     // クライアント: 端台車(0=後/1=前)のレール接線ヨーの前tick/現tick値。
-    // 毎フレーム生計算すると微振動(ガクガク)、減衰平滑すると遅延する。
     private final float[] clientBogieYawPrev = {Float.NaN, Float.NaN};
     private final float[] clientBogieYawCurr = {Float.NaN, Float.NaN};
     private final int[] clientBogieYawRejectCount = {0, 0};
@@ -229,8 +224,20 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
     public float doorMoveL;
     public float doorMoveR;
-    // クライアント側ドア開閉音 (sound_DoorOpen/sound_DoorClose) の状態変化検出用。
-    // 多くのパック (209/125 系等) はサウンドスクリプトでドア音を鳴らさず、この設定に頼る。
+    /** 本家 EntityTrainBase.MAX_AIR_COUNT / MIN_AIR_COUNT。 */
+    public static final short MAX_AIR_COUNT = 2880;
+    public static final short MIN_AIR_COUNT = 2480;
+    public int brakeAirCount = MAX_AIR_COUNT;
+    public boolean complessorActive;
+    /** TrainState.State_Signal (-1..127)。 */
+    private int signalState = 0;
+    /** TrainState.State_DoorCut (0/1)。 */
+    private int doorCutState = 0;
+    /** TrainState.State_ChunkLoader (0..8)。 */
+    private int chunkLoaderState = 0;
+    /** TrainState.State_Type (種別幕 index)。 */
+    private int typeIndex = 0;
+    // クライアント側ドア開閉音 (sound_DoorOpen/sound_DoorClose) の状態…
     private boolean prevDoorLeftForSound;
     private boolean prevDoorRightForSound;
     private boolean doorSoundStateInitialized;
@@ -244,8 +251,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     public TrainEntity(EntityType<?> type, Level level) {
         super(type, level);
         this.setNoGravity(true);
-        // noCulling は false。
-        // 広い AABB でフラスタム判定するので、画面外の車両は描画(JS実行含む)がスキップされる。
+        // noCulling は false。 広い AABB でフラスタム判定するので、画面外の車両は描画…
         this.noCulling = false;
     }
 
@@ -257,9 +263,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         e.setLightMode(0);
         // スポーン位置をレール基準で少し上げる（埋まり防止）
         e.moveTo(x, y + RAIL_HEIGHT_OFFSET, z, yRot, 0f);
-        // 前tick位置(xo/yo/zo)を現在位置に揃える。これをしないとスポーン直後の
-        // 描画補間が原点(0,0,0)から行われ、台車のワールド位置計算が大きくズレる
-        // (=「列車を出した瞬間だけ台車がズレる/動かすと直る」の原因)。
+        // 前tick位置(xo/yo/zo)を現在位置に揃える。
         e.setOldPosAndRot();
         e.refreshDimensions();
 
@@ -267,7 +271,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return e;
     }
 
-    /** The rail this train currently sits on (used by placement to allow side-by-side trains on separate rails). */
+    /** The rail this train currently sits on (used by pl… */
     public RailMap getActiveRailMap() {
         return activeRailMap;
     }
@@ -299,8 +303,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         setDeltaMovement(Vec3.ZERO);
         setSpeed(0.0F);
         setNotch(0);
-        // レール整列後の本体位置を前tick位置にも反映し、初回フレームの補間ズレ
-        // (台車が一瞬ズレて見える)を防ぐ。
+        // レール整列後の本体位置を前tick位置にも反映し、初回フレームの補間ズレ (台車が一瞬ズレて見える…
         setOldPosAndRot();
     }
 
@@ -343,7 +346,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     public String getVehicleId() { return entityData.get(VEHICLE_ID); }
     public void setVehicleId(String id) { entityData.set(VEHICLE_ID, id != null ? id : ""); }
 
-    // ---- IModelSelector (車経路。本家 EntityVehicle と同じ型名/意味) ----
+    // ---- IModelSelector (車経路。
 
     @Override
     public String getModelName() {
@@ -361,13 +364,59 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     }
     public float getSpeed() { return entityData.get(SPEED); }
     public void setSpeed(float speed) { entityData.set(SPEED, speed); }
-    /** 動輪/ロッドの累積回転角(度, 0-360)。毎tickの移動距離で加算。スクリプトの getWheelRotationR が参照。 */
+    /** 動輪/ロッドの累積回転角(度, 0-360)。毎tickの移動距離で加算。 */
     private float wheelRotationDegrees = 0.0F;
     public float getWheelRotationDegrees() { return wheelRotationDegrees; }
     public float getTrainDistance() { return entityData.get(TRAIN_DISTANCE); }
     public void setTrainDistance(float distance) { entityData.set(TRAIN_DISTANCE, Math.max(2.5f, distance)); }
     public int getNotch() { return entityData.get(NOTCH); }
-    public void setNotch(int notch) { entityData.set(NOTCH, Mth.clamp(notch, -getMaxBrakeNotch(), getMaxPowerNotch())); }
+    public boolean setNotch(int notch) {
+        int previous = getNotch();
+        int clamped = Mth.clamp(notch, -getMaxBrakeNotch(), getMaxPowerNotch());
+        if (previous == clamped) {
+            return false;
+        }
+        entityData.set(NOTCH, clamped);
+        // 本家 EntityTrainBase.setNotch: ブレーキ -> 力行に移る瞬間、編成全車…
+        if (!this.level().isClientSide() && previous < 0 && clamped - previous > 0) {
+            this.playBrakeReleaseSound(clamped >= 0);
+        }
+        return true;
+    }
+
+    /** 本家 playBrakeReleaseSound: sound_BrakeRelease / so… */
+    protected void playBrakeReleaseSound(boolean strong) {
+        jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = this.trainConfig();
+        String sound = cfg == null ? null : (strong ? cfg.sound_BrakeRelease : cfg.sound_BrakeRelease2);
+        if (sound != null && !sound.isBlank()) {
+            com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(
+                    this, sound, 1.0F, 1.0F, jp.ngt.rtm.RTMConfig.trainBrakeReleaseSoundRange);
+        }
+    }
+
+    private jp.ngt.rtm.modelpack.cfg.TrainConfig trainConfig() {
+        Object set = this.getModelSet();
+        return set instanceof jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> base
+                && base.getConfig() instanceof jp.ngt.rtm.modelpack.cfg.TrainConfig cfg ? cfg : null;
+    }
+
+    /** 本家 addNotch: マスコン操作音 (sound_Notch、無ければ rtm:train.… */
+    public void playNotchSound() {
+        jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = this.trainConfig();
+        String sound = cfg == null || cfg.sound_Notch == null || cfg.sound_Notch.isBlank()
+                ? "rtm:train.lever" : cfg.sound_Notch;
+        com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(
+                this, sound, 1.0F, 1.0F);
+    }
+
+    /** 本家 sound_Reversal: レバーサ操作音。 */
+    public void playReversalSound() {
+        jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = this.trainConfig();
+        String sound = cfg == null || cfg.sound_Reversal == null || cfg.sound_Reversal.isBlank()
+                ? "rtm:train.lever" : cfg.sound_Reversal;
+        com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(
+                this, sound, 1.0F, 1.0F);
+    }
     public int getMaxPowerNotch() { return getMaxPowerNotch(VehicleRegistry.getById(getVehicleId())); }
     public int getMaxBrakeNotch() { return MAX_BRAKE_NOTCH; }
     public boolean isHeadlightOn() { return entityData.get(HEADLIGHT_ON); }
@@ -445,6 +494,58 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         entityData.set(REVERSER, clamped);
         entityData.set(REVERSE, clamped < 0);
     }
+    /**
+     * 本家 getTrainDirection の移植。
+     * 編成の進行方向: 0=前, 1=後。
+     * 本家と同じく「運転士が運転台に乗った向き (cabDir)」が編成全体の向きになる。
+     * 単行/編成とも、力行方向 (reverser) ではなく乗った向きで決まる。
+     */
+    private int resolveTrainDirection() {
+        List<TrainEntity> formation = getFormationTrainsForDisplay();
+        TrainEntity driverCar = null;
+        // 実際に運転している (運転席に乗員が居る) 車両を探す
+        for (TrainEntity car : formation) {
+            for (Entity passenger : car.getPassengers()) {
+                if (passenger instanceof net.minecraft.world.entity.player.Player
+                        && car.isDriverPassenger(passenger)) {
+                    driverCar = car;
+                    break;
+                }
+            }
+            if (driverCar != null) {
+                break;
+            }
+        }
+        // 誰も運転していない: 現在の reverser で前後のみ決定 (従来動作)
+        if (driverCar == null) {
+            return getReverser() >= 0 ? 0 : 1;
+        }
+        // 本家: cabDir (乗った向き) がそのまま trainDir。 reverser -1 (後進運転) は向きを反す
+        boolean facingFront = driverCar.getDriverCabDirection() >= 0;
+        boolean reversing = driverCar.getReverser() < 0;
+        boolean forward = facingFront != reversing; // XOR: 後向きに乗って前進=編成は後向き
+        // 編成内での運転車の位置は本家 Formation.direction ^ entry.dir 相当
+        if (formation.size() > 1) {
+            int index = formation.indexOf(driverCar);
+            boolean driverAtFront = index == (getReverser() >= 0 ? 0 : formation.size() - 1);
+            forward = facingFront == driverAtFront;
+            if (reversing) forward = !forward;
+        }
+        return forward ? 0 : 1;
+    }
+
+    /** 運転台に乗った向き (本家 DW_CabDir)。0=前向き, 1=後向き (-1 は未着席)。 */
+    public int getDriverCabDirection() {
+        for (Entity passenger : getPassengers()) {
+            if (passenger instanceof net.minecraft.world.entity.player.Player
+                    && isDriverPassenger(passenger)) {
+                float relative = Mth.wrapDegrees(passenger.getYRot() - getYRot());
+                return Math.abs(relative) > 90.0F ? 1 : 0;
+            }
+        }
+        return -1;
+    }
+
     /** 転換クロスシートの向き。乗り込んだ向きで自動転換。未乗車は進行方向に従う。 */
     public float getSeatDirection() {
         int dir = entityData.get(SEAT_DIRECTION);
@@ -565,19 +666,11 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
     private void ensureServerScriptLoaded() {
         if (attemptedServerScriptLoad) return;
-        String id = getVehicleId();
-        if (id == null || id.isBlank()) return;
-        VehicleDefinition def = VehicleRegistry.getById(id);
-        if (def == null || !def.hasServerScript()) {
-            attemptedServerScriptLoad = true;
-            return;
-        }
         attemptedServerScriptLoad = true;
-        try {
-            serverScriptEngine = com.portofino.realtrainmodunofficial.client.model.MqoModelLoader
-                .loadServerScriptForVehicle(def);
-        } catch (Throwable t) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load train server script for {}: {}", id, t.toString());
+        // 本家と同じく、サーバースクリプトは ModelSet が構築時に読み込んだ serverSE をそ…
+        Object set = this.getModelSet();
+        if (set instanceof jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> base) {
+            this.serverScriptEngine = base.serverSE;
         }
     }
 
@@ -610,6 +703,43 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return new AABB(x - half, y - half, z - half, x + half, y + half, z + half);
     }
 
+    /** 雨の遮蔽判定用の車体全体 AABB。getBoundingBox() は 0.1 ブロックの 当た… */
+    public double getRainHalfLength() {
+        return getTrainHalfLength();
+    }
+
+    public double getRainHalfWidth() {
+        return getTrainHalfWidth();
+    }
+
+    public double getRainHeight() {
+        return Math.max(3.2D, getTrainHalfWidth() * 2.2D);
+    }
+
+    public net.minecraft.world.phys.AABB getRainOcclusionBox() {
+        double halfLength = getTrainHalfLength();
+        double halfWidth = getTrainHalfWidth();
+        double height = Math.max(3.2D, halfWidth * 2.2D);
+        double yaw = Math.toRadians(getYRot());
+        double cos = Math.cos(yaw);
+        double sin = Math.sin(yaw);
+        double minX = Double.MAX_VALUE, minY = getY(), minZ = Double.MAX_VALUE;
+        double maxX = -Double.MAX_VALUE, maxY = getY() + height, maxZ = -Double.MAX_VALUE;
+        for (int sx = -1; sx <= 1; sx += 2) {
+            for (int sz = -1; sz <= 1; sz += 2) {
+                double lx = sx * halfWidth;
+                double lz = sz * halfLength;
+                double wx = getX() + lx * cos - lz * sin;
+                double wz = getZ() + lx * sin + lz * cos;
+                minX = Math.min(minX, wx);
+                maxX = Math.max(maxX, wx);
+                minZ = Math.min(minZ, wz);
+                maxZ = Math.max(maxZ, wz);
+            }
+        }
+        return new net.minecraft.world.phys.AABB(minX, minY - 0.5D, minZ, maxX, maxY, maxZ);
+    }
+
     public double getBodyHalfLengthForPlacement() {
         return getTrainHalfLength();
     }
@@ -620,7 +750,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
     private double getTrainHalfLength() {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
-        // trainDistance stores center-to-end distance (half-length), not total length.
+        // trainDistance stores center-to-end distance (half…
         double maxZ = Math.max(1.75D, getTrainDistance());
         if (def != null) {
             for (VehicleDefinition.BogieDefinition bogie : def.getBogies()) {
@@ -676,32 +806,19 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
         // スクリプトのtick関数を呼び出す
         updateTrainAnimationState();
-        if (level().isClientSide() && soundScriptEngine == null && !attemptedSoundScriptLoad) {
-            attemptedSoundScriptLoad = true;
-            VehicleDefinition soundVehicle = VehicleRegistry.getById(getVehicleId());
-            if (soundVehicle != null && soundVehicle.hasSoundScript()) {
-                setSoundScriptEngine(com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadSoundScriptForVehicle(soundVehicle));
-            }
-        }
-        boolean runScriptTick = !level().isClientSide() || shouldRunClientVisualScriptThisTick();
-        if (level().isClientSide()) this.getSoundUpdater().updateAts();
-        if (level().isClientSide() && soundScriptEngine != null) {
-            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAutoRunningSound(this);
-            // 本家 SoundUpdaterVehicle.update:45 と同じ onUpdate(su) 1 本。
-            // 以前ここだけ「生エンティティを tick/update へ渡す」独自呼出になっていて、
-            // EntityTrainBase 側 (本家系) と全く違うフックを同じサウンドスクリプトに投げていた。
-            TrainScriptSystem.invokeSoundScript(soundScriptEngine, this);
-        } else {
-            if (level().isClientSide()) {
-                com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
-            }
-            // ★描画スクリプトを毎tick tick/onUpdate で叩く独自フックは撤去した。
-            //   本家は描画スクリプトのフックを init / render のみとし、
-            //   onUpdate は serverSE (サーバースクリプト) にだけ送る。
+        if (level().isClientSide()) {
+            this.updateAirCompressor();
+            // 本家 SoundUpdaterVehicle.update: スクリプトがあれば onUpdate…
+            this.getSoundUpdater().update();
         }
 
         if (level().isClientSide()) {
-            if (clientLerpSteps > 0) {
+            if (this.motionBuffer.sample()) {
+                setPos(this.motionBuffer.outX, this.motionBuffer.outY, this.motionBuffer.outZ);
+                setRot(this.motionBuffer.outYaw, this.motionBuffer.outPitch);
+                this.rotationRoll = this.motionBuffer.outRoll;
+                clientLerpSteps = 0;
+            } else if (clientLerpSteps > 0) {
                 lerpPositionAndRotationStep(clientLerpSteps, clientLerpX, clientLerpY, clientLerpZ, clientLerpYRot, clientLerpXRot);
                 clientLerpSteps--;
             } else {
@@ -712,13 +829,9 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             return;
         }
 
-        // SD8200 等の serverScriptPath（Server_sd8200_1.js など）を毎tick実行。
-        // 方向幕(pck_maku) や buildData 等の DataMap を書き換える処理がここで走る。
+        // 本家 EntityVehicleBase.onVehicleUpdate と同じ: execute…
         ensureServerScriptLoaded();
-        if (serverScriptEngine != null) {
-            com.portofino.realtrainmodunofficial.script.TrainScriptSystem
-                .invokeServerScriptOnUpdate(serverScriptEngine, this, this.scriptExecuter);
-        }
+        this.scriptExecuter.execScript(this);
 
         if (scriptDataDirty && !scriptData.isEmpty()) {
             scriptDataDirty = false;
@@ -758,15 +871,13 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
                 this.hurtMarked = true;
                 this.hasImpulse = true;
                 // 後続車もここで早期returnするため、台車位置の同期を必ず行う。
-                // (アンカーは編成側 formation.updateTrainMovement が設定済み。
                 syncBogieRenderOffsets();
                 return;
             }
 
             float speed = getSpeed();
             int notch = getNotch();
-            // ATSA(別mod)は NeoForge の EntityTickEvent 経由で notch を制御するため、
-            // ここでの直接呼び出しは行わない。ATSA未導入時は何も起きない。
+            // ATSA(別mod)は NeoForge の EntityTickEvent 経由で notch…
 
             FormationDriver formationDriver = getFormationDriver();
             Entity controller = formationDriver != null ? formationDriver.controller() : null;
@@ -789,9 +900,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
             setSpeed(speed);
 
-            // 先に支え(レール)の有無を判定する。レールが壊れて支えが無い時に travelAlongRail を
-            // 走らせると、キャッシュ済みアンカー(壊れたレール位置)へスナップし続けて空中に浮くため、
-            // 支え無しならレール追従をスキップして重力に任せる。
+            // 先に支え(レール)の有無を判定する。レールが壊れて支えが無い時に travelAlongRail…
             boolean unsupported = isUnsupportedInAir();
             boolean onRail = !unsupported && travelAlongRail(speed, controller, cabTrain);
             if (!onRail || unsupported) {
@@ -836,9 +945,11 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         clientLerpZ = z;
         clientLerpYRot = yRot;
         clientLerpXRot = xRot;
-        //★本家 EntityVehicleBase.setPositionAndRotation2 は par6 (通常 3) tick かけて
-        //  位置/向きを補間する。以前は steps=1 で即スナップしていたため、継ぎ目の多い
-        //  レール (SRB3 等) で本体が微振動していた。呼び出し側の steps を尊重する。
+        // AppleExtended の遅延バッファ方式。到着順に貯めて、設定した遅延で等速再生する。
+        jp.ngt.rtm.entity.ClientMotionBuffer.setDelayMillis(
+                com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.smoothFollowDelayMs);
+        this.motionBuffer.push(x, y, z, yRot, xRot, this.rotationRoll);
+        // ★本家 EntityVehicleBase.setPositionAndRotation2 は p…
         clientLerpSteps = Math.max(1, steps);
         setDeltaMovement(Vec3.ZERO);
     }
@@ -885,7 +996,6 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
     private float applyNotchPhysics(float speed, int notch) {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
-        float accelBase = getConfiguredAcceleration(def);
 
         if (notch > 0) {
             if (getReverser() == 0) {
@@ -893,27 +1003,21 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             }
             float maxSpeed = getConfiguredMaxSpeed(def, notch);
             float absSpeed = Math.abs(speed);
-            float speedRatio = Mth.clamp(absSpeed / maxSpeed, 0.0F, 1.0F);
             if (absSpeed >= maxSpeed) {
                 return speed;
             }
-            // 力行: 実車らしく「発車はゆっくり → 徐々にぐんぐん速くなる → 最高速で頭打ち」。
-            float notchFactor = notch / (float) getMaxPowerNotch(def);
-            // 発進ランプ: 最高速の約15%まででフル牽引に立ち上げる(カックン発進を防ぐ程度に短め)。
-            float launchRamp = Mth.clamp(speedRatio / 0.15F, 0.0F, 1.0F);
-            launchRamp = launchRamp * launchRamp * (3.0F - 2.0F * launchRamp);
-            // 高速減衰は緩やか(speedRatio^3)。中速までは加速度を保ち「どんどん速くなる」感を出し、
-            // 最高速付近でだけ頭打ちにする(実車の定出力域→特性域に近い)。
-            float tractionCurve = (0.30F + launchRamp * 0.70F) * (1.0F - (float) Math.pow(speedRatio, 3.0));
-            float accelCurve = accelBase * (0.55F + notchFactor * 0.70F) * tractionCurve;
-            float next = speed + Math.max(0.00008F, accelCurve);
+            // 現実の力行加速度 (ノッチごとの実車値、km/h/s → blocks/tick² 换算)。
+            float accel = getConfiguredAcceleration(def, notch);
+            float next = speed + Math.signum(speed) * Math.max(0.0F, accel);
             return Math.abs(next) > maxSpeed ? Math.copySign(maxSpeed, next) : next;
         }
 
         if (notch < 0) {
-            // 本家RTM(EnumNotch)準拠のブレーキ。B1=-0.0005 ... B7=-0.0035、非常EB(-8)=-0.01。
+            // 現実のブレーキ減速度 (km/h/s): B1=1.8 ... B7=4.5、EB=5.2。
             int b = -notch; // 1..8
-            float decel = (b >= MAX_BRAKE_NOTCH) ? 0.01F : 0.0005F * b;
+            float decel = (b >= MAX_BRAKE_NOTCH)
+                    ? 5.2F * KMH_PER_S_TO_BLOCK_PER_TICK2
+                    : (1.8F + (b - 1) * 0.45F) * KMH_PER_S_TO_BLOCK_PER_TICK2;
             return approachZero(speed, decel);
         }
 
@@ -929,20 +1033,35 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             }
         }
         // 本家RTM(EnumNotch): 力行ノッチごとに最高速を制限する(P_n = 0.36*n)。
-        // これで低ノッチは低速で頭打ち、高ノッチほど伸びる本家挙動になる。
         if (notch > 0) {
             return RTM_POWER_SPEED_PER_NOTCH * Math.min(notch, MAX_POWER_NOTCH);
         }
         return MAX_SPEED;
     }
 
-    private float getConfiguredAcceleration(VehicleDefinition def) {
-        if (def != null && def.getAcceleration() > 0.0F) {
-            // 実車に近い穏やかな加速にするため倍率と上限を下げる
-            // (旧: *1.75 / 上限0.0062 は急加速ぎみだった)。
-            return Mth.clamp(def.getAcceleration() * 1.30F, 0.0006F, 0.0042F);
+    /**
+     * 現実の加減速: ノッチごとの実車加速度 (km/h/s) をブロック/tick へ換算して使う。
+     * 実車の力行加速度は速度によらずほぼ一定 (P5 で 2.5 km/h/s 程度)。
+     * 1 block = 1 m, 1 tick = 1/20 s → km/h/s = 1000/3600/20 blocks/tick² = 1/72。
+     */
+    private static final float KMH_PER_S_TO_BLOCK_PER_TICK2 = 1.0F / 72.0F;
+
+    private float getConfiguredAcceleration(VehicleDefinition def, int notch) {
+        if (def != null) {
+            List<Float> accels = def.getNotchAccelerations();
+            if (accels != null && !accels.isEmpty()) {
+                int index = Mth.clamp(Math.max(notch, 1) - 1, 0, accels.size() - 1);
+                float configured = accels.get(index);
+                if (configured > 0.0F) {
+                    return configured * KMH_PER_S_TO_BLOCK_PER_TICK2;
+                }
+            }
+            if (def.getAcceleration() > 0.0F) {
+                return def.getAcceleration() * KMH_PER_S_TO_BLOCK_PER_TICK2;
+            }
         }
-        return 0.0022F;
+        // E257系相当: P5 = 2.5 km/h/s
+        return 2.5F * KMH_PER_S_TO_BLOCK_PER_TICK2;
     }
 
     private boolean shouldRunClientVisualScriptThisTick() {
@@ -973,18 +1092,40 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         if (level().isClientSide()) {
             updateDoorSound();
         }
-        // 本家RTM準拠: pantograph movement(=pantograph_F/40) は「下降量」。DOWN で 40(=1.0)、UP で 0。
-        // (RTMU は従来 UP で 40 にしており、パンタ上で下降表示・下で上昇表示と逆になっていた。)
+        // 本家RTM準拠: pantograph movement(=pantograph_F/40) は「…
         pantograph_F = approach(pantograph_F, isPantographUp() ? 0.0F : 40.0F, 1.0F);
         pantograph_B = approach(pantograph_B, isPantographUp() ? 0.0F : 40.0F, 1.0F);
-        int reverserDir = getReverser();
-        // 座席 script 側は -45〜45 度前提なので、進行方向へゆっくり寄せていく。
-        if (reverserDir < 0 && seatRotation > -45.0F) {
+        // 本家 EntityTrainBase.updateAnimation と同じ:
+        //   trainDirection == 0 (前) なら seatRotation を -45 へ、1 (後) なら +45 へ毎tick 1 ずつ動かす。
+        // trainDirection は本家と同じく「乗務員の乗った向き (cabDir)」から決まる編成の向き。
+        int trainDirection = resolveTrainDirection();
+        if (trainDirection == 0 && seatRotation > -45.0F) {
             seatRotation -= 1.0F;
-        } else if (reverserDir > 0 && seatRotation < 45.0F) {
+        } else if (trainDirection == 1 && seatRotation < 45.0F) {
             seatRotation += 1.0F;
         }
         seatRotation = Mth.clamp(seatRotation, -45.0F, 45.0F);
+    }
+
+    /** 本家 EntityTrainBase.updateAnimation のブレーキ空気圧/コンプレッ… */
+    private void updateAirCompressor() {
+        if (this.complessorActive) {
+            ++this.brakeAirCount;
+            if (this.brakeAirCount >= MAX_AIR_COUNT) {
+                this.complessorActive = false;
+                jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = this.trainConfig();
+                String sound = cfg == null || cfg.sound_CpFin == null || cfg.sound_CpFin.isBlank()
+                        ? "rtm:train.cp_fin" : cfg.sound_CpFin;
+                com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
+                        .playLegacyId(this, sound, 1.0F, 1.0F, false, true, 32.0F);
+            }
+        } else if (this.brakeAirCount < MIN_AIR_COUNT) {
+            this.complessorActive = true;
+        }
+        // ブレーキ使用で空気が減る (本家 updateSpeed の --brakeAirCount)
+        if (this.getNotch() < 0 && this.brakeAirCount > 0) {
+            --this.brakeAirCount;
+        }
     }
 
     /** ドア開閉変化を検出してsound_DoorOpen/Closeを鳴らす。初回tickは記録のみ。 */
@@ -1010,19 +1151,26 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             return;
         }
         if (opened) {
-            playDoorSound(def.getSoundDoorOpen());
+            playDoorSound(true, def.getSoundDoorOpen());
         }
         if (closed) {
-            playDoorSound(def.getSoundDoorClose());
+            playDoorSound(false, def.getSoundDoorClose());
         }
     }
 
-    private void playDoorSound(String soundId) {
+    private void playDoorSound(boolean open, String soundId) {
+        // ModelSetVehicleBase の正規化済み ResourceLocation を優先する。
+        if (this.getModelSet() instanceof jp.ngt.rtm.modelpack.modelset.ModelSetVehicleBase<?> set) {
+            net.minecraft.resources.ResourceLocation resource = open ? set.sound_doorOpen : set.sound_doorClose;
+            if (resource != null) {
+                soundId = resource.toString();
+            }
+        }
         if (soundId == null || soundId.isBlank()) {
             return;
         }
         com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
-            .playLegacyId(this, soundId, 1.0F, 1.0F, false);
+            .playLegacyId(this, soundId, 1.0F, 1.0F, false, true);
     }
 
     private boolean canTravelOnRail(Vec3 worldPos) {
@@ -1388,9 +1536,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     }
 
     private boolean travelAlongRail(float speed, Entity controller, TrainEntity cabTrain) {
-        // Direction of travel is driven purely by the reverser.
-        // Cab direction (seat Z position) is a UI concept only — reading it here caused
-        // the train to violently reverse the moment a player mounted a rear seat.
+        // Direction of travel is driven purely by the rever…
         int controllerDirection = Integer.compare(getReverser(), 0);
         if (controllerDirection == 0 && Math.abs(speed) > 0.0F) {
             controllerDirection = activeRailDirection != 0 ? activeRailDirection : (speed >= 0.0F ? 1 : -1);
@@ -1453,14 +1599,10 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
                 double jumpSq = jumpDx * jumpDx + jumpDz * jumpDz;
                 double allowed = distance + RAIL_TELEPORT_TOLERANCE;
                 if (jumpSq > allowed * allowed && (preX != 0.0D || preZ != 0.0D)) {
-                    // 復帰試行: スパン逆算が膨らみレール等で遠点を拾った場合でも永久停止しないよう、
-                    // 前台車は素直に前進、後台車は「前回後台車位置の近傍」で前台車からスパン直線距離の
-                    // 点に補正する(連続性優先=膨らみの遠点を拾わない)。結果がしきい値内なら採用して進む。
+                    // 復帰試行: スパン逆算が膨らみレール等で遠点を拾った場合でも永久停止しないよう、 前台車は素直に前…
                     boolean recovered = false;
                     {
-                        // 前台車は advanceBogiePairAlongPath が選んだ進行先(分岐切替時は分岐先)をそのまま維持し、
-                        // 後台車だけ「前回後台車位置の近傍」で前台車から台車間隔の点に補正する。これで
-                        // 分岐ルートを維持したまま、後台車がレールの膨らみの遠点を拾うのを防ぐ。
+                        // 前台車は advanceBogiePairAlongPath が選んだ進行先(分岐切替時は分岐先)…
                         double[] bz = getBogieRailOffsets();
                         double span = Math.abs(bz[1] - bz[0]);
                         RailAnchor recRear = refineAnchorByStraightDistance(preRearAnchor, front, span);
@@ -1558,7 +1700,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return cont;
     }
 
-    /** baseAnchor の位置が leadingSample から span 弦距離(±1m)になっているか。 */
+    /** baseAnchor の位置が leadingSample から span 弦距離(±1m)になっ… */
     private boolean chordWithinTolerance(RailAnchor a, RailSample leadingSample, double span) {
         if (!isRailAnchorUsable(a) || leadingSample == null) {
             return false;
@@ -1579,9 +1721,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         }
         RailMap map = baseAnchor.map();
         int split = baseAnchor.split();
-        // 探索窓は弦-弧差(数十cm〜数m)を吸収できる小さめに固定する。台車間隔(targetDist)でスケール
-        // させると窓が非常に広くなり、端点を大きくはみ出す不正レールで遠い張り出し点を拾ってしまい、
-        // 本体中心が1tickで瞬間移動→ワープ棄却で列車が停止する(ユーザー報告: 分岐で止まる)。
+        // 探索窓は弦-弧差(数十cm〜数m)を吸収できる小さめに固定する。
         int searchInc = Math.max(8, (int) (3.0D * (double) BOGIE_SPLITS_PER_METER));
         int center = Mth.clamp((int) Math.round(baseAnchor.index()), 0, split);
         int min = Math.max(0, center - searchInc);
@@ -1629,8 +1769,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
                 return false;
             }
             RailSample movedFrontSample = sampleBogieRail(movedFront.map(), movedFront.split(), movedFront.index());
-            // 本家RTM式: 後台車は「前回位置の近傍」で前台車から台車間隔の弦距離になる点を探す(連続性優先・
-            // 遠点回避)。前回位置近傍に無い(レール端越え等)場合だけアーク逆算にフォールバックする。
+            // 本家RTM式: 後台車は「前回位置の近傍」で前台車から台車間隔の弦距離になる点を探す(連続性優先・…
             RailAnchor bestRear = deriveTrailingAnchor(rearRailAnchor, movedFrontSample, Math.abs(span), movedFront);
             if (!isRailAnchorUsable(bestRear)) {
                 return false;
@@ -1713,9 +1852,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
         double[] bogieZ = getBogieRailOffsets();
         int bodyDirection = fallbackBodyDirection == 0 ? 1 : fallbackBodyDirection;
-        // Go backward from front bogie by bogieZ[1] to reach center (bogieZ[1] > 0, so negate).
-        // Go forward from rear bogie by |bogieZ[0]| to reach center; bogieZ[0] < 0 so use it
-        // directly — the negative offset flips rearAnchor's backward travelDirection to forward.
+        // Go backward from front bogie by bogieZ[1] to reac…
         RailAnchor centerFromFront = advanceAnchorAlongPath(frontRailAnchor, -bogieZ[1]);
         RailAnchor centerFromRear = advanceAnchorAlongPath(rearRailAnchor, bogieZ[0]);
         RailAnchor centerAnchor = chooseCenterAnchor(centerFromFront, centerFromRear, bodyDirection);
@@ -1766,11 +1903,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         float yaw = horizontal > 1.0E-4D
             ? (float) Math.toDegrees(Math.atan2(dx, dz))
             : fallbackYaw;
-        //★本家 EntityVehicleBase.updatePosAndRotationClient に合わせる:
-        //  目標 (vehicleY / vehiclePitch) を<b>そのまま</b>与え、位置/向きは
-        //  数 tick かけた補間で追従させる。以前はここでデッドゾーン・1tick クランプ・
-        //  filterBodyY という独自の揺れ抑制をしていたが、本家に無い上に
-        //  「継ぎ目の多いレール (SRB3 等) で揺れる」原因になっていたため撤去した。
+        // ★本家 EntityVehicleBase.updatePosAndRotationClient…
         float pitch = horizontal > 1.0E-4D
             ? (float) Math.toDegrees(Math.atan2(dy, horizontal))
             : fallbackPitch;
@@ -1778,8 +1911,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         RailSample centerSample = resolveBodyCenterSample(front, rear);
         Vec3 center = new Vec3(centerSample.x, centerSample.y + TRAIN_BODY_HEIGHT_OFFSET, centerSample.z);
         if (move) {
-            // 本家は更新を受けて vehiclePosRotationInc tick かけて補間する。1.21 の
-            // バニラ補間 (lerpTo) で同じことをする (瞬間スナップさせない)。
+            // 本家は更新を受けて vehiclePosRotationInc tick かけて補間する。
             this.lerpTo(center.x, center.y, center.z, yaw, pitch, 3);
         } else {
             setPos(center.x, center.y, center.z);
@@ -2260,10 +2392,10 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return current;
     }
 
-    /** true の間はスイッチの全分岐をレール探索候補にする(アクティブ分岐で見つからない時のフォールバック)。 */
+    /** true の間はスイッチの全分岐をレール探索候補にする(アクティブ分岐で見つからない時のフォールバ… */
     private boolean railLookupIncludeAllSegments = false;
 
-    /** スイッチの候補 RailMap。本家コアは全マップを返す (getActiveRailMaps は本家に無い)。 */
+    /** スイッチの候補 RailMap。本家コアは全マップを返す (getActiveRailMaps は… */
     private RailMap[] switchCandidateMaps(jp.ngt.rtm.rail.TileEntityLargeRailCore core, RailMap currentMap) {
         return core == null ? new RailMap[0] : core.getAllRailMaps();
     }
@@ -2524,7 +2656,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         if (isRailAnchorUsable(anchor)) {
             return relativeBogieYaw(getAnchorRailYaw(anchor, baseYaw), baseYaw);
         }
-        // クライアント: tick記録した端台車ヨーを partialTicks で補間(滑らか＋遅延なし=RTM同等)。
+        // クライアント: tick記録した端台車ヨーを partialTicks で補間(滑らか＋遅延なし=…
         if (level().isClientSide()) {
             int side = resolveExtremeSideForBogieIndex(bogieIndex);
             if (side >= 0 && side < 2 && !Float.isNaN(clientBogieYawCurr[side])) {
@@ -2583,7 +2715,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         if (def == null) {
             return bogie.position();
         }
-        // クライアントはサーバー同期の台車ワールド位置を partialTicks 補間で使う(本家RTMの台車補間相当)。
+        // クライアントはサーバー同期の台車ワールド位置を partialTicks 補間で使う(本家RTMの…
         boolean clientSynced = level().isClientSide() && entityData.get(BOGIE_SYNC_VALID);
         Vec3 railWorldY = clientSynced ? clientSyncedBogieWorld(bogieIndex, partialTicks) : getBogieWorldPosition(bogieIndex);
         if (railWorldY == null) {
@@ -2593,13 +2725,11 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         RailAnchor anchor = getAnchorForRenderedBogie(bogieIndex);
         if (clientSynced || isRailAnchorUsable(anchor)) {
             double bodyRefY = railWorldY.y + (RAIL_HEIGHT_OFFSET - BOGIE_HITBOX_HEIGHT_OFFSET) + bogie.position().y + BOGIE_RENDER_LIFT;
-            // 本体ポーズ(yaw/pitch/bank/modelOffset/scale)を厳密に逆変換して、カーブのバンクでも
-            // 台車がレール上の正しい位置に描画されるようにする。
+            // 本体ポーズ(yaw/pitch/bank/modelOffset/scale)を厳密に逆変換して、…
             Vec3 railLocal = worldToBogieLocalForRender(new Vec3(railWorldY.x, bodyRefY, railWorldY.z), partialTicks);
             return new Vec3(railLocal.x, railLocal.y, railLocal.z);
         }
-        // レール非追従時(浮いている等)は本家 updatePosAndRotationClient と同様、
-        // bogiePos をそのまま車体相対オフセットとして使う。
+        // レール非追従時(浮いている等)は本家 updatePosAndRotationClient と同様…
         return bogie.position();
     }
 
@@ -2664,9 +2794,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             float reference = bogieYawMemory[side] == 0.0F ? getYRot() : bogieYawMemory[side];
             return sampleAnchorTangentYaw(anchor, reference);
         }
-        // クライアント: アンカー/bogieYawMemory が無いので、台車位置のレール接線を直接求める。
-        // これを返さないと getYRot(車体ヨー)になり、スクリプトの台車相対角が 0 → 台車が
-        // 車体と一緒に回ってしまう(独立しない)。本家RTMは台車エンティティの接線ヨーを返す。
+        // クライアント: アンカー/bogieYawMemory が無いので、台車位置のレール接線を直接求め…
         float railYaw = computeClientBogieRailYaw(bogieIndex);
         if (!Float.isNaN(railYaw)) {
             return railYaw;
@@ -2676,16 +2804,13 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
     /** 台車のレール接線ワールドヨーを求める。無ければNaN。 */
     private float computeClientBogieRailYaw(int bogieIndex) {
-        // 注意: 同期された台車エンティティの向き(clientBogieEntityYaw)はラグがあり、
-        // 走行中に台車が一瞬古い向きを指して横ずれして見える。そこでクライアントでは
-        // 台車取付位置のレール接線を毎フレーム直接計算する(ラグ無し・描画位置と一致)。
+        // 注意: 同期された台車エンティティの向き(clientBogieEntityYaw)はラグがあり、…
         int side = resolveExtremeSideForBogieIndex(bogieIndex);
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
         if (def == null) {
             return Float.NaN;
         }
-        // 同期された実台車ワールド位置でレール接線を求める(剛体マウントだと弦上=レールずれ位置で
-        // 接線を取ってしまうため)。同期が無い時は従来どおり剛体マウント位置にフォールバック。
+        // 同期された実台車ワールド位置でレール接線を求める(剛体マウントだと弦上=レールずれ位置で 接線を取…
         Vec3 mount = getBogieWorldPosition(bogieIndex);
         RailMap map = clientBogieRailMap[side];
         // キャッシュ済みレールが取付位置から遠ければ(別レールへ移った)再探索。
@@ -2701,8 +2826,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         if (split <= 0) {
             return Float.NaN;
         }
-        // サーバー(sampleAnchorTangentYaw)と同じ規約: 最近点の前後を少しずらしてサンプルし、
-        // atan2(dx,dz) で接線ヨーを求める。getRailYaw より滑らかで規約も一致する。
+        // サーバー(sampleAnchorTangentYaw)と同じ規約: 最近点の前後を少しずらしてサ…
         int nearest = Mth.clamp(map.getNearlestPoint(split, mount.x, mount.z), 0, split);
         double delta = Math.max(1.0D, split * 0.0060D);
         double beforeIndex = Mth.clamp(nearest - delta, 0.0D, split);
@@ -2714,11 +2838,11 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         float tangentYaw = (dx * dx + dz * dz < 1.0E-6D)
             ? sampleRailYaw(map, split, nearest)
             : (float) Math.toDegrees(Math.atan2(dx, dz));
-        // 本家RTM EntityBogie.fixBogieYaw と同じ: 車体向きと 90°以上離れていれば 180°反転。
+        // 本家RTM EntityBogie.fixBogieYaw と同じ: 車体向きと 90°以上離れて…
         return fixBogieYaw(getYRot(), tangentYaw);
     }
 
-    /** 本家RTM EntityBogie.fixBogieYaw 準拠: yaw2 を reference と同じ向き(90°以内)に整える。 */
+    /** 本家RTM EntityBogie.fixBogieYaw 準拠: yaw2 を referenc… */
     private static float fixBogieYaw(float reference, float yaw2) {
         float diff = Math.abs(Mth.wrapDegrees(reference - yaw2));
         return Mth.wrapDegrees(diff > 90.0F ? yaw2 + 180.0F : yaw2);
@@ -2738,11 +2862,9 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     }
 
     public Vec3 getBogieWorldPosition(int bogieIndex) {
-        // クライアントは movement を走らせずレールも持たないため、サーバーが同期した端台車の
-        // ワールド位置を使う(カーブで台車をレール上に正確に描く)。中間台車は前後で補間。
+        // クライアントは movement を走らせずレールも持たないため、サーバーが同期した端台車の ワー…
         if (level().isClientSide() && entityData.get(BOGIE_SYNC_VALID)) {
-            // partialTicks 無しの呼び出し(ヨー計算等)は現tick値(pt=1)を使う。描画位置の補間は
-            // getBogieRenderOffset 側が partialTicks 付きで clientSyncedBogieWorld を呼ぶ。
+            // partialTicks 無しの呼び出し(ヨー計算等)は現tick値(pt=1)を使う。
             Vec3 synced = clientSyncedBogieWorld(bogieIndex, 1.0F);
             if (synced != null) {
                 return synced;
@@ -2758,7 +2880,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return localToWorld(local);
     }
 
-    /** クライアント: 毎tick、同期された端台車オフセットを prev/curr へ取り込む(描画補間用)。 */
+    /** クライアント: 毎tick、同期された端台車オフセットを prev/curr へ取り込む(描画補間… */
     private void updateClientBogieOffsetInterpolation() {
         Vec3 rear = new Vec3(entityData.get(REAR_BOGIE_DX), entityData.get(REAR_BOGIE_DY), entityData.get(REAR_BOGIE_DZ));
         Vec3 front = new Vec3(entityData.get(FRONT_BOGIE_DX), entityData.get(FRONT_BOGIE_DY), entityData.get(FRONT_BOGIE_DZ));
@@ -2772,8 +2894,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         clientFrontBogieOffPrev = clientFrontBogieOffCurr;
         clientRearBogieOffCurr = filterOffsetJump(0, clientRearBogieOffCurr, rear);
         clientFrontBogieOffCurr = filterOffsetJump(1, clientFrontBogieOffCurr, front);
-        // 端台車のレール接線ヨーを tick 単位で記録(描画時に partialTicks 補間=滑らか＋遅延なし)。
-        // ヨーはサーバーのアンカー接線を同期した値を使う(クライアント探索の誤方向/180°反転を回避)。
+        // 端台車のレール接線ヨーを tick 単位で記録(描画時に partialTicks 補間=滑らか＋…
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());
         if (def != null && !def.getBogies().isEmpty()) {
             if (entityData.get(BOGIE_SYNC_VALID)) {
@@ -2800,7 +2921,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return target;
     }
 
-    /** side(0=後/1=前)のレール接線ヨーを prev/curr へ記録(NaNは前回値維持、初回は即セット)。 */
+    /** side(0=後/1=前)のレール接線ヨーを prev/curr へ記録(NaNは前回値維持、初回… */
     private void updateTickBogieYaw(int side, float target) {
         if (Float.isNaN(target)) {
             return;
@@ -2876,7 +2997,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         entityData.set(REAR_BOGIE_DX, (float) (rearWorld.x - getX()));
         entityData.set(REAR_BOGIE_DY, (float) (rearWorld.y - getY()));
         entityData.set(REAR_BOGIE_DZ, (float) (rearWorld.z - getZ()));
-        // 台車のレール接線ヨーもサーバーのアンカーから求めて同期(クライアントの探索計算より安定=誤方向なし)。
+        // 台車のレール接線ヨーもサーバーのアンカーから求めて同期(クライアントの探索計算より安定=誤方向なし…
         entityData.set(FRONT_BOGIE_YAW, getBogieWorldYaw(ext[1]));
         entityData.set(REAR_BOGIE_YAW, getBogieWorldYaw(ext[0]));
         entityData.set(BOGIE_SYNC_VALID, true);
@@ -3052,8 +3173,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             double[] p = activeRailMap.getRailPos(activeRailSplit, index);
             double py = activeRailMap.getRailHeight(activeRailSplit, index) + RAIL_HEIGHT_OFFSET;
             double distSq = distanceToSqr(p[1], py, p[0]);
-            // 交差部では別レールとの距離がかなり近くなるので、少し離れても
-            // 現在のレールを優先して掴み続ける。
+            // 交差部では別レールとの距離がかなり近くなるので、少し離れても 現在のレールを優先して掴み続ける。
             if (distSq < 400.0D) {
                 return new RailFollowContext(activeRailMap, activeRailSplit, index, distSq);
             }
@@ -3094,8 +3214,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         int radius = 20;
         float referenceYaw = getYRot();
 
-        // 1st pass: アクティブ分岐のみ。見つからなければ 2nd pass で全分岐へフォールバック
-        // (非アクティブ分岐の終端突入やスイッチ切替で現在分岐が非アクティブ化した際に弾かれないように)。
+        // 1st pass: アクティブ分岐のみ。見つからなければ 2nd pass で全分岐へフォールバッ…
         for (int pass = 0; pass < 2 && best == null; pass++) {
             railLookupIncludeAllSegments = pass == 1;
             for (int dx = -radius; dx <= radius; dx++) {
@@ -3108,7 +3227,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
                         for (RailMap map : maps) {
                             if (map == null || map == exclude) continue;
                             int split = getMovementSplitForMap(map);
-                            // RailMap#getNearlestPoint expects world X/Z in that order.
+                            // RailMap#getNearlestPoint expects world X/Z in tha…
                             int nearest = map.getNearlestPoint(split, worldPos.x, worldPos.z);
                             nearest = Mth.clamp(nearest, 0, split);
                             double[] p = map.getRailPos(split, nearest);
@@ -3142,8 +3261,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         int radius = (int) RAIL_SEARCH_RADIUS;
         float referenceYaw = getYRot();
 
-        // 1st pass: アクティブ分岐のみ。見つからなければ 2nd pass で全分岐へフォールバック
-        // (分岐器の非アクティブ側に触れて再取得が走った時に弾かれないように)。
+        // 1st pass: アクティブ分岐のみ。見つからなければ 2nd pass で全分岐へフォールバッ…
         for (int pass = 0; pass < 2 && best == null; pass++) {
             railLookupIncludeAllSegments = pass == 1;
             for (int dx = -radius; dx <= radius; dx++) {
@@ -3319,8 +3437,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             return;
         }
         tail.linkCouplingByPosition(otherHead);
-        // stabilizeCoupledFormations handles: velocity zeroing, settings sync, position snapping,
-        // formation rebuild, and immediate updateTrainMovement snap for all cars.
+        // stabilizeCoupledFormations handles: velocity zero…
         stabilizeCoupledFormations(tail, otherHead);
         clearCouplingModeInvolving(this, other);
         tail.hurtMarked = true;
@@ -3444,7 +3561,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
     public void decouple() {
         if (level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-            // Invalidate the shared Formation so all members rebuild independently on next tick
+            // Invalidate the shared Formation so all members re…
             if (formation != null) {
                 formation.trainStream().forEach(t -> { if (t != null) t.formation = null; });
             }
@@ -3497,7 +3614,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return getAnchorForBogieIndex(def, bogieIndex);
     }
 
-    // ======== Coupling system (RTM-faithful port) ========
+    // ======== Coupling system (RTM-faithful port) ====…
 
     private boolean coupleFormationsRtMLike(TrainEntity sourceTrain, int sourceSide, TrainEntity targetTrain, int targetSide) {
         if (sourceTrain == null || targetTrain == null || sourceTrain == targetTrain) return false;
@@ -3560,7 +3677,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         // 連結時に本体をテレポートさせない。編成結合とブレーキのみ
         sourceTail.stopFormationMotionForResync(8L);
         targetHead.stopFormationMotionForResync(8L);
-        // Rebuild Formation for the newly combined UUID chain
+        // Rebuild Formation for the newly combined UUID cha…
         sourceTail.getFormationHead().rebuildFormationFromUuidChain();
         TrainEntity newHead = sourceTail.getFormationHead();
         if (newHead != null) {
@@ -3746,7 +3863,6 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         int otherSide = otherTrain.getCouplerSideForBogieIndex(otherCouplingIndex);
         if (isConnectionPresentOnSide(thisSide) || otherTrain.isConnectionPresentOnSide(otherSide)) return false;
         // カーブなどで編成先頭車の前端に別の車両が誤接触するのを防ぐ。
-        // 先頭車（後方に連結済み）の前端へのボギー接触連結は禁止し、プレイヤー操作連結のみ許可する。
         if (isHeadFrontSideOfMulticarFormation(thisSide) || otherTrain.isHeadFrontSideOfMulticarFormation(otherSide)) return false;
         boolean coupled = coupleFormationsRtMLike(this, thisSide, otherTrain, otherSide)
                 || otherTrain.coupleFormationsRtMLike(otherTrain, otherSide, this, thisSide);
@@ -3765,9 +3881,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
     public void handleBogieContactWithoutCoupling(int thisBogieIndex, TrainEntity otherTrain, int otherBogieIndex) {
         if (otherTrain == null || otherTrain == this || level().isClientSide()) return;
-        // 連結モード中(プレイヤーがこの2編成を選択して連結しようとしている)は、接触ブレーキを
-        // 抑止して接近・連結させる。ブレーキすると速度0/1の振動で連結完了距離まで近づけず、
-        // 3両目以降が連結できない不具合になっていた(tryCompletePendingCoupling が完了させる)。
+        // 連結モード中(プレイヤーがこの2編成を選択して連結しようとしている)は、接触ブレーキを 抑止して接…
         if (isCouplingModeActiveBetween(this, otherTrain)) {
             return;
         }
@@ -4308,18 +4422,13 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return isDriverSeatIndex(assignedSeat);
     }
 
+    /** 運転席に着席している乗員のみ true。客席では UI/運転操作を出さない。 */
     public boolean isLikelyDriverPassenger(Entity passenger) {
         if (passenger == null) {
             return false;
         }
         int assignedSeat = getAssignedSeatIndex(passenger);
-        if (isDriverSeatIndex(assignedSeat)) {
-            return true;
-        }
-        if (level().isClientSide()) {
-            return isDriverSeatIndex(findNearestSeatIndex(passenger));
-        }
-        return false;
+        return isDriverSeatIndex(assignedSeat);
     }
 
     public void markDriverControl(Entity passenger) {
@@ -4352,10 +4461,14 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     }
 
     public void stepMascon(int delta) {
+        boolean changed = false;
         if (delta > 0) {
-            setNotch(Math.min(getMaxPowerNotch(), getNotch() + delta));
+            changed = setNotch(Math.min(getMaxPowerNotch(), getNotch() + delta));
         } else if (delta < 0) {
-            setNotch(Math.max(-getMaxBrakeNotch(), getNotch() + delta));
+            changed = setNotch(Math.max(-getMaxBrakeNotch(), getNotch() + delta));
+        }
+        if (changed && !this.level().isClientSide()) {
+            this.playNotchSound();
         }
     }
 
@@ -4498,26 +4611,57 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return getVehicleState(stateType);
     }
 
+    /** 本家 EntityTrainBase.getTrainState: id + 値から TrainS… */
+    public jp.ngt.rtm.entity.train.util.TrainState getTrainState(int id) {
+        return jp.ngt.rtm.entity.train.util.TrainState.getState(id, (byte) getVehicleState(id));
+    }
+
     public void setTrainStateData(int stateType, float value) {
         syncVehicleState(stateType, value);
     }
 
     public float getVehicleState(int stateType) {
+        // KaizPatchX TrainState.TrainStateType の id と意味をそのま…
         return switch (stateType) {
-            case 0 -> getReverser() >= 0 ? 0.0F : 1.0F;
+            case 0 -> (getReverser() >= 0) == isLeadingCar() ? 0.0F : 1.0F;
             case 1 -> getNotch();
-            case 2 -> getRailProgress();
-            case 3 -> 0.0F;
+            case 2 -> this.signalState;
+            case 3 -> this.doorCutState;
             case 4 -> (isDoorRightOpen() ? 1.0F : 0.0F) + (isDoorLeftOpen() ? 2.0F : 0.0F);
             case 5 -> toLegacyLightMode(getLightMode());
             case 6 -> isPantographUp() ? 1.0F : 0.0F;
-            case 7 -> Math.abs(getSpeed()) * 72.0F;  // speed in km/h (RTM compat)
+            case 7 -> this.chunkLoaderState;
             case 8 -> getDestinationIndex();
             case 9 -> getSoundIndex();
             case 10 -> 1.0F - getReverser();
             case 11 -> getInteriorLightMode();
+            case 12 -> this.typeIndex;
             default -> 0.0F;
         };
+    }
+
+    /** State_Direction: 0=前, 1=中, 2=後。 */
+    private float formationPositionCode() {
+        List<TrainEntity> trains = getFormationTrainsForDisplay();
+        int index = trains.indexOf(this);
+        if (index < 0 || trains.size() <= 1) {
+            return 0.0F;
+        }
+        int frontIndex = 0;
+        if (formation != null) {
+            var front = formation.getFrontEntry();
+            if (front != null && front.train != null) {
+                int resolved = trains.indexOf(front.train);
+                if (resolved >= 0) {
+                    frontIndex = resolved;
+                }
+            }
+        }
+        if (index == frontIndex) {
+            return 0.0F;
+        }
+        int rearIndex = frontIndex == 0 ? trains.size() - 1 : 0;
+        return index == rearIndex ? 2.0F : 1.0F;
     }
 
     private float toLegacyLightMode(int mode) {
@@ -4575,7 +4719,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         trailingCarCache = this == trailing;
     }
 
-    // 旧 RTM の Render スクリプトは entity.getRotation で車体 yaw を取得する。
+    // 旧 RTM の Render スクリプトは entity.getRotation で車体 yaw…
     public float getRotation() {
         return getYRot();
     }
@@ -4609,7 +4753,8 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         switch (stateType) {
             case 0 -> setReverser(value < 0.5F ? 1 : -1);
             case 1 -> setNotch(Math.round(value));
-            case 2 -> setRailProgress(value);
+            case 2 -> this.signalState = Math.round(value);
+            case 3 -> this.doorCutState = Math.round(value);
             case 4 -> {
                 int door = Math.round(value);
                 setDoorRightOpen((door & 1) != 0);
@@ -4617,16 +4762,14 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             }
             case 5 -> setLightMode(Math.round(value));
             case 6 -> setPantographUp(value > 0.5F);
+            case 7 -> this.chunkLoaderState = Math.max(0, Math.min(8, Math.round(value)));
             case 8 -> setDestinationIndex(Math.max(0, Math.round(value)));
             case 9 -> setSoundIndex(Math.max(0, Math.round(value)));
             case 11 -> setInteriorLightOn(value > 0.0F);
+            case 12 -> this.typeIndex = Math.max(0, Math.round(value));
             default -> {
             }
         }
-    }
-
-    public float getSeatRotation() {
-        return Mth.clamp(seatRotation / 45.0F, -1.0F, 1.0F);
     }
 
     /** seatRotationの生値(-45〜45)。 */
@@ -4670,11 +4813,24 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     }
 
     public int getSignal() {
-        return 0;
+        return this.signalState;
+    }
+
+    /** 本家 EntityTrainBase.setSignal: -1 (確認済み) 以外なら sign… */
+    public void setSignal(int signal) {
+        if (signal > 0 && this.signalState != -1) {
+            this.setSignal2(signal);
+        }
+    }
+
+    /** 本家 EntityTrainBase.setSignal2: State_Signal へ直接書く。 */
+    public void setSignal2(int signal) {
+        this.signalState = signal;
     }
 
     public boolean isControlCar() {
-        return true;
+        // 本家 EntityTrainBase.isControlCar: 進行方向の先頭/最後尾 (運転台…
+        return formationPositionCode() != 1.0F;
     }
 
     private com.portofino.realtrainmodunofficial.script.SoundScriptExecutor legacySoundUpdater;
@@ -4686,20 +4842,27 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     }
 
     public javax.script.ScriptEngine getServerScriptEngine() {
-        if (this.level().isClientSide()) return null;
-        com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry entry =
-                com.portofino.realtrainmodunofficial.script.CarServerScripts.get(VehicleRegistry.getById(this.getVehicleId()));
-        return entry == null ? null : entry.engine();
+        Object set = this.getModelSet();
+        return set instanceof jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> base ? base.serverSE : null;
     }
 
+    /** 本家 IModelSelector.getModelSet。 */
     public Object getModelSet() {
-        ModelSetCompat set = new ModelSetCompat(getVehicleId());
-        set.serverSE = this.getServerScriptEngine();
-        return set;
+        return jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getTrainModelSet(this.getVehicleId());
     }
 
-    public ResourceStateCompat getResourceState() {
-        return new ResourceStateCompat(this);
+    public jp.ngt.rtm.modelpack.state.ResourceState getResourceState() {
+        jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> set = this.modelSetForScript();
+        if (set != null && set != this.dataFormatterSet) {
+            this.dataFormatterSet = set;
+            set.dataFormatter.initDataMap(this.resourceState.getDataMap());
+        }
+        return this.resourceState;
+    }
+
+    private jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> modelSetForScript() {
+        Object set = this.getModelSet();
+        return set instanceof jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> base ? base : null;
     }
 
     public BogieCompat getBogie(int index) {
@@ -4730,219 +4893,175 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         return scriptIndex == 0 ? extremes[1] : extremes[0];
     }
 
-    public static final class ResourceStateCompat {
+    /** scriptData (string map) を本家 DataMap API で読み書きするブリ… */
+    public static final class TrainScriptDataMap extends jp.ngt.rtm.modelpack.state.DataMap {
         private final TrainEntity train;
 
-        public ResourceStateCompat(TrainEntity train) {
+        public TrainScriptDataMap(TrainEntity train) {
             this.train = train;
         }
 
-        /** Returns a typed map view used by old render scripts. */
-        public DataMapCompat getDataMap() {
-            return new DataMapCompat(train);
-        }
-
-        /** Returns the vehicle id for scripts that compare resource names. */
-        public String getResourceName() {
-            return train.getVehicleId();
-        }
-
-        // 旧 RTM スクリプトは getName で列車名(カスタムネーム)を取得し、substring(0,4) 等で
-        // 列車番号を切り出す。少なくとも String が返れば pck_customNames は通る。
-        public String getName() {
-            String id = train.getVehicleId();
-            return id == null ? "" : id;
-        }
-
-        /** Returns a config holder compatible with old render scripts. */
-        public ModelSetCompat getResourceSet() {
-            return new ModelSetCompat(train.getVehicleId());
-        }
-
-        public void addExclusionParts(Object... parts) {}
-        public void removeExclusionParts(Object... parts) {}
-    }
-
-    public static final class DataMapCompat {
-        private final TrainEntity train;
-        private final Map<String, Object> values = new HashMap<>();
-
-        /** Creates a script-visible data map for a train. */
-        public DataMapCompat(TrainEntity train) {
-            this.train = train;
-            refresh();
-        }
-
-        /** Returns a raw value by key. */
-        public Object get(String key) {
-            refresh();
-            Object value = values.get(key);
-            if (value != null) {
-                return value;
-            }
-            return train == null ? null : train.scriptData.get(key);
-        }
-
+        @Override
         public boolean contains(String key) {
-            refresh();
-            return values.containsKey(key) || train != null && train.scriptData.containsKey(key);
+            return this.train != null && this.train.scriptData.containsKey(key);
         }
 
-        /** Returns an integer value by key. */
-        public int getInt(String key) {
-            Object value = get(key);
-            if (value instanceof Number number) {
-                return number.intValue();
-            }
-            if (value instanceof Boolean bool) {
-                return bool ? 1 : 0;
-            }
-            if (value instanceof String string) {
-                try {
-                    return Integer.parseInt(string);
-                } catch (NumberFormatException ignored) {
-                    try {
-                        return (int) Math.round(Double.parseDouble(string));
-                    } catch (NumberFormatException ignoredAgain) {
-                    }
-                }
-            }
-            return 0;
-        }
-
-        public int getHex(String key) {
-            return getInt(key);
-        }
-
-        /** Returns a boolean value by key. */
-        public boolean getBoolean(String key) {
-            Object value = get(key);
-            if (value instanceof Boolean bool) {
-                return bool;
-            }
-            if (value instanceof Number number) {
-                return number.intValue() != 0;
-            }
-            if (value instanceof String string) {
-                return Boolean.parseBoolean(string) || "1".equals(string);
-            }
-            return false;
-        }
-
+        @Override
         public String getString(String key) {
-            Object value = get(key);
-            return value == null ? "" : String.valueOf(value);
+            return this.train == null ? "" : this.train.getScriptDataValue(key);
         }
 
+        @Override
+        public boolean getBoolean(String key) {
+            String value = this.getString(key);
+            return "true".equalsIgnoreCase(value) || "1".equals(value);
+        }
+
+        @Override
+        public int getInt(String key) {
+            try {
+                return Integer.parseInt(this.getString(key));
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+
+        @Override
         public double getDouble(String key) {
-            Object value = get(key);
-            if (value instanceof Number number) {
-                return number.doubleValue();
+            try {
+                return Double.parseDouble(this.getString(key));
+            } catch (NumberFormatException e) {
+                return 0.0D;
             }
-            if (value instanceof Boolean bool) {
-                return bool ? 1.0D : 0.0D;
-            }
-            if (value instanceof String string) {
+        }
+
+        @Override
+        public int getHex(String key) {
+            String value = this.getString(key);
+            try {
+                return Integer.decode(value);
+            } catch (NumberFormatException e) {
                 try {
-                    return Double.parseDouble(string);
+                    return (int) Math.round(Double.parseDouble(value));
+                } catch (NumberFormatException ignored) {
+                    return 0;
+                }
+            }
+        }
+
+        @Override
+        public jp.ngt.ngtlib.math.Vec3 getVec(String key) {
+            String value = this.getString(key);
+            String[] parts = value.trim().split("\\s+");
+            if (parts.length >= 3) {
+                try {
+                    return new jp.ngt.ngtlib.math.Vec3(
+                            Double.parseDouble(parts[0]), Double.parseDouble(parts[1]), Double.parseDouble(parts[2]));
                 } catch (NumberFormatException ignored) {
                 }
             }
-            return 0.0D;
+            return jp.ngt.ngtlib.math.Vec3.ZERO;
         }
 
-        /** Stores a boolean value for the current script frame. */
-        public void setBoolean(String key, boolean value, int syncType) {
-            values.put(key, value);
-            if (train != null) {
-                train.scriptData.put(key, Boolean.toString(value));
-                if (syncType != 0) train.scriptDataDirty = true;
+        @Override
+        public Object[] getArray(String key) {
+            String value = this.getString(key);
+            if (value.isEmpty()) {
+                return new Object[0];
+            }
+            return value.split("\\|", -1);
+        }
+
+        @Override
+        public void setHex(String key, int value, int flag) {
+            this.apply(key, Integer.toString(value), flag);
+        }
+
+        @Override
+        public void setVec(String key, jp.ngt.ngtlib.math.Vec3 value, int flag) {
+            this.apply(key, value == null ? "0.0 0.0 0.0"
+                    : value.getX() + " " + value.getY() + " " + value.getZ(), flag);
+        }
+
+        @Override
+        public void setArray(String key, Object value, int flag) {
+            Object stored = value instanceof java.util.Collection<?> col ? col.toArray() : value;
+            if (stored instanceof Object[] array) {
+                StringBuilder sb = new StringBuilder();
+                for (Object element : array) {
+                    if (sb.length() > 0) {
+                        sb.append('|');
+                    }
+                    sb.append(element == null ? "" : element);
+                }
+                this.apply(key, sb.toString(), flag);
+            } else {
+                this.apply(key, stored == null ? "" : stored.toString(), flag);
             }
         }
 
-        /** Stores an integer value for the current script frame. */
-        public void setInt(String key, int value, int syncType) {
-            values.put(key, value);
-            if (train != null) {
-                train.scriptData.put(key, Integer.toString(value));
-                if (syncType != 0) train.scriptDataDirty = true;
+        @Override
+        public String getArg() {
+            if (this.train == null) {
+                return "";
             }
+            StringBuilder sb = new StringBuilder();
+            for (Map.Entry<String, String> entry : this.train.scriptData.entrySet()) {
+                if (sb.length() > 0) {
+                    sb.append(',');
+                }
+                sb.append(entry.getKey()).append("=(String)").append(entry.getValue());
+            }
+            return sb.toString();
         }
 
-        public void setString(String key, String value, int syncType) {
-            String safeValue = value == null ? "" : value;
-            values.put(key, safeValue);
-            if (train != null) {
-                train.scriptData.put(key, safeValue);
-                if (syncType != 0) train.scriptDataDirty = true;
-            }
-        }
-
-        public void setDouble(String key, double value, int syncType) {
-            values.put(key, value);
-            if (train != null) {
-                train.scriptData.put(key, Double.toString(value));
-                if (syncType != 0) train.scriptDataDirty = true;
-            }
-        }
-
-        private void refresh() {
-            if (train == null) {
+        @Override
+        public void setArg(String arg, boolean overwrite) {
+            if (arg == null || arg.isEmpty() || this.train == null) {
                 return;
             }
-            values.put("headLight", train.isHeadlightOn() ? 1 : 0);
-            values.put("door", train.isDoorOpen() ? 1 : 0);
-            values.put("doorLeft", train.isDoorLeftOpen() ? 1 : 0);
-            values.put("doorRight", train.isDoorRightOpen() ? 1 : 0);
-            values.put("lightMode", train.getLightMode());
-            values.put("pantograph", train.isPantographUp() ? 1 : 0);
-            values.put("destination", train.getDestinationIndex());
-            values.put("sound", train.getSoundIndex());
-            values.put("reverse", train.getReverser() < 0 ? 1 : 0);
-            values.put("reverser", train.getReverser());
-            values.put("customButtons", train.getCustomButtonBits());
-            values.put("railProgress", train.getRailProgress());
-            values.put("connected", train.isConnected() ? 1 : 0);
-            values.put("carNumber", defaultCarNumber(train));
-            values.put("prevFormationSize", defaultFormationSize(train));
-            values.put("isFormationA", false);
-            values.put("isFormationB", false);
-            values.put("isFormationError", false);
-            values.putIfAbsent("prevRollsignId", train.getDestinationIndex());
-            for (int i = 0; i < 16; i++) {
-                int state = train.getCustomButtonValue(i);
-                values.put("Button" + i, state);
-                values.put("button" + i, state);
-                values.put("CustomButton" + i, state);
-                values.put("customButton" + i, state);
-            }
-            train.scriptData.forEach(values::put);
-        }
-
-        private static int defaultCarNumber(TrainEntity train) {
-            if (train == null) {
-                return 1;
-            }
-            try {
-                List<TrainEntity> formationTrains = train.getFormationTrainsForDisplay();
-                int index = formationTrains.indexOf(train);
-                if (index >= 0) {
-                    return index + 1;
+            for (String part : arg.split(",")) {
+                int eq = part.indexOf('=');
+                if (eq <= 0) {
+                    continue;
                 }
-            } catch (RuntimeException ignored) {
+                String key = part.substring(0, eq);
+                if (!overwrite && this.train.scriptData.containsKey(key)) {
+                    continue;
+                }
+                String value = part.substring(eq + 1);
+                if (value.startsWith("(") && value.indexOf(')') > 0) {
+                    value = value.substring(value.indexOf(')') + 1);
+                }
+                this.apply(key, value, 0);
             }
-            return 1;
         }
 
-        private static int defaultFormationSize(TrainEntity train) {
-            if (train == null) {
-                return 1;
+        @Override
+        public void setString(String key, String value, int flag) {
+            this.apply(key, value == null ? "" : value, flag);
+        }
+
+        @Override
+        public void setBoolean(String key, boolean value, int flag) {
+            this.apply(key, Boolean.toString(value), flag);
+        }
+
+        @Override
+        public void setInt(String key, int value, int flag) {
+            this.apply(key, Integer.toString(value), flag);
+        }
+
+        @Override
+        public void setDouble(String key, double value, int flag) {
+            this.apply(key, Double.toString(value), flag);
+        }
+
+        private void apply(String key, String value, int flag) {
+            if (this.train == null || key == null || key.isBlank()) {
+                return;
             }
-            try {
-                return Math.max(1, train.getFormationTrainsForDisplay().size());
-            } catch (RuntimeException ignored) {
-                return 1;
-            }
+            this.train.setScriptDataValue(key, value);
         }
     }
 
@@ -5031,6 +5150,15 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             return train.formation != null ? train.formation.getDirection() : 0;
         }
 
+        /** 本家 Formation.isFrontCar: 進行方向の先頭車か。 */
+        public boolean isFrontCar(Object entity) {
+            TrainEntity resolved = train;
+            if (entity instanceof TrainEntity t) {
+                resolved = t;
+            }
+            return frontTrain() == resolved;
+        }
+
         private TrainEntity frontTrain() {
             if (train.formation != null) {
                 com.portofino.realtrainmodunofficial.entity.legacyformation.FormationEntry front = train.formation.getFrontEntry();
@@ -5100,97 +5228,6 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         }
     }
 
-    public static final class ModelSetCompat {
-        public javax.script.ScriptEngine serverSE;
-        private final String id;
-        private final VehicleDefinition definition;
-
-        public ModelSetCompat(String id) {
-            this.id = id;
-            this.definition = VehicleRegistry.getById(id);
-        }
-
-        public String getName() {
-            return id;
-        }
-
-        public String getModelName() {
-            return id;
-        }
-
-        public String getTextureName() {
-            return id;
-        }
-
-        /** Returns a minimal config object used by old render scripts. */
-        public ConfigCompat getConfig() {
-            return new ConfigCompat(definition);
-        }
-    }
-
-    public static final class ConfigCompat {
-        private static final String[] DEFAULT_ROLLSIGN_NAMES = {
-            "None",
-            "Out of service",
-            "Test run",
-            "Party",
-            "Extra",
-            "Local",
-            "Rapid",
-            "Express"
-        };
-        // Legacy cab scripts inspect the array length to know the brake notch count.
-        public final float[] deccelerations = {
-            0.0F, 0.1F, 0.2F, 0.35F, 0.5F, 0.7F, 0.9F, 1.1F, 1.3F
-        };
-        // maxSpeedはノッチ別上限の配列として読まれる。非nullで1要素以上必須
-        public final float[] maxSpeed = {
-            0.0F, 0.22F, 0.44F, 0.66F, 0.88F, 1.1F
-        };
-        public final String[] rollsignNames;
-        // Legacy cab/server scripts read sound_Announcement as a 2D array [[name, soundPath], ...].
-        public final String[][] sound_Announcement;
-        public final boolean isSingleTrain;
-        private final String name;
-
-        public ConfigCompat() {
-            this(null, null);
-        }
-
-        public ConfigCompat(String name) {
-            this(name, null);
-        }
-
-        public ConfigCompat(VehicleDefinition definition) {
-            this(definition != null ? definition.getId() : null, definition);
-        }
-
-        private ConfigCompat(String name, VehicleDefinition definition) {
-            this.name = name != null ? name : "";
-            if (definition != null && !definition.getRollsignNames().isEmpty()) {
-                this.rollsignNames = definition.getRollsignNames().toArray(String[]::new);
-            } else {
-                this.rollsignNames = DEFAULT_ROLLSIGN_NAMES;
-            }
-            this.isSingleTrain = definition != null && definition.isSingleTrain();
-            java.util.List<String> sounds = definition != null ? definition.getAnnouncementSounds() : java.util.List.of();
-            if (sounds == null || sounds.isEmpty()) {
-                this.sound_Announcement = new String[0][];
-            } else {
-                String[][] arr = new String[sounds.size()][];
-                for (int i = 0; i < sounds.size(); i++) {
-                    String s = sounds.get(i);
-                    arr[i] = new String[] { s, s };
-                }
-                this.sound_Announcement = arr;
-            }
-        }
-
-        public String getName() { return name; }
-        public String getId() { return name; }
-        public String getTrainName() { return name; }
-    }
-
     public static final class WorldCompat {
         private final TrainEntity train;
         public boolean field_72995_K;
@@ -5223,7 +5260,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             return out;
         }
 
-        /** field 風アクセス対応のためのキャッシュ getter (JS の `world.field_72996_f` でも動くように)。 */
+        /** field 風アクセス対応のためのキャッシュ getter (JS の `world.field_… */
         public java.util.List<net.minecraft.world.entity.Entity> getField_72996_f() {
             return field_72996_f();
         }
@@ -5884,7 +5921,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         float yawDelta = Mth.wrapDegrees(getYRot() - this.yRotO);
         float horizSpeed = (float) getDeltaMovement().horizontalDistance();
         float bankAngle = Mth.clamp(-yawDelta * horizSpeed * 5.0F, -10.0F, 10.0F);
-        // レンダラの回転(YP yaw → XP -pitch → ZP bank)を組み、その逆(共役)で world ベクトルを戻す。
+        // レンダラの回転(YP yaw → XP -pitch → ZP bank)を組み、その逆(共役)で…
         org.joml.Quaternionf q = new org.joml.Quaternionf()
             .rotateY((float) Math.toRadians(renderYaw))
             .rotateX((float) Math.toRadians(-renderPitch))
@@ -5892,7 +5929,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         org.joml.Vector3f d = new org.joml.Vector3f(
             (float) (world.x - renderX), (float) (world.y - renderY), (float) (world.z - renderZ));
         q.conjugate().transform(d);
-        // modelOffset は回転後の本体フレームで translate されるので、回転を戻した後に引く。
+        // modelOffset は回転後の本体フレームで translate されるので、回転を戻した後に…
         d.sub((float) offset.x, (float) offset.y, (float) offset.z);
         return new Vec3(d.x / scale, d.y / scale, d.z / scale);
     }
@@ -6111,7 +6148,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
             discardSeatHitboxes();
             seatAssignments.clear();
             syncSeatAssignmentsToEntityData();
-            // Invalidate Formation so remaining cars rebuild without this train on next tick
+            // Invalidate Formation so remaining cars rebuild wi…
             if (formation != null) {
                 formation.trainStream().forEach(t -> { if (t != null && t != this) t.formation = null; });
                 formation = null;
@@ -6145,6 +6182,10 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         }
         if (tag.contains("DestinationIndex")) setDestinationIndex(tag.getInt("DestinationIndex"));
         if (tag.contains("SoundIndex")) setSoundIndex(tag.getInt("SoundIndex"));
+        if (tag.contains("SignalState")) this.signalState = tag.getInt("SignalState");
+        if (tag.contains("DoorCutState")) this.doorCutState = tag.getInt("DoorCutState");
+        if (tag.contains("ChunkLoaderState")) this.chunkLoaderState = tag.getInt("ChunkLoaderState");
+        if (tag.contains("TypeIndex")) this.typeIndex = tag.getInt("TypeIndex");
         if (tag.contains("BodyRoll")) setBodyRoll(tag.getFloat("BodyRoll"));
         if (tag.contains("CustomButtonBits")) setCustomButtonBits(tag.getInt("CustomButtonBits"));
         if (tag.contains("RailProgress")) setRailProgress(tag.getFloat("RailProgress"));
@@ -6218,6 +6259,10 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         tag.putInt("Reverser", getReverser());
         tag.putInt("DestinationIndex", getDestinationIndex());
         tag.putInt("SoundIndex", getSoundIndex());
+        tag.putInt("SignalState", this.signalState);
+        tag.putInt("DoorCutState", this.doorCutState);
+        tag.putInt("ChunkLoaderState", this.chunkLoaderState);
+        tag.putInt("TypeIndex", this.typeIndex);
         tag.putFloat("BodyRoll", getBodyRoll());
         tag.putInt("CustomButtonBits", getCustomButtonBits());
         tag.putFloat("RailProgress", getRailProgress());
@@ -6420,7 +6465,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
     }
 
     private void ensureDriverReadyForFormation(Entity driver) {
-        // stub — driver seat handling not needed for rail movement
+        // stub — driver seat handling not needed for rail m…
     }
 
     public void setReverserForFormation(int value) {
@@ -6466,9 +6511,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
 
     public void moveAsFormationFollower(TrainEntity leader, int leaderSide, int followerSide, float speed) {
         if (leader == null || level().isClientSide()) return;
-        // テレポート・ガード: フォロワーがレール追従に失敗した時のフォールバック moveTo は、
-        // 中間車のレール状態が未確立だと遠方(他車の上)へ飛ぶことがある。連結中の正当な
-        // 微調整を超える大ジャンプは棄却し、本体を元位置に留める(本家は台車を保持して飛ばさない)。
+        // テレポート・ガード: フォロワーがレール追従に失敗した時のフォールバック moveTo は、 中間…
         double preX = getX();
         double preY = getY();
         double preZ = getZ();
@@ -6520,7 +6563,7 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         scriptDataDirty = true;
     }
 
-    // ---- Previous-frame bogie world position (for bogie entity xo/yo/zo sync) ----
+    // ---- Previous-frame bogie world position (for bog…
 
     public Vec3 getBogieEntityWorldPositionPrev(int bogieIndex) {
         VehicleDefinition def = VehicleRegistry.getById(getVehicleId());

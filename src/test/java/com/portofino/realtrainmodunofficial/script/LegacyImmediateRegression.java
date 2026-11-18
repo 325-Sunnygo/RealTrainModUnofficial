@@ -9,7 +9,7 @@ public final class LegacyImmediateRegression {
         var recorder=new GLRecorder(); GLRecorder.activate(recorder);
         try {
             var script=jp.ngt.ngtlib.io.ScriptUtil.createEngine();
-            script.eval(PackScriptSource.prepare("var GL=Java.type('org.lwjgl.opengl.GL11'); GL.glColor4f(1,0,0,1); GL.glTexCoord2f(0.25,0.5); GL.glBegin(GL.GL_TRIANGLES); GL.glVertex2f(0,0); GL.glColor3d(0,1,0); GL.glTexCoord2d(0.75,1); GL.glVertex3d(1,0,0); GL.glColor4d(0,0,1,0.5); GL.glNormal3d(1,0,0); GL.glVertex3f(0,1,0); GL.glEnd();","immediate.js"));
+            script.eval(PackScriptSource.PRELUDE + PackScriptSource.prepare("var GL=Java.type('org.lwjgl.opengl.GL11'); GL.glColor4f(1,0,0,1); GL.glTexCoord2f(0.25,0.5); GL.glBegin(GL.GL_TRIANGLES); GL.glVertex2f(0,0); GL.glColor3d(0,1,0); GL.glTexCoord2d(0.75,1); GL.glVertex3d(1,0,0); GL.glColor4d(0,0,1,0.5); GL.glNormal3d(1,0,0); GL.glVertex3f(0,1,0); GL.glEnd();","immediate.js"));
             var draw=(GLRecorder.TessDraw)recorder.getCommands().get(recorder.getCommands().size()-1).payload;
             check(draw.mode==4 && draw.verts.length==27,"old GL11 immediate triangle records all vertices");
             check(draw.verts[5]==1 && draw.verts[6]==0 && draw.verts[14]==0 && draw.verts[15]==1 && draw.verts[25]==1,"current color is captured per vertex");

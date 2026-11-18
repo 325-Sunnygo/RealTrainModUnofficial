@@ -5,10 +5,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
 
-/**
- * コークス。本家 {@code jp.ngt.rtm.item.ItemCoke} の移植。
- * 置いた所にコークスの粒を 1 つ出す。
- */
+/** コークス。本家 jp.ngt.rtm.item.ItemCoke の移植。 */
 public class ItemCoke extends Item {
     public ItemCoke() {
         super(new Properties());

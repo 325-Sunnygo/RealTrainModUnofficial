@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.joml.Matrix4f;
 import java.util.Random;
 
-/** Shared-edge coordinates must be bit-identical across normal and light submissions. */
+/** Shared-edge coordinates must be bit-identical acr… */
 public final class LegacyVertexTransformRegression {
     private static final class Capture implements VertexConsumer {
         float x,y,z;

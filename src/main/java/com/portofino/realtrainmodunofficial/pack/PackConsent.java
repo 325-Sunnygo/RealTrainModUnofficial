@@ -15,12 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/**
- * パック同意 (README 初回同意) の管理。
- * パック zip の中に README (readme.txt / お読みください.txt 等) が入っている場合、
- * その起動構成でそのパックを初めて入れたときにタイトル画面で README を表示し、
- * 「同意する / 同意しない」を選ばせる。
- */
+/** パック同意 (README 初回同意) の管理。 */
 public final class PackConsent {
 
     private PackConsent() {
@@ -36,7 +31,7 @@ public final class PackConsent {
     private static final Map<String, State> DECISIONS = new ConcurrentHashMap<>();
     // ファイル名 → 未決パック (README あり・未決定)。タイトル画面で表示する。
     private static final Map<String, Pending> PENDING = new ConcurrentHashMap<>();
-    // README を持たないと判明したパック (同一セッションで複数ローダーから何度も zip を開かないため)。
+    // README を持たないと判明したパック (同一セッションで複数ローダーから何度も zip を開か…
     private static final java.util.Set<String> NO_README = ConcurrentHashMap.newKeySet();
     private static volatile boolean loaded;
 
@@ -71,9 +66,7 @@ public final class PackConsent {
                     if ("AGREED".equals(state)) {
                         DECISIONS.put(name, State.AGREED);
                     }
-                    // DECLINED は読み込まない: 「同意しない」は永続しない仕様
-                    // (同意するまで毎起動で同意画面を出す)。旧形式の DECLINED 行は無視され、
-                    // 次回 save で消える。
+                    // DECLINED は読み込まない: 「同意しない」は永続しない仕様 (同意するまで毎起動で同意画面…
                 }
             }
         } catch (Exception e) {
@@ -99,35 +92,21 @@ public final class PackConsent {
         }
     }
 
-    /**
-     * このパック zip をロードしてよいか。
-     * 同意済み / README 無し → true
-     * 同意しない → false
-     * 未決 (README あり・未決定) → false を返し、タイトル画面表示用に retain する
-     */
+    /** このパック zip をロードしてよいか。 同意済み / README 無し → true 同意しな… */
     public static boolean isAllowed(Path zip) {
         if (zip == null) {
             return true;
         }
-        // 専用サーバーにはタイトル画面 (README 同意 UI) が無いため、同意ゲートを適用すると
-        // README 付きパックが永久に「未決=false」となりロードされない。
-        // 車両/レール/サウンド等のパックが欠け、クライアントで選んだ列車が設置時に
-        // VehicleRegistry.getById=null → 既定 (先頭の ELECTRIC =5000番台Tc) にフォールバック
-        // する (= 「専用サーバーだと全列車がになる。自動車 (同梱) は正常」の真因。
+        // 専用サーバーにはタイトル画面 (README 同意 UI) が無いため、同意ゲートを適用すると R…
         if (net.neoforged.fml.loading.FMLEnvironment.dist != net.neoforged.api.distmarker.Dist.CLIENT) {
             return true;
         }
-        // ★MOD 自身の規約は出さない。
-        // README 判定が "license" にも一致するため、パックの規約と同じ画面に出てしまっていた。
-        // ★同梱パック (rtm_default_assets/ の等) は除外しない。
+        // ★MOD 自身の規約は出さない。 README 判定が "license" にも一致するため、パッ…
         if (isOwnModJar(zip)) {
             return true;
         }
         String name = zip.getFileName().toString();
-        // ★同意を求めるのは<b>zip のモデルパックだけ</b>。
-        //   RTMU は mods フォルダも探すので、他 MOD の jar に入っている LICENSE まで
-        //   README 判定に引っかかって「規約に同意」画面に出ていた。
-        //   モデルパックは zip、MOD は jar なので拡張子で切り分ける。
+        // ★同意を求めるのはzip のモデルパックだけ。
         if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
             return true;
         }
@@ -172,10 +151,7 @@ public final class PackConsent {
         return !PENDING.isEmpty();
     }
 
-    /**
-     * 同意/不同意を記録する。未決一覧からは外す。
-     * 同意はファイルへ保存され以後表示しない。
-     */
+    /** 同意/不同意を記録する。未決一覧からは外す。 同意はファイルへ保存され以後表示しない。 */
     public static void decide(String fileName, boolean agreed) {
         if (fileName == null || fileName.isEmpty()) {
             return;
@@ -245,17 +221,12 @@ public final class PackConsent {
                 || raw.contains("はじめに") || raw.contains("注意");
     }
 
-    /**
-     * README を画面表示用に整える。テキストファイルと同じ見た目にする。
-     * BOM / ゼロ幅文字を除去 (Minecraft が "ZWNBSP" 等の箱で表示するのを防ぐ)
-     * 改行を LF に正規化 (CRLF/CR の \r が "CR" の箱で表示されるのを防ぐ)
-     * タブ・改行以外の制御文字を除去
-     */
+    /** README を画面表示用に整える。テキストファイルと同じ見た目にする。 */
     private static String sanitize(String s) {
         if (s == null) {
             return "";
         }
-        // 改行を LF に統一 (\r を消す)。CRLF/CR の \r が "CR" の箱で表示されるのを防ぐ。
+        // 改行を LF に統一 (\r を消す)。CRLF/CR の \r が "CR" の箱で表示されるの…
         s = s.replace("\r\n", "\n").replace("\r", "\n");
         // タブは "HT" の箱で表示されるのでスペースへ置き換える。
         s = s.replace("\t", "    ");
@@ -266,9 +237,9 @@ public final class PackConsent {
             if (c == '\n') {
                 sb.append(c);
             } else if (c < 0x20) {
-                continue; //制御文字
+                continue; // 制御文字
             } else if (c == '﻿' || (c >= '​' && c <= '‏')) {
-                continue; //BOM・ゼロ幅文字
+                continue; // BOM・ゼロ幅文字
             } else {
                 sb.append(c);
             }
@@ -276,12 +247,7 @@ public final class PackConsent {
         return sb.toString();
     }
 
-    /**
-     * README を UTF-8 → MS932(CP932) → Shift_JIS の順に厳格デコードする共通デコーダに委譲する。
-     * 旧実装は Shift_JIS しか試さず、① / ㈱ / 号 のような「JDK の Shift_JIS には無く CP932 にだけある」
-     * 文字を含む README (ATS 系パックに多い) だと 1 文字でも失敗した瞬間に全文が UTF-8 素通し = 文字化け
-     * していた。MS932 を挟む com.portofino.realtrainmodunofficial.util.PackTextDecoder に一本化して解消。
-     */
+    /** README を UTF-8 → MS932(CP932) → Shift_JIS の順に厳格デコ… */
     private static String decodeText(byte[] bytes) {
         return com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
     }

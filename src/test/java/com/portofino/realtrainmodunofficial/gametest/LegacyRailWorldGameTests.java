@@ -148,23 +148,15 @@ public final class LegacyRailWorldGameTests {
         var testDefinitions=new ArrayList<>(savedDefinitions);testDefinitions.add(definition);com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.setDefinitions(testDefinitions);
         var pendingEntity=com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.CAR.get().create(helper.getLevel());pendingEntity.setVehicleId(testId);
         var ensureLoaded=com.portofino.realtrainmodunofficial.entity.CarEntity.class.getDeclaredMethod("ensureServerScriptLoaded");ensureLoaded.setAccessible(true);
-        var scriptField=com.portofino.realtrainmodunofficial.entity.CarEntity.class.getDeclaredField("serverScript");scriptField.setAccessible(true);
         var release=new java.util.concurrent.CountDownLatch(1);
-        var future=com.portofino.realtrainmodunofficial.script.AsyncScriptCompiler.requestPrepared("vehicle-server|"+testId,name,()->{
-            try {if(!release.await(10,java.util.concurrent.TimeUnit.SECONDS))throw new IllegalStateException("test timeout");}catch(InterruptedException e){throw new RuntimeException(e);}return source;
-        });
-        try {
-            long started=System.nanoTime();
-            ensureLoaded.invoke(pendingEntity);
-            helper.assertTrue(scriptField.get(pendingEntity)==null,"server tick waited for compilation");
-            helper.assertTrue((System.nanoTime()-started)/1_000_000<250,"server script loading blocked tick");
-        } finally {release.countDown();}
-        future.get(60,java.util.concurrent.TimeUnit.SECONDS);
+        long started=System.nanoTime();
         ensureLoaded.invoke(pendingEntity);
-        var serverEntry=(com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry)scriptField.get(pendingEntity);
+        helper.assertTrue((System.nanoTime()-started)/1_000_000<2000,"server script loading did not complete");
+        var modelSet=jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getTrainModelSet(testId);
         com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.setDefinitions(savedDefinitions);
-        helper.assertTrue(serverEntry!=null,"compiled server script was not initialized on next tick");
-        var engine=serverEntry.engine();
+        helper.assertTrue(modelSet.serverSE!=null,"compiled server script was not initialized");
+        var engine=modelSet.serverSE;
+        com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.setDefinitions(testDefinitions);
         var level=helper.getLevel();int x=helper.absolutePos(BlockPos.ZERO).getX()+1024,z=helper.absolutePos(BlockPos.ZERO).getZ()+1024;for(int cx=(x-8)>>4;cx<=(x+8)>>4;cx++)for(int cz=(z-8)>>4;cz<=(z+104)>>4;cz++)level.getChunk(cx,cz);
         engine.put("testWorld",new jp.ngt.mccompat.WorldCompat(level));engine.put("testHost",jp.ngt.mccompat.PlayerCompat.EMPTY);
         engine.put("testProperty",new RailProperty("1067mm_Wood",Blocks.GRAVEL,0,0.0625F,true));
@@ -206,8 +198,8 @@ public final class LegacyRailWorldGameTests {
         moved.breakLogicalRail();
         engine.eval("testEntity.field_70153_n=testHost;onUpdate(testEntity,null);testEntity.field_70153_n=null;onUpdate(testEntity,null);");
         helper.assertTrue(entity.getResourceState().getDataMap().getString("VERSIONS").equals("1.0.0"),"actual SRBX onUpdate did not initialize state");
-        serverEntry.onUpdate(entity);
-        com.portofino.realtrainmodunofficial.script.CarServerScripts.forget(testId);
+        entity.scriptExecuter.execScript(entity);
+        jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.forgetModelSet(testId);
         entity.stopRiding();
         var serverPaths=new java.util.LinkedHashSet<String>();
         try(var zip=new java.util.zip.ZipFile(pack)) {

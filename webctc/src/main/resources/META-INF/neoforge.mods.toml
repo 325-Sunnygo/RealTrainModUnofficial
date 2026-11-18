@@ -5,7 +5,7 @@ issueTrackerURL="https://github.com/WebCTC/WebCTC"
 
 [[mods]]
 modId="webctc"
-version="1.21.1-1.0.0"
+version="1.21.1-1.0.2"
 displayName="RTMU-WebCTC_1.21.1"
 # 本家 WebCTC (1.7.10) の開発者をそのまま継承
 authors="Kaiz_JP, masa0300"

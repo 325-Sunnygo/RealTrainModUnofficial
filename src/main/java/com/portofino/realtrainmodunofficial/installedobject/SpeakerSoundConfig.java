@@ -10,18 +10,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * スピーカーの「音源ID(1〜64) → ogg 音名」マッピングを保持する。
- * 本家 RTM の rtm/speaker_sounds.json と同じ「String 配列」形式で
- * config/realtrainmodunofficial/speaker_sounds.json に永続化する。
- */
+/** スピーカーの「音源ID(1〜64) → ogg 音名」マッピングを保持する。 */
 public final class SpeakerSoundConfig {
     public static final int MAX_SOUND_ID = 64;
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String FILE_NAME = "speaker_sounds.json";
 
-    // sounds[id-1] = 音名（"rtm:..." 等の namespace 付き、または ogg パス）。null/"null"/空 は未設定。
+    // sounds[id-1] = 音名（"rtm:..." 等の namespace 付き、または o…
     private static final String[] SOUNDS = new String[MAX_SOUND_ID];
 
     private static boolean loaded = false;
@@ -92,11 +88,7 @@ public final class SpeakerSoundConfig {
         }
     }
 
-    /**
-     * 全マッピングのスナップショット（同期パケット用）。長さは MAX_SOUND_ID。
-     * 未設定スロットは null ではなく空文字を入れる
-     * (STRING_UTF8 codec が null をエンコードできず接続が切れるのを防ぐ)。
-     */
+    /** 全マッピングのスナップショット（同期パケット用）。長さは MAX_SOUND_ID。 */
     public static synchronized String[] snapshot() {
         if (!loaded) {
             load();

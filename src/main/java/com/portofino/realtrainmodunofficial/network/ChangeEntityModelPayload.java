@@ -10,11 +10,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 設置済みエンティティのモデル差し替え (本家 GuiSelectModel → PacketSelectModel 相当)。
- * 本家は列車をシフト右クリックすると guiIdSelectEntityModel が開き、決定すると
- * そのエンティティの modelName / DataMap / 名前 / 色 が書き換わる。
- */
+/** 設置済みエンティティのモデル差し替え (本家 GuiSelectModel → PacketSel… */
 public record ChangeEntityModelPayload(int entityId, String modelId, String dataMapValue,
                                        String customName, int color)
         implements CustomPacketPayload {
@@ -49,6 +45,23 @@ public record ChangeEntityModelPayload(int entityId, String modelId, String data
                 return;
             }
             Entity entity = player.level().getEntity(payload.entityId());
+            if (entity instanceof jp.ngt.rtm.entity.EntityInstalledObject installed) {
+                if (player.distanceToSqr(installed) > 64.0D * 64.0D) {
+                    return;
+                }
+                installed.setModelName(payload.modelId());
+                var installedState = installed.getResourceState();
+                if (installedState != null) {
+                    installedState.color = payload.color();
+                    if (payload.customName() != null && !payload.customName().isBlank()) {
+                        installedState.setName(payload.customName());
+                    }
+                    if (payload.dataMapValue() != null && !payload.dataMapValue().isBlank()) {
+                        installedState.setArg(payload.dataMapValue(), true);
+                    }
+                }
+                return;
+            }
             if (!(entity instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> vehicle)) {
                 return;
             }
@@ -72,6 +85,11 @@ public record ChangeEntityModelPayload(int entityId, String modelId, String data
 
             // モデルが変わると座席位置 (slotPos) も変わるので、床を作り直させる。
             vehicle.onModelChanged();
+            if (entity instanceof com.portofino.realtrainmodunofficial.entity.TrainEntity train) {
+                train.getSoundUpdater().onModelChanged();
+            } else if (entity instanceof com.portofino.realtrainmodunofficial.entity.CarEntity car) {
+                car.getSoundUpdater().onModelChanged();
+            }
         });
     }
 }

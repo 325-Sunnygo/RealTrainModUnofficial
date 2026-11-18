@@ -7,10 +7,7 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * 信号変換機のアイテム。本家はメタ 0〜3 の 4 種 (RS入力 / RS出力 / +1 / -1)。
- * ★右クリックでのタイプ切替は本家に無い。<b>アイテムの時点で種類が決まる</b>。
- */
+/** 信号変換機のアイテム。本家はメタ 0〜3 の 4 種 (RS入力 / RS出力 / +1 / -1… */
 public class SignalConverterItem extends BlockItem {
     private final int type;
 

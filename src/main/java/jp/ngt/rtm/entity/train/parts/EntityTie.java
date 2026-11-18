@@ -17,12 +17,7 @@ import net.minecraft.world.phys.AABB;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * 貨物用枕木。本家 {@code jp.ngt.rtm.entity.train.parts.EntityTie} の移植。
- *
- * <p>右クリックで近くのエンティティを 1 つ「固定」して載せる。もう一度で降ろす。
- * 本家 {@code setSize(3.0F, 0.125F)}。
- */
+/** 貨物用枕木。本家 jp.ngt.rtm.entity.train.parts.EntityTie… */
 public class EntityTie extends EntityCargo {
 
     public EntityTie(EntityType<? extends EntityTie> type, Level level) {
@@ -44,7 +39,7 @@ public class EntityTie extends EntityCargo {
             return;
         }
         UUID uuid = new UUID(l0, l1);
-        //本家は loadedEntityList を総当りする。1.21 は近傍だけ見る (全走査 API が無い)
+        // 本家は loadedEntityList を総当りする。
         for (Entity entity : this.level().getEntities(this, this.getBoundingBox().inflate(8.0D))) {
             if (uuid.equals(entity.getUUID())) {
                 entity.startRiding(this);
@@ -70,7 +65,7 @@ public class EntityTie extends EntityCargo {
     @Override
     public void tick() {
         super.tick();
-        //本家: 生き物でない乗客は枕木と同じ向きに固定する
+        // 本家: 生き物でない乗客は枕木と同じ向きに固定する
         Entity passenger = this.getFirstPassenger();
         if (passenger != null && !(passenger instanceof LivingEntity)) {
             passenger.setYRot(this.getYRot());
@@ -96,7 +91,7 @@ public class EntityTie extends EntityCargo {
                 if (entity instanceof EntityVehiclePart || entity instanceof EntityBogie) {
                     return false;
                 }
-                //★プレイヤーを固定してしまうと右クリックした本人が座る。対象外にする
+                // ★プレイヤーを固定してしまうと右クリックした本人が座る。対象外にする
                 if (entity instanceof Player) {
                     return false;
                 }

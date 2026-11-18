@@ -2,11 +2,7 @@ package jp.ngt.mccompat;
 
 import net.minecraft.world.phys.AABB;
 
-/**
- * 1.7.10 net.minecraft.util.AxisAlignedBB のスクリプト互換ラッパー。
- * 列車検知器のサーバースクリプトは自分の当たり判定を縦に広げてから
- * その中の列車を探す:
- */
+/** 1.7.10 net.minecraft.util.AxisAlignedBB のスクリプト互換ラ… */
 @SuppressWarnings("unused")
 public final class AxisAlignedBB {
 
@@ -40,11 +36,7 @@ public final class AxisAlignedBB {
         this(new AABB(minX, minY, minZ, maxX, maxY, maxZ));
     }
 
-    /**
-     * func_72330_a = 1.7.10 AxisAlignedBB.getBoundingBox(minX,minY,minZ,maxX,maxY,maxZ) の静的ファクトリ。
-     * ATS 地上子の server_ATS_Beacon.js が列車検知の当たり判定を作るのに
-     * AxisAlignedBB.func_72330_a(...) を呼ぶ。
-     */
+    /** func_72330_a = 1.7.10 AxisAlignedBB.getBoundingBo… */
     public static AxisAlignedBB func_72330_a(double minX, double minY, double minZ,
                                              double maxX, double maxY, double maxZ) {
         return new AxisAlignedBB(minX, minY, minZ, maxX, maxY, maxZ);

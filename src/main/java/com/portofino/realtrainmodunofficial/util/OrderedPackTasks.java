@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 
-/** Parse concurrently, then publish on the caller in original pack/entry order. */
+/** Parse concurrently, then publish on the caller in… */
 public final class OrderedPackTasks implements AutoCloseable {
     private static final ThreadLocal<OrderedPackTasks> BATCH=new ThreadLocal<>();
     private static final ThreadLocal<List<Runnable>> CAPTURE=new ThreadLocal<>();
@@ -21,7 +21,7 @@ public final class OrderedPackTasks implements AutoCloseable {
             try{parser.run();return result;}finally{CAPTURE.remove();}
         },LegacyLoadPolicy.executor()));
     }
-    /** Directory-pack IO is part of the configured worker workload as well. */
+    /** Directory-pack IO is part of the configured worke… */
     public static void read(java.nio.file.Path path,Consumer<byte[]> parser) {
         submit(()->{
             try{parser.accept(java.nio.file.Files.readAllBytes(path));}

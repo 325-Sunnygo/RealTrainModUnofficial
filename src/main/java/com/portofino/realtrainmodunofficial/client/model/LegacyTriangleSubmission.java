@@ -1,6 +1,6 @@
 package com.portofino.realtrainmodunofficial.client.model;
 
-/** Reconstructs the original triangle stream from the internal four-corner storage. */
+/** Reconstructs the original triangle stream from th… */
 public final class LegacyTriangleSubmission {
     private LegacyTriangleSubmission() {}
     public static int[] indices(float[] data) {return indices(data,new java.util.BitSet());}

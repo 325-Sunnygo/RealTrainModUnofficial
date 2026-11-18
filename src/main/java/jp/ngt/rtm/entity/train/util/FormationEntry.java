@@ -5,17 +5,13 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 
-/** 本家 jp.ngt.rtm.entity.train.util.FormationEntry (KaizPatchX) の忠実移植。 */
+/** 本家 jp.ngt.rtm.entity.train.util.FormationEntry (K… */
 public class FormationEntry implements Comparable<FormationEntry> {
     public final EntityTrainBase train;
     public byte entryId;
     public byte dir;
 
-    /**
-     * @param par1 車両
-     * @param par2 位置
-     * @param par3 向き
-     */
+    
     public FormationEntry(EntityTrainBase par1, int par2, int par3) {
         this.train = par1;
         this.entryId = (byte) par2;

@@ -14,10 +14,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * 本家 jp.ngt.rtm.entity.npc.macro.MacroExecutor の移植。
- * マクロ (TrainCommand の列) を開始時刻からの相対時刻で順に実行する。
- */
+/** 本家 jp.ngt.rtm.entity.npc.macro.MacroExecutor の移植。 */
 public class MacroExecutor {
     private final List<TrainCommand> commands = new ArrayList<>();
     private boolean executing;
@@ -33,7 +30,7 @@ public class MacroExecutor {
             return false;
         }
         this.executing = true;
-        // 本家は worldTime だが、/time set の影響を受けない gameTime を使う (相対時刻なので挙動は同じ)
+        // 本家は worldTime だが、/time set の影響を受けない gameTime を使う…
         this.startTime = level.getGameTime();
         return true;
     }

@@ -8,7 +8,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Behavioral checks for the remaining original config consumers. */
+/** Behavioral checks for the remaining original conf… */
 public final class LegacyRemainingConfigRegression {
     private static int checks;
     private static void check(boolean value,String message){checks++;if(!value)throw new AssertionError(message);}

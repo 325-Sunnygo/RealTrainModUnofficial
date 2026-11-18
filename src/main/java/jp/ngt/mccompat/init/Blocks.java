@@ -2,10 +2,7 @@ package jp.ngt.mccompat.init;
 
 import net.minecraft.world.level.block.Block;
 
-/**
- * 1.7.10 net.minecraft.init.Blocks のスクリプト互換 (SRG フィールド名)。
- * SRB3 の underBlock (羊毛) 等が参照する主要ブロックのみ。
- */
+/** 1.7.10 net.minecraft.init.Blocks のスクリプト互換 (SRG フィ… */
 public final class Blocks {
     private Blocks() {
     }
@@ -39,9 +36,7 @@ public final class Blocks {
     /** glass_pane (無着色、メタ無し) */
     public static final Block field_150410_aZ = net.minecraft.world.level.block.Blocks.GLASS_PANE;
 
-    // ---- レッドストーン出力系 (列車検知器のサーバースクリプトが置く) ----
-    // 1.7.10 は「1 ブロック + メタで 16 色」だったので、色付きブロックは白色版を
-    // 代表として置き、メタは WorldCompat.func_147465_d が色に読み替える。
+    // ---- レッドストーン出力系 (列車検知器のサーバースクリプトが置く) ---- 1.7.10…
 
     /** redstone_block */
     public static final Block field_150451_bX = net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK;
@@ -58,11 +53,7 @@ public final class Blocks {
     /** lever */
     public static final Block field_150442_at = net.minecraft.world.level.block.Blocks.LEVER;
 
-    // ---- 1.7.10 メタ互換: 1.21 の色別ブロック → (白色版=基準ブロック, 色メタ 0-15) ----
-    // 信号機のブロック検知スクリプト (searchBlockAndMeta) が色ガラス/羊毛/テラコッタのメタを
-    // 灯火状態として読むが、1.21 は色ごとに別ブロックでメタが無い。そこで getBlock (func_147439_a) は
-    // 色別ブロックを白色版へ正規化し、getMetadata (func_72805_g) は色番号(0-15)を返すことで
-    // 1.7.10 の「1ブロック+メタ16色」を再現する。[[rtmu-api-sweep-complete]] の受け皿方式。
+    // ---- 1.7.10 メタ互換: 1.21 の色別ブロック → (白色版=基準ブロック, 色メタ…
     private static final String[] COLORS_16 = {
         "white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
         "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"
@@ -71,11 +62,7 @@ public final class Blocks {
     private static final java.util.Map<Block, Integer> META = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** 色別ブロックを白色版(1.7.10 の基準ブロック)へ正規化。非色ブロックはそのまま返す。 */
-    /**
-     * func_149716_u = Block.hasTileEntity。
-     * レシーバがバニラの Block でシムを挟めないため、スクリプト変換
-     * (PackScriptSource.remapVanillaOnlyMethods) がここへ回してくる。
-     */
+    /** func_149716_u = Block.hasTileEntity。 */
     public static boolean func_149716_u(Object block) {
         if (block instanceof net.minecraft.world.level.block.EntityBlock) {
             return true;
@@ -101,11 +88,7 @@ public final class Blocks {
         return m;
     }
 
-    /**
-     * 1.7.10 の (block, meta) を 1.21 の BlockState へ解決する。
-     * 色付きブロック (1.7.10 は 1 ブロック + メタ 16 色) は色別ブロックへ読み替える。
-     * スクリプトの getIcon(side, meta) と setBlock(..., meta, ...) の両方から使う。
-     */
+    /** 1.7.10 の (block, meta) を 1.21 の BlockState へ解決する。 */
     public static net.minecraft.world.level.block.state.BlockState stateFor(Block block, int meta) {
         if (block == null) {
             return net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();

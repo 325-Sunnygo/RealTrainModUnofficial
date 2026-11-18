@@ -2,11 +2,7 @@ package jp.ngt.mccompat.tileentity;
 
 import net.minecraft.world.level.block.entity.CommandBlockEntity;
 
-/**
- * 1.7.10 net.minecraft.tileentity.TileEntityCommandBlock のスクリプト互換ラッパー。
- * 列車検知器 (hi03TrainDetector 等) のサーバースクリプトは、自分の真下を掘って
- * コマンドブロックを探し、そのコマンド文字列を設定ファイルとして読む:
- */
+/** 1.7.10 net.minecraft.tileentity.TileEntityCommand… */
 @SuppressWarnings("unused")
 public final class TileEntityCommandBlock {
 

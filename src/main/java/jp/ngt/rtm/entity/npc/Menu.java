@@ -10,10 +10,7 @@ import net.minecraft.world.item.Items;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 商売メニュー。本家 {@code Menu} の移植 (NBT 文字列 {list:[{item,price}...]})。
- * 空のときは本家と同じ既定メニュー (クッキー/焼き鮭)。
- */
+/** 商売メニュー。本家 Menu の移植 (NBT 文字列 {list:[{item,price}..… */
 public class Menu {
     private final List<MenuEntry> menuList = new ArrayList<>();
 
@@ -63,7 +60,7 @@ public class Menu {
                 e.printStackTrace();
             }
         }
-        //本家の既定メニュー
+        // 本家の既定メニュー
         if (role == EntityNPC.Role.SALESPERSON) {
             this.add(new MenuEntry(new ItemStack(Items.COOKIE, 10), 200));
             this.add(new MenuEntry(new ItemStack(Items.COOKED_SALMON, 5), 500));

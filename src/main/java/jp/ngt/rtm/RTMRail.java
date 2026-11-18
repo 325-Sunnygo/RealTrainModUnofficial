@@ -3,10 +3,7 @@ package jp.ngt.rtm;
 import jp.ngt.rtm.rail.RTMRailBlocks;
 import net.minecraft.world.level.block.Block;
 
-/**
- * 本家 jp.ngt.rtm.RTMRail のスクリプト互換 (SRB3 等がレール生成に使用)。
- * フィールド名は KaizPatchX (1.7.10) の "0" 付き。
- */
+/** 本家 jp.ngt.rtm.RTMRail のスクリプト互換 (SRB3 等がレール生成に使用)。 */
 @SuppressWarnings("unused")
 public final class RTMRail {
     private RTMRail() {

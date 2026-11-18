@@ -16,7 +16,8 @@ public final class LegacyFastIncludeRegression {
         check("undefined,,7".equals(engine.get("result")),"included vars and function bodies are hoisted in their original function scope");
         String guarded="var RTMX_COMPAT_TARGETS={};function RTMX_loadCompatTarget_fixture(){};var count=0;function run(){\n//include <child.js>\nreturn included();}\n//include <child.js>\n//include <child.js>\n//include <child.js>\nvar result=run();";
         var fast=LegacyExecutionIncludes.prepare(guarded,"generated.js",files::get,"");
-        check(fast.binding()!=null&&fast.source().length()<2000,"guarded target graph compiles without repeated module bodies");
+        // KaizPatchX と同じく、include は本文へ展開する (分割 eval はしない)。
+        check(fast.binding()==null,"includes are expanded textually");
         var compiled=ScriptUtil.createEngine();fast.bind(compiled);compiled.eval(fast.source());
         check(((Number)compiled.get("count")).intValue()==4&&((Number)compiled.get("result")).intValue()==7,"repeated modules execute in the current function scope");
         var strict=LegacyExecutionIncludes.prepare("'use strict';\n"+guarded,"strict.js",files::get,"");

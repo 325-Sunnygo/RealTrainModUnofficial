@@ -25,11 +25,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.List;
 
 public class WireItem extends Item implements ModelSelectableItem {
-    /**
-     * 本家 KaizPatchX の customIconTexture 用の描画器。
-     * 実際に使われるのは、選択中のモデルが customIconTexture を持つときだけ
-     * (com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel が判定する)。
-     */
+    /** 本家 KaizPatchX の customIconTexture 用の描画器。 */
     @Override
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
@@ -102,9 +98,7 @@ public class WireItem extends Item implements ModelSelectableItem {
                 tag.putInt("Y", clickedPos.getY());
                 tag.putInt("Z", clickedPos.getZ());
                 stack.set(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get(), tag);
-                // ★本家 TileEntityElectricalWiring.onRightClick: 接続待ちの状態はタイル側に持ち、
-                //   TO_PLAYER 接続でプレイヤーの手元へ仮ワイヤーを描く。RTMU はアイテム側に
-                //   持つだけだったので仮ワイヤーが出なかった。
+                // ★本家 TileEntityElectricalWiring.onRightClick: 接続待ち…
                 if (level.getBlockEntity(clickedPos) instanceof InstalledObjectBlockEntity startBe) {
                     startBe.setConnectionTo(player.getId(), -1, 0,
                         jp.ngt.rtm.electric.Connection.ConnectionType.TO_PLAYER, definition.getId());
@@ -125,8 +119,6 @@ public class WireItem extends Item implements ModelSelectableItem {
         }
 
         // 本家 ItemWire: 2 回目にクリックした碍子へ接続を張る (そちらが root)。
-        // 中間ブロックは置かない。ワイヤーモデルは接続 (Connection) が持ち、
-        // 碍子はそのまま残る (NGTO Builder2 のビーム設置と同じ形)。
         if (level.getBlockEntity(clickedPos) instanceof InstalledObjectBlockEntity targetBe) {
             if (!level.isClientSide) {
                 // 始点に残した仮ワイヤー (TO_PLAYER) を消してから本接続を張る。
@@ -142,8 +134,7 @@ public class WireItem extends Item implements ModelSelectableItem {
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
 
-        // 設置物以外 (信号変換器など) は従来の中間ブロック式のまま。
-        // 先に始点の仮ワイヤーを消しておく。
+        // 設置物以外 (信号変換器など) は従来の中間ブロック式のまま。 先に始点の仮ワイヤーを消しておく。
         if (!level.isClientSide) {
             clearPendingWire(level, startPos, player);
         }
@@ -199,11 +190,87 @@ public class WireItem extends Item implements ModelSelectableItem {
             .toList();
     }
 
-    // --- NGTO Builder の Wire ツール互換 (本家 ItemWithModel の API 名で選択モデルを返す) ---
-    // 注意: スクリプトは実 ItemStack ではなく jp.ngt.mccompat.ItemStackCompat (ラッパー) を渡すため、
-    // 引数は Object で受けて unwrap する (ItemStack 型で受けると ClassCastException になる)。
+    // --- NGTO Builder の Wire ツール互換 (本家 ItemWithModel の…
 
-    /** 手持ちワイヤーの選択モデル ID。スクリプトが setConnectionTo の modelName に使う。 */
+    /** 本家 TileEntityElectricalWiring.onRightClick: 配線エンテ… */
+    public static InteractionResult handleEntityConnection(
+            Level level, Player player, ItemStack stack,
+            jp.ngt.rtm.entity.EntityElectricalWiring node) {
+        if (level == null || player == null || stack == null || node == null) {
+            return InteractionResult.PASS;
+        }
+        String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge
+                .getSelectedModelId(stack);
+        InstalledObjectDefinition definition = InstalledObjectRegistry.getById(selectedId);
+        if (definition == null || definition.getCategory() != InstalledObjectCategory.WIRE) {
+            if (level.isClientSide) {
+                ClientHooks.openInstalledObjectSelectScreen(player, stack, InstalledObjectCategory.WIRE);
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        CompoundTag startTag = stack.get(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get());
+        BlockPos nodePos = node.blockPosition();
+        if (startTag == null || !startTag.contains("X")) {
+            if (!level.isClientSide) {
+                CompoundTag tag = new CompoundTag();
+                tag.putInt("X", nodePos.getX());
+                tag.putInt("Y", nodePos.getY());
+                tag.putInt("Z", nodePos.getZ());
+                stack.set(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get(), tag);
+                // 本家 TO_PLAYER: プレイヤーの手元へ仮ワイヤーを描く。
+                node.setConnectionTo(player.getId(), -1, 0,
+                        jp.ngt.rtm.electric.Connection.ConnectionType.TO_PLAYER, definition.getId());
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        BlockPos startPos = new BlockPos(startTag.getInt("X"), startTag.getInt("Y"), startTag.getInt("Z"));
+        if (startPos.equals(nodePos)) {
+            if (!level.isClientSide) {
+                clearEntityPreview(level, player, startPos);
+                stack.remove(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get());
+            }
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        if (!level.isClientSide) {
+            clearEntityPreview(level, player, startPos);
+            net.minecraft.world.level.block.entity.BlockEntity startBe = level.getBlockEntity(startPos);
+            jp.ngt.rtm.entity.EntityElectricalWiring startEntity =
+                    jp.ngt.rtm.entity.EntityElectricalWiring.find(level, startPos);
+            if (startBe instanceof InstalledObjectBlockEntity io) {
+                io.setConnectionTo(nodePos.getX(), nodePos.getY(), nodePos.getZ(),
+                        jp.ngt.rtm.electric.Connection.ConnectionType.WIRE, definition.getId());
+            } else if (startEntity != null) {
+                startEntity.setConnectionTo(nodePos.getX(), nodePos.getY(), nodePos.getZ(),
+                        jp.ngt.rtm.electric.Connection.ConnectionType.TO_ENTITY, definition.getId());
+            } else {
+                return InteractionResult.FAIL;
+            }
+            stack.remove(RealTrainModUnofficialComponents.WIRE_PLACEMENT_START.get());
+            if (!player.getAbilities().instabuild) {
+                stack.shrink(1);
+            }
+        }
+        return InteractionResult.sidedSuccess(level.isClientSide);
+    }
+
+    private static void clearEntityPreview(Level level, Player player, BlockPos startPos) {
+        if (level.getBlockEntity(startPos) instanceof InstalledObjectBlockEntity io) {
+            io.setConnectionTo(player.getId(), -1, 0,
+                    jp.ngt.rtm.electric.Connection.ConnectionType.NONE, "");
+            return;
+        }
+        jp.ngt.rtm.entity.EntityElectricalWiring start =
+                jp.ngt.rtm.entity.EntityElectricalWiring.find(level, startPos);
+        if (start != null) {
+            start.setConnectionTo(player.getId(), -1, 0,
+                    jp.ngt.rtm.electric.Connection.ConnectionType.NONE, "");
+        }
+    }
+
+    /** 手持ちワイヤーの選択モデル ID。スクリプトが setConnectionTo の modelNa… */
     public String getModelName(Object stackLike) {
         ItemStack stack = jp.ngt.mccompat.ItemStackCompat.unwrap(stackLike);
         if (stack == null) {
@@ -213,7 +280,7 @@ public class WireItem extends Item implements ModelSelectableItem {
         return id == null ? "" : id;
     }
 
-    /** 選択モデルの状態。スクリプトは .type.subType を読み、setConnectionTo にも渡す。 */
+    /** 選択モデルの状態。スクリプトは .type.subType を読み、setConnectionTo… */
     public WireModelState getModelState(Object stackLike) {
         return new WireModelState(getModelName(stackLike));
     }
@@ -223,7 +290,7 @@ public class WireItem extends Item implements ModelSelectableItem {
         return getModelName(stackLike);
     }
 
-    /** 本家 ResourceState の .type.subType を Nashorn から読めるようにする最小互換。 */
+    /** 本家 ResourceState の .type.subType を Nashorn から読めるよ… */
     public static final class WireModelState {
         public final String modelId;
         public final WireModelType type;

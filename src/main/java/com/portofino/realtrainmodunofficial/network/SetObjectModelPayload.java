@@ -12,10 +12,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 設置済みの設置物のモデル/テクスチャを差し替える。
- * 本家 guiIdSelectTileEntityTexture (標識を素手で右クリック → テクスチャ選択) 用。
- */
+/** 設置済みの設置物のモデル/テクスチャを差し替える。 */
 public record SetObjectModelPayload(BlockPos pos, String definitionId) implements CustomPacketPayload {
 
     public static final Type<SetObjectModelPayload> TYPE = new Type<>(

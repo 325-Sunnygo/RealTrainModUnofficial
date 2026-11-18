@@ -5,16 +5,7 @@ import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCateg
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 
-/**
- * 足場の接続判定。本家 {@code jp.ngt.rtm.block.BlockScaffold} のうち、
- * <b>描画スクリプトから呼ばれる静的メソッドだけ</b>を移植したもの。
- *
- * <p>本家の {@code RenderScaffold.js} は
- * {@code BlockScaffold.getConnectionType(world, x, y, z, dir)} を直に呼ぶ。
- * ★このクラスが無いとスクリプトが例外で止まり、<b>手すりが 4 方向とも描かれる</b>。
- *
- * <p>足場ブロックそのものは RTMU では設置物 ({@code InstalledObjectBlock}) が兼ねている。
- */
+/** 足場の接続判定。本家 jp.ngt.rtm.block.BlockScaffold のうち、 描画… */
 public final class BlockScaffold {
 
     public static byte getConnectionType(BlockGetter level, int x, int y, int z, Object tile) {
@@ -52,7 +43,7 @@ public final class BlockScaffold {
         if (category == InstalledObjectCategory.STAIR) {
             return stairFlag(level, pos, dir);
         }
-        //本家は「1 つ下が階段」も見る (階段の上り口)
+        // 本家は「1 つ下が階段」も見る (階段の上り口)
         if (categoryAt(level, pos.below()) == InstalledObjectCategory.STAIR) {
             return stairFlag(level, pos.below(), dir);
         }
@@ -61,10 +52,7 @@ public final class BlockScaffold {
 
     private static byte stairFlag(BlockGetter level, BlockPos pos, int dir) {
         int d2 = dirAt(level, pos);
-        // 本家 BlockScaffold.getConnectionType(world,x,y,z,byte dir):
-        //   b0 = dir == 1 ? (stairsDir == 2 || stairsDir == 0) : (stairsDir == 1 || stairsDir == 3)
-        // ★以前は {1,3} / {0,2} と反転していたため、RenderScaffold.js が出す手すりと
-        //   当たり判定が食い違い、見えない壁に阻まれていた。
+        // 本家 BlockScaffold.getConnectionType(world,x,y,z,by…
         boolean flag = dir == 1 ? (d2 == 0 || d2 == 2) : (d2 == 1 || d2 == 3);
         return (byte) (flag ? 3 : 0);
     }
@@ -73,10 +61,7 @@ public final class BlockScaffold {
         return level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be ? be.getCategory() : null;
     }
 
-    /**
-     * ★向きは必ず {@code InstalledObjectBlockEntity.getDir()} から取る。
-     * 描画スクリプトも {@code entity.getDir()} を使うので、当たり判定と食い違わせない。
-     */
+    /** ★向きは必ず InstalledObjectBlockEntity.getDir() から取る。 */
     public static int dirAt(BlockGetter level, BlockPos pos) {
         return level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be ? be.getDir() : 0;
     }

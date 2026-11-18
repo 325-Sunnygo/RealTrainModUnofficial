@@ -24,10 +24,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.Base64;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.EntityTrainBase (KaizPatchX) の忠実移植 (物理コア)。
- * updateSpeed / updateRoll / applyPhysicalEffect / TrainState 16byte 同期 / Formation 連携は本家のまま。
- */
+/** 本家 jp.ngt.rtm.entity.train.EntityTrainBase (KaizP… */
 public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     private static final EntityDataAccessor<Integer> DATA_BOGIE0 =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.INT);
@@ -41,52 +38,35 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<String> DATA_MODEL_NAME =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.STRING);
-    /** 本家 PacketVehicleMovement (setRollAndSpeed) 代替: 振子ロールの同期 */
+    /** 本家 PacketVehicleMovement (setRollAndSpeed) 代替: 振子… */
     private static final EntityDataAccessor<Float> DATA_ROLL =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.FLOAT);
-    /**
-     * 本家 PacketVehicleMovement 代替: ヨー/ピッチの float 同期。
-     * バニラのエンティティ回転パケットはバイト量子化 (約1.4°刻み) のため、
-     * カーブで曲がり方が段階的に見える — float で送って滑らかにする。
-     */
+    /** 本家 PacketVehicleMovement 代替: ヨー/ピッチの float 同期。 */
     private static final EntityDataAccessor<Float> DATA_YAW =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_PITCH =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.FLOAT);
-    /**
-     * 客席 (slotPos): 列車に直接乗せて座席オフセットで配置する方式。
-     * EntityFloor に乗せる旧方式は視点固定バグの温床だったため作り直し。
-     */
+    /** 客席 (slotPos): 列車に直接乗せて座席オフセットで配置する方式。 */
     private static final EntityDataAccessor<String> DATA_SEATS =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.STRING);
-    /**
-     * 編成 (Formation) のクライアント同期。本家 PacketFormation 相当。
-     * 本家 Formation.sendPacket は編成をクライアントへ送るが、移植では no-op のままで、
-     * クライアント側の getFormation が常に null だった。
-     */
+    /** 編成 (Formation) のクライアント同期。本家 PacketFormation 相当。 */
     private static final EntityDataAccessor<String> DATA_FORMATION =
             SynchedEntityData.defineId(EntityTrainBase.class, EntityDataSerializers.STRING);
 
     public static final short MAX_AIR_COUNT = 2880;
     public static final short MIN_AIR_COUNT = 2480;
     public static final float TRAIN_WIDTH = 2.75F;
-    public static final float TRAIN_HEIGHT = 1.25F - 0.0625F;//レールに合わせ高さ修正
-    /**
-     * 客席 (slotPos) を持たない車両だけで使う、車内床の Y オフセットの控え。
-     * 通常は {@link #getInteriorFloorY()} が slotPos から床を出すので使われない。
-     */
+    public static final float TRAIN_HEIGHT = 1.25F - 0.0625F;// レールに合わせ高さ修正
+    /** 客席 (slotPos) を持たない車両だけで使う、車内床の Y オフセットの控え。 */
     public static final double INTERIOR_FLOOR_OFFSET = -0.875D;
-    /** 運転席の座り高さ補正。JSON playerPos_Y に足すオフセット。「高すぎる」指摘で JSON より少し下げる (負値)。 */
+    /** 運転席の座り高さ補正。JSON playerPos_Y に足すオフセット。 */
     public static final double DRIVER_SEAT_Y_OFFSET = -0.2D;
 
     public BogieController bogieController = new BogieController();
     private Formation formation;
 
     private float trainSpeed;
-    /**
-     * 実際に車体へ効かせている加減速度 (tick 毎)。目標加速度へ上限ジャークで漸近させ、
-     * 力行/制動の突き上げ (急発進・急ブレーキ) を無くして実車のような立ち上がりにする。
-     */
+    /** 実際に車体へ効かせている加減速度 (tick 毎)。 */
     private float appliedAccel;
     /** 制動の加加速度上限 (tick 毎の加速度変化量)。小さいほどブレーキがじんわり効く。 */
     private static final float BRAKE_JERK = 0.00018F;
@@ -105,14 +85,11 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         super(type, level);
     }
 
-    /** TrainConfig の供給。暫定: VehicleDefinition アダプタ (Phase 4 で ModelSet 直結)。 */
+    /** TrainConfig の供給。暫定: VehicleDefinition アダプタ (Phase… */
     @Override
     public TrainConfig getConfig() {
         if (this.configCache == null) {
-            //★速度性能は<b>パックの JSON</b> (KaizPatchX TrainConfig の maxSpeed /
-            //  accelerateion / accelerateions / deccelerations) だけで決まる。
-            //  以前は運転席 GUI で 1 両ずつ決める作りで DataMap の値を被せていたが、
-            //  「本家 RTM で出る速度にする」ため撤去した (旧ワールドの設定値も無視する)。
+            // ★速度性能はパックの JSON (KaizPatchX TrainConfig の maxSpee…
             this.configCache = jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.get(this.getModelName());
         }
         return this.configCache;
@@ -127,21 +104,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return this.getModelName();
     }
 
-    /**
-     * 本家 getModelSet 互換 (スクリプトが getConfig を参照)。
-     * TODO(Phase 4): ModelSetTrainClient の本実装。
-     */
-    public jp.ngt.rtm.modelpack.modelset.ModelSetCompat getModelSet() {
-        jp.ngt.rtm.modelpack.modelset.ModelSetCompat set =
-                new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(this.getConfig());
-        set.serverSE = this.getServerScriptEngine();
-        return set;
+    /** 本家 getModelSet 互換 (スクリプトが getConfig を参照)。 */
+    public jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getModelSet() {
+        return jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getTrainModelSet(this.getModelName());
     }
 
-    /**
-     * 本家 ModelSetBase.serverSE 相当。サーバースクリプト (Server_*.js) の engine。
-     * 未ロード / クライアント側では null。TrainSpeedManager の可変加減速フックが使う。
-     */
+    /** 本家 ModelSetBase.serverSE 相当。 */
     private com.portofino.realtrainmodunofficial.script.SoundScriptExecutor legacySoundUpdater;
 
     @net.neoforged.api.distmarker.OnlyIn(net.neoforged.api.distmarker.Dist.CLIENT)
@@ -152,29 +120,13 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     }
 
     public javax.script.ScriptEngine getServerScriptEngine() {
-        // ★本家 ModelSetBase.serverSE 相当: エンジンは「モデルセット (定義) ごとに 1 個」で
-        //   全インスタンスが共有する。RTMU は以前エンティティごとに別エンジンを作っていた。
-        if (this.level().isClientSide()) {
-            return null;
-        }
-        com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry entry = this.serverScriptEntry();
-        return entry == null ? null : entry.engine();
+        // 本家 ModelSetBase.serverSE 相当。モデルセットは定義ごとに 1 個。
+        return this.getModelSet().serverSE;
     }
 
-    /** この車両のモデル定義に対応する共有サーバースクリプト (無ければ null)。 */
-    private com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry serverScriptEntry() {
-        com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
-                com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
-        return com.portofino.realtrainmodunofficial.script.CarServerScripts.get(def);
-    }
-
-    /**
-     * スクリプト entity.getResourceState.getResourceSet.getConfig を
-     * entity.getModelSet.getConfig と等価にする。新しめのパック 等) は前者で
-     * 設定を読むため、これが無いと描画/サーバースクリプトが TypeError で中断する。
-     */
+    /** スクリプト entity.getResourceState.getResourceSet.getC… */
     @Override
-    protected jp.ngt.rtm.modelpack.modelset.ModelSetCompat getResourceSetForScript() {
+    protected jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getResourceSetForScript() {
         return this.getModelSet();
     }
 
@@ -193,8 +145,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return 1.0F;
     }
 
-    // クライアント側ドア開閉音 (sound_DoorOpen/sound_DoorClose) の状態変化検出用。
-    // 209/125 系等の多くのパックはサウンドスクリプトでドア音を鳴らさず、この JSON 設定に頼る。
+    // クライアント側ドア開閉音 (sound_DoorOpen/sound_DoorClose) の状態…
     private int prevDoorStateForSound;
     private boolean doorSoundStateInitialized;
 
@@ -210,8 +161,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             ++this.seatRotation;
         }
 
-        // 幕回し (方向幕スクロール): 目標フレーム = 行先 index、そこへ rollsignAnimation を毎 tick ±1 で寄せる。
-        // 本家 EntityTrainBase.onUpdate 準拠。描画側 (doAnimation=true のパネル) が getRollsignAnimation を読む。
+        // 幕回し (方向幕スクロール): 目標フレーム = 行先 index、そこへ rollsignAni…
         this.setRollsignAnimation(this.getTrainStateData(TrainStateType.State_Destination.id));
         if (this.rollsignAnimation > this.rollsignV) {
             --this.rollsignAnimation;
@@ -239,9 +189,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             --this.doorMoveL;
         }
 
-        // クライアント側: ドア状態 (State_Door, bit0=右/bit1=左) の変化を検出して開閉音を鳴らす。
-        // 本家 RTM 同様、サウンドスクリプトを持たない/ドア音を扱わないパック (209/125 系等) でも
-        // JSON の sound_DoorOpen/sound_DoorClose が鳴るようにする。初回は状態記録のみ (スポーン時無音)。
+        // クライアント側: ドア状態 (State_Door, bit0=右/bit1=左) の変化を検出し…
         if (this.level().isClientSide()) {
             if (!this.doorSoundStateInitialized) {
                 this.prevDoorStateForSound = doorState;
@@ -249,13 +197,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             } else if (doorState != this.prevDoorStateForSound) {
                 int prev = this.prevDoorStateForSound;
                 this.prevDoorStateForSound = doorState;
-                boolean opened = (doorState & ~prev & 3) != 0; //新たに開いた側
-                boolean closed = (~doorState & prev & 3) != 0; //新たに閉じた側
+                boolean opened = (doorState & ~prev & 3) != 0; // 新たに開いた側
+                boolean closed = (~doorState & prev & 3) != 0; // 新たに閉じた側
                 com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
                         com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
                 if (def != null) {
-                    // ドア開閉は離散イベント音: 登録制ラッチを通すと 2 回目以降が鳴らなくなるため
-                    // bypass=true で毎回そのまま鳴らす (状態変化時にしか呼ばれない)
+                    // ドア開閉は離散イベント音: 登録制ラッチを通すと 2 回目以降が鳴らなくなるため bypass=t…
                     if (opened && !def.getSoundDoorOpen().isBlank()) {
                         com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
                                 .playLegacyId(this, def.getSoundDoorOpen(), 1.0F, 1.0F, false, true);
@@ -294,10 +241,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
     private static final int[] PANTO_POS_ZERO = new int[]{0, 0};
 
-    /**
-     * 本家 getPantographMaxHeight: 各パンタが上がれる高さ (0=全上昇)。
-     * pantoPos は {x, z, 上限y, 下限y}。
-     */
+    /** 本家 getPantographMaxHeight: 各パンタが上がれる高さ (0=全上昇)。 */
     protected int[] getPantographMaxHeight() {
         TrainConfig config = this.getConfig();
         if (config == null || config.pantoPos == null) {
@@ -320,10 +264,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return ia;
     }
 
-    /**
-     * 本家 updateATS: ATS 確認をしないまま 100tick 経つと非常停止する。
-     * atsCount は信号現示で 1 から立ち上がり、確認操作で 0 に戻る。
-     */
+    /** 本家 updateATS: ATS 確認をしないまま 100tick 経つと非常停止する。 */
     protected void updateATS() {
         if (this.atsCount > 0) {
             ++this.atsCount;
@@ -334,10 +275,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
-    /**
-     * 本家 spawnSmoke: SL 等の煙を出す (クライアント側のみ)。
-     * config.smoke は 1 個あたり {x, y, z, 粒子名, 停車時の量, 走行時の量, [初速]}。
-     */
+    /** 本家 spawnSmoke: SL 等の煙を出す (クライアント側のみ)。 */
     protected void spawnSmoke() {
         TrainConfig config = this.getConfig();
         if (config == null || config.smoke == null || !this.level().isClientSide()) {
@@ -379,7 +317,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return o instanceof Number n ? n.doubleValue() : 0.0D;
     }
 
-    /** 1.7.10 の粒子名 ("largesmoke" 等) を 1.21 の ParticleOptions へ。 */
+    /** 1.7.10 の粒子名 ("largesmoke" 等) を 1.21 の ParticleOpt… */
     private static net.minecraft.core.particles.ParticleOptions resolveParticle(Object name) {
         String s = name == null ? "" : String.valueOf(name).toLowerCase(java.util.Locale.ROOT);
         return switch (s) {
@@ -401,8 +339,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
-    // ---- 運転席GUI (ドアタブ) で設定する速度性能 ----
-    // JSON からは読まなくなったので、車両ごとの設定はここに持つ。
+    // ---- 運転席GUI (ドアタブ) で設定する速度性能 ---- JSON からは読まなくなった…
 
     public void setModelName(String name) {
         this.entityData.set(DATA_MODEL_NAME, name == null ? "" : name);
@@ -410,8 +347,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     }
 
     public void spawnTrain(Level world) {
-        // DATA_YAW/PITCH の初期値を実姿勢に (デフォルト 0 のまま初期同期されると
-        // クライアントが一瞬ヨー 0 にスナップしてから回転して見える)
+        // DATA_YAW/PITCH の初期値を実姿勢に (デフォルト 0 のまま初期同期されると クライ…
         if (!world.isClientSide) {
             this.entityData.set(DATA_YAW, this.getYRot());
             this.entityData.set(DATA_PITCH, this.getXRot());
@@ -422,9 +358,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.bogieController.spawnBogies(world, this);
         world.addFreshEntity(this);
         this.formation = FormationManager.getInstance(world.isClientSide).createNewFormation(this);
-        // カーブ上スポーン対策: setupBogiePos は直線配置 (弦) のため、カーブでは
-        // 台車が線路から浮いて脱線して見える。forceMove でレール吸着を 1 回実行し、
-        // 台車をレールへ、車体を台車間へ整列させる (走り出しと同じ経路)。
+        // カーブ上スポーン対策: setupBogiePos は直線配置 (弦) のため、カーブでは 台車が…
         if (!world.isClientSide) {
             this.bogieController.moveTrainWithBogie(this, null, 0.0F, true);
         }
@@ -522,9 +456,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
-    // ---- サウンド (クライアント側) ----
-    // 列車アイテムが出すのはこのクラス (本家系) だが、サウンド一式は旧 TrainEntity 側にしか
-    // 実装されていなかったため、リリース版では走行音が一切鳴らなくなっていた。
+    // ---- サウンド (クライアント側) ---- 列車アイテムが出すのはこのクラス (本家系) だ…
 
     /** 車両パックのサウンドスクリプト (sound_*.js)。クライアント専用。 */
     private javax.script.ScriptEngine soundScriptEngine;
@@ -542,25 +474,18 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             // 立ち乗り: 床に立つローカルプレイヤーを車両の移動・旋回に追従させる (動く床)。
             com.portofino.realtrainmodunofficial.client.StandingRideClient.tick(this);
             // ★クライアントのスクリプトが flag=1 で書いた値をサーバーへ送る。
-            // 本家の DataMap は双方向だが RTMU は server→client しか無かったため、
-            // 描画スクリプトが操作を受けてサーバースクリプトが実処理するパック
-            // (NGTO Builder の Enter 敷設など) が一切動かなかった。
             this.syncDataMapToServer();
         } else {
             // DataMap を書き換えるサーバースクリプトを先に回してから同期する。
             this.tickServerScript();
-            // ATS 基礎: 車両の下にあるレールの signal を State_Signal に拾う (本家 updateBlockCollisionState 相当)。
+            // ATS 基礎: 車両の下にあるレールの signal を State_Signal に拾う (本家…
             this.updateRailSignalPickup();
             this.syncFormationData();
             this.syncDataMap();
         }
     }
 
-    /**
-     * ATS 基礎 (Phase 1): 車両直下のレール (jp.ngt.rtm.rail.TileEntityLargeRailCore) の
-     * signal を読み、#setSignal で自車 (=編成) の State_Signal に反映する。
-     * これで ATC 地上子がレールに書いた信号を、通過した列車が拾えるようになる。
-     */
+    /** ATS 基礎 (Phase 1): 車両直下のレール (jp.ngt.rtm.rail.TileE… */
     private void updateRailSignalPickup() {
         jp.ngt.rtm.rail.TileEntityLargeRailBase rail =
                 jp.ngt.rtm.rail.TileEntityLargeRailBase.getRailFromCoordinates(
@@ -573,27 +498,15 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
-    /**
-     * 本家 serverScriptPath (Server_*.js) を毎 tick 実行する。
-     * entity.getResourceState.getDataMap.setString("trainType", ...) のように DataMap を書き換え、
-     * 方向幕・種別・trainType 等を決める。
-     */
+    /** 本家 serverScriptPath (Server_*.js) を毎 tick 実行する。 */
     private void tickServerScript() {
-        // ★本家 EntityVehicleBase (サーバー側 tick): rider 更新のあと
-        //   executer.execScript(this) → updateBlockCollisionState → updateMovement の順で呼ぶ。
-        //   RTMU も共有エンジン経由で同じ経路に統一した (エンジンは定義ごとに 1 個)。
-        com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry entry = this.serverScriptEntry();
-        if (entry != null) {
-            entry.onUpdate(this);
-        }
+        // 本家 EntityVehicleBase (サーバー側 tick): executer.execS…
+        this.scriptExecuter.execScript(this);
     }
 
 
 
-    /**
-     * サーバー: DataMap の flag=1 書き込み (ATSA の HUD 情報等) をクライアントへ配信する。
-     * ★間隔を空けてはいけない。
-     */
+    /** サーバー: DataMap の flag=1 書き込み (ATSA の HUD 情報等) をクライ… */
     /** クライアント → サーバー。スクリプトが flag=1 で書いた値を持ち主の車両へ反映させる。 */
     private void syncDataMapToServer() {
         java.util.Map<String, Object> pending = this.getResourceState().getDataMap().drainPendingSync();
@@ -680,38 +593,15 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.formation = f;
     }
 
-    /**
-     * 走行音を鳴らす。サウンドスクリプトがある車両はそれを回し、無ければ
-     * 車両 JSON の running sound 定義 (速度で音量/ピッチを変えるだけの簡易版) で鳴らす。
-     */
+    /** 走行音を鳴らす。サウンドスクリプトがある車両はそれを回し、無ければ 車両 JSON の runni… */
     private void tickSound() {
-        if (!this.attemptedSoundScriptLoad) {
-            this.attemptedSoundScriptLoad = true;
-            com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
-                    com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
-            if (def != null && def.hasSoundScript()) {
-                this.soundScriptEngine =
-                        com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.loadSoundScriptForVehicle(def);
-            }
-        }
-
         // 軽量化: カメラから遠い (可聴距離外の) 列車はサウンド処理を毎tick回さない。
-        // 距離で毎tick Nashorn / 走行音 tick を回すのは無駄。
-        if (com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.beyondCameraRange(this, Math.max(96.0,jp.ngt.rtm.RTMConfig.trainRunningSoundRange))) {
+        if (com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.beyondCameraRange(
+                this, Math.max(96.0, jp.ngt.rtm.RTMConfig.trainRunningSoundRange))) {
             return;
         }
-
-        if (this.soundScriptEngine != null) {
-            // スクリプトが鳴らす音と JSON 定義の自動走行音が二重に鳴らないようにする
-            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.stopAutoRunningSound(this);
-            // サウンド管理は本家 SoundUpdaterVehicle 方式 (登録制)。playSound は
-            // 「登録済みなら音量/ピッチ更新のみ」なので前後処理は不要。
-            com.portofino.realtrainmodunofficial.script.TrainScriptSystem.invokeSoundScript(this.soundScriptEngine, this);
-        } else {
-            com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager.tickJsonRunningSound(this);
-        }
-        // 本家 SoundUpdaterTrain.update: ATS チャイム/ベル (制御車が signal=1 で走行中にループ)。
-        this.getSoundUpdater().updateAts();
+        // 本家 SoundUpdaterTrain.update: ATS + スクリプト onUpdate…
+        this.getSoundUpdater().update();
     }
 
     @Override
@@ -728,6 +618,11 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 ++this.brakeAirCount;
                 if (this.brakeAirCount >= MAX_AIR_COUNT) {
                     this.complessorActive = false;
+                    String cpFin = this.getModelSet().getConfig() instanceof TrainConfig cfg
+                            ? cfg.sound_CpFin : null;
+                    com.portofino.realtrainmodunofficial.client.sound.LegacyScriptSoundManager
+                            .playLegacyId(this, cpFin == null || cpFin.isBlank()
+                                    ? "rtm:train.cp_fin" : cpFin, 1.0F, 1.0F, false, true, 32.0F);
                 }
             } else if (this.brakeAirCount < MIN_AIR_COUNT) {
                 this.complessorActive = true;
@@ -745,7 +640,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
-    /** チャンクローダーの前回チャンク (ChunkPos.toLong)。Long.MIN_VALUE = 未登録 */
+    /** チャンクローダーの前回チャンク (ChunkPos.toLong)。 */
     private long chunkLoaderLastChunk = Long.MIN_VALUE;
 
     @Override
@@ -754,8 +649,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         if (!this.level().isClientSide) {
             this.entityData.set(DATA_YAW, this.getYRot());
             this.entityData.set(DATA_PITCH, this.getXRot());
-            // 本家 ChunkLoader (TrainState State_ChunkLoader): ON なら周囲チャンクを強制ロード。
-            // 軽量化: 10tick に 1 回だけチェック + 編成先頭車のみ (全車両分のチケットは張らない)。
+            // 本家 ChunkLoader (TrainState State_ChunkLoader): ON…
             if (this.tickCount % 10 == 0) {
                 boolean loaderOn = this.getTrainStateData(TrainState.TrainStateType.State_ChunkLoader.id) != 0
                         && this.formation != null && this.formation.isFrontCar(this);
@@ -765,9 +659,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
         this.setDeltaMovement(this.getDeltaMovement().scale(0.99D));
 
-        // 本家はピッチを無条件で毎tick水平へ減衰させるが、坂に停車した列車まで
-        // 水平になって片方が浮いてしまう。レールに乗っている間 (台車が RailMap を
-        // 保持) は勾配ピッチを維持し、脱線/落下時のみ減衰させる。
+        // 本家はピッチを無条件で毎tick水平へ減衰させるが、坂に停車した列車まで 水平になって片方が浮いて…
         boolean onRail = this.existBogies()
                 && ((this.getBogie(0) != null && this.getBogie(0).hasRailMap())
                     || (this.getBogie(1) != null && this.getBogie(1).hasRailMap()));
@@ -795,7 +687,16 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     public void updateRoll(float par1) {
         TrainConfig cfg = this.getConfig();
         float f0 = -cfg.rolling;
-        float pendulum = Mth.wrapDegrees((this.getYRot() - this.prevRotationYawVehicle) * f0);
+        // 本家 KaizPatchX と同じ振子計算。 ただし setPositionAndRotationDirect で yaw が
+        // 設定された直後 (スポーン/方向転換) に前tick差が 180° に入る問題があるため、
+        // 前tick差が大きい (90° 超 = テレポート/方向転換) 場合は振子を 0 扱い、
+        // prev を現在値へ合わせる。 通常走行中のカーブ (数度/tick) には影響しない。
+        float yawDelta = Mth.wrapDegrees(this.getYRot() - this.prevRotationYawVehicle);
+        if (Math.abs(yawDelta) > 90.0F) {
+            this.prevRotationYawVehicle = this.getYRot();
+            yawDelta = 0.0F;
+        }
+        float pendulum = yawDelta * f0;
         if (this.getTrainDirection() == 1) {
             pendulum *= -1.0F;
         }
@@ -804,15 +705,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         float sw = (NGTMath.getSin(this.wave) + NGTMath.getSin(this.wave * cfg.rollVariationCoefficient)) * 0.5F;
         this.rotationRoll = roll + sw * cfg.rollWidthCoefficient;
         if (!this.level().isClientSide) {
-            // 本家 PacketVehicleMovement 代替: クライアントは vehicleRoll へ補間
+            // 本家 PacketVehicleMovement 代替: クライアントは vehicleRoll…
             this.entityData.set(DATA_ROLL, this.rotationRoll);
         }
     }
 
-    /**
-     * 残ブレーキ量の割合 (0.0 = 完全に緩解, 1.0 = 最大ブレーキ)。
-     * brakeCount は「ブレーキノッチ × 18」で溜まり、緩解時は 1tick に 2 ずつ抜ける。
-     */
+    /** 残ブレーキ量の割合 (0.0 = 完全に緩解, 1.0 = 最大ブレーキ)。 */
     public float getBrakeRatio() {
         int maxBrakeCount = (this.getConfig().deccelerations.length - 1) * 18;
         if (maxBrakeCount <= 0) {
@@ -827,9 +725,6 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
         float speed = this.trainSpeed;
         // 停車中に残っているブレーキ (brakeCount) が加速をどれだけ殺すか。1.0=緩解済み。
-        // 本家は「緩解し切るまで加速を一切計算しない (isBrakeDisabled=false)」ため、
-        // B8 から発進すると 144/2 = 72tick (約3.6秒) 完全に無反応 → 抜けた瞬間フル加速、
-        // という不自然な挙動になっていた。
         float brakeReleaseFactor = 1.0F;
 
         // ブレーキ処理, 全ての車両で
@@ -868,8 +763,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                     targetAccel *= -1;
                 }
 
-                // 現実的な加減速: 目標加速度へ上限ジャークで漸近させる。ノッチを入れた瞬間に
-                // フル制動/フル力行がかかる突き上げを無くし、実車のようにじんわり立ち上げる。
+                // 現実的な加減速: 目標加速度へ上限ジャークで漸近させる。
                 float maxJerk = notch < 0 ? BRAKE_JERK : POWER_JERK;
                 this.appliedAccel += Mth.clamp(targetAccel - this.appliedAccel, -maxJerk, maxJerk);
                 float prevSpeed = speed;
@@ -881,13 +775,13 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                     this.appliedAccel = 0.0F;
                 }
 
-                if (notch >= 0)//ブレーキ解
+                if (notch >= 0)// ブレーキ解
                 {
                     float deceleration;
                     if (this.getXRot() == 0.0F) {
                         float f1 = -cfg.deccelerations[0];
                         deceleration = speed > 0.0F ? f1 : (speed < 0.0F ? -f1 : 0.0F);
-                    } else//坂
+                    } else// 坂
                     {
                         float dec = 0.0125F;
                         float f2 = (this.getTrainDirection() == 0) ? dec : -dec;
@@ -932,15 +826,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return false;
     }
 
-    /** 客席への着席 (Server Only)。座席オフセット (slotPos) で列車本体に直接乗せる。 */
+    /** 客席への着席 (Server Only)。 */
     public boolean mountToSeat(Player player, float[] partPos) {
         return this.mountEntityToSeat(player, partPos);
     }
 
-    /**
-     * 任意のエンティティを客席に着席させる (Server Only)。
-     * (乗客 NPC) が座席へ座らせるために公開する。
-     */
+    /** 任意のエンティティを客席に着席させる (Server Only)。 */
     public boolean mountEntityToSeat(net.minecraft.world.entity.Entity entity, float[] partPos) {
         if (this.level().isClientSide || this.isSeatOccupied(partPos) || this.hasPassenger(entity)) {
             return false;
@@ -1010,22 +901,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
-    /**
-     * 立ち乗り・乗客が立つ車内床の Y (ワールド)。
-     *
-     * <p>★<b>客席 (slotPos) の高さをそのまま床にする。</b>
-     * {@link #positionRider} が座らせる位置は「slotPos の Y + 0.15」なので、
-     * slotPos の Y は<b>椅子の座面ではなく椅子の下＝車内の床</b>を指している
-     * (旧 EntityFloor をそこへ置き、その 0.15 上に座らせていた名残)。
-     * だから立ち乗りはここに立たせれば、座っている人よりわずかに低い正しい高さになる。
-     *
-     * <p>slotPos は車両ごとに違うので、これで<b>車両ごとの床の高さの違いが自動で合う</b>。
-     * 以前は {@link #INTERIOR_FLOOR_OFFSET} の一律値だったため、車両によって
-     * 床から浮いたりめり込んだりしていた。slotPos を持たない車両だけ従来の一律値に戻る。
-     *
-     * <p>2 階建て等で床が複数あるときは一番低い床。段ごとに選びたい側は
-     * {@link #getInteriorFloorLevels()} を使う。
-     */
+    /** 立ち乗り・乗客が立つ車内床の Y (ワールド)。 */
     public double getInteriorFloorY() {
         double[] levels = this.getInteriorFloorLevels();
         if (levels.length > 0) {
@@ -1034,10 +910,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return this.getY() + TRAIN_HEIGHT + INTERIOR_FLOOR_OFFSET;
     }
 
-    /**
-     * 車内の床の高さ (車体ローカル Y) を低い順に。客席 (slotPos) の Y を重複無しで集めたもの。
-     * 2 階建てなら 2 段返る。slotPos が無ければ空。
-     */
+    /** 車内の床の高さ (車体ローカル Y) を低い順に。 */
     public double[] getInteriorFloorLevels() {
         TrainConfig cfg = this.getConfig();
         float[][] slots = cfg == null ? null : cfg.getSlotPos();
@@ -1064,10 +937,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
 
     private static final double[] EMPTY_FLOOR_LEVELS = new double[0];
 
-    /**
-     * 車体ローカル座標 (x=幅, y=高, z=長) をワールド座標へ変換する。
-     * #positionRider の座席変換と同一 (roll→pitch→yaw)。
-     */
+    /** 車体ローカル座標 (x=幅, y=高, z=長) をワールド座標へ変換する。 */
     public net.minecraft.world.phys.Vec3 localToWorldVec(double lx, double ly, double lz) {
         Vec3 v = new Vec3(lx, ly, lz);
         v = v.rotateAroundZ(-this.rotationRoll);
@@ -1086,10 +956,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return new net.minecraft.world.phys.Vec3(v.getX(), v.getY(), v.getZ());
     }
 
-    /**
-     * 座席オフセットのワールド位置 (#positionRider が着席させる位置と同じ、Y は座面+0.15)。
-     * 乗客 NPC が着席前に「席の位置」へ歩くための目標に使う。
-     */
+    /** 座席オフセットのワールド位置 (#positionRider が着席させる位置と同じ、Y は座面+… */
     public net.minecraft.world.phys.Vec3 getSeatWorldPos(float[] seat) {
         net.minecraft.world.phys.Vec3 w = localToWorldVec(seat[0], seat[1], seat[2]);
         return new net.minecraft.world.phys.Vec3(w.x, w.y + 0.15D, w.z);
@@ -1098,7 +965,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     @Override
     protected void positionRider(Entity rider, Entity.MoveFunction move) {
         if (this.hasPassenger(rider)) {
-            // 客席 (座席オフセット): EntityVehiclePart.updatePartPos と同じ回転
+            // 客席 (座席オフセット): EntityVehiclePart.updatePartPos と同じ…
             float[] seat = this.seatOffsets.get(rider.getUUID());
             if (seat != null) {
                 Vec3 sv = new Vec3(seat[0], seat[1], seat[2]);
@@ -1114,19 +981,31 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 return;
             }
             float[][] pos = this.getConfig().getPlayerPos();
+            if (pos == null || pos.length == 0) {
+                move.accept(rider, this.getX(), this.getY() + 1.0D, this.getZ());
+                return;
+            }
             int dir = this.entityData.get(DATA_CAB_DIR);
-            Vec3 v31 = new Vec3(pos[dir][0], pos[dir][1], pos[dir][2]);
+            // playerPos が 1 つしか無い車両 (E257 等) は前後どちらも同じ位置を使う
+            int index = dir < pos.length ? dir : 0;
+            Vec3 v31 = new Vec3(pos[index][0], pos[index][1], pos[index][2]);
             v31 = v31.rotateAroundZ(-this.rotationRoll);
             v31 = v31.rotateAroundX(this.getXRot());
             v31 = v31.rotateAroundY(this.getYRot());
-            // 座位の高さ補正。playerPos (JSON, 列車ごとに Y が異なる) を基準にした一定オフセット。
-            // 以前は +0.15 だったが「高すぎる」との指摘で、JSON値より少し下げた負オフセットにする
-            // (運転士が座面に沈むように)。列車ごとの高さ差は playerPos_Y (v31.getY) が担う。
+            // 座位の高さ補正。playerPos (JSON, 列車ごとに Y が異なる) を基準にした一定オフ…
             move.accept(rider,
                     this.getX() + v31.getX(),
                     this.getY() + v31.getY() + DRIVER_SEAT_Y_OFFSET,
                     this.getZ() + v31.getZ());
         }
+    }
+
+    /** 本家 updateRiderPosition。RTMU は座席エンティティで処理済み。 */
+    public void updateRiderPosition() {
+    }
+
+    /** 本家 func_145781_i (KaizPatchX は no-op)。 */
+    public void func_145781_i(int par1) {
     }
 
     /** 本家 attackEntityFrom 相当: バール/クリエイティブで撤去 */
@@ -1146,10 +1025,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     }
 
     /** EntityBogieで呼ばれる (乗車・連結棒) */
-    /**
-     * 本家 interactFirst: シフト右クリックでモデル選択画面を開く。
-     * 台車 (EntityBogie#interact) がシフト時にここへ回す。
-     */
+    /** 本家 interactFirst: シフト右クリックでモデル選択画面を開く。 */
     @Override
     public InteractionResult interact(Player player, net.minecraft.world.InteractionHand hand) {
         if (player.isShiftKeyDown()) {
@@ -1209,22 +1085,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return InteractionResult.SUCCESS;
     }
 
-    /**
-     * 運転台へ乗せる (本家の運転士アイテムと同じ処理)。
-     * 自動運転アドオン (RTMU-AutoDrive) が運転士を自動で乗務させるために使う。
-     *
-     * @param direction 進行方向 (getTrainDirection と同じ 0/1)
-     */
+    /** 運転台へ乗せる (本家の運転士アイテムと同じ処理)。 */
     public void boardDriverSeat(Entity entity, int direction) {
         this.mountEntityToTrain(entity, direction);
     }
 
-    /**
-     * この編成が<b>終点に着いている</b>か。自動運転アドオンが立てる。
-     *
-     * <p>立っている間、乗客 NPC は<b>降りるだけで乗ってこない</b>
-     * (終点で乗せると、消える列車に乗せることになる)。
-     */
+    /** この編成が終点に着いているか。自動運転アドオンが立てる。 */
     private boolean terminating;
 
     public boolean isTerminating() {
@@ -1235,7 +1101,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.terminating = value;
     }
 
-    /** 運転台が空いているか (本家 interactTrain の driverSeatFree と同じ判定)。 */
+    /** 運転台が空いているか (本家 interactTrain の driverSeatFree と同じ… */
     public boolean isDriverSeatFree() {
         return this.getPassengers().stream().allMatch(this::hasSeat);
     }
@@ -1250,13 +1116,36 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             }
         }
         this.entityData.set(DATA_CAB_DIR, (byte) direction);
+        // 本家 KaizPatchX と同じ: 運転席が空いていれば playerPos[dir] へ、
+        // 埋まっている (または客) なら空いている EntityFloor (slotPos 座席) へ乗せる。
+        if (entity instanceof net.minecraft.world.entity.player.Player player
+                && this.hasPassenger(entity)) {
+            // すでに乗員
+            return;
+        }
+        if (this.isDriverSeatFree()) {
+            this.seatOffsets.remove(entity.getUUID());
+            entity.startRiding(this);
+            return;
+        }
+        // 空いている EntityFloor を探す (本家 EntityFloor.interactFirst 相当)
+        for (jp.ngt.rtm.entity.train.parts.EntityFloor floor : this.vehicleFloors) {
+            if (floor == null || !floor.isAlive()) {
+                continue;
+            }
+            if (floor.getSeatType() == 0) {
+                continue; // 運転台フロア (床) には乗れない
+            }
+            if (floor.getPassengers().isEmpty() && entity.startRiding(floor, true)) {
+                return;
+            }
+        }
+        // 空席が無ければ運転台に乗せる (本家 driverSeatFree が false のまま動く)
+        this.seatOffsets.remove(entity.getUUID());
         entity.startRiding(this);
     }
 
-    /**
-     * @param par1 連結される台車
-     * @param par2 連結対象の台車
-     */
+    
     public void connectTrain(EntityBogie par1, EntityBogie par2) {
         if (!this.level().isClientSide && par2.getTrain() != null) {
             int id1 = par1.getBogieId();
@@ -1322,7 +1211,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.entityData.set(id == 0 ? DATA_BOGIE0 : DATA_BOGIE1, bogie.getId());
     }
 
-    /** @param par1 0 or 1 */
+    
     public EntityTrainBase getConnectedTrain(int par1) {
         if (this.formation != null) {
             FormationEntry entry = this.formation.getEntry(this);
@@ -1415,16 +1304,14 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
     /** 本家 rtm:sounds/train/lever.ogg (マスコン/ブレーキハンドルの操作音)。 */
     private static final String SOUND_LEVER = "rtm:sounds/train/lever.ogg";
 
-    /** 本家 EntityTrainBase.atsCount (ATS 確認カウンタ)。ATSAssistMod (別mod) が使用する。 */
+    /** 本家 EntityTrainBase.atsCount (ATS 確認カウンタ)。 */
     public int atsCount;
 
     public boolean addNotch(Entity driver, int par2) {
         if (par2 != 0) {
             int i = this.getNotch();
             if (this.setNotch(i + par2)) {
-                // 本家 EntityTrainBase.addNotch と同じ: ノッチが動いたらレバー音を鳴らす
-                com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(
-                        this, SOUND_LEVER, 1.0F, 1.0F);
+                this.playNotchSound();
                 // ブレーキ → 力行に入れた瞬間の緩解音 (ノッチ -1 からなら強い音)
                 if (i < 0 && par2 > 0 && !this.level().isClientSide()) {
                     this.playBrakeReleaseSound(i == -1);
@@ -1437,7 +1324,23 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return false;
     }
 
-    /** 本家 playBrakeReleaseSound: 車両側 JSON の sound_BrakeRelease / sound_BrakeRelease2。 */
+    /** 本家 EntityTrainBase.addNotch の操作音 (sound_Notch / 既… */
+    public void playNotchSound() {
+        String sound = this.getModelSet().getConfig() instanceof jp.ngt.rtm.modelpack.cfg.TrainConfig cfg
+                ? cfg.sound_Notch : null;
+        com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(
+                this, sound == null || sound.isBlank() ? SOUND_LEVER : sound, 1.0F, 1.0F);
+    }
+
+    /** 本家 sound_Reversal: レバーサ操作音。 */
+    public void playReversalSound() {
+        String sound = this.getModelSet().getConfig() instanceof jp.ngt.rtm.modelpack.cfg.TrainConfig cfg
+                ? cfg.sound_Reversal : null;
+        com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(
+                this, sound == null || sound.isBlank() ? SOUND_LEVER : sound, 1.0F, 1.0F);
+    }
+
+    /** 本家 playBrakeReleaseSound: 車両側 JSON の sound_BrakeR… */
     protected void playBrakeReleaseSound(boolean isStrong) {
         com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition def =
                 com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(this.getModelName());
@@ -1463,10 +1366,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return false;
     }
 
-    /**
-     * 非常ブレーキのノッチ番号 (最も深いブレーキ)。車両ごとの段数で決まる。
-     * レバーサ (↑↓) を動かせる位置の判定にも使う。
-     */
+    /** 非常ブレーキのノッチ番号 (最も深いブレーキ)。車両ごとの段数で決まる。 */
     public int getEmergencyBrakeNotch() {
         try {
             int steps = this.getConfig().deccelerations.length;
@@ -1474,9 +1374,9 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
                 return -(steps - 1);
             }
         } catch (Throwable ignored) {
-            //パック未読込など
+            // パック未読込など
         }
-        return -8;   //本家 EnumNotch.emergency_brake と同じ既定
+        return -8;   // 本家 EnumNotch.emergency_brake と同じ既定
     }
 
     public void setEBNotch() {
@@ -1498,10 +1398,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
-    /**
-     * 0:direction 1:notch 2:signal 4:door 5:light 6:pantograph 7:chunk_loader
-     * 8:destination 9:announcement 10:direction 11:interior_light
-     */
+    /** 0:direction 1:notch 2:signal 4:door 5:light 6:pan… */
     public byte getTrainStateData(int id) {
         return this.getByteFromDataWatcher(id);
     }
@@ -1520,19 +1417,14 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.setByteToDataWatcher(id, data);
     }
 
-    // ---- 本家スクリプト互換 API ----
-    // RTM 標準のレンダースクリプトが entity に対して直接呼ぶメソッド群。
+    // ---- 本家スクリプト互換 API ---- RTM 標準のレンダースクリプトが entity…
 
-    /** 本家 EntityVehicleBase.getVehicleState。RTMU の状態は id で持っているので id に落として読む。 */
+    /** 本家 EntityVehicleBase.getVehicleState。 */
     public byte getVehicleState(TrainState.TrainStateType type) {
         return type == null ? 0 : this.getTrainStateData(type.id);
     }
 
-    /**
-     * getVehicleState の int オーバーロード。
-     * TrainState.TrainStateType.Door は JS シムで整数 (id=4 等) に化けるため、
-     * getVehicleState(4) のように int で呼ばれる。
-     */
+    /** getVehicleState の int オーバーロード。 */
     public byte getVehicleState(int stateTypeId) {
         return this.getTrainStateData(stateTypeId);
     }
@@ -1549,30 +1441,21 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         this.setTrainStateData(stateTypeId, (byte) data);
     }
 
-    /**
-     * 本家 EntityVehicleBase.syncVehicleState: クライアントの操作をサーバーへ送る。
-     * 本家はモデル内の運転台スイッチをクリックしたときにスクリプトから呼ばれる。
-     */
+    /** 本家 EntityVehicleBase.syncVehicleState: クライアントの操作を… */
     public void syncVehicleState(TrainState.TrainStateType type, byte data) {
         if (type != null && !this.level().isClientSide) {
             this.setTrainStateData(type.id, data);
         }
     }
 
-    /**
-     * 本家 EntityTrainBase.syncNotch: ノッチを相対値で動かす。
-     * syncVehicleState と同じ理由でサーバー側でのみ効かせる。
-     */
+    /** 本家 EntityTrainBase.syncNotch: ノッチを相対値で動かす。 */
     public void syncNotch(int notchInc) {
         if (notchInc != 0 && !this.level().isClientSide) {
             this.addNotch(null, notchInc);
         }
     }
 
-    /**
-     * 本家 EntityTrainBase.getCouplerYaw: 連結器が隣の車両を向く角度 (度)。
-     * 連結相手がいなければ 0。
-     */
+    /** 本家 EntityTrainBase.getCouplerYaw: 連結器が隣の車両を向く角度 (… */
     public float getCouplerYaw(int dir) {
         EntityTrainBase conTrain = this.getConnectedTrain(dir);
         if (conTrain == null) {
@@ -1598,8 +1481,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
             float yaw = this.entityData.get(DATA_YAW);
             this.vehicleYaw = yaw;
             this.motionBuffer.setLatestRotation(this.vehicleYaw, this.vehiclePitch, this.vehicleRoll);
-            // ★実姿勢が届いた時点で即座に向ける。tick を待つと 1 フレームだけ
-            //   スポーンパケットの粗い yaw (だいたい 0 = 横向き) で描かれてしまう。
+            // ★実姿勢が届いた時点で即座に向ける。tick を待つと 1 フレームだけ スポーンパケットの粗い…
             if (!this.isClientRotInit()) {
                 this.snapClientRotation(yaw, this.entityData.get(DATA_PITCH));
             }
@@ -1619,7 +1501,7 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         }
     }
 
-    /** 本家syncTrainStateData: クライアントからの状態同期要求。setTrainStateDataに委譲。 */
+    /** 本家syncTrainStateData: クライアントからの状態同期要求。 */
     public void syncTrainStateData(int id, byte data) {
         this.setTrainStateData(id, data);
     }

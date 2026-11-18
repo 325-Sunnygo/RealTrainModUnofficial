@@ -23,10 +23,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import javax.annotation.Nullable;
 import java.util.Arrays;
 
-/**
- * 本家 jp.ngt.rtm.rail.BlockLargeRailBase (KaizPatchX) の忠実移植。
- * 道床(レールベース)ブロック。描画はコア BE のレンダラが行うため INVISIBLE。
- */
+/** 本家 jp.ngt.rtm.rail.BlockLargeRailBase (KaizPatchX… */
 public class BlockLargeRailBase extends BaseEntityBlock {
     public static final MapCodec<BlockLargeRailBase> CODEC = simpleCodec(props -> new BlockLargeRailBase(2, props));
 
@@ -52,11 +49,7 @@ public class BlockLargeRailBase extends BaseEntityBlock {
 
     @Override
     public RenderShape getRenderShape(BlockState state) {
-        // ★道床 (レール下の砂利) はこのブロックが描く。本家 1.7.10 も同じで、
-        // BlockLargeRailBase.getRenderType() = RTMBlock.renderIdBlockRail →
-        // RenderBlockLargeRail (ISimpleBlockRenderingHandler) がチャンクへ焼いていた。
-        // 1.21 では BallastModel / BallastFabricModel が同じ 6 面を出す。
-        // INVISIBLE に戻すと道床が丸ごと消える (レールの MQO モデルは砂利を描かない)。
+        // ★道床 (レール下の砂利) はこのブロックが描く。
         return RenderShape.MODEL;
     }
 
@@ -98,23 +91,16 @@ public class BlockLargeRailBase extends BaseEntityBlock {
             }
             return Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, height2 + 256.0D, 1.0D);
         }
-        // 坂は「1ブロック=平らな箱1つ」だと段差になるので、ブロック内を細かく割って
-        // レール面に沿わせる (TileEntityLargeRailBase.getRailCollisionShape)。
+        // 坂は「1ブロック=平らな箱1つ」だと段差になるので、ブロック内を細かく割って レール面に沿わせる…
         return rail.getRailCollisionShape(pos.getX(), pos.getY(), pos.getZ(), THICKNESS);
     }
 
-    /**
-     * 本家: ModelSetRail.getConfig.allowCrossing が false なら Mob 通行禁止。
-     * TODO(Phase 4): ModelSetRail 移植後に allowCrossing を参照。それまでは通行許可。
-     */
+    /** 本家: ModelSetRail.getConfig.allowCrossing が false… */
     public boolean preventMobMovement(BlockGetter level, BlockPos pos) {
         return false;
     }
 
-    /**
-     * 本家 getPickBlock: レールをピックブロックすると RailPosition 込みのコピーアイテムを得る
-     * (レールコピー&ペースト機能)。
-     */
+    /** 本家 getPickBlock: レールをピックブロックすると RailPosition 込みのコ… */
     @Override
     public net.minecraft.world.item.ItemStack getCloneItemStack(net.minecraft.world.level.LevelReader level, BlockPos pos, BlockState state) {
         BlockEntity tileEntity = level.getBlockEntity(pos);
@@ -125,7 +111,6 @@ public class BlockLargeRailBase extends BaseEntityBlock {
                     return jp.ngt.rtm.item.ItemRail.copyItemFromRail(coreTile);
                 } catch (Throwable t) {
                     // ★ここは他 MOD (WAILA 等) から毎tick呼ばれる。
-                    // 敷設途中のレールは中身が揃っていないので、落とさず空を返す。
                     return net.minecraft.world.item.ItemStack.EMPTY;
                 }
             }
@@ -157,8 +142,7 @@ public class BlockLargeRailBase extends BaseEntityBlock {
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        // クライアントでも tick する: 分岐の Point.moveCount (転てつアニメーション) は
-        // クライアント側 SwitchType.onUpdate で進む (本家 updateEntity は両側で動く)。
+        // クライアントでも tick する: 分岐の Point.moveCount (転てつアニメーション…
         if (this.isCore()) {
             return (lvl, pos, st, be) -> {
                 if (be instanceof TileEntityLargeRailCore core) {
@@ -172,15 +156,6 @@ public class BlockLargeRailBase extends BaseEntityBlock {
     @Override
     protected void neighborChanged(BlockState state, Level world, BlockPos pos, net.minecraft.world.level.block.Block neighborBlock, BlockPos neighborPos, boolean movedByPiston) {
         super.neighborChanged(state, world, pos, neighborBlock, neighborPos, movedByPiston);
-        // ★ここでは分岐の状態を触らない。本家 BlockLargeRailSwitchBase /
-        // BlockLargeRailSwitchCore の onNeighborBlockChange は<b>空実装</b>で、
-        // レッドストーンは毎tickのポーリングだけで見ている
-        // (SwitchType.onUpdate → Point.onUpdate → rpRoot.checkRSInput、
-        //  進路は Point.getActiveRailMap がその場で引く)。
-        //
-        // 以前ここで onBlockChanged() を呼んでいたが、あれは activeRails を消して
-        // 「両端が同時に通電しているか」という別の規則で組み直す。
-        // 毎tickのポーリングと規則が食い違うため、<b>レッドストーンをつないだ瞬間に
-        // 分岐が切り替わらなくなる</b>。本家と同じく何もしないのが正しい。
+        // ★ここでは分岐の状態を触らない。本家 BlockLargeRailSwitchBase / Blo…
     }
 }

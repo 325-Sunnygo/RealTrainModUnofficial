@@ -15,11 +15,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.Arrays;
 
-/**
- * クライアント → サーバー。 スピーカーGUIからの設定送信。
- * soundSlot >= 1: 音源ID(1-64)に soundName を割り当て（全体共通・config保存）し、
- * 全クライアントへ同期する。
- */
+/** クライアント → サーバー。 スピーカーGUIからの設定送信。 */
 public record ConfigureSpeakerPayload(BlockPos pos, int soundSlot, String soundName, int range)
         implements CustomPacketPayload {
 
@@ -50,8 +46,7 @@ public record ConfigureSpeakerPayload(BlockPos pos, int soundSlot, String soundN
                 return;
             }
             if (payload.soundSlot() >= 1 && payload.soundSlot() <= SpeakerSoundConfig.MAX_SOUND_ID) {
-                // 本家 TileEntitySpeaker.setSound 準拠: 音の登録はスピーカーごと
-                // (グローバル設定は旧ワールドの読み取りフォールバックとして残す)
+                // 本家 TileEntitySpeaker.setSound 準拠: 音の登録はスピーカーごと (グ…
                 if (player.level().getBlockEntity(payload.pos()) instanceof InstalledObjectBlockEntity speakerBe
                         && speakerBe.isSpeaker()) {
                     speakerBe.setSpeakerSound(payload.soundSlot(), payload.soundName());

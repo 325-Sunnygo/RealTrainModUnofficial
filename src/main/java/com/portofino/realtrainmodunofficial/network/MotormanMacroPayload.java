@@ -10,10 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 運転士のマクロ設定 (クライアントの GUI で選んだ .txt の中身をサーバーへ送る)。
- * 本家 PacketNotice の "TMacro//..." 相当。
- */
+/** 運転士のマクロ設定 (クライアントの GUI で選んだ .txt の中身をサーバーへ送る)。 */
 public record MotormanMacroPayload(int entityId, String macro) implements CustomPacketPayload {
 
     public static final Type<MotormanMacroPayload> TYPE = new Type<>(

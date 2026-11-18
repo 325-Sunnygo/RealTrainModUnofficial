@@ -3,10 +3,7 @@ package jp.ngt.mccompat;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 
-/**
- * 1.7.10 MovingObjectPosition のスクリプト互換 (SRG フィールド名)。
- * BlockUtil.getMOPFromPlayer が返す。
- */
+/** 1.7.10 MovingObjectPosition のスクリプト互換 (SRG フィールド名)。 */
 public final class MovingObjectPosition {
     /** blockX */
     public final int field_72311_b;
@@ -18,12 +15,7 @@ public final class MovingObjectPosition {
     public final Vec3Compat field_72307_f;
     /** sideHit */
     public final int field_72310_e;
-    /**
-     * sideHit (1.8+ の EnumFacing 版)。
-     * NGTO Builder.zip!.../Wire/render_Wire.js:538  mop.field_178784_b
-     * スクリプトは続けて .func_176745_a でインデックスを取るため、
-     * 生の net.minecraft.core.Direction を持たせる。
-     */
+    /** sideHit (1.8+ の EnumFacing 版)。 */
     public final net.minecraft.core.Direction field_178784_b;
 
     /** typeOfHit: 0=MISS(TILE?), ここでは常にブロックヒットのみ生成 */

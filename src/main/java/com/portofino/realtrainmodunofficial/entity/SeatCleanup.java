@@ -10,17 +10,10 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 import java.util.List;
 
-/**
- * 座席 (EntityFloor) の後始末。
- * 座席は車体に追従するだけの当たり判定で、単独で存在してよいものではない。
- */
+/** 座席 (EntityFloor) の後始末。 */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID)
 public final class SeatCleanup {
-    /**
-     * 掃除の間隔 (tick)。5 秒に 1 回。
-     * 取り残された座席は見つかり次第クリック不可 (isPickable) になるので、
-     * ここは実体を片付けるだけの後片付け。頻繁に回す必要はない。
-     */
+    /** 掃除の間隔 (tick)。5 秒に 1 回。 */
     private static final int INTERVAL = 100;
 
     private static int counter;

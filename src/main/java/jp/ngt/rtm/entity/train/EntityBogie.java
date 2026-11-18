@@ -24,10 +24,7 @@ import net.minecraft.world.phys.AABB;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.EntityBogie (KaizPatchX) の忠実移植。
- * レール追従 (updateBogiePos)・連結衝突・fixBogieYaw/Pitch は本家アルゴリズムのまま。
- */
+/** 本家 jp.ngt.rtm.entity.train.EntityBogie (KaizPatch… */
 public class EntityBogie extends Entity {
     /** ベジェ曲線の分割精度(1m当たり) */
     private static final int SPLITS_PER_METER = 360;
@@ -75,7 +72,7 @@ public class EntityBogie extends Entity {
     public EntityBogie(EntityType<?> type, Level level) {
         super(type, level);
         this.noPhysics = true;
-        // 本家 EntityBogie:89  this.ignoreFrustumCheck = true;
+        // 本家 EntityBogie:89 this.ignoreFrustumCheck = true;
         this.noCulling = true;
     }
 
@@ -136,121 +133,10 @@ public class EntityBogie extends Entity {
         return !this.isRemoved();
     }
 
-    /**
-     * 当たり判定をレール面まで下げる。
-     * 本家の台車は getYOffset == 0 でレール高さそのものに立ち、
-     * 当たり判定もそこから上へ伸びる。
-     */
+    /** 当たり判定をレール面まで下げる。 本家の台車は getYOffset == 0 でレール高さそのも… */
     @Override
     protected AABB makeBoundingBox() {
         return super.makeBoundingBox().move(0.0D, -EntityTrainBase.TRAIN_HEIGHT, 0.0D);
-    }
-
-    /**
-     * 分岐で台車が追従すべきレールマップを選ぶ。
-     * 本家と同じライブ参照方式。
-     */
-    private RailMap selectSwitchRailMap(jp.ngt.rtm.rail.util.SwitchType sw, double px, double pz) {
-        // ★最優先: 同じ列車のもう一方の台車が既にこの分岐の枝に乗っているなら、必ず同じ枝を使う。
-        // 分岐の根元付近では2本の枝が近接しているため、台車ごとに独立して選ぶと前後で判定が割れ、
-        // 片方が直進側・片方が分岐側になって車体が引き裂かれる (台車が分離して残る)。
-        RailMap sibling = this.siblingBogieSwitchRailMap(sw);
-        if (sibling != null) {
-            return sibling;
-        }
-        // ★本家と同じ: 台車に最も近い分岐点の「開通(アクティブ)側」をライブ参照で掴む。
-        // Point.getActiveRailMap は根元で checkRSInput (getBestNeighborSignal) を毎回読むため、
-        // レバー/RS の現在状態を必ず反映する。activeRails キャッシュには一切依存しない。
-        jp.ngt.rtm.rail.util.Point np = sw.getNearestPoint(this);
-        RailMap active = np != null ? np.getActiveRailMap(this.level()) : null;
-
-        // 進入元レールと連続していれば其れに従う (通常の進入。根元では両枝が根元端点を共有するので
-        // 開通側が直進でも分岐でも canConnect が成立し、RS の選択どおりに進む)。
-        if (active != null && (this.currentRailMap == null || this.currentRailMap.canConnect(active))) {
-            return active;
-        }
-        // ★開通側が進入元と繋がらない = 非開通の枝から背向で合流している。実際に連続する枝へ乗せ、
-        // 開通側へ台車だけを TP させない。
-        jp.ngt.rtm.rail.util.RailMapSwitch[] allArr = sw.getAllRailMap();
-        if (allArr != null && this.currentRailMap != null) {
-            for (jp.ngt.rtm.rail.util.RailMapSwitch rm : allArr) {
-                if (rm != null && this.currentRailMap.canConnect(rm)) {
-                    return rm;
-                }
-            }
-        }
-        return active;
-    }
-
-    /**
-     * 同じ列車のもう一方の台車が、この分岐のいずれかの枝に乗っていればその枝を返す (無ければ null)。
-     * 前後の台車を必ず同じ枝に乗せ、車体が別々の枝へ引き裂かれる (台車が分離する) のを防ぐ。
-     */
-    private RailMap siblingBogieSwitchRailMap(jp.ngt.rtm.rail.util.SwitchType sw) {
-        EntityTrainBase train = this.getTrain();
-        if (train == null) {
-            return null;
-        }
-        jp.ngt.rtm.rail.util.RailMapSwitch[] all = sw.getAllRailMap();
-        if (all == null) {
-            return null;
-        }
-        for (int i = 0; i < 2; i++) {
-            EntityBogie other = train.getBogie(i);
-            if (other == null || other == this) {
-                continue;
-            }
-            RailMap orm = other.currentRailMap;
-            if (orm == null) {
-                continue;
-            }
-            for (jp.ngt.rtm.rail.util.RailMapSwitch rm : all) {
-                if (rm == orm) {
-                    return rm;
-                }
-            }
-        }
-        return null;
-    }
-
-    /**
-     * レール曲線と点 (px,pz) の最短距離の2乗 (サンプリング近似)。
-     * 選ぶのに使う。
-     */
-    private static double distToRailMapSq(RailMap rm, double px, double pz,
-                                          double samplesPerMeter, double minSplit) {
-        int split = (int) Math.max(minSplit, rm.getLength() * samplesPerMeter);
-        int idx = rm.getNearlestPoint(split, px, pz);
-        double[] p = rm.getRailPos(split, idx);//{z, x}
-        double dz = p[0] - pz;
-        double dx = p[1] - px;
-        return dx * dx + dz * dz;
-    }
-
-    /**
-     * 描画専用: 分岐器の全枝のうち (px,pz) に最も近いものを返す (開通方向は見ない)。
-     * この選択は「どちらの枝に描くか」を決めるだけなので、サーバ側の進路選択のような細かい
-     * 分解能は要らない。
-     */
-    private static RailMap nearestSwitchRailMapForRender(jp.ngt.rtm.rail.util.SwitchType sw,
-                                                         double px, double pz) {
-        jp.ngt.rtm.rail.util.RailMapSwitch[] all = sw.getAllRailMap();
-        if (all == null) {
-            return null;
-        }
-        RailMap best = null;
-        double bestSq = Double.MAX_VALUE;
-        for (jp.ngt.rtm.rail.util.RailMapSwitch rm : all) {
-            if (rm == null) {
-                continue;
-            }
-            double d = distToRailMapSq(rm, px, pz, 4.0D, 32.0D);
-            if (d < bestSq) {
-                bestSq = d;
-                best = rm;
-            }
-        }
-        return best;
     }
 
     /** レールに乗っているか (currentRailMap 保持)。停車中のピッチ維持判定に使用。 */
@@ -263,7 +149,7 @@ public class EntityBogie extends Entity {
         return this.currentRailObj;
     }
 
-    /** @return 位置更新が成功したらtrue */
+    
     public boolean updateBogiePos(float speed, float trainLength, EntityBogie frontBogie) {
         if (this.updateCollision()) {
             return false;
@@ -284,8 +170,13 @@ public class EntityBogie extends Entity {
 
         RailMap rm = this.currentRailMap;
         int pIndex = 0;
-        if (frontBogie == null || this.prevPosIndex == -1) {
+        // 本家 KaizPatchX と同じ分岐処理。
+        // frontBogie が無いときだけ周囲探索、prevPosIndex==-1 のときは全体最近点、
+        // それ以外は前回位置の近傍で台車間距離が一致する点を探す。
+        if (frontBogie == null) {
             pIndex = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findNearestPointAround(rm,this.split,this.prevPosIndex,px,pz,speed);
+        } else if (this.prevPosIndex == -1) {
+            pIndex = rm.getNearlestPoint(this.split, px, pz);
         } else {
             // 移動範囲を制限して、「台車からの距離は同じでも位置は真逆」な点の検出を防ぐ
             int indexInc = (int) ((Math.abs(speed) + 0.25F) * (float) SPLITS_PER_METER);
@@ -309,7 +200,7 @@ public class EntityBogie extends Entity {
         }
 
         if ((this.getX() == posZX[1]) && (this.getZ() == posZX[0])) {
-            return true;//低速時に斜めレールで走行しない問題回避
+            return true;// 低速時に斜めレールで走行しない問題回避
         }
 
         this.posBuf[0] = posZX[1];
@@ -337,45 +228,55 @@ public class EntityBogie extends Entity {
         return dx * dx + dy * dy + dz * dz;
     }
 
-    /** @return 移動先にレールがあればtrue */
+    
+    /**
+     * 移動先にレールがあれば true。
+     * 本家 KaizPatchX EntityBogie.resetRailObj と同じ:
+     * - core を getRail で決める (跨ぎ済み接続コア / その場レール / 接続コア)
+     * - 分岐器では getNearestPoint(this).getActiveRailMap(level) の開通側を使う
+     * - 別ロジカルレールへの移行で接続できなければ切り替えず、true を返す
+     * - ロジカル上同じレールなら接続可否に関わらず切り替える
+     */
     private boolean resetRailObj(double px, double py, double pz) {
-        TileEntityLargeRailCore coreObj = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findCrossedConnectedCore(level(),currentRailObj,currentRailMap,split,prevPosIndex,getX(),getZ(),px,pz,movingYaw);
-        if(coreObj==null) {
-            coreObj=this.getRail(px,py,pz);
-            if(coreObj!=null)coreObj=jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.keepCurrentSectionCore(currentRailObj,coreObj);
-        }
-        if(coreObj==null)coreObj=jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedCore(level(),currentRailObj,currentRailMap,split,prevPosIndex,getX(),getZ(),px,pz,movingYaw);
+        TileEntityLargeRailCore coreObj = this.getRail(px, py, pz);
 
         if (coreObj == null) {
             return false;
-        } else {
-            if (this.currentRailObj != coreObj) {
-                // 新しいレール上に移動
-                RailMap railMap;
-                if (coreObj instanceof TileEntityLargeRailSwitchCore switchObj) {
-                    jp.ngt.rtm.rail.util.SwitchType sw = switchObj.getSwitch();
-                    railMap = sw != null ? this.selectSwitchRailMap(sw, px, pz) : null;
-                } else {
-                    railMap = coreObj.getRailMap(this);
-                }
-                if (railMap == null) {
-                    return this.currentRailMap != null;
-                }
+        }
 
-                if (this.currentRailMap != null && !this.currentRailMap.canConnect(railMap)) {
-                    return true;
-                }
-
-                RailMap previousMap=this.currentRailMap;
-                this.currentRailObj = coreObj;
-                this.currentRailMap = railMap;
-                this.split = (int) (this.currentRailMap.getLength() * (double) SPLITS_PER_METER);
-                this.prevPosIndex = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedEntryIndex(previousMap,railMap,this.split);
-                this.onChangeRail(coreObj);
+        if (this.currentRailObj != coreObj) {
+            boolean sameLogicalRail = this.currentRailObj != null
+                    && this.currentRailObj.isSameLogicalRail(coreObj);
+            RailMap previousRailMap = this.currentRailMap;
+            RailMap railMap;
+            if (coreObj instanceof TileEntityLargeRailSwitchCore switchObj) {
+                jp.ngt.rtm.rail.util.SwitchType sw = switchObj.getSwitch();
+                jp.ngt.rtm.rail.util.Point np = sw != null ? sw.getNearestPoint(this) : null;
+                railMap = np != null ? np.getActiveRailMap(level()) : null;
+            } else {
+                railMap = coreObj.getRailMap(this);
             }
 
-            return true;
+            if (railMap == null) {
+                return this.currentRailMap != null;
+            }
+            if (this.currentRailMap != null && !sameLogicalRail
+                    && !this.currentRailMap.canConnect(railMap)) {
+                return true;
+            }
+
+            this.currentRailObj = coreObj;
+            this.currentRailMap = railMap;
+            this.split = (int) (this.currentRailMap.getLength() * (double) SPLITS_PER_METER);
+            this.prevPosIndex = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedEntryIndex(
+                    previousRailMap, this.currentRailMap, this.split
+            );
+            if (!sameLogicalRail) {
+                this.onChangeRail(coreObj);
+            }
         }
+
+        return true;
     }
 
     /** 別レールに移動した際呼び出し */
@@ -383,7 +284,7 @@ public class EntityBogie extends Entity {
         // 新しいレールの反響音指定を引き継ぎ、継ぎ目カウントを最初から数え直す
         this.reverbSound = newRail != null && newRail.isReberbSound();
         this.jointIndex = 0;
-        // 継ぎ目は<b>音だけ</b>。車体を揺らす入力は持たない (上を参照)
+        // 継ぎ目は音だけ。車体を揺らす入力は持たない (上を参照)
         this.playJointSound();
     }
 
@@ -391,11 +292,7 @@ public class EntityBogie extends Entity {
     private static final String JOINT_SOUND = "rtm:train/joint";
     private static final String JOINT_SOUND_REVERB = "rtm:train/joint_reverb";
 
-    /**
-     * 本家 playJointSound: レール継ぎ目の「ガタン」を鳴らし、次の継ぎ目までの距離を決める。
-     * jointDelay は台車ごとの配列で、車体の何本目の継ぎ目かによって間隔が変わる
-     * (先頭台車と後方台車で「ガタン…ゴトン」がずれるのはこれ)。
-     */
+    /** 本家 playJointSound: レール継ぎ目の「ガタン」を鳴らし、次の継ぎ目までの距離を決め… */
     protected void playJointSound() {
         EntityTrainBase train = this.getTrain();
         if (train == null) {
@@ -435,10 +332,7 @@ public class EntityBogie extends Entity {
         }
     }
 
-    /**
-     * 本家 reverseJointArray: 進行方向と台車位置の組み合わせで、
-     * jointDelay 配列を逆から読むか。後進時に継ぎ目の間隔が反転するのを合わせる。
-     */
+    /** 本家 reverseJointArray: 進行方向と台車位置の組み合わせで、 jointDela… */
     protected boolean reverseJointArray() {
         EntityTrainBase train = this.getTrain();
         if (train == null) {
@@ -472,11 +366,47 @@ public class EntityBogie extends Entity {
     }
 
     private TileEntityLargeRailCore getRail(double px, double py, double pz) {
+        TileEntityLargeRailCore crossedRail = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findCrossedConnectedCore(
+                this.level(),
+                this.currentRailObj,
+                this.currentRailMap,
+                this.split,
+                this.prevPosIndex,
+                this.getX(),
+                this.getZ(),
+                px,
+                pz,
+                this.movingYaw
+        );
+        if (crossedRail != null) {
+            return crossedRail;
+        }
+
+        int x = net.minecraft.util.Mth.floor(px);
+        int z = net.minecraft.util.Mth.floor(pz);
+        this.level().getChunk(x >> 4, z >> 4);
         TileEntityLargeRailBase railObj = TileEntityLargeRailBase.getRailFromCoordinates(this.level(), px, py, pz);
         if (railObj == null) {
+            return jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedCore(
+                    this.level(),
+                    this.currentRailObj,
+                    this.currentRailMap,
+                    this.split,
+                    this.prevPosIndex,
+                    this.getX(),
+                    this.getZ(),
+                    px,
+                    pz,
+                    this.movingYaw
+            );
+        }
+
+        TileEntityLargeRailCore coreObj = railObj.getRailCore();
+        if (coreObj == null) {
             return null;
         }
-        return railObj.getRailCore();
+
+        return jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.keepCurrentSectionCore(this.currentRailObj, coreObj);
     }
 
     public double[] getPosBuf() {
@@ -503,7 +433,7 @@ public class EntityBogie extends Entity {
         }
     }
 
-    /** BogieController.updateBogies から毎 tick (本家 updateBogie)。 */
+    /** BogieController.updateBogies から毎 tick (本家 updateB… */
     public void updateBogie() {
         this.prevRotationRoll = this.rotationRoll;
         this.xo = this.getX();
@@ -516,12 +446,7 @@ public class EntityBogie extends Entity {
     }
 
     protected void updatePosAndRotationClient() {
-        // ★ここに遅延バッファを入れてはいけない。
-        // バニラは移動パケットに回転が無いとき lerpTo へ entity.lerpTargetYRot()
-        // (= クライアント自身の現在値) を渡す (ClientPacketListener:630)。
-        // それを標本として貯めると<b>自分の出力を遅れて再生し続ける閉ループ</b>になり、
-        // 回転パケットが止まった瞬間 (カーブを抜けた直後) に小刻みに揺れる。
-        // 台車の姿勢はレールから直に求める (snapToRailArc / RtmBogieRenderer)。
+        // ★ここに遅延バッファを入れてはいけない。 バニラは移動パケットに回転が無いとき lerpTo へ…
         if (this.carPosRotationInc > 0) {
             float d0 = 1.0F / (float) this.carPosRotationInc;
             this.setYRot(this.getYRot() + Mth.wrapDegrees(this.carYaw - this.getYRot()) * d0);
@@ -533,8 +458,7 @@ public class EntityBogie extends Entity {
         if (train != null) {
             TrainConfig cfg = train.getConfig();
             if (cfg != null) {
-                // Clientでの台車エンティティ位置は車両位置から (弦 = 車体位置 + bogiePos を直線配置)。
-                // 実レール(弧)へのスナップは描画側 (RtmBogieRenderer) が毎フレーム行う。
+                // Clientでの台車エンティティ位置は車両位置から (弦 = 車体位置 + bogiePos を直…
                 float[][] pos = cfg.getBogiePos();
                 int bogieIndex = this.getBogieId();
                 Vec3 v31 = new Vec3(pos[bogieIndex][0], pos[bogieIndex][1], pos[bogieIndex][2]);
@@ -543,50 +467,6 @@ public class EntityBogie extends Entity {
                 this.setPos(train.getX() + v31.getX(), train.getY() + v31.getY(), train.getZ() + v31.getZ());
             }
         }
-    }
-
-    /**
-     * クライアント描画専用: 弦上の推定位置 (cx,cz) に最も近いレール曲線 (弧) 上の点へ吸着する。
-     * サーバ #updateBogiePos と同じレール取得・サンプリングを行うが、
-     * 台車の物理状態フィールド (currentRailObj/currentRailMap/split/prevPosIndex) は
-     * 一切変更しない。
-     * @return {x, y, z, ヨー, ピッチ, カント}。レール未検出時は null (呼び出し側で弦へフォールバック)。
-     */
-    public double[] snapToRailArc(double cx, double cy, double cz) {
-        TileEntityLargeRailCore coreObj = this.getRail(cx, cy, cz);
-        if (coreObj == null) {
-            return null;
-        }
-        // ★分岐器では「開通している側」ではなく車体が実際に居る側の枝へ吸着すること。
-        // 以前はここで getActiveRailMap を呼び、分岐器の開通方向へ無条件にスナップしていた。
-        RailMap railMap;
-        if (coreObj instanceof TileEntityLargeRailSwitchCore switchObj) {
-            railMap = switchObj.getSwitch() != null
-                    ? nearestSwitchRailMapForRender(switchObj.getSwitch(), cx, cz)
-                    : null;
-        } else {
-            railMap = coreObj.getRailMap(this);
-        }
-        if (railMap == null) {
-            return null;
-        }
-        int railSplit = (int) (railMap.getLength() * (double) SPLITS_PER_METER);
-        int pIndex = railMap.getNearlestPoint(railSplit, cx, cz);
-        double[] posZX = railMap.getRailPos(railSplit, pIndex);//{z, x}
-        double py = railMap.getRailHeight(railSplit, pIndex) + EntityTrainBase.TRAIN_HEIGHT;
-        // ★姿勢もレールから求める。
-        // パケット由来の姿勢は 1.4 度に量子化されていて、しかも回転が止まると
-        // 自分の値が返ってくる (lerpTargetYRot) ので滑らかにできない。
-        // レールは連続な曲線なので、そこから取れば刻みも遅れも無い。
-        // 式はサーバー側 updateBogiePos と同じ (向きの 180 度反転もそこで解決する)。
-        float railYaw = Mth.wrapDegrees(railMap.getRailRotation(railSplit, pIndex));
-        float bogieYaw = fixBogieYaw(this.getYRot(), railYaw);
-        float bogiePitch = fixBogiePitch(railMap.getRailPitch(railSplit, pIndex), railYaw, bogieYaw);
-        float cant = railMap.getCant(railSplit, pIndex);
-        if (Math.abs(Mth.wrapDegrees(railYaw - bogieYaw)) > 90.0F) {
-            cant *= -1.0F;
-        }
-        return new double[]{posZX[1], py, posZX[0], bogieYaw, bogiePitch, cant};
     }
 
     @Override
@@ -636,7 +516,7 @@ public class EntityBogie extends Entity {
         return this.getTrain().hurt(source, amount);
     }
 
-    /** @return 衝突して止まるならtrue */
+    
     private boolean updateCollision() {
         double dis = this.getBbWidth() * 2.0F;
         List<Entity> list = this.level().getEntities(this,
@@ -646,10 +526,7 @@ public class EntityBogie extends Entity {
         return this.collideWithEntities(list);
     }
 
-    /**
-     * 本家 EntityBogie.collideWithBumpingPost の移植。
-     * 進行方向の先頭台車が車止めの 1.75 ブロック以内に入ったら列車を非常停止させる。
-     */
+    /** 本家 EntityBogie.collideWithBumpingPost の移植。 */
     private void collideWithBumpingPost() {
         EntityTrainBase train = this.getTrain();
         // 本家: 先頭台車のときだけ判定する。動いていない列車は調べる必要が無い。
@@ -670,8 +547,7 @@ public class EntityBogie extends Entity {
                                 != com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.BUMPING_POST) {
                         continue;
                     }
-                    // 車止めはレールに吸着して置かれる。実際の位置はブロックの
-                    // (x+0.5, y, z+0.5) にレール曲線への寄せ (renderOffset) を足したもの。
+                    // 車止めはレールに吸着して置かれる。実際の位置はブロックの (x+0.5, y, z+0.5) にレ…
                     net.minecraft.world.phys.Vec3 offset = be.getRenderOffset();
                     double px = pos.getX() + 0.5D + offset.x;
                     double py = pos.getY() + offset.y;
@@ -711,7 +587,7 @@ public class EntityBogie extends Entity {
         return false;
     }
 
-    /** @return 連結可能か */
+    
     private boolean collideWithBogie(EntityBogie bogie) {
         EntityTrainBase train = this.getTrain();
         EntityTrainBase train2 = bogie.getTrain();
@@ -836,10 +712,7 @@ public class EntityBogie extends Entity {
         this.entityData.set(DATA_BOGIE_ID, par1);
     }
 
-    /**
-     * @param yaw1 : 元の向き
-     * @param yaw2 : 新しい向き
-     */
+    
     public static float fixBogieYaw(float yaw1, float yaw2) {
         float f0 = Math.abs(yaw1 - yaw2);
         f0 = f0 > 180.0F ? 360.0F - f0 : f0;

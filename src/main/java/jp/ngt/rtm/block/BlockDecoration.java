@@ -12,10 +12,7 @@ import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 装飾ブロック。本家 {@code jp.ngt.rtm.block.BlockDecoration} の移植。
- * 当たり判定はフルキューブ、描画は BER (DecorationRenderer)。
- */
+/** 装飾ブロック。本家 jp.ngt.rtm.block.BlockDecoration の移植。 */
 public class BlockDecoration extends BaseEntityBlock {
 
     public static final MapCodec<BlockDecoration> CODEC = simpleCodec(p -> new BlockDecoration(p));

@@ -12,13 +12,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
-/**
- * NPC の商売画面。本家 {@code GuiSalesperson} の移植。
- *
- * <p>本家はお金をスロットに入れる方式だが、RTMU は所持金を自動精算する
- * (サーバーがインベントリの紙幣を数え、釣り銭は紙幣で返す)。
- * メニューは 7 行 x ページ、+/- で個数、店主 (飼い主) は登録/削除ができる。
- */
+/** NPC の商売画面。本家 GuiSalesperson の移植。 */
 public class NpcTradeScreen extends Screen {
 
     private static final int ROWS = 7;
@@ -57,7 +51,7 @@ public class NpcTradeScreen extends Screen {
         int maxPage = Math.max(0, (list.size() - 1) / ROWS);
         this.pageIndex = Math.min(this.pageIndex, maxPage);
 
-        //ページ送り
+        // ページ送り
         this.addRenderableWidget(Button.builder(Component.literal("<"), b -> {
             if (this.pageIndex > 0) {
                 --this.pageIndex;
@@ -78,7 +72,7 @@ public class NpcTradeScreen extends Screen {
             }
             int y = top + i * rowH;
             int row = i;
-            //行選択
+            // 行選択
             this.addRenderableWidget(Button.builder(Component.literal("選択"), b -> {
                 this.selectedRow = row;
                 this.count = 1;
@@ -87,13 +81,13 @@ public class NpcTradeScreen extends Screen {
                 this.addRenderableWidget(Button.builder(Component.literal("X"), b -> {
                     net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new NpcTradePayload(this.npc.getId(), 3, this.pageIndex * ROWS + row, 0, 0));
-                    //エンティティデータの同期を待ってから再読込
+                    // エンティティデータの同期を待ってから再読込
                     this.minecraft.execute(this::rebuild);
                 }).bounds(hw + 78, y, 20, 20).build());
             }
         }
 
-        //個数 +/-
+        // 個数 +/-
         this.addRenderableWidget(Button.builder(Component.literal("-"), b -> {
             if (this.count > 1) {
                 --this.count;
@@ -106,7 +100,7 @@ public class NpcTradeScreen extends Screen {
             }
         }).bounds(hw - 70, this.height - 56, 20, 20).build());
 
-        //買う / 売る
+        // 買う / 売る
         String actionKey = this.npc.getRole() == EntityNPC.Role.BUYER ? "gui.npc.sell" : "gui.npc.buy";
         this.addRenderableWidget(Button.builder(Component.translatable(actionKey), b -> {
             int index = this.selectedIndex();
@@ -118,7 +112,7 @@ public class NpcTradeScreen extends Screen {
                 new NpcTradePayload(this.npc.getId(), action, index, this.count, 0));
         }).bounds(hw - 40, this.height - 56, 60, 20).build());
 
-        //登録 (店主のみ): メインハンドの品を価格つきで
+        // 登録 (店主のみ): メインハンドの品を価格つきで
         if (this.isOwner) {
             this.priceField = new EditBox(this.font, hw + 30, this.height - 56, 60, 20, Component.empty());
             this.priceField.setValue("100");
@@ -181,14 +175,14 @@ public class NpcTradeScreen extends Screen {
             graphics.drawString(this.font, String.format("￥%d", entry.price), hw - 4, y + 6, 0xFFFF80);
         }
 
-        //個数と合計
+        // 個数と合計
         MenuEntry entry = this.selectedEntry();
         graphics.drawCenteredString(this.font, String.valueOf(this.count), hw - 95, this.height - 50, 0xFFFFFF);
         if (entry != null) {
             graphics.drawString(this.font, String.format("￥%d", entry.price * this.count),
                 hw + 24, this.height - 76, 0xFFFF80);
         }
-        //所持金
+        // 所持金
         int money = NpcTradePayload.countMoney(this.minecraft.player);
         graphics.drawString(this.font,
             Component.translatable("gui.npc.have_money").getString() + String.format(" ￥%d", money),

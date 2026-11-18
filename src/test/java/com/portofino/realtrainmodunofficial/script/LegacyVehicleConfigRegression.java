@@ -4,7 +4,7 @@ import com.portofino.realtrainmodunofficial.vehicle.*;
 import jp.ngt.rtm.modelpack.cfg.*;
 import java.util.*;
 
-/** Actual pack JSON -> native definition -> script configuration, without a world. */
+/** Actual pack JSON -> native definition -> script c… */
 public final class LegacyVehicleConfigRegression {
     private static int checks;
     private static void check(boolean ok,String message) {checks++;if(!ok)throw new AssertionError(message);}

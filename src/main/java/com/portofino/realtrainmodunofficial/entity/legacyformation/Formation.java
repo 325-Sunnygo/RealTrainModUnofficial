@@ -8,7 +8,7 @@ import java.util.stream.Stream;
 public final class Formation {
     public final long id;
     public FormationEntry[] entries;
-    private byte direction; // 0 = entries[0] is front, 1 = entries[last] is front
+    private byte direction; // 0 = entries[0] is front, 1 = entries[last] is fro…
     private float speed;
 
     public Formation(long id, int size) {
@@ -29,12 +29,7 @@ public final class Formation {
         return stream().map(e -> e.train).filter(Objects::nonNull);
     }
 
-    /**
-     * 引数は TrainEntity でも、レガシー JS が渡す LegacyScriptExecutor ラッパーでも受け付ける。
-     * ★TrainEntity 専用オーバーロードを作らないこと: Nashorn はオーバーロードがあると
-     * getEntry(TrainEntity) を選び、ラッパー引数を TrainEntity へキャストして ClassCastException に
-     * なる。Object 1 本にして内部で getTrain で中身を取り出す(スクリプト互換)。
-     */
+    /** 引数は TrainEntity でも、レガシー JS が渡す LegacyScriptExecut… */
     public FormationEntry getEntry(Object obj) {
         TrainEntity train = asTrainEntity(obj);
         return train == null ? null : stream().filter(e -> train.equals(e.train)).findFirst().orElse(null);
@@ -57,7 +52,7 @@ public final class Formation {
         return null;
     }
 
-    /** Returns the front-most entry (the one driving the formation) */
+    /** Returns the front-most entry (the one driving the… */
     public FormationEntry getFrontEntry() {
         if (entries.length == 0) return null;
         return (direction == 0) ? entries[0] : entries[entries.length - 1];
@@ -101,15 +96,12 @@ public final class Formation {
         entries = arr;
     }
 
-    /**
-     * RTM faithful: merge par5 (other formation) into this formation.
-     * par1/par2: trains being connected, par3/par4: their bogieIndex sides (0 or 1).
-     */
+    /** RTM faithful: merge par5 (other formation) into t… */
     public void connectTrain(TrainEntity par1, TrainEntity par2, int par3, int par4, Formation par5) {
         FormationEntry entry = getEntry(par1);
         if (entry == null) return;
 
-        // If connecting side == entry.dir, reverse this formation so par1 becomes the tail
+        // If connecting side == entry.dir, reverse this for…
         if (par3 == entry.dir) {
             reverse();
         }
@@ -117,18 +109,17 @@ public final class Formation {
         entry = par5.getEntry(par2);
         if (entry == null) return;
 
-        // If connecting side != entry.dir, reverse other formation so par2 becomes the head
+        // If connecting side != entry.dir, reverse other fo…
         if (par4 != entry.dir) {
             par5.reverse();
         }
 
-        // Store connection sides in the first entry of par5 (it now connects to our last entry)
+        // Store connection sides in the first entry of par5…
         int lastIdx = entries.length - 1;
         FormationEntry ourTail = entries[lastIdx];
         FormationEntry theirHead = par5.entries[0];
         if (ourTail != null && theirHead != null) {
-            // Determine actual sides based on dir:
-            // ourTail connects via its "end" end (dir=0 → side index 1 end, dir=1 → side index 0 end)
+            // Determine actual sides based on dir: ourTail conn…
             int ourSide = (ourTail.dir == 0) ? 1 : -1; // +1=front end, -1=rear end
             int theirSide = (theirHead.dir == 0) ? -1 : 1; // opposite side
             theirHead.leaderSide = ourSide;
@@ -169,10 +160,7 @@ public final class Formation {
         reallocation();
     }
 
-    /**
-     * Called by crowbar: disconnect at the given side of the given train.
-     * RTM faithful port of Formation.onDisconnectedTrain.
-     */
+    /** Called by crowbar: disconnect at the given side o… */
     public void onDisconnectedTrain(TrainEntity train, int side) {
         FormationEntry entry = getEntry(train);
         if (entry == null) return;
@@ -202,10 +190,7 @@ public final class Formation {
 
     public byte getDirection() { return direction; }
 
-    /**
-     * Called every tick from the front car.
-     * Moves all cars in formation order using the rail movement system.
-     */
+    /** Called every tick from the front car. */
     public void updateTrainMovement() {
         TrainEntity prevTrain = null;
         float currentSpeed = speed;
@@ -214,7 +199,7 @@ public final class Formation {
             FormationEntry entry = entries[idx];
             if (entry != null && entry.train != null && entry.train.isAlive()) {
                 if (prevTrain == null) {
-                    // Front car: already moved by normal tick; capture its actual speed
+                    // Front car: already moved by normal tick;
                     currentSpeed = entry.train.getSpeed();
                 } else {
                     // Follower car: position relative to previous car
@@ -225,7 +210,7 @@ public final class Formation {
         }
     }
 
-    /** Returns true if this formation contains the given train */
+    /** Returns true if this formation contains the given… */
     public boolean containsTrain(TrainEntity train) {
         return trainStream().anyMatch(t -> t == train);
     }

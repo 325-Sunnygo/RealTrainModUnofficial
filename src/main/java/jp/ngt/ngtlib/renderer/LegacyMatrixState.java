@@ -3,7 +3,7 @@ package jp.ngt.ngtlib.renderer;
 import org.joml.Matrix4f;
 import java.util.*;
 
-/** Virtual fixed-function stacks: no removed GL entry points are called on core contexts. */
+/** Virtual fixed-function stacks: no removed GL entr… */
 public final class LegacyMatrixState {
     private final GLRecorder recorder;
     public int mode=5888,activeTexture=33984;

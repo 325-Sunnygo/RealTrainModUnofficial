@@ -8,9 +8,7 @@ import java.util.Map;
 
 
 
-/**
- * モデルファイルのデータを格納
- */
+/** モデルファイルのデータを格納 */
 
 public interface IModelNGT {
     void renderAll(boolean smoothing);
@@ -19,9 +17,7 @@ public interface IModelNGT {
 
     void renderPart(boolean smoothing, String partName);
 
-    /**
-     * GL_QUADS or GL_TRIANGLES
-     */
+    /** GL_QUADS or GL_TRIANGLES */
     int getDrawMode();
 
     List<GroupObject> getGroupObjects();

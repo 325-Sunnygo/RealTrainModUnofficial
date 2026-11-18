@@ -1,9 +1,6 @@
 package com.portofino.realtrainmodunofficial.util;
 
-/**
- * ログに出すファイルパスから利用者の個人情報を伏せるヘルパ。
- * 不具合報告では latest.log をそのまま添付してもらうことが多い。
- */
+/** ログに出すファイルパスから利用者の個人情報を伏せるヘルパ。 */
 public final class LogPaths {
 
     private static final String HOME = System.getProperty("user.home", "");
@@ -11,10 +8,7 @@ public final class LogPaths {
     private LogPaths() {
     }
 
-    /**
-     * ログ出力用にパスを無害化する。ホームディレクトリ配下なら先頭を ~ に置き換える。
-     * slf4j は引数を遅延評価するため、戻り値はそのまま {} へ渡してよい。
-     */
+    /** ログ出力用にパスを無害化する。ホームディレクトリ配下なら先頭を ~ に置き換える。 */
     public static Object safe(Object path) {
         if (path == null) {
             return null;

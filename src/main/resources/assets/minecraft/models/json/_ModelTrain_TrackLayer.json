@@ -20,12 +20,12 @@
   "customButtonTips": ["mode", "execute", "place mode"],
 
   "buttonTexture": "textures/train/track_layer/button_track_layer.png",
-  "sound_Stop": "rtm:train.rtm_dc40r_stn",
-  "sound_S_A": "rtm:train.rtm_dc40r_go-a",
-  "sound_Acceleration": "rtm:train.rtm_dc40r_a",
-  "sound_Deceleration": "rtm:train.rtm_dc40r_i",
-  "sound_D_S": "rtm:train.rtm_dc40r_i-stop",
-  "sound_Horn": "rtm:train.rtm_wh_00l",
+  "sound_Stop": "train.rtm_dc40r_stn",
+  "sound_S_A": "train.rtm_dc40r_go-a",
+  "sound_Acceleration": "train.rtm_dc40r_a",
+  "sound_Deceleration": "train.rtm_dc40r_i",
+  "sound_D_S": "train.rtm_dc40r_i-stop",
+  "sound_Horn": "train.rtm_wh_00l",
 
   "headLights": [
     {

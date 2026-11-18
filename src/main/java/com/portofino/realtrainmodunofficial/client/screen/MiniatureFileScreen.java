@@ -16,10 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * NGTO ファイルの選択 / 書き出し画面 (neo mcte)。
- * 本家 MCTE の「選択」「書き出し」ボタンから開く画面に相当する。
- */
+/** NGTO ファイルの選択 / 書き出し画面 (neo mcte)。 */
 public class MiniatureFileScreen extends Screen {
 
     private final MiniatureSettingsScreen parent;

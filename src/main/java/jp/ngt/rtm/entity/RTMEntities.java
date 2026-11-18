@@ -10,10 +10,7 @@ import net.minecraft.world.entity.MobCategory;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/**
- * jp.ngt.rtm エンティティの登録 (Phase 2)。
- * メインクラスから REGISTER.register(modBus) される。
- */
+/** jp.ngt.rtm エンティティの登録 (Phase 2)。 */
 public final class RTMEntities {
     public static final DeferredRegister<EntityType<?>> REGISTER =
             DeferredRegister.create(Registries.ENTITY_TYPE, RealTrainModUnofficial.MODID);
@@ -22,9 +19,7 @@ public final class RTMEntities {
             REGISTER.register("rtm_train", () -> EntityType.Builder.<EntityTrain>of(EntityTrain::new, MobCategory.MISC)
                     .sized(EntityTrainBase.TRAIN_WIDTH, EntityTrainBase.TRAIN_HEIGHT)
                     .clientTrackingRange(10)
-                    // ★毎tick送る。本家は VehicleTrackerEntry という専用トラッカーを
-                    // 持たせて位置を毎tick配っている。3 tick に 1 回だと、走行中だけ
-                    // 車ごとに更新の位相がずれて車間が開く (停車中は正常に見える)。
+                    // ★毎tick送る。本家は VehicleTrackerEntry という専用トラッカーを 持たせて…
                     .updateInterval(1)
                     .build("rtm_train"));
 
@@ -32,9 +27,7 @@ public final class RTMEntities {
             REGISTER.register("rtm_bogie", () -> EntityType.Builder.<EntityBogie>of(EntityBogie::new, MobCategory.MISC)
                     .sized(EntityTrainBase.TRAIN_WIDTH, EntityTrainBase.TRAIN_HEIGHT)
                     .clientTrackingRange(10)
-                    // ★毎tick送る。本家は VehicleTrackerEntry という専用トラッカーを
-                    // 持たせて位置を毎tick配っている。3 tick に 1 回だと、走行中だけ
-                    // 車ごとに更新の位相がずれて車間が開く (停車中は正常に見える)。
+                    // ★毎tick送る。本家は VehicleTrackerEntry という専用トラッカーを 持たせて…
                     .updateInterval(1)
                     .build("rtm_bogie"));
 
@@ -44,9 +37,7 @@ public final class RTMEntities {
                     // 本家 setSize(1.25F, 0.0625F) — 高さは掴みやすいよう少し確保
                     .sized(1.25F, 0.35F)
                     .clientTrackingRange(8)
-                    // ★毎tick送る。本家は VehicleTrackerEntry という専用トラッカーを
-                    // 持たせて位置を毎tick配っている。3 tick に 1 回だと、走行中だけ
-                    // 車ごとに更新の位相がずれて車間が開く (停車中は正常に見える)。
+                    // ★毎tick送る。本家は VehicleTrackerEntry という専用トラッカーを 持たせて…
                     .updateInterval(1)
                     .build("rtm_floor"));
 
@@ -58,11 +49,7 @@ public final class RTMEntities {
                     .clientTrackingRange(10)
                     .build("rtm_motorman"));
 
-    /**
-     * 本家 EntityBullet (銃の弾)。
-     * 本家は {@code setSize(0.05F,0.05F)}、40cm 砲弾だけ 0.5F。当たり判定は自前で
-     * AABB を膨らませて取るので、大きい方に合わせてある。
-     */
+    /** 本家 EntityBullet (銃の弾)。 */
     public static final DeferredHolder<EntityType<?>, EntityType<EntityBullet>> BULLET =
             REGISTER.register("rtm_bullet", () -> EntityType.Builder.<EntityBullet>of(
                             EntityBullet::new, MobCategory.MISC)
@@ -71,9 +58,7 @@ public final class RTMEntities {
                     .updateInterval(1)
                     .build("rtm_bullet"));
 
-    /**
-     * 本家 EntityFluid (溶けた金属 / コークスの粒)。本家 {@code setSize(SIZE, SIZE)}。
-     */
+    /** 本家 EntityFluid (溶けた金属 / コークスの粒)。 */
     public static final DeferredHolder<EntityType<?>, EntityType<jp.ngt.rtm.entity.fluid.EntityFluid>> FLUID =
             REGISTER.register("rtm_fluid", () -> EntityType.Builder.<jp.ngt.rtm.entity.fluid.EntityFluid>of(
                             jp.ngt.rtm.entity.fluid.EntityFluid::new, MobCategory.MISC)

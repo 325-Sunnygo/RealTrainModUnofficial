@@ -18,6 +18,10 @@ public final class VehicleRegistry {
     public static void setDefinitions(List<VehicleDefinition> defs) {
         DEFINITIONS.clear();
         BY_ID.clear();
+        // モデル定義が変わったら ModelSet (serverSE/guiSE) と設定アダプタも作り直…
+        jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.clearModelSetCache();
+        jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.clearCache();
+        jp.ngt.rtm.modelpack.cfg.VehicleConfigAdapter.clearCache();
         Map<String, VehicleDefinition> unique = new LinkedHashMap<>();
         for (VehicleDefinition d : defs) {
             if (d == null) {

@@ -10,44 +10,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/**
- * 設置オブジェクト (標識/看板/信号/踏切) の焼き込みキャッシュ。本家 RTM のディスプレイリスト方式の移植。
- * 本家の作り
- * 本家 RailPartsRenderer.renderRailStatic (KaizPatchX) はこうなっている:
- * hasList = prepareStaticDisplayList(te);                       //無ければ生成
- * if (hasList && te.shouldRerenderRail && !shouldRefreshDisplayList(te))
- * te.shouldRerenderRail = false;                            //★キーが同じなら焼き直さずフラグだけ下ろす
- * if (!hasList || te.shouldRerenderRail) compileStaticRailParts(te);
- * if (hasList) renderStaticDisplayList(te);                     //push→translate→bindTexture→callList→pop
- */
+/** 設置オブジェクト (標識/看板/信号/踏切) の焼き込みキャッシュ。 */
 public final class ObjectMeshCache {
 
     /** 保持する焼き込みの上限。超えたら古いものから VBO を解放する。 */
     private static final int MAX_ENTRIES = 1024;
     /** 1 つの焼き込みで許す頂点数。異常に大きいものは焼かず CPU 経路に任せる。 */
     private static final int MAX_VERTICES = 1 << 20;
-    /**
-     * 1 フレームに焼く数の上限。視界に大量の設置物が入った瞬間のスパイクを散らす
-     * (レール側 RailMeshCache.MAX_BAKES_PER_FRAME と同じ考え方)。
-     */
+    /** 1 フレームに焼く数の上限。視界に大量の設置物が入った瞬間のスパイクを散らす (レール側 Rail… */
     private static final int MAX_BAKES_PER_FRAME = 8;
 
 
     private static int bakesThisFrame;
     private static int frameCounter;
 
-    /**
-     * 1 つの設置物が保持できる「向き違いの焼き込み」の数。
-     * 回転灯 (24 ポーズ) / ミラーボール (360 ポーズ) を丸ごと保持できる値にしてある。
-     * これを超えて新しいキーが来続けるものは「連続変化」と見なして焼くのをやめる (dynamic)。
-     */
+    /** 1 つの設置物が保持できる「向き違いの焼き込み」の数。 */
     private static final int POSES_PER_ENTRY = 1024;
 
-    /**
-     * これより頂点が多いモデルは「向き別キャッシュ」の対象外にする。
-     * 1 ポーズの焼き込みが重い巨大モデルを毎フレーム焼くと、そのままクライアントが
-     * 固まってしまう (MSE の 4.9MB MQO 等)。回転灯/ミラーボールは数千頂点なので対象内。
-     */
+    /** これより頂点が多いモデルは「向き別キャッシュ」の対象外にする。 */
     private static final int MAX_POSES_VERTICES = 16384;
 
     /** 何フレーム連続で内容が変わったら「可動物」と見なすか。 */
@@ -65,11 +45,7 @@ public final class ObjectMeshCache {
     }
 
     private static final class Entry {
-        /**
-         * 内容キー → 焼き込み。本家のディスプレイリストは「形を焼いて回転は行列」なので
-         * 同じ形の向き違いは 1 回焼けば使い回せる。RTMU は向き込みで焼くため、
-         * 向きごとに焼き込みを保持して再焼きを無くす (回転灯/ミラーボール対策)。
-         */
+        /** 内容キー → 焼き込み。本家のディスプレイリストは「形を焼いて回転は行列」なので 同じ形の向き違い… */
         final Map<Integer, List<MeshCapture.Section>> poses =
             new LinkedHashMap<>(8, 0.75F, true) {
                 @Override
@@ -102,10 +78,7 @@ public final class ObjectMeshCache {
         }
     }
 
-    /**
-     * 焼き込みの置き場。本家は te.glLists だが、RTMU はブロックエンティティに手を入れずに済むよう
-     * ここで持つ。アクセス順で上限を切り、あふれたぶんは VBO を解放する (描画スレッドで起きる)。
-     */
+    /** 焼き込みの置き場。本家は te.glLists だが、RTMU はブロックエンティティに手を入れず… */
     private static final Map<BlockEntity, Entry> CACHE =
         new LinkedHashMap<>(64, 0.75F, true) {
             @Override
@@ -121,13 +94,7 @@ public final class ObjectMeshCache {
     private ObjectMeshCache() {
     }
 
-    /**
-     * 焼き込みを描く。本家 renderRailStatic と同じ流れ。
-     * 単位行列基準 (ブロックエンティティ原点) で描画すること。
-     * @param key   焼き直し判定キー (本家 createStaticRenderKey 相当)
-     * @param baker キーが変わったときだけ呼ばれる。渡された MultiBufferSource へ
-     * @return true = 描画を予約した (呼び出し元は CPU 経路で描かない)
-     */
+    /** 焼き込みを描く。本家 renderRailStatic と同じ流れ。 */
     public static boolean draw(BlockEntity be, PoseStack poseStack, int key,
                                Consumer<MultiBufferSource> baker) {
         if (be == null || poseStack == null || baker == null) {
@@ -135,9 +102,6 @@ public final class ObjectMeshCache {
         }
 
         // ★ シェーダーパック使用中は焼き込み VBO を使わない。
-        //   この VBO は RailDrawQueue 経由 (CPU 合成 ModelView + drawWithShader) で描かれるため、
-        //   Iris では行列が一致せず設置物が引き伸ばされる。false を返すと呼び出し側
-        //   (InstalledObjectScriptCache / MachineScriptRenderers) が毎フレーム即時描画する。
         if (com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
             return false;
         }
@@ -154,12 +118,6 @@ public final class ObjectMeshCache {
         }
 
         // ★本家の要点そのもの: キーが同じなら焼き直さない。
-        // ★回転灯/ミラーボールは向きごとにキーが変わるが、向きの数は有限なので
-        //   「向きごとに焼いて保持」する (poses)。これで再焼きが起きなくなる。
-        // ★ただし巨大モデル (MSE 等) は 1 ポーズが重すぎるので向き別キャッシュにしない。
-        //   向き別に持つと毎フレーム焼き続けてクライアントが固まる (統合サーバーが
-        //   "Can't keep up!" を出す)。その場合は 1 ポーズだけ保持し、
-        //   内容が変わり続けるなら焼くのをやめる (dynamic)。
         List<MeshCapture.Section> sections = entry.poses.get(key);
         if (sections == null || !isUsable(sections)) {
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
@@ -194,8 +152,7 @@ public final class ObjectMeshCache {
         } else {
             entry.churn = 0;
         }
-        // 本家 renderStaticDisplayList: push → translate → bindTexture (リストの外) → callList → pop。
-        // ここでは RenderType がテクスチャを持ち、pose が translate にあたる。
+        // 本家 renderStaticDisplayList: push → translate → bi…
         boolean drewAny = false;
         for (MeshCapture.Section s : sections) {
             if (RailDrawQueue.enqueue(s.vbo(), s.renderType(), poseStack)) {
@@ -209,9 +166,7 @@ public final class ObjectMeshCache {
     public static void beginFrame() {
         bakesThisFrame = 0;
         frameCounter++;
-        // ワールドを移ったら全部捨てる。ここは BlockEntity を強参照で持つので、
-        // 捨てないと前のワールドのブロックエンティティと VBO を掴んだままになる
-        // (レール側 RailMeshCache.dropIfLevelChanged と同じ)。
+        // ワールドを移ったら全部捨てる。ここは BlockEntity を強参照で持つので、 捨てないと前の…
         net.minecraft.world.level.Level level = net.minecraft.client.Minecraft.getInstance().level;
         if (level != lastLevel) {
             clear();
@@ -235,7 +190,6 @@ public final class ObjectMeshCache {
     private static List<MeshCapture.Section> bake(Consumer<MultiBufferSource> baker) {
         MeshCapture.Source source = new MeshCapture.Source();
         // ★レール側 (RailMeshCache.bake) と同じ。
-        // 静的 VBO 直描画を止めて、頂点が必ずこの Source へ流れるようにする。
         boolean prevCapture = com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.captureMode;
         com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.captureMode = true;
         try {

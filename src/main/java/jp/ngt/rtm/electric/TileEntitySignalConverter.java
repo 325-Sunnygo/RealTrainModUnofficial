@@ -13,32 +13,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 信号変換機。本家 {@code jp.ngt.rtm.electric.TileEntitySignalConverter} と
- * その 5 つの内部クラス (RSIn / RSOut / Increment / Decrement / Wireless) の移植。
- *
- * <p>本家は種類ごとに別クラスだが、1.21 の BlockEntity は 1 種類にまとめて
- * BlockState の {@code type} で分岐する (本家のメタと同じ 0〜4)。
- * 分岐の中身・NBT のキー ({@code comparatorIndex} / {@code signal_0} / {@code signal_1})・
- * 値の意味は本家そのまま。
- *
- * <p>★本家は「配線網が {@link #getElectricity()} を読みに来る」<b>プル型</b>だが、
- * RTMU の {@link WireManager} は信号が変わった側から流す<b>プッシュ型</b>。
- * そのため RSIn と無線受信は、値が変わった時にこちらから {@code propagate} する。
- * 流れる値そのものは本家と同じ。
- */
+/** 信号変換機。本家 jp.ngt.rtm.electric.TileEntitySignalConv… */
 public class TileEntitySignalConverter extends BlockEntity implements IProvideElectricity {
 
     /** 本家 comparator。RSOut の比較演算子。 */
     private ComparatorType comparator = ComparatorType.EQUAL;
-    /** 本家 signalOnTrue: RS_ON のとき流す値 / RSOut の閾値 / 無線のチャンネル。 */
+    /** 本家 signalOnTrue: RS_ON のとき流す値 / RSOut の閾値 / 無線のチャ… */
     private int signalOnTrue;
     /** 本家 signalOnFalse: RS_OFF のとき流す値 / 無線のチャンク読み込み範囲。 */
     private int signalOnFalse;
-    /**
-     * 本家 signal: 変換器が今持っている値 (RSOut では比較結果の 0/1)。
-     * ★本家は<b>保存しない</b> (writeToNBT に無い) のでこちらも保存しない。
-     */
+    /** 本家 signal: 変換器が今持っている値 (RSOut では比較結果の 0/1)。 */
     private int signal;
 
     /** RSIn がレッドストーンの変化を拾うための前回値。 */
@@ -58,7 +42,7 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
     @Override
     protected void loadAdditional(CompoundTag nbt, HolderLookup.Provider provider) {
         super.loadAdditional(nbt, provider);
-        //本家のキー。旧 RTMU のキーも読めるようにしておく (既存ワールド互換)
+        // 本家のキー。旧 RTMU のキーも読めるようにしておく (既存ワールド互換)
         int index = nbt.contains("comparatorIndex") ? nbt.getInt("comparatorIndex") : nbt.getInt("comparator");
         int i0 = nbt.contains("signal_0") ? nbt.getInt("signal_0")
             : (nbt.contains("signalOnTrue") ? nbt.getInt("signalOnTrue") : 15);
@@ -76,11 +60,7 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
         nbt.putInt("signal_1", this.signalOnFalse);
     }
 
-    /**
-     * ★本家 {@code markDirty} は {@code sendPacket()} でクライアントへも配る。
-     * これが無いと設定画面を開き直したときにクライアントが既定値 (15 / 0) を出すので、
-     * 「完了を押したのに保存されていない」ように見える。
-     */
+    /** ★本家 markDirty は sendPacket() でクライアントへも配る。 */
     @Override
     public CompoundTag getUpdateTag(HolderLookup.Provider provider) {
         return this.saveWithoutMetadata(provider);
@@ -91,7 +71,7 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    // ───── 本家 getComparator / getSignalLevel / setSignalProp ─────
+    // ───── 本家 getComparator / getSignalLevel / setSign…
 
     public ComparatorType getComparator() {
         return this.comparator;
@@ -110,11 +90,11 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
         this.setChanged();
         if (this.level != null && !this.level.isClientSide()) {
             if (this.getConverterType() == SignalConverterType.Wireless) {
-                this.registerWireless();   //本家 updateAntennaList (チャンネル変更で入り直す)
+                this.registerWireless();   // 本家 updateAntennaList (チャンネル変更で入り直す)
             }
-            //本家 markDirty → sendPacket 相当 (クライアントへ同期)
+            // 本家 markDirty → sendPacket 相当 (クライアントへ同期)
             this.level.sendBlockUpdated(this.worldPosition, this.getBlockState(), this.getBlockState(), 3);
-            //設定が変わったら今の値で流し直す (本家はプル型なので次の読み取りで反映される)
+            // 設定が変わったら今の値で流し直す (本家はプル型なので次の読み取りで反映される)
             this.prevInputSignal = Integer.MIN_VALUE;
         }
     }
@@ -124,21 +104,21 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
         this.setSignalProp(onTrue, onFalse, ComparatorType.getType(comparatorId));
     }
 
-    // ───── 本家 getElectricity / setElectricity (種類ごと) ─────
+    // ───── 本家 getElectricity / setElectricity (種類ごと) ─…
 
     /** 本家 各 TileEntitySC_*.getElectricity。 */
     @Override
     public int getElectricity() {
         return switch (this.getConverterType()) {
-            //本家 TileEntitySC_RSIn: どこかの面がレッドストーンで押されていれば signalOnTrue
+            // 本家 TileEntitySC_RSIn: どこかの面がレッドストーンで押されていれば signa…
             case RSIn -> this.isPoweredBySide() ? this.signalOnTrue : this.signalOnFalse;
-            //本家 TileEntitySC_RSOut: 配線へは何も出さない
+            // 本家 TileEntitySC_RSOut: 配線へは何も出さない
             case RSOut -> 0;
             default -> this.signal;
         };
     }
 
-    /** 本家 TileEntitySC_RSIn.getElectricity の {@code world.isSidePowered} 相当。 */
+    /** 本家 TileEntitySC_RSIn.getElectricity の world.isSid… */
     private boolean isPoweredBySide() {
         if (this.level == null) {
             return false;
@@ -156,10 +136,10 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
     public void setElectricity(int x, int y, int z, int level) {
         switch (this.getConverterType()) {
             case RSIn -> {
-                //本家 TileEntitySC_RSIn.setElectricity は空 (入力専用)
+                // 本家 TileEntitySC_RSIn.setElectricity は空 (入力専用)
             }
             case RSOut -> {
-                //本家 TileEntitySC_RSOut: 閾値 (signalOnTrue) と比べて 0/1
+                // 本家 TileEntitySC_RSOut: 閾値 (signalOnTrue) と比べて 0/1
                 int i0 = switch (this.comparator) {
                     case EQUAL -> level == this.signalOnTrue ? 1 : 0;
                     case GREATER_EQUAL -> level >= this.signalOnTrue ? 1 : 0;
@@ -171,17 +151,17 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
                 if (i0 != this.signal) {
                     this.signal = i0;
                     if (this.level != null && !this.level.isClientSide()) {
-                        //本家 world.notifyNeighborsOfStateChange
+                        // 本家 world.notifyNeighborsOfStateChange
                         this.level.updateNeighborsAt(this.worldPosition, this.getBlockState().getBlock());
                     }
                 }
             }
-            //本家 TileEntitySC_Increment: 0 より大きければ +1、0 なら 0 (上限クランプ無し)
+            // 本家 TileEntitySC_Increment: 0 より大きければ +1、0 なら 0 (上…
             case Increment -> this.signal = level > 0 ? level + 1 : 0;
-            //本家 TileEntitySC_Decrement: 1 より大きければ -1、それ以外はそのまま (1 は 1 のまま)
+            // 本家 TileEntitySC_Decrement: 1 より大きければ -1、それ以外はそのまま…
             case Decrement -> this.signal = level > 1 ? level - 1 : level;
             case Wireless -> {
-                //本家 TileEntitySC_Wireless.setElectricity: 同じチャンネルの全機へ配る
+                // 本家 TileEntitySC_Wireless.setElectricity: 同じチャンネルの…
                 this.signal = level;
                 if (this.level != null && !this.level.isClientSide()) {
                     broadcastWireless(this, level);
@@ -192,15 +172,11 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
 
     /** 本家 getRSOutput: この変換器がレッドストーンへ出す強さ。 */
     public int getRSOutput() {
-        //本家: RSOut 以外は 0
+        // 本家: RSOut 以外は 0
         return this.getConverterType() == SignalConverterType.RSOut && this.signal == 1 ? 15 : 0;
     }
 
-    /**
-     * RSIn の監視。
-     * ★本家はプル型なので tick を持たないが、RTMU の配線はプッシュ型なので
-     * 「レッドストーンが変わったら流し直す」役をここでやる。流す値は本家と同じ。
-     */
+    /** RSIn の監視。 ★本家はプル型なので tick を持たないが、RTMU の配線はプッシュ型なの… */
     public static void tick(Level level, BlockPos pos, BlockState state, TileEntitySignalConverter be) {
         if (level.isClientSide()) {
             return;
@@ -228,7 +204,7 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
         return this.signalOnTrue;
     }
 
-    /** 本家 getChunkLoadRange: signalOnFalse (GUI の下段)。★チャンク常時読み込みは未実装。 */
+    /** 本家 getChunkLoadRange: signalOnFalse (GUI の下段)。 */
     public int getChunkLoadRange() {
         return this.signalOnFalse;
     }
@@ -284,9 +260,7 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
                 if (receiver == sender || receiver.isRemoved() || receiver.level == null) {
                     continue;
                 }
-                receiver.signal = level;   //本家 setWirelessSignal
-                //本家はここで終わり (受け手の getElectricity を配線が読む)。
-                //RTMU はプッシュ型なので受け手側の配線へ流す。
+                receiver.signal = level;   // 本家 setWirelessSignal 本家はここで終わり (受け手の getElectrici…
                 WireManager.propagate(receiver.level, receiver.worldPosition, level);
             }
         } finally {
@@ -294,7 +268,7 @@ public class TileEntitySignalConverter extends BlockEntity implements IProvideEl
         }
     }
 
-    //★onLoad は NeoForge 拡張でバニラ (Fabric) に無い。両ローダーにある clearRemoved で登録する
+    // ★onLoad は NeoForge 拡張でバニラ (Fabric) に無い。
     @Override
     public void clearRemoved() {
         super.clearRemoved();

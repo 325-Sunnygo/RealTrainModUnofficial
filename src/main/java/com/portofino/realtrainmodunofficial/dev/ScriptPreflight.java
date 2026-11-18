@@ -11,18 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
-/**
- * 開発用プリフライト。同梱している全スクリプトを検査する。ゲームを起動せずに
- * 「読めないスクリプト」を洗い出すための検証専用 (jar には含めない)。
- *
- * <p><b>構文検査</b>: prepare 済みソースを eval し、<b>パースエラーだけ</b>を本物の失敗として
- * 報告する。トップレベルでプリリュードのグローバル (NGTMath 等) を参照すると
- * ReferenceError になるが、それは実行時エラーであってスクリプトの不備ではないため除外する。
- *
- * <p><b>本番同等ロード</b>: プリリュードを付けて eval し、__bindFails を集計する。
- * プリリュードは Minecraft のレジストリ (jp.ngt.mccompat.init.Blocks) や FMLPaths に
- * 触るため、ゲーム外では初期化に失敗する。それは<b>環境要因</b>として区分する。
- */
+/** 開発用プリフライト。同梱している全スクリプトを検査する。 */
 public final class ScriptPreflight {
 
     private ScriptPreflight() {
@@ -65,7 +54,6 @@ public final class ScriptPreflight {
                 prepared = PackScriptSource.prepare(raw, rel, path -> readInclude(scriptsDir, path));
             } catch (Throwable t) {
                 // prepare は gameDir 等に触るためゲーム外では失敗し得る。
-                // 構文検査だけは生ソースで行う。
                 prepared = raw;
                 preparedOk = false;
                 prepareFailed++;
@@ -83,7 +71,7 @@ public final class ScriptPreflight {
                 syntaxFailures.add(formatSyntaxError(rel, prepared, e));
                 continue;
             } catch (Throwable t) {
-                // An unavailable engine is a failed check, never a syntax pass.
+                // An unavailable engine is a failed check, never a…
                 syntaxFailed++;
                 syntaxFailures.add(rel + " :: syntax check unavailable: " + t);
                 continue;
@@ -118,10 +106,7 @@ public final class ScriptPreflight {
             }
         }
 
-        // --- プリリュード自己テスト ---
-        // Java.type の代わりに素の java.lang.Class を返すバインダを使うと、
-        // GL11.glPushMatrix() / new Parts(...) が壊れる (実機で発生した回帰)。
-        // ここで「関数として呼べるか」を必ず検査する。
+        // --- プリリュード自己テスト --- Java.type の代わりに素の java.lang.C…
         List<String> bindFailures = new ArrayList<>();
         try {
             ScriptEngine se = ScriptUtil.createEngine();

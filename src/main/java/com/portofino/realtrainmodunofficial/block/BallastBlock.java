@@ -16,11 +16,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-/**
- * 道床ブロック。高さ1px(1/16) = カーペット相当の薄板。見た目あり（バラスト/砂利テクスチャ）。
- * 対応レールコア(LargeRailCore)位置を BlockEntity に保持し、道床を壊すとレールも撤去される
- * (ユーザー要望)。列車設置時のレール検出 (getRailMapAt) でも道床からコアを引ける。
- */
+/** 道床ブロック。高さ1px(1/16) = カーペット相当の薄板。 */
 public class BallastBlock extends BaseEntityBlock {
     public static final MapCodec<BallastBlock> CODEC = simpleCodec(p -> new BallastBlock());
     /** 高さ1px のカーペット相当スラブ */
@@ -64,7 +60,6 @@ public class BallastBlock extends BaseEntityBlock {
     @Override
     public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
         // 道床を壊したら対応するレールコアも撤去する (ユーザー要望)。
-        // RailMap.suppressRailRemoval 中(レール自身の撤去処理)は連鎖させない。
         if (!level.isClientSide && state.getBlock() != newState.getBlock() && !RailMap.suppressRailRemoval) {
             BlockEntity be = level.getBlockEntity(pos);
             if (be instanceof BallastBlockEntity bbe) {

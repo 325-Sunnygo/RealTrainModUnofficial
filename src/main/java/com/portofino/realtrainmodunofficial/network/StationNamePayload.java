@@ -11,7 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** 駅コアの駅名をサーバーへ送る。本家 {@code PacketNBT.sendToServer(tileEntity)} 相当。 */
+/** 駅コアの駅名をサーバーへ送る。本家 PacketNBT.sendToServer(tileEnti… */
 public record StationNamePayload(BlockPos pos, String name) implements CustomPacketPayload {
 
     public static final Type<StationNamePayload> TYPE = new Type<>(

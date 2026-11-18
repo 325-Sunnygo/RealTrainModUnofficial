@@ -2,11 +2,7 @@ package jp.ngt.mccompat;
 
 import net.minecraft.world.item.ItemStack;
 
-/**
- * 1.7.10 ItemStack のスクリプト互換ラッパー。
- * SRB3/NGTO は item.func_77973_b (getItem) を RTMItem.itemLargeRail 等と
- * 同一性比較し、func_77978_p (NBT) をミニチュア読取に使う。
- */
+/** 1.7.10 ItemStack のスクリプト互換ラッパー。 */
 public final class ItemStackCompat {
     public final ItemStack stack;
     private record TagView(jp.ngt.mccompat.nbt.NBTTagCompound tag,
@@ -28,11 +24,7 @@ public final class ItemStackCompat {
         return null;
     }
 
-    /**
-     * func_77973_b = getItem。
-     * 1.7.10 に 1 個しか無かったアイテムが RTMU で 2 個に分かれている場合は、
-     * 本家側の 1 個へ正規化して返す。
-     */
+    /** func_77973_b = getItem。 */
     public net.minecraft.world.item.Item func_77973_b() {
         net.minecraft.world.item.Item item = stack.getItem();
         if (item instanceof jp.ngt.rtm.item.ItemRail && jp.ngt.rtm.RTMItem.itemLargeRail != null) {
@@ -58,9 +50,7 @@ public final class ItemStackCompat {
 
     /** func_77978_p = getTagCompound */
     public jp.ngt.mccompat.nbt.NBTTagCompound func_77978_p() {
-        // MCTEU (com.mattya.mcteunofficial) のミニチュアは、NGTO Builder が読めるよう中身を
-        // NGTObject 形式 ("BlocksData" を含む) に変換して見せる (ソフト連携)。MCTEU 未導入や
-        // データ未解決なら null が返り、従来どおり実 NBT にフォールバックする。
+        // MCTEU (com.mattya.mcteunofficial) のミニチュアは、NGTO Bu…
         net.minecraft.nbt.CompoundTag mcteu = jp.ngt.mcte.McteuMiniatureBridge.getBlocksDataTag(stack);
         if (mcteu != null) {
             return new jp.ngt.mccompat.nbt.NBTTagCompound(mcteu);
@@ -99,7 +89,7 @@ public final class ItemStackCompat {
         TAG_VIEWS.put(stack,new java.lang.ref.WeakReference<>(view));
         wrapper.watch(()->{
             var current=reference.get();
-            // Replacing or removing the tag detaches old references, just as setTagCompound does.
+            // Replacing or removing the tag detaches old refere…
             if(current==null || current.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA)!=view.data().get()) return;
             var data=net.minecraft.world.item.component.CustomData.of(wrapper.tag);
             view.data().set(data); current.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,data);

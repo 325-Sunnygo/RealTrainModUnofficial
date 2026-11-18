@@ -5,10 +5,7 @@ import jp.ngt.rtm.entity.train.EntityTrainBase;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.util.FormationManager (KaizPatchX) の忠実移植。
- * 本家は RTMCore.proxy が Side ごとのインスタンスを供給 → ここでは static 2 面で再現。
- */
+/** 本家 jp.ngt.rtm.entity.train.util.FormationManager… */
 public final class FormationManager {
     private static final FormationManager SERVER = new FormationManager(false);
     private static final FormationManager CLIENT = new FormationManager(true);

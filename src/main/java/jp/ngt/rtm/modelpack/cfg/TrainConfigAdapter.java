@@ -7,10 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 暫定アダプタ (Phase 2): VehicleDefinition → 本家 TrainConfig。
- * Phase 4 で ModelPackManager による ModelTrain_*.json 直読に置き換えて削除する。
- */
+/** 暫定アダプタ (Phase 2): VehicleDefinition → 本家 TrainCon… */
 public final class TrainConfigAdapter {
     private static final Map<String, TrainConfig> CACHE = new ConcurrentHashMap<>();
     private static final TrainConfig DEFAULT = create(null);
@@ -66,7 +63,7 @@ public final class TrainConfigAdapter {
                 cfg.accelerateion = def.getAcceleration();
             }
 
-            //KaizPatchX: ノッチ段ごとの加速度 (段数は maxSpeed と同じ)
+            // KaizPatchX: ノッチ段ごとの加速度 (段数は maxSpeed と同じ)
             List<Float> accels = def.getNotchAccelerations();
             if (accels != null && !accels.isEmpty()) {
                 float[] aa = new float[accels.size()];
@@ -75,7 +72,7 @@ public final class TrainConfigAdapter {
                 }
                 cfg.accelerateions = aa;
             }
-            //KaizPatchX: ブレーキ 9 段
+            // KaizPatchX: ブレーキ 9 段
             List<Float> decels = def.getDecelerations();
             if (decels != null && !decels.isEmpty()) {
                 float[] dd = new float[decels.size()];

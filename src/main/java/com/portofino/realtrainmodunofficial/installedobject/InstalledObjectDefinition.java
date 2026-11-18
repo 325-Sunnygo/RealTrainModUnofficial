@@ -13,10 +13,7 @@ public class InstalledObjectDefinition {
     private final String modelFile;
     private final String scriptPath;
     private final String buttonTexture;
-    /**
-     * 本家 KaizPatchX の customIconTexture (ModelConfig)。
-     * 設定すると、アイテムの絵が既定のアイコンではなくこの画像になる。
-     */
+    /** 本家 KaizPatchX の customIconTexture (ModelConfig)。 */
     private String customIconTexture = "";
     private final Map<String, String> textureOverrides;
     private final Vec3 modelOffset;
@@ -34,21 +31,19 @@ public class InstalledObjectDefinition {
     private final int signFrame;
     private final int backTexture;
     private Vec3 wireAttachPos = Vec3.ZERO;
-    // ワイヤー用パラメータ(WireConfig 相当)。コンストラクタ後に setWireParams で設定。
+    // ワイヤー用パラメータ(WireConfig 相当)。
     private float sectionLength = 0.5F;
     private float deflectionCoefficient = 0.0F;
     /** 本家 WireConfig.lengthCoefficient。既定 0 = 長さによる補正なし。 */
     private float lengthCoefficient = 0.0F;
-    // 看板用パラメータ(本家 SignboardConfig 相当)。コンストラクタ後に setSignboardParams で設定。
-    // animationCycle: frame を1コマ進めるのに要する tick 数。
+    // 看板用パラメータ(本家 SignboardConfig 相当)。
     private int animationCycle = 1;
     private int color = 0;
     private int lightValue = 0;
-    // 本家 ModelConfig.serverScriptPath。サーバー側で毎 tick onUpdate(entity, executer) が呼ばれる
-    // スクリプト (列車検知器など)。コンストラクタ引数が既に多いので setter で後付けする。
+    // 本家 ModelConfig.serverScriptPath。
     private String serverScriptPath = "";
 
-    /** 本家 ModelConfig.customForm: 機械を右クリックしたときの DataMap 編集フォーム。 */
+    /** 本家 ModelConfig.customForm: 機械を右クリックしたときの DataMap… */
     public record FormField(String key, String label, int row, int column) {
     }
 
@@ -65,10 +60,7 @@ public class InstalledObjectDefinition {
         this.customForm = form;
     }
 
-    /**
-     * 本家 ModelConfig.defaultValues: 設置物の DataMap 既定値。
-     * スクリプトは {@code dataMap.getString("audio_loop_sound")} 等で読む。
-     */
+    /** 本家 ModelConfig.defaultValues: 設置物の DataMap 既定値。 */
     public record DefaultValue(String type, String elementType, String key, String value,
                                java.util.List<String> values) {
     }
@@ -78,23 +70,17 @@ public class InstalledObjectDefinition {
     public java.util.List<DefaultValue> getDefaultValues() {
         return this.defaultValues;
     }
-    // 本家 ModelConfig.doCulling (既定 false = 両面描画)。上と同じくコンストラクタが肥大するため setter。
+    // 本家 ModelConfig.doCulling (既定 false = 両面描画)。
     private boolean doCulling = false;
-    // 本家 MachineConfig.rotateByMetadata。true の照明 (サーチライト/回転灯/灯台灯) は
-    // RenderMachine と同じく「クリック面 (meta 0-5) の回転 ∘ プレイヤー向き」で描く。
+    // 本家 MachineConfig.rotateByMetadata。
     private boolean rotateByMetadata = false;
-    /**
-     * 本家 FlagConfig (textures/flag/Flag_*.json) の旗。null なら通常の mqo モデル設置物。
-     * texture はパック相対パス ("textures/flag/x.png")。
-     */
+    /** 本家 MachineConfig.followRailAngle: レールの勾配・カントにモデルを… */
+    private boolean followRailAngle = false;
+    /** 本家 FlagConfig (textures/flag/Flag_*.json) の旗。 */
     public record FlagParams(String texture, float width, float height,
                              int resolutionU, int resolutionV, float poleLength) {}
 
-    /**
-     * 本家 SignalConfig.maxSignalLevel。信号機が出せる現示の上限。
-     * json に無ければ {@code lights} の S(n) の最大値 (本家 SignalConfig.init と同じ導出)。
-     * 0 なら上限なし扱い。
-     */
+    /** 本家 SignalConfig.maxSignalLevel。信号機が出せる現示の上限。 */
     private int maxSignalLevel = -1;
 
     public int getMaxSignalLevel() {
@@ -125,7 +111,7 @@ public class InstalledObjectDefinition {
         this.flagParams = flagParams;
     }
 
-    /** 本家 OrnamentConfig.conveyorSpeed。足場 (エスカレーター) が乗った物を押す速さ。 */
+    /** 本家 OrnamentConfig.conveyorSpeed。 */
     private float conveyorSpeed = 0.0F;
 
     public float getConveyorSpeed() {
@@ -144,6 +130,14 @@ public class InstalledObjectDefinition {
         this.rotateByMetadata = rotateByMetadata;
     }
 
+    public boolean isFollowRailAngle() {
+        return this.followRailAngle;
+    }
+
+    public void setFollowRailAngle(boolean followRailAngle) {
+        this.followRailAngle = followRailAngle;
+    }
+
     public String getServerScriptPath() {
         return serverScriptPath;
     }
@@ -152,11 +146,7 @@ public class InstalledObjectDefinition {
         this.serverScriptPath = serverScriptPath == null ? "" : serverScriptPath;
     }
 
-    /**
-     * 本家 ModelConfig.doCulling。既定 false = 両面描画。
-     * 本家 ModelObject.render は車両も設置オブジェクトも通る共通経路で、
-     * if (!cfg.doCulling) GL11.glDisable(GL_CULL_FACE); と一律に扱う。
-     */
+    /** 本家 ModelConfig.doCulling。既定 false = 両面描画。 */
     public boolean isDoCulling() {
         return doCulling;
     }
@@ -196,11 +186,7 @@ public class InstalledObjectDefinition {
         return deflectionCoefficient;
     }
 
-    /**
-     * 本家 WireConfig.lengthCoefficient。長いほどたるみを小さくする係数で、
-     * 本家は alpha = deflectionCoefficient * cos(pitch) / (1+lengthCoefficient)^水平長 に使う。
-     * 既定の架線 (ModelWire_BasicWireBlack.json) は 0.0625 を指定している。
-     */
+    /** 本家 WireConfig.lengthCoefficient。 */
     public float getLengthCoefficient() {
         return lengthCoefficient;
     }
@@ -225,10 +211,7 @@ public class InstalledObjectDefinition {
         this.wireAttachPos = wireAttachPos == null ? Vec3.ZERO : wireAttachPos;
     }
 
-    // ---- 信号用 (本家 SignalConfig.modelPartsFixture / rotateBody) ----
-    // 本家 BasicSignalPartsRenderer: 柱 (fixture) は設置面の4方位のまま、
-    // ヘッド (body) だけ「プレイヤー向き (15°/スニーク1°) − 設置面の向き」回転させる。
-    // これで信号だけ斜めに置ける。コンストラクタ引数が既に多いので setter で後付けする。
+    // ---- 信号用 (本家 SignalConfig.modelPartsFixture / rot…
     private List<String> fixtureObjects = List.of();
     private Vec3 fixturePos = Vec3.ZERO;
     private boolean rotateBody = false;
@@ -251,8 +234,7 @@ public class InstalledObjectDefinition {
         this.rotateBody = rotateBody;
     }
 
-    // 本家 ModelConnector_*.json の connectorType ("Relay" 等)。NGTO Builder の Wire ツールが
-    // 碍子アイテムの getSubType==="Relay" でリレー碍子を判定するのに使う。
+    // 本家 ModelConnector_*.json の connectorType ("Relay"…
     private String subType = "";
 
     public String getSubType() {
@@ -272,7 +254,7 @@ public class InstalledObjectDefinition {
         this.subType = subType == null ? "" : subType;
     }
 
-    /** id ("category:pack:name") の末尾 = 本家の定義名 (スクリプトが比較する bare name)。 */
+    /** id ("category:pack:name") の末尾 = 本家の定義名 (スクリプトが比較す… */
     public String getBareName() {
         int idx = id.lastIndexOf(':');
         return idx >= 0 ? id.substring(idx + 1) : id;

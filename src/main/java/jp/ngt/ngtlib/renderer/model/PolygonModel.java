@@ -6,10 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.model.PolygonModel のスクリプト互換移植。
- * renderPart は GLRecorder に記録され、再生側が現在テクスチャで面を emit する。
- */
+/** 本家 jp.ngt.ngtlib.renderer.model.PolygonModel のスクリ… */
 public class PolygonModel implements IModelNGT {
     public jp.ngt.ngtlib.io.FileType getType() { return jp.ngt.ngtlib.io.FileType.getType(this.fileName); }
     public final List<GroupObject> groupObjects = new ArrayList<>();
@@ -125,7 +122,7 @@ public class PolygonModel implements IModelNGT {
         return out.toArray(new String[0]);
     }
 
-    /** 本家 tessellateAll: 全グループの頂点を tessellator へ積む (draw はしない)。 */
+    /** 本家 tessellateAll: 全グループの頂点を tessellator へ積む (draw… */
     public void tessellateAll(Object tessellator, boolean smoothing) {
         for (GroupObject group : this.groupObjects) {
             group.render(tessellator, smoothing);
@@ -173,7 +170,7 @@ public class PolygonModel implements IModelNGT {
         this.renderAll(false);
     }
 
-    /** 本家 renderAll(smoothing)。smoothing=true なら再生側が頂点法線で描く。 */
+    /** 本家 renderAll(smoothing)。 */
     public void renderAll(boolean smoothing) {
         GLRecorder rec = GLRecorder.active();
         if (rec != null) {

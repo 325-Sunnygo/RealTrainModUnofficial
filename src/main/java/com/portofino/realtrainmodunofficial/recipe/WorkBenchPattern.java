@@ -16,17 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * RTM 専用作業台 (5x5) のレシピ形状。
- *
- * <p>★バニラの {@link net.minecraft.world.item.crafting.ShapedRecipePattern} は
- * <b>3x3 を超えると解析時に例外を投げる</b> ("Invalid pattern: too many rows, 3 is maximum")。
- * そのまま使うと 4x4 以上のレシピが 1 つも読み込まれず、
- * サーバー起動ログに大量の {@code Parsing error loading recipe} が出る。
- * ここは本家 {@code ShapedRecipes55} と同じ 5x5 まで許す独自実装。
- *
- * <p>json の書式はバニラと同じ ({@code pattern} + {@code key})。
- */
+/** RTM 専用作業台 (5x5) のレシピ形状。 */
 public record WorkBenchPattern(int width, int height, NonNullList<Ingredient> ingredients) {
 
     /** 本家 RTM の作業台は 5x5。 */
@@ -96,10 +86,7 @@ public record WorkBenchPattern(int width, int height, NonNullList<Ingredient> in
         return DataResult.error(() -> "WorkBenchPattern の書き出しには未対応");
     }
 
-    /**
-     * 盤面に置かれた材料と一致するか。バニラの shaped と同じで<b>ずらして</b>照合し、
-     * 左右反転も見る (本家 RTM の作業台も鏡像を許す)。
-     */
+    /** 盤面に置かれた材料と一致するか。バニラの shaped と同じでずらして照合し、 左右反転も見る… */
     public boolean matches(CraftingInput input) {
         if (input.width() < this.width || input.height() < this.height) {
             return false;

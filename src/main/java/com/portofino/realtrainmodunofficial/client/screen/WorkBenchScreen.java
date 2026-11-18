@@ -6,11 +6,7 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
-/**
- * RTM 専用作業台の画面。本家 {@code GuiRTMWorkBench} 相当。
- *
- * <p>本家は専用の背景画像を使うが、RTMU は同梱していないので枠だけ自前で描く。
- */
+/** RTM 専用作業台の画面。本家 GuiRTMWorkBench 相当。 */
 public class WorkBenchScreen extends AbstractContainerScreen<WorkBenchMenu> {
 
     private static final int BG = 0xFFC6C6C6;
@@ -32,7 +28,7 @@ public class WorkBenchScreen extends AbstractContainerScreen<WorkBenchMenu> {
         graphics.fill(x, y, x + 1, y + this.imageHeight, 0xFFFFFFFF);
         graphics.fill(x + this.imageWidth - 1, y, x + this.imageWidth, y + this.imageHeight, 0xFF555555);
         graphics.fill(x, y + this.imageHeight - 1, x + this.imageWidth, y + this.imageHeight, 0xFF555555);
-        //枠は menu 側のスロット位置に合わせる
+        // 枠は menu 側のスロット位置に合わせる
         for (var slot : this.menu.slots) {
             graphics.fill(x + slot.x - 1, y + slot.y - 1, x + slot.x + 17, y + slot.y + 17, SLOT);
         }

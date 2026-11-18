@@ -18,10 +18,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 運転士のカスタムスキン (config/realtrainmodunofficial/npc_skins/*.png) の読み込み。
- * プレイヤースキン形式 (64x64)。旧 64x32 形式は読み込み時に 64x64 へ変換する。
- */
+/** 運転士のカスタムスキン (config/realtrainmodunofficial/npc_sk… */
 @OnlyIn(Dist.CLIENT)
 public final class MotormanSkinLoader {
 
@@ -71,8 +68,7 @@ public final class MotormanSkinLoader {
             try (InputStream in = Files.newInputStream(file)) {
                 img = NativeImage.read(in);
             }
-            // 旧 64x32 スキンは 64x64 キャンバスへ載せ替え (旧 img は close、新 img は
-            // DynamicTexture が所有して close する)
+            // 旧 64x32 スキンは 64x64 キャンバスへ載せ替え (旧 img は close、新 im…
             if (img.getHeight() == img.getWidth() / 2) {
                 NativeImage expanded = new NativeImage(img.getWidth(), img.getWidth(), true);
                 for (int x = 0; x < img.getWidth(); x++) {
@@ -83,15 +79,13 @@ public final class MotormanSkinLoader {
                 img.close();
                 img = expanded;
             }
-            // 旧レイアウト補正: 左脚/左腕領域が空なら右のミラーコピーで埋める
-            // (RTM 時代のスキンは 64x64 でも下半分が透明。プレイヤーモデルは左手足を
-            // (16,48)/(32,48) から読むため、空のままだと左腕・左脚が消える)
+            // 旧レイアウト補正: 左脚/左腕領域が空なら右のミラーコピーで埋める (RTM 時代のスキンは 64…
             int s = img.getWidth() / 64;
             if (regionEmpty(img, 16, 48, 16, 16, s)) {
-                mirrorCopy(img, 0, 16, 16, 48, 16, 16, s);   //右脚 → 左脚位置 (左右反転)
+                mirrorCopy(img, 0, 16, 16, 48, 16, 16, s);   // 右脚 → 左脚位置 (左右反転)
             }
             if (regionEmpty(img, 32, 48, 16, 16, s)) {
-                mirrorCopy(img, 40, 16, 32, 48, 16, 16, s);  //右腕 → 左腕位置 (左右反転)
+                mirrorCopy(img, 40, 16, 32, 48, 16, 16, s);  // 右腕 → 左腕位置 (左右反転)
             }
             String key = "motorman_skin/" + fileName.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_.-]", "_");
             ResourceLocation rl = ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, key);

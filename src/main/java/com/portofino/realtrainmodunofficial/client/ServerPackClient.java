@@ -13,7 +13,7 @@ import java.security.*;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Client download runs off-thread; activating completed archives happens on the game thread. */
+/** Client download runs off-thread; */
 public final class ServerPackClient {
     private static final ExecutorService IO=Executors.newSingleThreadExecutor(task->{Thread t=new Thread(task,"RTMU-Pack-Download");t.setDaemon(true);return t;});
     private static volatile String session="";
@@ -49,7 +49,7 @@ public final class ServerPackClient {
                     long total=0;var names=new HashSet<String>();pending.clear();
                     for(var pack:packs){if(!names.add(pack.name()))throw new IllegalArgumentException("Duplicate model pack");total+=pack.size();pending.add(pack);}
                     if(total>ServerPackStorage.MAX_TOTAL)throw new IllegalArgumentException("Model pack transfer exceeds limit");
-                    // Each manifest has its own activation directory, so removed server packs cannot remain active.
+                    // Each manifest has its own activation directory, s…
                     directory=directory.resolve("manifest-"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(message.data())).substring(0,24));
                     next(message.session());
                 } else if(message.action()==ServerModelPackPayload.CHUNK) {

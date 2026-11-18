@@ -15,10 +15,7 @@ import java.util.Objects;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.util.Formation (KaizPatchX) の忠実移植。
- * 編成の管理, ServerOnly。
- */
+/** 本家 jp.ngt.rtm.entity.train.util.Formation (KaizPa… */
 public class Formation {
     public final long id;
     public FormationEntry[] entries;
@@ -28,10 +25,7 @@ public class Formation {
     private byte direction;
     private float speed;
 
-    /**
-     * @param par1 ID
-     * @param par2 両数
-     */
+    
     public Formation(long par1, int par2) {
         this(par1, par2, false);
     }
@@ -80,7 +74,7 @@ public class Formation {
         }
     }
 
-    /** @return 両数 */
+    
     public int size() {
         return this.entries.length;
     }
@@ -105,11 +99,7 @@ public class Formation {
         return this.getFormationEntryStream().filter(entry -> par1.equals(entry.train)).findFirst().orElse(null);
     }
 
-    /**
-     * 編成に車両を登録
-     * @param par3 車両の位置
-     * @param par5 向き
-     */
+    /** 編成に車両を登録 */
     public void setTrain(EntityTrainBase par1, int par3, int par5) {
         this.setEntry(new FormationEntry(par1, par3, par5), par3);
         this.sendPacket();
@@ -157,13 +147,7 @@ public class Formation {
         this.entries = array;
     }
 
-    /**
-     * @param par1 連結される車両
-     * @param par2 連結対象の車両
-     * @param par3 連結される車両の向き
-     * @param par4 連結対象の車両の向き
-     * @param par5 連結対象の編成
-     */
+    
     public void connectTrain(EntityTrainBase par1, EntityTrainBase par2, int par3, int par4, Formation par5) {
         FormationEntry entry = this.getEntry(par1);
         if (entry == null) {
@@ -199,10 +183,7 @@ public class Formation {
         FormationManager.getInstance(this.isRemote).removeFormation(par5.id);
     }
 
-    /**
-     * 車両を編成から除去
-     * ※Server Only
-     */
+    /** 車両を編成から除去 ※Server Only */
     public void onRemovedTrain(EntityTrainBase par1) {
         // 1両編成の時
         if (this.entries.length <= 1) {
@@ -239,7 +220,7 @@ public class Formation {
             return;
         }
 
-        boolean b0 = (par2 == entry.dir);//true:切る向きが前
+        boolean b0 = (par2 == entry.dir);// true:切る向きが前
         int i0 = b0 ? entry.entryId : entry.entryId + 1;
         int size = this.entries.length - i0;
         Formation formation = new Formation(FormationManager.getInstance(this.isRemote).getNewFormationId(), size, this.isRemote);
@@ -283,7 +264,7 @@ public class Formation {
             return;
         }
 
-        this.direction = (byte) (par1 ^ entry.dir);//編成としての向き,XOR
+        this.direction = (byte) (par1 ^ entry.dir);// 編成としての向き,XOR
 
         this.getFormationEntryStream().forEach(entry2 -> {
             byte b0 = (byte) (this.direction ^ entry2.dir);
@@ -292,7 +273,7 @@ public class Formation {
     }
 
     public void setTrainStateData(int id, byte data, EntityTrainBase par2) {
-        if (id == TrainStateType.State_Direction.id)//向き
+        if (id == TrainStateType.State_Direction.id)// 向き
         {
             if (data == TrainState.Direction_Front.data || data == TrainState.Direction_Back.data) {
                 this.controlCar = par2;
@@ -307,13 +288,11 @@ public class Formation {
                     train.setTrainStateData_NoSync(id, TrainState.Direction_Center.data);
                 }
             });
-        } else if (id == TrainStateType.State_Door.id)//ドア
+        } else if (id == TrainStateType.State_Door.id)// ドア
         {
             int stateR = data & 1;
             int stateL = (data >> 1) & 1;
             // data は「操作した車両 (par2) 自身の物理左右」で来る。
-            // (FormationEntry.dir) が par2 と違う車両だけ左右を反転させれば、編成全体で
-            // 同じ物理側のドアが開く (本家は getTrainDirection を基準に同じ事をしている)。
             FormationEntry control = this.getEntry(par2);
             int refDir = (control == null) ? 0 : control.dir;
             for (FormationEntry e : this.entries) {

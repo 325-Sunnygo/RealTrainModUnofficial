@@ -86,7 +86,6 @@ public final class TrainCommands {
                     )
                 )
                 // 本家 MacroRecorder: 運転操作 (ノッチ/ドア/警笛) をマクロとして録画する。
-                // start → 列車を運転 → stop で config/realtrainmodunofficial/macro/日時.txt へ保存。
                 .then(Commands.literal("macro")
                     .then(Commands.literal("start")
                         .executes(context -> {
@@ -114,14 +113,7 @@ public final class TrainCommands {
         registerMctrl(dispatcher);
     }
 
-    /**
-     * KaizPatchX CommandMCtrl / ModelCtrl の移植。
-     * /mctrl <target> notch <-8~5>
-     * /mctrl <target> dir <0|1>
-     * /mctrl <target> dm <dataName> <value>
-     * /mctrl <target> state <TrainStateType> <TrainState>
-     * target = @a(全列車) / @n(最寄り) / @r:NN(半径NN) / @s(搭乗中) / 列車名。
-     */
+    /** KaizPatchX CommandMCtrl / ModelCtrl の移植。 */
     private static void registerMctrl(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(
             Commands.literal("mctrl")
@@ -271,7 +263,7 @@ public final class TrainCommands {
         return list.size();
     }
 
-    /** DataMap の値を型推定して書き込む (本家 ModelCtrl の set(name,value,3) 相当)。 */
+    /** DataMap の値を型推定して書き込む (本家 ModelCtrl の set(name,val… */
     private static void applyDataMap(jp.ngt.rtm.entity.train.EntityTrainBase tr, String name, String value) {
         jp.ngt.rtm.modelpack.state.DataMap dm = tr.getResourceState().getDataMap();
         if (value.equalsIgnoreCase("true") || value.equalsIgnoreCase("false")) {
@@ -306,15 +298,11 @@ public final class TrainCommands {
         return removedCount;
     }
 
-    /**
-     * Phase 0 スモークテスト: スタンドアロン Nashorn が本家 RTM と同じフラグ
-     * ("-doe" "--language=es6" + mozilla_compat.js) で NeoForge/Java21 上で動き、
-     * MOD クラス (Packages.jp.ngt / Java.type) を解決できるかを検証する。
-     */
+    /** Phase 0 スモークテスト: スタンドアロン Nashorn が本家 RTM と同じフラグ (… */
     private static int executeNashornTest(CommandSourceStack source) {
         try {
             String script =
-                // mozilla_compat: importPackage / importClass が生えていること
+                // mozilla_compat: importPackage / importClass が生えてい…
                 "importPackage(java.util);\n" +
                 "var list = new ArrayList(); list.add('a'); list.add('b');\n" +
                 // ES6 構文が有効であること (--language=es6)
@@ -338,11 +326,7 @@ public final class TrainCommands {
     }
 
 
-    /**
-     * 車両のサーバースクリプトをその場で読み込ませて結果を出す。
-     * サーバースクリプトは車を置いたときに初めて読まれるので、失敗しても
-     * 「本来の機能が使えない」としか分からず、原因の切り分けができなかった。
-     */
+    /** 車両のサーバースクリプトをその場で読み込ませて結果を出す。 */
     private static int executeServerScriptTest(CommandSourceStack source, String id) {
         var definition = com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(id);
         if (definition == null) {
@@ -355,9 +339,9 @@ public final class TrainCommands {
             return 1;
         }
         // キャッシュ済みだと 2 回目以降が素通りするので、必ず読み直す
-        com.portofino.realtrainmodunofficial.script.CarServerScripts.forget(id);
-        var entry = com.portofino.realtrainmodunofficial.script.CarServerScripts.get(definition);
-        if (entry == null) {
+        jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.forgetModelSet(id);
+        var modelSet = jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getTrainModelSet(id);
+        if (modelSet.serverSE == null) {
             source.sendFailure(Component.literal(
                 id + " のサーバースクリプト読み込みに失敗しました。原因はログを見てください ("
                 + definition.getServerScriptPath() + ")"));
@@ -369,10 +353,7 @@ public final class TrainCommands {
     }
 
 
-    /**
-     * 調査用: モデルのグループを名前で隠す / 戻す。引数なしで一覧と全解除。
-     * 「変な板が出ている」の類はどの部品かを先に確定させないと直せない。
-     */
+    /** 調査用: モデルのグループを名前で隠す / 戻す。引数なしで一覧と全解除。 */
     private static int executeHideGroup(CommandSourceStack source, String name) {
         if (name == null || name.isBlank()) {
             var hidden = com.portofino.realtrainmodunofficial.client.DebugHiddenGroups.listHidden();
@@ -435,10 +416,7 @@ public final class TrainCommands {
         }
     }
 
-    /**
-     * 本家系の列車 (jp.ngt.rtm.entity.train.EntityTrainBase — 設置される列車はこちら) と
-     * その台車・車両パーツを全て削除する。旧 TrainEntity の削除だけでは実車が残る。
-     */
+    /** 本家系の列車 (jp.ngt.rtm.entity.train.EntityTrainBase —… */
     private static int removeRtmTrainEntities(ServerLevel level) {
         List<Entity> targets = new ArrayList<>();
         int trainCount = 0;

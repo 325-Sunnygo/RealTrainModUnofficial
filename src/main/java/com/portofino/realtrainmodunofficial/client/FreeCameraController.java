@@ -12,12 +12,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import org.lwjgl.glfw.GLFW;
 
-/**
- * フリーカメラモード (RTMU オリジナル)。
- * 列車の運転席・客席に座っている状態でフリーカメラキー (既定 V、MC のコントロール設定で変更可)
- * を押すと「幽体離脱」してカメラがその場から切り離され、クリエイティブ飛行と同じ操作で
- * 自由に飛べる (WASD=水平移動 / スペース=上昇 / スニーク=下降 / ダッシュキー=高速)。
- */
+/** フリーカメラモード (RTMU オリジナル)。 */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class FreeCameraController {
 
@@ -49,10 +44,7 @@ public final class FreeCameraController {
         return camPitch;
     }
 
-    /**
-     * MouseHandlerMixin から: マウスの視点デルタをカメラの向きへ加える
-     * (体は回さない)。係数 0.15 は Entity.turn と同じ。
-     */
+    /** MouseHandlerMixin から: マウスの視点デルタをカメラの向きへ加える (体は回さな… */
     public static void addLook(double dyaw, double dpitch) {
         camYaw += (float) (dyaw * LOOK_SPEED);
         camPitch += (float) (dpitch * LOOK_SPEED);
@@ -170,10 +162,7 @@ public final class FreeCameraController {
         }
     }
 
-    /**
-     * フリーカメラ中は移動 (WASD/スペース/スニーク/マウス視点) 以外の操作を全て無効化する。
-     * 攻撃・使用・アイテムピック (左/右/中クリック) を握りつぶす。
-     */
+    /** フリーカメラ中は移動 (WASD/スペース/スニーク/マウス視点) 以外の操作を全て無効化する。 */
     @SubscribeEvent
     public static void onInteraction(InputEvent.InteractionKeyMappingTriggered event) {
         if (active) {
@@ -189,11 +178,7 @@ public final class FreeCameraController {
         }
     }
 
-    /**
-     * フリーカメラ中は E キー等でインベントリを開かせない (ユーザー報告: フリーカメラなのに
-     * E でインベントリが開いてしまう)。飛び回っている最中に画面が開くと操作が奪われ没入も切れるため。
-     * ポーズメニュー (Esc) は脱出用に通す。
-     */
+    /** フリーカメラ中は E キー等でインベントリを開かせない (ユーザー報告: フリーカメラなのに E… */
     @SubscribeEvent
     public static void onScreenOpening(net.neoforged.neoforge.client.event.ScreenEvent.Opening event) {
         if (!active) {
@@ -206,11 +191,7 @@ public final class FreeCameraController {
         }
     }
 
-    /**
-     * Camera.setup 末尾で CameraMixin が呼ぶ、補間済みカメラ位置。
-     * ComputeCameraAngles イベントは position 確定より前に発火し上書きされてしまうため、
-     * 位置の上書きは setup の TAIL (mixin) で行う。null ならフリーカメラ非アクティブ。
-     */
+    /** Camera.setup 末尾で CameraMixin が呼ぶ、補間済みカメラ位置。 */
     public static Vec3 getInterpolatedPosition(float partialTick) {
         if (!active) {
             return null;

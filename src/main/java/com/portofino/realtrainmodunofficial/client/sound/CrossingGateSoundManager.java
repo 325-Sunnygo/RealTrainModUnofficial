@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class CrossingGateSoundManager {
     private static final ResourceLocation CROSSING_SOUND_ID = ResourceLocation.fromNamespaceAndPath("rtm", "block.crossing_gate");
     private static final Map<String, LoopingCrossingSound> ACTIVE = new ConcurrentHashMap<>();
-    /** 踏切音が聞こえる最大距離(ブロック)。これより遠いと鳴らさない/停止する(=どこでも聞こえる不具合対策)。 */
+    /** 踏切音が聞こえる最大距離(ブロック)。これより遠いと鳴らさない/停止する(=どこでも聞こえる不具合… */
     private static double maximumDistance() { return jp.ngt.rtm.RTMConfig.crossingGateSoundRange; }
 
     private CrossingGateSoundManager() {
@@ -39,7 +39,7 @@ public final class CrossingGateSoundManager {
         return (dx * dx + dy * dy + dz * dz) <= maximumDistance() * maximumDistance() && maximumDistance() > 0;
     }
 
-    /** プレイヤーとの距離に応じた音量(近=1.0、FULL_VOLUME_DISTANCE超で線形減衰、MAXで0)。 */
+    /** プレイヤーとの距離に応じた音量(近=1.0、FULL_VOLUME_DISTANCE超で線形減衰、… */
     private static float volumeForDistance(BlockPos pos) {
         net.minecraft.client.player.LocalPlayer player = Minecraft.getInstance().player;
         if (player == null) {
@@ -145,8 +145,7 @@ public final class CrossingGateSoundManager {
             return CROSSING_SOUND_ID;
         }
         try {
-            // 空白・大文字入りのサウンド名 (hi03 Train Melodies 等) を生成側と同じ規則で安全化する。
-            // 揃えないと生成した SoundEvent と参照がずれ、踏切のデフォルトベル音に落ちて無音扱いになる。
+            // 空白・大文字入りのサウンド名 (hi03 Train Melodies 等) を生成側と同じ規則で…
             if (normalized.contains(":")) {
                 String[] split = normalized.split(":", 2);
                 String namespace = split[0].isBlank() ? "minecraft" : ExternalSoundPackBridge.sanitizeSoundPath(split[0]);

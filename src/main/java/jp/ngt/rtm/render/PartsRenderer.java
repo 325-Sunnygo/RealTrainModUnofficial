@@ -11,23 +11,14 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 
 import javax.script.ScriptEngine;
 
-/**
- * 本家 jp.ngt.rtm.render.PartsRenderer の段階的移植 (レールスクリプトが使う面から)。
- * GL 呼び出し・Parts 描画は GLRecorder に記録され、BER 側で PoseStack に再生される。
- */
+/** 本家 jp.ngt.rtm.render.PartsRenderer の段階的移植 (レールスクリ… */
 public class PartsRenderer implements com.portofino.realtrainmodunofficial.client.ActionPartsHost {
     public static java.util.Calendar CALENDAR = java.util.Calendar.getInstance();
 
-    // スクリプトが時刻系API (getTick/getSystemTime/getMCTime等) を読んだ = 描画結果が時間依存の合図。
-    // VehicleScriptRenderers はこれを見て、その車両を「静止でも毎フレーム再実行」に切り替える。
+    // スクリプトが時刻系API (getTick/getSystemTime/getMCTime等) を…
     private static boolean timeAccessed;
 
-    /**
-     * 時刻系APIが呼ばれたら立てる。
-     * ★public。実際にスクリプトへ束縛されるのは TrainScriptSystem 側の ScriptRenderer なので、
-     * あちらの時刻 API からも立てないと「時間で動く物」を検知できない
-     * (ミラーボール・赤色灯が回らなかった原因)。
-     */
+    /** 時刻系APIが呼ばれたら立てる。 ★public。 */
     public static void markTimeAccessed() {
         timeAccessed = true;
     }
@@ -55,10 +46,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
     protected static final float ANGLE = (float) (Math.PI * 2.0D / (double) DIV_NUM);
 
     protected ScriptEngine script;
-    /**
-     * 本家のフィールド名は modelObj (KaizPatchX PartsRenderer.java:39)。
-     * スクリプトは getter ではなくリフレクションでフィールド名を直接読む:
-     */
+    /** 本家のフィールド名は modelObj (KaizPatchX PartsRenderer.jav… */
     protected ModelObject modelObj = new ModelObject(null);
     protected Object modelSet;
     protected final java.util.List<Parts> partsList = new java.util.ArrayList<>();
@@ -75,19 +63,13 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
     public int currentMatId;
     public int currentPass;
 
-    /**
-     * 直近の render でスクリプトが例外を投げたか。
-     * ★これが無いと「モデルが透明になる」。
-     */
+    /** 直近の render でスクリプトが例外を投げたか。 ★これが無いと「モデルが透明になる」。 */
     private boolean scriptFailed;
 
     public PartsRenderer(String... par1) {
     }
 
-    /**
-     * スクリプトを実行し、例外が出たら #scriptFailed を立てる。
-     * 例外自体は本家どおり握りつぶす (1 フレームの失敗でクラッシュさせない)。
-     */
+    /** スクリプトを実行し、例外が出たら #scriptFailed を立てる。 */
     protected void execRenderScript(Object entity, int pass, float partialTick) {
         if (this.script == null) {
             return;
@@ -96,15 +78,10 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
             jp.ngt.ngtlib.io.ScriptUtil.doScriptFunction(this.script, "render", entity, pass, partialTick);
         } catch (Throwable t) {
             this.scriptFailed = true;
-            // 失敗の種類ごとに 1 回出す。以前は「このレンダラで 1 回だけ」だったため、
-            // 起動直後に別の理由で 1 回出ると以後の失敗が全て無音になり、
-            // ClassCastException で描画スクリプトが丸ごと落ちていても気付けなかった。
+            // 失敗の種類ごとに 1 回出す。以前は「このレンダラで 1 回だけ」だったため、 起動直後に別の理由…
             Throwable cause = t.getCause() != null ? t.getCause() : t;
             String key = pass + "|" + cause;
             // ★「render が無い」は異常ではない。
-            //   架線スクリプト (renderClass = WirePartsRenderer) は renderWireStatic /
-            //   renderWireDynamic しか持たず、柱そのものは素のモデルで描くのが正しい。
-            //   これを警告で出していたので、本当の失敗と見分けが付かなかった。
             boolean noRenderFunction = cause instanceof NoSuchMethodException
                     && String.valueOf(cause.getMessage()).contains("render");
             if (this.loggedScriptFailures.size() < 32 && this.loggedScriptFailures.add(key)) {
@@ -127,10 +104,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
     /** ログ用のスクリプト名。どのパックが落ちたか判らないと追えない。 */
     public String scriptName;
 
-    /**
-     * 直近の render が失敗したかを読み取ってフラグを下ろす。
-     * @return true = スクリプトが落ちた (呼び出し側は素のモデル描画へフォールバックすること)
-     */
+    /** 直近の render が失敗したかを読み取ってフラグを下ろす。 */
     public boolean consumeScriptFailure() {
         boolean failed = this.scriptFailed;
         this.scriptFailed = false;
@@ -161,9 +135,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
                 Throwable cause = t.getCause() != null ? t.getCause() : t;
                 // init を持たないスクリプトは正常
                 if (!(cause instanceof NoSuchMethodException)) {
-                    // ★握りつぶさない。init が落ちるとパーツ登録も定数の代入も行われず、
-                    //   スクリプトは「例外なしで何も描かない」状態になる
-                    //   (架線が既定のケーブルに落ちる症状の原因がここだと追えなかった)。
+                    // ★握りつぶさない。init が落ちるとパーツ登録も定数の代入も行われず、 スクリプトは「例外なしで…
                     com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
                         "[RTMU] スクリプトの init が落ちました script={}: {}",
                         this.scriptName == null ? "?" : this.scriptName, String.valueOf(cause));
@@ -177,7 +149,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         return this.modelObj;
     }
 
-    /** 本家 targetsList: クリック可能パーツ (ActionParts) の一覧。ActionPartsPicker が使う。 */
+    /** 本家 targetsList: クリック可能パーツ (ActionParts) の一覧。 */
     @Override
     public java.util.List<Parts> getTargetsList() {
         return this.targetsList;
@@ -189,10 +161,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         return this.modelObj != null ? this.modelObj.model : null;
     }
 
-    /**
-     * 本家 hittedParts / hittedEntity を更新する (スクリプトが参照する)。
-     * PICK パスの代わりに ActionPartsPicker が三角形レイキャストで当たりを求めて呼ぶ。
-     */
+    /** 本家 hittedParts / hittedEntity を更新する (スクリプトが参照する)。 */
     @Override
     public void setHoveredParts(Object entity, Parts part) {
         this.hittedEntity = entity;
@@ -203,17 +172,14 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         }
     }
 
-    /**
-     * 本家のフィールド名は modelObj。Nashorn はプロパティ参照を getter へ
-     * 解決するので、この名前で renderer.modelObj と書ける。
-     */
+    /** 本家のフィールド名は modelObj。Nashorn はプロパティ参照を getter へ 解決… */
     public ModelObject getModelObj() {
         return this.modelObj;
     }
 
     public Parts registerParts(Parts par1) {
         this.partsList.add(par1);
-        // 本家はクリック可能パーツ (ActionParts) を targetsList にも積み、id を 1 始まりで振る
+        // 本家はクリック可能パーツ (ActionParts) を targetsList にも積み、id…
         if (par1 != null && par1.isActionParts()) {
             par1.id = this.targetsList.size() + 1;
             this.targetsList.add(par1);
@@ -221,12 +187,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         return par1;
     }
 
-    /**
-     * 本家シグネチャ getRendererWithScript(ResourceLocation par1, String... args)
-     * (KaizPatchX PartsRenderer.java:440)。
-     * // test.zip!.../__targets__/kaizpatch/scripts/hi03_lib/lib_RTMApiCompatClient.compat.js:38
-     * Packages.jp.ngt.rtm.render.PartsRenderer.getRendererWithScript.apply(..., [resource, ...args]);
-     */
+    /** 本家シグネチャ getRendererWithScript(ResourceLocation pa… */
     public static PartsRenderer getRendererWithScript(Object resource, String... args)
             throws ReflectiveOperationException {
         if (resource instanceof ScriptEngine se) {
@@ -242,10 +203,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         return getRendererWithScript(se, args);
     }
 
-    /**
-     * 本家 getRendererWithScript: スクリプトの renderClass で指定された
-     * PartsRenderer サブクラスを生成し、スクリプトを結びつける。
-     */
+    /** 本家 getRendererWithScript: スクリプトの renderClass で指定さ… */
     public static PartsRenderer getRendererWithScript(ScriptEngine se, String... args)
             throws ReflectiveOperationException {
         String className = se == null ? null : String.valueOf(se.get("renderClass"));
@@ -295,29 +253,27 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
     }
 
     /** 本家: modelSet.getConfig.getName — スクリプトが車種判定に使う */
-    /**
-     * 本家 RailPartsRendererBase 限定の API だが、パックによっては車両/設置物の
-     * レンダラーからも呼ばれる。落とさないよう空実装を用意する
-     * (レール用は RailPartsRenderer が override する)。
-     */
+    /** 本家 RailPartsRendererBase 限定の API だが、パックによっては車両/設置… */
     public void renderStaticParts(Object tile, double x, double y, double z) {
     }
 
     public String getModelName() {
-        if (this.modelSet instanceof jp.ngt.rtm.modelpack.modelset.ModelSetCompat msc) {
-            return msc.getConfig().getName();
+        if (this.modelSet instanceof jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> set
+                && set.getConfig() instanceof jp.ngt.rtm.modelpack.cfg.ModelConfig cfg) {
+            return cfg.getName();
         }
         return "";
     }
 
-    /**
-     * 本家 PartsRenderer.getColor: 対象の ResourceState.color (プレイヤーが設定する色)。
-     * return entity instanceof IResourceSelector
-     * ? ((IResourceSelector) entity).getResourceState.color : 0;
-     */
+    /** 本家 PartsRenderer.getColor: 対象の ResourceState.colo… */
     public int getColor(Object entity) {
         if (entity instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity io) {
             return io.getWireColor();
+        }
+        // 本家: ResourceState.color (プレイヤーが設定する色)。
+        if (entity instanceof jp.ngt.rtm.modelpack.IModelSelector selector
+                && selector.getResourceState() instanceof jp.ngt.rtm.modelpack.state.ResourceState state) {
+            return state.color;
         }
         return 16777215;
     }
@@ -376,7 +332,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         this.dataMap.put(id, value);
     }
 
-    /** 本家: 前照灯のボリュームライト描画 (KaizPatchX PartsRenderer.renderLightEffect)。 */
+    /** 本家: 前照灯のボリュームライト描画 (KaizPatchX PartsRenderer.rend… */
     public void renderLightEffect(Object normal, double[] pos, float rL, float rS,
                                   float length, int color, int type, boolean reverse) {
         if (pos == null || pos.length < 3) {
@@ -385,11 +341,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         renderLightEffectS(normal, pos[0], pos[1], pos[2], rL, rS, length, color, type, reverse);
     }
 
-    /**
-     * 本家 PartsRenderer.renderLightEffectS の移植。
-     * 幾何計算は {@link com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry}
-     * に共通化し (車経路と共有)、ここでは GLRecorder の DRAW_TESS (加算合成) として記録する。
-     */
+    /** 本家 PartsRenderer.renderLightEffectS の移植。 */
     public static void renderLightEffectS(Object normal, double x, double y, double z,
                                           float rL, float rS, float length, int color, int type, boolean reverse) {
         GLRecorder recorder = GLRecorder.active();
@@ -402,7 +354,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
             // 視点依存 = カメラを動かすと形が変わる。焼き込みキーに混ぜてはいけない印。
             recorder.markViewDependent();
         }
-        // 本家 renderLightEffect は disableLighting → setLightmapMaxBrightness → 描画。
+        // 本家 renderLightEffect は disableLighting → setLight…
         recorder.brightness(0xF000F0);
         for (com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.Piece p
                 : com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.compute(
@@ -426,10 +378,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         this.recordRenderPartsSet(normalizedNames, null);
     }
 
-    /**
-     * Parts インスタンス付き版。色ピッキング (ActionParts) で同名パーツを区別するために
-     * インスタンス参照を記録へ添える。描画そのものは名前 Set だけで決まる。
-     */
+    /** Parts インスタンス付き版。色ピッキング (ActionParts) で同名パーツを区別するた… */
     public void recordRenderPartsSet(java.util.Set<String> normalizedNames, Object partsRef) {
         GLRecorder r = GLRecorder.active();
         if (r != null) {
@@ -443,11 +392,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         jp.ngt.ngtlib.util.NGTUtilClient.bindTexture(texture);
     }
 
-    /**
-     * 本家: 対象に乗員がいるか (NPC/車両スクリプトが使う)。
-     * 旧経路 (TrainScriptSystem.ScriptRenderer) にしか無かったため、
-     * jp.ngt レンダラ経路のスクリプトで未定義になっていた。
-     */
+    /** 本家: 対象に乗員がいるか (NPC/車両スクリプトが使う)。 */
     public boolean isRidden(Object entity) {
         if (entity instanceof net.minecraft.world.entity.Entity e) {
             return !e.getPassengers().isEmpty();
@@ -475,17 +420,8 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         return mc.player != null ? mc.player.getYRot() : 0.0F;
     }
 
-    /**
-     * 本家 (1.7.10) の {@code PartsRenderer.getPlayerYaw(entity)}。
-     * RTM 公式スクリプトが {@code renderer.getPlayerYaw(entity)} の形で呼ぶ
-     * (引数なし版しか無かったため "do not match any of its method signatures" で
-     *  描画スクリプトが落ちていた)。運転席のプレイヤーの向きを返す。
-     */
-    /**
-     * RTM 1.7.10 互換: 対象エンティティの向き (yaw)。
-     * RTM 公式スクリプトが {@code renderer.getYaw(entity)} と呼ぶ
-     * (無いと "getYaw is not a function" で描画スクリプトが丸ごと落ちる)。
-     */
+    /** 本家 (1.7.10) の PartsRenderer.getPlayerYaw(entity)。 */
+    /** RTM 1.7.10 互換: 対象エンティティの向き (yaw)。 */
     public float getYaw(Object entity) {
         if (entity instanceof net.minecraft.world.entity.Entity e) {
             return e.getYRot();
@@ -511,7 +447,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         return this.getPlayerYaw();
     }
 
-    /** Empty legacy slots are null, including native ItemStack.EMPTY. */
+    /** Empty legacy slots are null, including native Ite… */
     public Object getInventoryItem(Object entity, int slot) {
         return jp.ngt.ngtlib.renderer.LegacyItemRenderer.inventoryItem(entity,slot);
     }
@@ -541,11 +477,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         }
     }
 
-    /**
-     * 本家 GLHelper.disableLighting/enableLighting をレンダラー経由で呼ぶスクリプト互換
-     * 等: 室内灯で setFullBright; … renderer.enableLighting;)。
-     * enableLighting / disableLighting は記録された GL_LIGHTING 状態を切り替える。
-     */
+    /** 本家 GLHelper.disableLighting/enableLighting をレンダラー… */
     public void disableLighting() {
         jp.ngt.ngtlib.renderer.GLHelper.disableLighting();
     }
@@ -577,10 +509,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
         return NGTMath.sigmoid(x, c);
     }
 
-    /**
-     * 本家 PartsRenderer.spawnParticle: 粒子名 (文字列) で粒子を出す。
-     * SL パックの蒸気/煙演出が renderer.spawnParticle(entity, "explode", ...) で呼ぶ。
-     */
+    /** 本家 PartsRenderer.spawnParticle: 粒子名 (文字列) で粒子を出す。 */
     public void spawnParticle(Object entity, String name, double posX, double posY, double posZ,
                               double speedX, double speedY, double speedZ) {
         Level level = getWorld(entity);
@@ -641,10 +570,7 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
     }
 
 
-    /**
-     * 本家 rotateAndRender: 指定座標を中心に 3 軸回転してからパーツを描く。
-     * 角度はラジアン (本家は内部で度へ変換して glRotatef している)。
-     */
+    /** 本家 rotateAndRender: 指定座標を中心に 3 軸回転してからパーツを描く。 */
     public void rotateAndRender(Parts parts, float x, float y, float z,
                                 float rotationX, float rotationY, float rotationZ) {
         GLRecorder r = GLRecorder.active();

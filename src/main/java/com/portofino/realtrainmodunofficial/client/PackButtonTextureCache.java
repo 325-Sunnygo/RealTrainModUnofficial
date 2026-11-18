@@ -28,17 +28,13 @@ public final class PackButtonTextureCache {
                                     int sourceX, int sourceY, int sourceWidth, int sourceHeight) {}
 
     private static final Map<String, ButtonTextureInfo> CACHE = new ConcurrentHashMap<>();
-    /** 表示解像度へニアレスト焼き直し済みテクスチャ (key = pack|path|WxH → location)。 */
+    /** 表示解像度へニアレスト焼き直し済みテクスチャ (key = pack|path|WxH → loc… */
     private static final Map<String, ResourceLocation> SCALED = new ConcurrentHashMap<>();
 
     private PackButtonTextureCache() {
     }
 
-    /**
-     * 「このパスにボタンテクスチャは無い」ことを表す番兵。
-     * null を返すと Map#computeIfAbsent がキャッシュに乗せないため、欠落テクスチャを
-     * 参照するたびに全パック走査が走って FPS が激減する。
-     */
+    /** 「このパスにボタンテクスチャは無い」ことを表す番兵。 */
     private static final ButtonTextureInfo MISSING =
         new ButtonTextureInfo(null, 0, 0, 0, 0, 0, 0);
 
@@ -53,9 +49,9 @@ public final class PackButtonTextureCache {
     }
 
     private static ButtonTextureInfo load(String packName, String texturePath) {
-        //同梱アセット (assets/minecraft/...)。旗などパック外の既定素材はここで解決する。
+        // 同梱アセット (assets/minecraft/...)。
         try {
-            //ResourceLocation は大文字不可 → 同梱側はファイル名ごと小文字化してある
+            // ResourceLocation は大文字不可 → 同梱側はファイル名ごと小文字化してある
             ResourceLocation direct = ResourceLocation.withDefaultNamespace(
                 texturePath.toLowerCase(java.util.Locale.ROOT));
             var res = Minecraft.getInstance().getResourceManager().getResource(direct);
@@ -95,19 +91,12 @@ public final class PackButtonTextureCache {
         }
     }
 
-    /**
-     * テクスチャ欠落。紫黒チェッカーは描かず、欠落であることだけをキャッシュに残す。
-     * 呼び出し側 (ModelSelectScreen) は null を受けて車両名の文字を描く。
-     */
+    /** テクスチャ欠落。紫黒チェッカーは描かず、欠落であることだけをキャッシュに残す。 */
     private static ButtonTextureInfo missingButtonInfo() {
         return MISSING;
     }
 
-    /**
-     * buttonTexture のソース矩形をニアレストで target サイズへ焼き直したテクスチャの location。
-     * これを 1:1 (target と同じ UV サイズ) で blit すれば、GUI の描画経路が線形補間を強制していても
-     * スケーリングが起きない (テクセル=ピクセル) ので必ず鮮明になる。にじみ対策の本命。
-     */
+    /** buttonTexture のソース矩形をニアレストで target サイズへ焼き直したテクスチャ… */
     public static ResourceLocation getCrisp(String packName, String texturePath, int targetW, int targetH) {
         ButtonTextureInfo base = get(packName, texturePath);
         if (base == null) {
@@ -142,10 +131,7 @@ public final class PackButtonTextureCache {
         return result;
     }
 
-    /**
-     * #getCrisp の全画像版。
-     * ニアレストで target へ焼き直す。
-     */
+    /** #getCrisp の全画像版。 ニアレストで target へ焼き直す。 */
     public static ResourceLocation getCrispFull(String packName, String texturePath, int targetW, int targetH) {
         ButtonTextureInfo base = get(packName, texturePath);
         if (base == null) {
@@ -178,7 +164,7 @@ public final class PackButtonTextureCache {
         return result;
     }
 
-    /** ソース矩形 (0,0)-(srcW,srcH) をニアレストで dstW×dstH に焼き直した新規画像。 */
+    /** ソース矩形 (0,0)-(srcW,srcH) をニアレストで dstW×dstH に焼き直した新… */
     private static NativeImage nearestScale(NativeImage src, int srcW, int srcH, int dstW, int dstH) {
         NativeImage out = new NativeImage(NativeImage.Format.RGBA, dstW, dstH, false);
         int sw = Math.max(1, srcW);
@@ -193,17 +179,7 @@ public final class PackButtonTextureCache {
         return out;
     }
 
-    /**
-     * 本家 RTM のボタンソース矩形。
-     *
-     * <p>本家は {@code drawTexturedModalRect(x, y, 0, 0, 160, 32)} で描く。1.7.10/1.12.2 の
-     * この API は UV を <b>256px 固定</b>で割るため、実際にサンプルされるのは
-     * テクスチャ左上の <b>160/256 × 32/256 の割合</b> (62.5% × 12.5%) になる。
-     * 解像度 (256/512/…) に依らずこの割合で切るのが本家と同じ。
-     *
-     * <p>★以前は「160×128 以上なら割合、それ以外は 160×32 固定」という RTMU 独自の
-     * 分岐があり、解像度がデフォルトと違うボタンで切り出しがずれて縮小/見切れしていた。
-     */
+    /** 本家 RTM のボタンソース矩形。 本家は drawTexturedModalRect(x, y,… */
     private static int[] computeSourceRegion(int width, int height) {
         return new int[]{
             Math.max(1, Math.min(width, Math.round(width * 160.0F / 256.0F))),
@@ -211,7 +187,7 @@ public final class PackButtonTextureCache {
         };
     }
 
-    /** パックから buttonTexture の NativeImage を読み込む (登録しない)。呼び出し側で close する。 */
+    /** パックから buttonTexture の NativeImage を読み込む (登録しない)。 */
     public static NativeImage readImage(String packName, String texturePath) throws Exception {
         Path packPath = RailPackLoader.resolvePackPath(packName);
         NativeImage image = null;
@@ -233,13 +209,11 @@ public final class PackButtonTextureCache {
         );
         int width = image.getWidth();
         int height = image.getHeight();
-        // 本家と同じく 256px 空間の UV (0,0)-(160,32) = 左上 62.5% × 12.5% をサンプルする。
-        // 解像度に依らずこの割合 (RTMU 独自の「160×32 固定」分岐は撤去)。
+        // 本家と同じく 256px 空間の UV (0,0)-(160,32) = 左上 62.5% × 1…
         int[] region = computeSourceRegion(width, height);
         int srcW = region[0];
         int srcH = region[1];
         // GUI ボタンはピクセル等倍で鮮明に見せたい。
-        // 拡大縮小時ににじむ (ユーザー報告「ボタンがぼやける」)。最近傍・ミップマップ無しに固定する。
         DynamicTexture dynamicTexture =
             com.portofino.realtrainmodunofficial.client.render.DynamicTextureRegistry.register(location, image);
         if (dynamicTexture != null) {
@@ -324,9 +298,7 @@ public final class PackButtonTextureCache {
     private static ZipEntry findEntry(ZipFile zipFile, String texturePath) {
         String normalized = normalize(texturePath).toLowerCase(Locale.ROOT);
         String leaf = normalized.substring(normalized.lastIndexOf('/') + 1);
-        // 1) フルパス一致を最優先。button_*.png が normal/ と new/ のように別フォルダに同名で
-        // 同居していると、リーフ名一致だけでは zip 内の先着を拾って取り違える とN で
-        // 同じボタンが出る不具合)。まず要求パスそのものに一致するエントリを探す。
+        // 1) フルパス一致を最優先。button_*.png が normal/ と new/ のように別…
         ZipEntry byFullPath = zipFile.stream()
             .filter(entry -> !entry.isDirectory())
             .filter(entry -> {
@@ -532,7 +504,7 @@ public final class PackButtonTextureCache {
         if (maxX < minX || maxY < minY) {
             return null;
         }
-        // RTM buttonTexture is usually used with a very tight crop plus a 1px margin.
+        // RTM buttonTexture is usually used with a very tig…
         minX = Math.max(0, minX - 1);
         minY = Math.max(0, minY - 1);
         maxX = Math.min(width - 1, maxX + 1);

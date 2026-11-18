@@ -2,10 +2,7 @@ package jp.ngt.mcte;
 
 import net.minecraft.world.item.Item;
 
-/**
- * MCTE (Minecraft Train Editor) のスクリプト互換。
- * NGTO Builder が MCTE.itemMiniature を参照する (無視リスト用)。
- */
+/** MCTE (Minecraft Train Editor) のスクリプト互換。 */
 @SuppressWarnings("unused")
 public final class MCTE {
     private MCTE() {

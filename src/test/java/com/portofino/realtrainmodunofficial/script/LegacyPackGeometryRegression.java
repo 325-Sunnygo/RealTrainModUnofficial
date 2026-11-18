@@ -6,14 +6,14 @@ import java.lang.reflect.*;
 import java.util.*;
 import java.util.zip.ZipFile;
 
-/** Compares the actual pack's script graph with the submitted mesh, including UVs and winding. */
+/** Compares the actual pack's script graph with the… */
 public final class LegacyPackGeometryRegression {
     private static String vertex(float x,float y,float z,float u,float v) {
         return bits(x)+","+bits(y)+","+bits(z)+","+bits(u)+","+bits(v);
     }
     private static String bits(float x) { return Integer.toHexString(Float.floatToIntBits(x==0?0:x)); }
     private static String triangle(String a,String b,String c) {
-        // Cyclic rotations preserve winding; reversing it must fail the comparison.
+        // Cyclic rotations preserve winding;
         String x=a+";"+b+";"+c,y=b+";"+c+";"+a,z=c+";"+a+";"+b;
         return Collections.min(List.of(x,y,z));
     }

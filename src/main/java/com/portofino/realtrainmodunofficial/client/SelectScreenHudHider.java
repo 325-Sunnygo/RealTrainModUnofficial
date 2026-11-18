@@ -10,11 +10,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderGuiLayerEvent;
 
-/**
- * モデル選択 / 標識・看板選択画面を開いている間は、ミニマップ等の MOD 製 HUD レイヤーを隠す。
- * JourneyMap などのミニマップは net.minecraft.client.Options#hideGui (F1) を無視して
- * 選択画面の上に被さる。
- */
+/** モデル選択 / 標識・看板選択画面を開いている間は、ミニマップ等の MOD 製 HUD レイヤーを… */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class SelectScreenHudHider {
     private SelectScreenHudHider() {

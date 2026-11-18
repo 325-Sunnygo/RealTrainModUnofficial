@@ -6,7 +6,7 @@ import jp.ngt.ngtlib.math.NGTMath;
 import jp.ngt.ngtlib.math.StraightLine;
 import net.minecraft.world.level.Level;
 
-/** 本家 jp.ngt.rtm.rail.util.RailMapBasic (KaizPatchX) の忠実移植。 */
+/** 本家 jp.ngt.rtm.rail.util.RailMapBasic (KaizPatchX)… */
 public class RailMapBasic extends RailMap {
     /** 水平方向の線形 */
     protected ILine lineHorizontal;
@@ -16,16 +16,15 @@ public class RailMapBasic extends RailMap {
     protected RailPosition startRP;
     protected RailPosition endRP;
 
-    // 本家準拠: RailMap.rails をシャドーイングしている (RailMapSlope が使用)
+    // 本家準拠: RailMap.rails をシャドーイングしている (RailMapSlope が使…
     protected final java.util.List<int[]> rails = new java.util.ArrayList<>();
 
     protected double length;
-    // version 0: RTM original or KaizPatch 1.6.0.older
-    // version 1: KaizPatch 1.7.0...
+    // version 0: RTM original or KaizPatch 1.6.0.older…
     public final int fixRTMRailMapVersion;
     public static int fixRTMRailMapVersionCurrent = 1;
 
-    /** @deprecated use #RailMapBasic(RailPosition, RailPosition, int) */
+    /** @deprecated use #RailMapBasic(RailPosition, RailP… */
     @Deprecated
     public RailMapBasic(RailPosition par1, RailPosition par2) {
         this(par1, par2, 0);
@@ -40,7 +39,7 @@ public class RailMapBasic extends RailMap {
         } else if (this.startRP.cantEdge * this.startRP.cantCenter == 0 && this.endRP.cantEdge * this.startRP.cantCenter > 0) {
             this.startRP.cantCenter = -this.startRP.cantCenter;
         }
-        this.endRP.cantCenter = this.startRP.cantCenter;//中央カント共通化
+        this.endRP.cantCenter = this.startRP.cantCenter;// 中央カント共通化
         this.createLine();
     }
 
@@ -57,8 +56,8 @@ public class RailMapBasic extends RailMap {
         double z1 = this.endRP.posZ;
 
         boolean flag1 = (this.startRP.anchorYaw + this.endRP.anchorYaw) % 180.0F == 0;
-        boolean flag2 = (z0 == z1 || x0 == x1);//直角
-        boolean flag3 = (Math.abs(z0 - z1) == Math.abs(x0 - x1) && this.startRP.direction % 2 != 0 && this.endRP.direction % 2 != 0);//45度
+        boolean flag2 = (z0 == z1 || x0 == x1);// 直角
+        boolean flag3 = (Math.abs(z0 - z1) == Math.abs(x0 - x1) && this.startRP.direction % 2 != 0 && this.endRP.direction % 2 != 0);// 45度
         boolean fixRTMV1 = fixRTMRailMapVersion >= 1 &&
                 (startRP.anchorYaw != NGTMath.wrapAngle(startRP.direction * 45.0F)
                         || endRP.anchorYaw != NGTMath.wrapAngle(endRP.direction * 45.0F));
@@ -70,7 +69,7 @@ public class RailMapBasic extends RailMap {
             double max = Math.max(ddz, ddx);
             double min = Math.min(ddz, ddx);
             if (this.startRP.anchorLengthHorizontal <= 0.0F) {
-                boolean b0 = this.startRP.direction % 2 == 0;//true:まっすぐ, false:斜め
+                boolean b0 = this.startRP.direction % 2 == 0;// true:まっすぐ, false:斜め
                 double d1 = b0 ? max : min;
                 this.startRP.anchorLengthHorizontal = (float) (d1 * RailPosition.Anchor_Correction_Value);
             }
@@ -88,7 +87,7 @@ public class RailMapBasic extends RailMap {
             this.lineHorizontal = new BezierCurve(z0, x0, z0 + d1, x0 + d2, z1 + d3, x1 + d4, z1, x1);
         }
 
-        // ////////////////////////////////////////////////////////////////////////////////////////////////
+        // ///////////////////////////////////////////////…
 
         double lenXZ = Math.sqrt(NGTMath.pow(x1 - x0, 2) + NGTMath.pow(z1 - z0, 2));
 
@@ -134,11 +133,7 @@ public class RailMapBasic extends RailMap {
         return this.lineHorizontal.getNearlestPoint(par1, par2, par3);
     }
 
-    /**
-     * @param par1 分割数
-     * @param par2 位置
-     * @return {z, x}
-     */
+    
     public double[] getRailPos(int par1, int par2) {
         double ratio = par1 == 0 ? 0.0D : (double) par2 / (double) par1;
         return this.getRailPos(ratio);
@@ -148,18 +143,14 @@ public class RailMapBasic extends RailMap {
         return this.lineHorizontal.getPoint(ratio);
     }
 
-    /**
-     * @param par1 分割数
-     * @param par2 位置
-     * @return y
-     */
+    
     public double getRailHeight(int par1, int par2) {
         double ratio = par1 == 0 ? 0.0D : (double) par2 / (double) par1;
         return this.getRailHeight(ratio);
     }
 
     public double getRailHeight(double ratio) {
-        float railWidth = 3.0F;//本来はRailConfigから取得すべし
+        float railWidth = 3.0F;// 本来はRailConfigから取得すべし
         double height = this.lineVertical.getPoint(ratio)[1];
         float cant = this.getRailRoll(ratio);
         if (cant != 0.0F) {
@@ -169,9 +160,7 @@ public class RailMapBasic extends RailMap {
         return height;
     }
 
-    /**
-     * @return 0~360
-     */
+    
     public float getRailYaw(int par1, int par2) {
         double ratio = par1 == 0 ? 0.0D : (double) par2 / (double) par1;
         return this.getRailYaw(ratio);
@@ -181,11 +170,7 @@ public class RailMapBasic extends RailMap {
         return NGTMath.toDegrees((float) this.lineHorizontal.getSlope(ratio));
     }
 
-    /**
-     * @param par1 分割数
-     * @param par2 位置
-     * @return 0~360
-     */
+    
     public float getRailPitch(int par1, int par2) {
         double ratio = par1 == 0 ? 0.0D : (double) par2 / (double) par1;
         return this.getRailPitch(ratio);
@@ -195,9 +180,7 @@ public class RailMapBasic extends RailMap {
         return NGTMath.toDegrees((float) this.lineVertical.getSlope(ratio));
     }
 
-    /**
-     * @return カント
-     */
+    
     public float getRailRoll(int split, int t) {
         double ratio = split == 0 ? 0.0D : (double) t / (double) split;
         return this.getRailRoll(ratio);
@@ -228,7 +211,7 @@ public class RailMapBasic extends RailMap {
         return this.startRP.checkRSInput(world) && this.endRP.checkRSInput(world);
     }
 
-    // ================= 以下は Remaster 暫定互換 API (Phase 2 で TrainEntity 刷新後に削除予定) =================
+    // ================= 以下は Remaster 暫定互換 API (Phase 2…
 
     /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated

@@ -6,7 +6,7 @@ import java.lang.reflect.*;
 import java.util.*;
 import java.util.function.Function;
 
-/** Optional Iris secondary views. Preserve the primary pipeline and its uniforms/buffers. */
+/** Optional Iris secondary views. */
 public final class IrisMirrorView implements AutoCloseable {
     private static Object sourcePipeline,reflectionPipeline,vanillaSkyPipeline;
     private static boolean vanillaView;

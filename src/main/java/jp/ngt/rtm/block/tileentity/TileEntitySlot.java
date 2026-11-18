@@ -6,10 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * スロットの中身。本家 {@code jp.ngt.rtm.block.tileentity.TileEntitySlot} の移植。
- * 5 tick に 1 回だけ、信号が来ていれば吸い込む。
- */
+/** スロットの中身。本家 jp.ngt.rtm.block.tileentity.TileEntity… */
 public class TileEntitySlot extends BlockEntity {
     private int count;
 

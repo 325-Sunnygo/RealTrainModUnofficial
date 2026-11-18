@@ -14,10 +14,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * ミニチュアの設定変更 (neo mcte)。クライアントの設定画面 → サーバ。
- * ★変更は手に持っているそのスタックにしか効かない。
- */
+/** ミニチュアの設定変更 (neo mcte)。クライアントの設定画面 → サーバ。 */
 public record MiniatureSettingsPayload(
     boolean offHand,
     float scale,
@@ -33,7 +30,7 @@ public record MiniatureSettingsPayload(
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "miniature_settings")
     );
 
-    // composite は 6 要素までなので手書き。順序は encode/decode で必ず一致させること。
+    // composite は 6 要素までなので手書き。
     public static final StreamCodec<ByteBuf, MiniatureSettingsPayload> STREAM_CODEC =
         StreamCodec.of((buf, p) -> {
             buf.writeBoolean(p.offHand());

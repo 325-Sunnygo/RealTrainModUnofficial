@@ -3,10 +3,7 @@ package jp.ngt.rtm.entity.npc.macro;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * 本家 jp.ngt.rtm.entity.npc.macro.TrainCommand の移植。
- * マクロの 1 行 = 時刻 コマンド:引数 (# 以降はコメント)。
- */
+/** 本家 jp.ngt.rtm.entity.npc.macro.TrainCommand の移植。 */
 public class TrainCommand {
     public static final String SEPARATOR = "//";
     private static final String FORMAT = "%s %s:%s";
@@ -23,13 +20,13 @@ public class TrainCommand {
     }
 
     public static TrainCommand parse(String par1) {
-        String s = par1.split("#")[0]; //コメント除去
+        String s = par1.split("#")[0]; // コメント除去
         try {
             Matcher matcher = PATTERN.matcher(s);
             if (matcher.find()) {
                 long t1 = Long.parseLong(matcher.group(1));
                 CommandType type = CommandType.valueOf(matcher.group(2));
-                String param = matcher.group(3).replace(" ", ""); //コメントあり時のスペース除去
+                String param = matcher.group(3).replace(" ", ""); // コメントあり時のスペース除去
                 return new TrainCommand(t1, type, param);
             }
         } catch (Exception ignored) {

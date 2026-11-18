@@ -1,15 +1,12 @@
 package jp.ngt.ngtlib.renderer;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.NGTRenderer のスクリプト互換。
- * NGTO Builder の Prop/Liner ツールがミニチュア (NGTObject) のゴーストプレビューに使う。
- */
+/** 本家 jp.ngt.ngtlib.renderer.NGTRenderer のスクリプト互換。 */
 @SuppressWarnings("unused")
 public final class NGTRenderer {
     private NGTRenderer() {
     }
 
-    /** NGTObject のプレビュー描画 (isOldVer 分岐: renderNGTObject(ngto, true))。 */
+    /** NGTObject のプレビュー描画 (isOldVer 分岐: renderNGTObject(… */
     public static void renderNGTObject(Object ngto, boolean translucent) {
         GLRecorder rec = GLRecorder.active();
         if (rec == null || !(ngto instanceof jp.ngt.ngtlib.block.NGTObject obj)) {
@@ -27,18 +24,12 @@ public final class NGTRenderer {
         }
     }
 
-    /**
-     * 本家 renderNGTObject(world, ngto, changeLighting, mode, pass)。
-     * RTMU は world/mode/pass を使わず、ブロック列をそのまま記録する。
-     */
+    /** 本家 renderNGTObject(world, ngto, changeLighting, m… */
     public static void renderNGTObject(Object world, Object ngto, boolean changeLighting, int mode, int pass) {
         renderNGTObject(ngto, changeLighting);
     }
 
-    /**
-     * 本家 renderPole: 半径 r・長さ length の円柱を tessellator へ積む。
-     * 球テーブルの赤道 (行 64〜79) を輪切りとして使う。
-     */
+    /** 本家 renderPole: 半径 r・長さ length の円柱を tessellator へ積… */
     public static void renderPole(Object tessellator, double r, double length, boolean useTexture) {
         if (!(tessellator instanceof NGTTessellator tess)) {
             return;
@@ -77,7 +68,7 @@ public final class NGTRenderer {
         }
     }
 
-    /** 本家 renderSphere: 半径 r の球を tessellator へ積む (8 段 × 16 分割)。 */
+    /** 本家 renderSphere: 半径 r の球を tessellator へ積む (8 段 ×… */
     public static void renderSphere(Object tessellator, double r) {
         if (!(tessellator instanceof NGTTessellator tess)) {
             return;
@@ -114,7 +105,7 @@ public final class NGTRenderer {
         double maxY = minY + height;
         double maxZ = minZ + depth;
         NGTTessellator t = NGTTessellator.instance;
-        t.startDrawing(1);//GL_LINES
+        t.startDrawing(1);// GL_LINES
         t.setColorRGBA_I(color, alpha);
 
         edge(t, minX, minY, minZ, maxX, minY, minZ);
@@ -140,10 +131,7 @@ public final class NGTRenderer {
         t.addVertex(x1, y1, z1);
     }
 
-    /**
-     * 本家 renderBlock: RenderBlocks でブロックを描く。
-     * 1.21 に RenderBlocks が無いので、BlockState を GLRecorder へ記録する形に読み替える。
-     */
+    /** 本家 renderBlock: RenderBlocks でブロックを描く。 */
     public static void renderBlock(double x, double y, double z, double par4, double par5, double par6,
                                    Object renderer, Object block) {
         recordBlock(block, x, y, z);
@@ -180,10 +168,7 @@ public final class NGTRenderer {
         }
     }
 
-    /**
-     * 本家 renderTileEntities / renderEntities: NGTWorld 内の TE/エンティティを描く。
-     * RTMU のミニチュアプレビューはブロックのみを描くため、実体は持たない。
-     */
+    /** 本家 renderTileEntities / renderEntities: NGTWorld… */
     public static void renderTileEntities(Object world, float partialTicks, int pass) {
     }
 

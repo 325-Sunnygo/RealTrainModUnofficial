@@ -30,13 +30,7 @@ public final class ClientItemHelper {
 
     private ClientItemHelper() {}
 
-    /**
-     * 選択を サーバーへペイロード送信するだけ。クライアント側の手持ちスタックには書かない。
-     * 重要 (回帰対策): 以前はここでクライアント側スタックにも
-     * LegacyItemStackBridge#setSelectedModelData で書き込んでいたが、これが
-     * Bukkit系ハイブリッド専用サーバー (Youer/Mohist 等) のクリエイティブで全列車が
-     * 5000番台Tc になる回帰を起こした (1.0.8 で混入)。
-     */
+    /** 選択を サーバーへペイロード送信するだけ。クライアント側の手持ちスタックには書かない。 */
     private static void commitSelection(ItemStack stack, ModelSelectScreen.SelectionResult selection) {
         PacketDistributor.sendToServer(new SelectModelPayload(
             selection.modelId(), selection.dataMapValue(), selection.customName(), selection.color(),selection.autoSplit()));
@@ -82,13 +76,39 @@ public final class ClientItemHelper {
         ).withRailOptions(jp.ngt.rtm.item.ItemRail.getProperty(stack)==null || jp.ngt.rtm.item.ItemRail.getProperty(stack).autoSplit));
     }
 
-    /**
-     * 本家 guiIdSelectEntityModel: 設置済み車両をシフト右クリックしたときのモデル選択画面。
-     * アイテム用の #openTrainSelectScreen と違い、決定したら
-     * com.portofino.realtrainmodunofficial.network.ChangeEntityModelPayload を送って
-     * ワールドに居るその車両のモデルを差し替える。初期選択には現在のモデルを入れる。
-     */
+    /** 本家 guiIdSelectEntityModel: 設置済み車両をシフト右クリックしたときのモデ… */
     public static void openEntityModelSelectScreen(Object vehicleObj) {
+        // 本家 guiIdSelectEntityModel は列車だけでなく設置済み EntityInst…
+        if (vehicleObj instanceof jp.ngt.rtm.entity.EntityInstalledObject installed) {
+            var definition = com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry
+                    .getById(installed.getModelId());
+            if (definition == null) {
+                return;
+            }
+            var category = definition.getCategory();
+            List<ModelSelectScreen.ModelInfo> installedInfos =
+                    com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry
+                            .getByCategory(category).stream()
+                            .map(d -> new ModelSelectScreen.ModelInfo(d.getId(), d.getDisplayName(),
+                                    d.getPackName(), d.getButtonTexture()))
+                            .toList();
+            var state = installed.getResourceState();
+            Minecraft.getInstance().setScreen(new ModelSelectScreen(
+                    Component.translatable(getInstalledObjectTitleKey(category)),
+                    installedInfos,
+                    selection -> net.neoforged.neoforge.network.PacketDistributor.sendToServer(
+                            new com.portofino.realtrainmodunofficial.network.ChangeEntityModelPayload(
+                                    installed.getId(),
+                                    selection.modelId(),
+                                    selection.dataMapValue() == null ? "" : selection.dataMapValue(),
+                                    selection.customName() == null ? "" : selection.customName(),
+                                    selection.color())),
+                    installed.getModelId(),
+                    state == null ? "" : state.getArg(),
+                    "",
+                    state == null ? 0xFFFFFF : state.color));
+            return;
+        }
         if (!(vehicleObj instanceof jp.ngt.rtm.entity.vehicle.EntityVehicleBase<?> vehicle)) {
             return;
         }
@@ -170,19 +190,17 @@ public final class ClientItemHelper {
         if (definition.isCarType()) {
             return false;
         }
-        // 列車判定の本質: 台車(bogies)を持つこと。RTM の Wire/Insulator/Pipe/Signal/転轍機 等は
-        // 台車を持たないため、これで非列車を一括除外できる。
+        // 列車判定の本質: 台車(bogies)を持つこと。
         if (definition.getBogies() == null || definition.getBogies().isEmpty()) {
             return false;
         }
-        // 内蔵の basic_train 系は packName だけでなく id / displayName 由来で残る場合がある。
+        // 内蔵の basic_train 系は packName だけでなく id / displayNam…
         String packName = definition.getPackName() == null ? "" : definition.getPackName();
         String id = definition.getId() == null ? "" : definition.getId().toLowerCase(Locale.ROOT);
         String displayName = definition.getDisplayName() == null ? "" : definition.getDisplayName();
         String displayNameLower = displayName.toLowerCase(Locale.ROOT);
         String buttonTexture = definition.getButtonTexture() == null ? "" : definition.getButtonTexture().toLowerCase(Locale.ROOT);
         // 一部のパックはボタン画像を同梱しない古い定義を残している。
-        // The pack author confirmed they are not intended selectable vehicles.
         if ((id.startsWith("dd51-498") || displayNameLower.startsWith("dd51-498"))
                 && buttonTexture.contains("button_dd51-498")) {
             return false;
@@ -224,7 +242,7 @@ public final class ClientItemHelper {
             ));
             return;
         }
-        //旗は本家 GuiSelectTexture (4x2 の升目にテクスチャそのものを並べる)。
+        // 旗は本家 GuiSelectTexture (4x2 の升目にテクスチャそのものを並べる)。
         if (category == InstalledObjectCategory.FLAG) {
             Minecraft.getInstance().setScreen(new FlagSelectScreen(
                 Component.translatable(getInstalledObjectTitleKey(category)),
@@ -245,11 +263,7 @@ public final class ClientItemHelper {
         ));
     }
 
-    /**
-     * 本家 guiIdSelectTileEntityTexture: 設置済みの標識を素手で右クリックしてテクスチャを変える。
-     * 標識は 1 テクスチャ = 1 定義なので、モデル選択画面をそのまま使える
-     * (ボタン画像に標識のテクスチャ自体が入っている)。
-     */
+    /** 本家 guiIdSelectTileEntityTexture: 設置済みの標識を素手で右クリック… */
     public static void openRailroadSignScreen(
             com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity blockEntity) {
         List<SignSelectGridScreen.Item> items =
@@ -293,9 +307,7 @@ public final class ClientItemHelper {
             case MECHANISM -> "screen.realtrainmodunofficial.select_mechanism";
         };
     }
-    /**
-     * 貨物のモデル選択。{@code entityId >= 0} なら設置済みの貨物、負なら手持ちのアイテム。
-     */
+    /** 貨物のモデル選択。entityId >= 0 なら設置済みの貨物、負なら手持ちのアイテム。 */
     public static void openCargoModelScreen(int entityId, boolean offHand) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
@@ -338,7 +350,7 @@ public final class ClientItemHelper {
                 new com.portofino.realtrainmodunofficial.network.CargoModelPayload(id, off, selection.modelId())),
             current, ""));
     }
-    /** NPC のモデル選択。{@code entityId >= 0} なら設置済み、負なら手持ちのアイテム。 */
+    /** NPC のモデル選択。entityId >= 0 なら設置済み、負なら手持ちのアイテム。 */
     public static void openNpcModelScreen(int entityId, boolean offHand) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {

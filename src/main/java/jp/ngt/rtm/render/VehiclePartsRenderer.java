@@ -5,10 +5,7 @@ import jp.ngt.rtm.entity.train.EntityBogie;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
 import jp.ngt.rtm.entity.vehicle.EntityVehicleBase;
 
-/**
- * 本家 jp.ngt.rtm.render.VehiclePartsRenderer の忠実移植。
- * パックの車両スクリプトが renderClass に指定する。
- */
+/** 本家 jp.ngt.rtm.render.VehiclePartsRenderer の忠実移植。 */
 public class VehiclePartsRenderer extends EntityPartsRenderer {
     /** 台車の場合はfalse */
     private boolean isvehicle;
@@ -24,16 +21,10 @@ public class VehiclePartsRenderer extends EntityPartsRenderer {
         }
     }
 
-    /**
-     * 本家 PartsRenderer.render: スクリプトの render(entity, pass, partialTick) を実行。
-     * PICK パス (マウス操作) はここでは行わず、
-     * {@code client.ActionPartsPicker} が描画時に記録したパーツ別行列で三角形レイキャストして
-     * onRightClick / onRightDrag を送る (本家の色ピッキングと同等の結果)。
-     */
+    /** 本家 PartsRenderer.render: スクリプトの render(entity, pa… */
     public void render(Object t, int pass, float partialTick) {
         this.currentPass = pass;
         // スクリプトが落ちたらフラグを立てる (呼び出し側が素のモデル描画へ戻せるように)。
-        // 黙って握りつぶすと「車体が丸ごと消える」ため。PartsRenderer.execRenderScript 参照。
         this.execRenderScript(t, pass, partialTick);
     }
 

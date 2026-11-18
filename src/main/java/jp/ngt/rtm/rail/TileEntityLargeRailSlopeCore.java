@@ -7,7 +7,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** 本家 jp.ngt.rtm.rail.TileEntityLargeRailSlopeCore の忠実移植。 */
+/** 本家 jp.ngt.rtm.rail.TileEntityLargeRailSlopeCore の… */
 public class TileEntityLargeRailSlopeCore extends TileEntityLargeRailCore {
     private byte slopeType;
 
@@ -67,8 +67,6 @@ public class TileEntityLargeRailSlopeCore extends TileEntityLargeRailCore {
         RailMap map = this.getRailMap(null);
         if (map == null || map.getStartRP() == null || map.getEndRP() == null) {
             // ★レールを置いた直後は RailMap がまだ無い。
-            // WAILA 系 MOD は見ているブロックへ毎tick getCloneItemStack を呼ぶので、
-            // ここで落ちるとレール設置の瞬間にクライアントごと落ちる (実測)。
             return "Type:Normal";
         }
         return "Type:Normal, " +

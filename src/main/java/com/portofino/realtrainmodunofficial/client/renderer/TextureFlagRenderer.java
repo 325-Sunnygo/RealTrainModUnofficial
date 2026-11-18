@@ -15,14 +15,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
-/**
- * 本家 {@code RenderFlag} の移植。テクスチャ記述子 (textures/flag/Flag_*.json) の旗を
- * ポール + はためく布として手続き描画する。
- *
- * <p>波は本家どおり 10°/tick で進み、位相はブロック座標から決める
- * (本家は BE ごとに乱数初期化。座標ハッシュなら同期不要で同じ見た目になる)。
- * 上のブロックも旗ならポールだけ描く (本家の連結ポール)。
- */
+/** 本家 RenderFlag の移植。テクスチャ記述子 (textures/flag/Flag_*.… */
 public final class TextureFlagRenderer {
 
     private static final ResourceLocation POLE_TEXTURE =
@@ -40,12 +33,12 @@ public final class TextureFlagRenderer {
             return false;
         }
         poseStack.pushPose();
-        //本家 renderFlag: 原点 = ブロック底面中心
+        // 本家 renderFlag: 原点 = ブロック底面中心
         poseStack.translate(0.5D, 0.0D, 0.5D);
 
         renderPole(poseStack, buffer, packedLight, params.poleLength());
 
-        //上も旗なら布は描かない (ポール連結)
+        // 上も旗なら布は描かない (ポール連結)
         boolean flagAbove = false;
         BlockPos above = blockEntity.getBlockPos().above();
         if (blockEntity.getLevel() != null
@@ -59,7 +52,7 @@ public final class TextureFlagRenderer {
         return true;
     }
 
-    /** 本家 RenderFlag.renderPole → NGTRenderer.renderPole (半径 1/16 の 16 角柱)。 */
+    /** 本家 RenderFlag.renderPole → NGTRenderer.renderPole… */
     private static void renderPole(PoseStack poseStack, MultiBufferSource buffer, int packedLight, float poleLength) {
         VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(POLE_TEXTURE));
         PoseStack.Pose pose = poseStack.last();
@@ -75,7 +68,7 @@ public final class TextureFlagRenderer {
                 float l1 = l * 0.0625F;
                 int ii0 = 64 + i1;
                 int ii2 = 64 + (i1 + 1) % 16;
-                //外向き + 内向き (本家は両面を明示的に描く)
+                // 外向き + 内向き (本家は両面を明示的に描く)
                 vertex(consumer, pose, sp[ii0][0] * r, sp[ii0][1] * r + l1, sp[ii0][2] * r, maxU, maxV, packedLight);
                 vertex(consumer, pose, sp[ii0][0] * r, sp[ii0][1] * r + 0.0625F + l1, sp[ii0][2] * r, maxU, minV, packedLight);
                 vertex(consumer, pose, sp[ii2][0] * r, sp[ii2][1] * r + 0.0625F + l1, sp[ii2][2] * r, minU, minV, packedLight);
@@ -95,7 +88,7 @@ public final class TextureFlagRenderer {
         float yaw = blockEntity.getYaw();
         poseStack.mulPose(com.mojang.math.Axis.YP.rotationDegrees(yaw));
 
-        //本家 TileEntityFlag: wave += 10/tick、初期位相は乱数 → 座標ハッシュで代替
+        // 本家 TileEntityFlag: wave += 10/tick、初期位相は乱数 → 座標ハッ…
         long time = blockEntity.getLevel() != null ? blockEntity.getLevel().getGameTime() : 0L;
         float phase = (blockEntity.getBlockPos().hashCode() & 0xFFFF) % 360;
         float wave = ((time * 10.0F + partialTick * 10.0F + phase) % 360.0F);
@@ -154,11 +147,9 @@ public final class TextureFlagRenderer {
         return (float) Math.toRadians(45.0F * Mth.cos(r) + 90.0F);
     }
 
-    /**
-     * 旗テクスチャの解決。同梱アセット (minecraft ns) → パック内ファイルの順。
-     */
+    /** 旗テクスチャの解決。同梱アセット (minecraft ns) → パック内ファイルの順。 */
     public static ResourceLocation resolveTexture(String packName, String path) {
-        //ResourceLocation は大文字不可 → 同梱の旗テクスチャは小文字化して同梱してある
+        // ResourceLocation は大文字不可 → 同梱の旗テクスチャは小文字化して同梱してある
         ResourceLocation direct = ResourceLocation.withDefaultNamespace(
             path.toLowerCase(java.util.Locale.ROOT));
         if (Minecraft.getInstance().getResourceManager().getResource(direct).isPresent()) {
@@ -169,7 +160,7 @@ public final class TextureFlagRenderer {
     }
 
     private static ResourceLocation resolveTexture(InstalledObjectBlockEntity blockEntity, String path) {
-        //ResourceLocation は大文字不可 → 同梱の旗テクスチャは小文字化して同梱してある
+        // ResourceLocation は大文字不可 → 同梱の旗テクスチャは小文字化して同梱してある
         ResourceLocation direct = ResourceLocation.withDefaultNamespace(
             path.toLowerCase(java.util.Locale.ROOT));
         if (Minecraft.getInstance().getResourceManager().getResource(direct).isPresent()) {

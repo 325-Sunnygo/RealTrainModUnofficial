@@ -3,9 +3,7 @@ package jp.ngt.rtm.block.decoration;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
-/**
- * 装飾ブロックのモデル。本家 {@code DecorationModel} の移植。JSON で保存する。
- */
+/** 装飾ブロックのモデル。本家 DecorationModel の移植。JSON で保存する。 */
 public class DecorationModel implements Cloneable {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 

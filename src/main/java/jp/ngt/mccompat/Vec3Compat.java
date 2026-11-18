@@ -1,10 +1,6 @@
 package jp.ngt.mccompat;
 
-/**
- * 1.7.10 {@code net.minecraft.util.Vec3} のスクリプト互換。
- * SRG 名 (field_72450_a/b/c = xCoord/yCoord/zCoord) を直接公開する。
- * NGTO Builder2 の render スクリプトが {@code look.field_72450_a} の形で読む。
- */
+/** 1.7.10 net.minecraft.util.Vec3 のスクリプト互換。 */
 public final class Vec3Compat {
     /** xCoord */
     public final double field_72450_a;

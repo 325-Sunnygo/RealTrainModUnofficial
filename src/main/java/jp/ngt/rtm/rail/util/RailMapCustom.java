@@ -5,21 +5,15 @@ import net.minecraft.util.Mth;
 
 import javax.script.ScriptEngine;
 
-/**
- * 本家 jp.ngt.rtm.rail.util.RailMapCustom (KaizPatchX) の忠実移植。
- * スクリプト駆動の自由形状レール。
- */
+/** 本家 jp.ngt.rtm.rail.util.RailMapCustom (KaizPatchX… */
 public final class RailMapCustom extends RailMap {
 
-    /** スクリプトソース解決フック (本家は ModelPackManager.getScript を直接使う)。 */
+    /** スクリプトソース解決フック (本家は ModelPackManager.getScript を直接… */
     public interface ScriptResolver {
         String getScript(String scriptName);
     }
 
-    /**
-     * 本家 RailMapCustom.init: ModelPackManager.INSTANCE.getScript(scriptName) で解決する。
-     * 見つからないときだけ例外にする (本家は ModelPackException)。
-     */
+    /** 本家 RailMapCustom.init: ModelPackManager.INSTANCE.… */
     public static ScriptResolver scriptResolver = name -> {
         String script = jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getScript(name);
         if (script == null) {

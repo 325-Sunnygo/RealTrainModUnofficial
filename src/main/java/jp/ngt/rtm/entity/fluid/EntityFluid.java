@@ -34,12 +34,7 @@ import net.minecraft.util.Mth;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 溶けた金属 / コークスの粒。本家 {@code jp.ngt.rtm.entity.fluid.EntityFluid} の移植。
- *
- * <p>粒 1 つ 1 つがエンティティで、近い粒どうしで熱をやり取りし、
- * 描画では近い粒へ向かって膨らんで繋がって見える。
- */
+/** 溶けた金属 / コークスの粒。本家 jp.ngt.rtm.entity.fluid.EntityF… */
 public class EntityFluid extends Entity {
     private static final EntityDataAccessor<String> TYPE =
         SynchedEntityData.defineId(EntityFluid.class, EntityDataSerializers.STRING);
@@ -86,7 +81,7 @@ public class EntityFluid extends Entity {
 
     @Override
     public boolean canBeCollidedWith() {
-        return this.isAlive();   //右クリックの対象にする
+        return this.isAlive();   // 右クリックの対象にする
     }
 
     @Override
@@ -119,7 +114,7 @@ public class EntityFluid extends Entity {
         this.yo = this.getY();
         this.zo = this.getZ();
 
-        this.setDeltaMovement(this.getDeltaMovement().add(0.0D, -0.03D, 0.0D));   //重力
+        this.setDeltaMovement(this.getDeltaMovement().add(0.0D, -0.03D, 0.0D));   // 重力
 
         this.calcFluidMovement();
         this.fixPosByBlockCollision();
@@ -127,7 +122,7 @@ public class EntityFluid extends Entity {
 
         float f = 0.98F;
         if (this.onGround()) {
-            //摩擦処理
+            // 摩擦処理
             BlockPos underPos = BlockPos.containing(this.getX(), this.getBoundingBox().minY - 1.0D, this.getZ());
             f *= this.level().getBlockState(underPos).getBlock().getFriction();
         }
@@ -184,7 +179,7 @@ public class EntityFluid extends Entity {
         this.posDif = 0.0F;
 
         final double repRange = SIZE * 1.2D;
-        final double repulsion = this.getFluidType().viscosity * this.getNormalizedTemperture();   //斥力
+        final double repulsion = this.getFluidType().viscosity * this.getNormalizedTemperture();   // 斥力
         double px = this.getX();
         double py = this.getY();
         double pz = this.getZ();
@@ -193,7 +188,7 @@ public class EntityFluid extends Entity {
 
         List<Entity> list = this.level().getEntities(this,
             this.getBoundingBox().inflate(METABALL_RANGE));
-        for (Entity entity2 : list) {   //反発処理
+        for (Entity entity2 : list) {   // 反発処理
             if (!entity2.isAlive()) {
                 continue;
             }
@@ -311,7 +306,7 @@ public class EntityFluid extends Entity {
         return false;
     }
 
-    /** 本家 {@code fixPosByBlockCollision}: 接地面からはみ出していれば横へずらして落とす。 */
+    /** 本家 fixPosByBlockCollision: 接地面からはみ出していれば横へずらして落とす。 */
     protected void fixPosByBlockCollision() {
         this.airCount = 0;
         Vec3 m = this.getDeltaMovement();
@@ -385,7 +380,7 @@ public class EntityFluid extends Entity {
         return InteractionResult.PASS;
     }
 
-    /** 本家 {@code attackEntityFrom}: 金ノコで冷えた塊を切り出す / 柄杓で押す。 */
+    /** 本家 attackEntityFrom: 金ノコで冷えた塊を切り出す / 柄杓で押す。 */
     @Override
     public boolean hurt(DamageSource source, float strength) {
         if (this.level().isClientSide() || !(source.getEntity() instanceof Player player)) {
@@ -475,7 +470,7 @@ public class EntityFluid extends Entity {
         return this.airCount;
     }
 
-    /** 本家は {@code setSize(SIZE, SIZE)}。判定箱は 1.21 では EntityType 側で決まる。 */
+    /** 本家は setSize(SIZE, SIZE)。 */
     public static BlockState airState() {
         return Blocks.AIR.defaultBlockState();
     }

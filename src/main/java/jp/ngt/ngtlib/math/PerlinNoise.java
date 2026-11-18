@@ -3,7 +3,7 @@ package jp.ngt.ngtlib.math;
 import java.util.stream.IntStream;
 
 public final class PerlinNoise {
-    //http://postd.cc/understanding-perlin-noise/
+    // http://postd.cc/understanding-perlin-noise/
     public static double octavePerlin(double x, double y, double z, int octaves, double persistence) {
         double total = 0;
         double frequency = 1;
@@ -18,13 +18,10 @@ public final class PerlinNoise {
         return total / maxValue;
     }
 
-    //http://mrl.nyu.edu/~perlin/noise/
+    // http://mrl.nyu.edu/~perlin/noise/
 
-    /**
-     * @param x
-     * @return -0.5~0.5
-     */
-    public static double perlin(double x, double y, double z)//0<=x<n, ix*0.0625
+    
+    public static double perlin(double x, double y, double z)// 0<=x<n, ix*0.0625
     {
         int X = (int) Math.floor(x) & 255;                  // FIND UNIT CUBE THAT
         int Y = (int) Math.floor(y) & 255;                  // CONTAINS POINT.
@@ -44,7 +41,7 @@ public final class PerlinNoise {
         return lerp(w, lerp(v, lerp(u, grad(p[AA], x, y, z),  // AND ADD
                 grad(p[BA], x - 1, y, z)), // BLENDED
                 lerp(u, grad(p[AB], x, y - 1, z),  // RESULTS
-                        grad(p[BB], x - 1, y - 1, z))),// FROM  8
+                        grad(p[BB], x - 1, y - 1, z))),// FROM 8
                 lerp(v, lerp(u, grad(p[AA + 1], x, y, z - 1),  // CORNERS
                         grad(p[BA + 1], x - 1, y, z - 1)), // OF CUBE
                         lerp(u, grad(p[AB + 1], x, y - 1, z - 1),

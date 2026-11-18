@@ -7,10 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
-/**
- * 本家 jp.ngt.rtm.block.tt.TimeTable の移植 (tt_*.csv の解析)。
- * CSV は4セクションからなる:
- */
+/** 本家 jp.ngt.rtm.block.tt.TimeTable の移植 (tt_*.csv の解… */
 public class TimeTable {
     public final String fileName;
     public String name;
@@ -155,10 +152,7 @@ public class TimeTable {
             this.trackNum = trackNum;
         }
 
-        /**
-         * 本家 TTEntry(String[]) 相当。本家は壊れた行で NumberFormatException を投げて
-         * 時刻表全体のロードを落としていたので、こちらは null を返して1行だけ捨てる。
-         */
+        /** 本家 TTEntry(String[]) 相当。 */
         static TTEntry parse(String[] entry) {
             if (entry.length < 4) {
                 return null;

@@ -2,11 +2,7 @@ package jp.ngt.mccompat.block;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 
-/**
- * 1.7.10 net.minecraft.block.Block の static ユーティリティ互換。
- * (スクリプトの instanceof には実 Block クラスがそのまま使えるため、
- * ここでは static メソッドのみ提供する)
- */
+/** 1.7.10 net.minecraft.block.Block の static ユーティリティ… */
 public final class Block {
     private Block() {
     }
@@ -32,11 +28,7 @@ public final class Block {
         return BuiltInRegistries.BLOCK.byId(id);
     }
 
-    /**
-     * func_149742_c = canPlaceBlockAt(world, x, y, z)。
-     * 1.7.10 の {@code Blocks.snow_layer.canPlaceBlockAt(...)} を
-     * 1.21 の {@code BlockState#canSurvive(LevelReader, BlockPos)} に対応させる。
-     */
+    /** func_149742_c = canPlaceBlockAt(world, x, y, z)。 */
     public static boolean func_149742_c(Object block, Object world, double x, double y, double z) {
         net.minecraft.world.level.block.Block b = asBlock(block);
         net.minecraft.world.level.Level level = unwrapLevel(world);
@@ -52,11 +44,7 @@ public final class Block {
         }
     }
 
-    /**
-     * isLeaves (1.7.10 の MCP 名) = 葉ブロックか。
-     * NGTO Builder2 の Snowfall ブラシが {@code block.isLeaves(world,x,y,z)} と呼ぶ。
-     * 1.21 は BlockTags.LEAVES で判定する。
-     */
+    /** isLeaves (1.7.10 の MCP 名) = 葉ブロックか。 */
     public static boolean isLeaves(Object block, Object world, double x, double y, double z) {
         net.minecraft.world.level.block.Block b = asBlock(block);
         return b != null && b.defaultBlockState().is(net.minecraft.tags.BlockTags.LEAVES);

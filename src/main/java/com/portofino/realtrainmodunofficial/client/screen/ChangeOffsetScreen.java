@@ -9,10 +9,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/**
- * 本家 GuiChangeOffset の 1.21.1 移植。バールで設置物を右クリックすると開く。
- * Offset X/Y/Z (ブロック単位・小数可 = ミリ単位調整)、Rotation Roll/Pitch/Yaw、Scale。
- */
+/** 本家 GuiChangeOffset の 1.21.1 移植。バールで設置物を右クリックすると開く。 */
 public class ChangeOffsetScreen extends Screen {
     private final InstalledObjectBlockEntity blockEntity;
     private EditBox fieldOffsetX;

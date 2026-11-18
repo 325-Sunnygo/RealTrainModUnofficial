@@ -20,12 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * 本家 GuiMotorman の移植 + スキン選択。運転士を素手で右クリックで開く。
- * スキン: 既定(季節)/標準/サンタ/獅子舞 + config/realtrainmodunofficial/npc_skins/*.png
- * マクロ: config/realtrainmodunofficial/macro/*.txt を選んで実行
- * (1 行 = 時刻 コマンド:引数。例: 0 Notch:5 / 300 Door:Door_OpenLeft)
- */
+/** 本家 GuiMotorman の移植 + スキン選択。運転士を素手で右クリックで開く。 */
 public class MotormanScreen extends Screen {
 
     private final int entityId;

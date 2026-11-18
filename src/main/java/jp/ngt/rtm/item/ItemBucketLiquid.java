@@ -22,12 +22,7 @@ import net.minecraft.world.phys.HitResult;
 
 import java.util.List;
 
-/**
- * 液体入りバケツ。本家 {@code jp.ngt.rtm.item.ItemBucketLiquid} の移植。
- *
- * <p>残量は<b>耐久値</b>で持ち、種別と温度は NBT。1.21 では NBT が無いので
- * {@code CompoundTag} のコンポーネントに同じキー ({@code type} / {@code temperture}) で入れている。
- */
+/** 液体入りバケツ。本家 jp.ngt.rtm.item.ItemBucketLiquid の移植。 */
 public class ItemBucketLiquid extends Item {
     /** 本家がクリエイティブに出す 2 種。 */
     public static final FluidType[] FLUID_LIST = {FluidType.PIG_IRON, FluidType.STEEL};
@@ -77,7 +72,7 @@ public class ItemBucketLiquid extends Item {
 
     public static boolean setFluid(Level level, double x, double y, double z, FluidType type, int amount, float temperature) {
         if (!level.isClientSide()) {
-            double fluc = 2.0F * (0.5D - EntityFluid.R);   //ブロックにめり込まない範囲で
+            double fluc = 2.0F * (0.5D - EntityFluid.R);   // ブロックにめり込まない範囲で
             for (int i = 0; i < amount; ++i) {
                 double d0 = (double) (i + 1) / (double) amount;
                 EntityFluid fluid = new EntityFluid(level);
@@ -99,10 +94,10 @@ public class ItemBucketLiquid extends Item {
         if (held.is(RealTrainModUnofficialItems.BUCKET_LIQUID_ITEM.get())) {
             count = MAX_COUNT - held.getDamageValue();
             if (count >= MAX_COUNT) {
-                return false;   //バケツが満杯
+                return false;   // バケツが満杯
             }
             if (getFluidType(held) != fluid.getFluidType()) {
-                return false;   //バケツと液体タイプが異なる
+                return false;   // バケツと液体タイプが異なる
             }
         }
         int oldCount = count;

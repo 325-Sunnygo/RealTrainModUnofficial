@@ -23,11 +23,7 @@ public final class RealTrainModUnofficialClientModEvents {
     private RealTrainModUnofficialClientModEvents() {
     }
 
-    /**
-     * 本家 KaizPatchX の customIconTexture を効かせる。
-     * 設置物アイテムの焼き上がったモデルを包み、スタックを見られる ItemOverrides で
-     * 差し替え判定をする。
-     */
+    /** 本家 KaizPatchX の customIconTexture を効かせる。 */
     @SubscribeEvent
     public static void wrapCustomIconModels(net.neoforged.neoforge.client.event.ModelEvent.ModifyBakingResult event) {
         int wrapped = 0;
@@ -50,11 +46,7 @@ public final class RealTrainModUnofficialClientModEvents {
             "[RTMU] customIconTexture 用にアイテムモデルを {} 個包みました", wrapped);
     }
 
-    /**
-     * 弾薬 / 紙幣の絵を variant で切り替える。
-     * 本家はアイテムのメタでモデルを分けていたが 1.21 にメタが無いので、
-     * モデル json の {@code overrides} が読む述語をここで用意する。
-     */
+    /** 弾薬 / 紙幣の絵を variant で切り替える。 */
     /** 作業台の画面を紐づける。 */
     @SubscribeEvent
     public static void registerScreens(net.neoforged.neoforge.client.event.RegisterMenuScreensEvent event) {
@@ -72,8 +64,7 @@ public final class RealTrainModUnofficialClientModEvents {
             net.minecraft.resources.ResourceLocation key =
                 net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
                     RealTrainModUnofficial.MODID, "variant");
-            //★ClampedItemPropertyFunction にすると値が 0〜1 に丸められ、variant 2 以上が
-            //  全部 1 に潰れる (枕木のアイコンが砲弾になる)。素の ItemPropertyFunction を使う。
+            // ★ClampedItemPropertyFunction にすると値が 0〜1 に丸められ、var…
             net.minecraft.client.renderer.item.ItemPropertyFunction fn =
                 (stack, level, entity, seed) -> {
                     Integer v = stack.get(
@@ -145,8 +136,7 @@ public final class RealTrainModUnofficialClientModEvents {
             com.portofino.realtrainmodunofficial.client.renderer.MiniatureBlockEntityRenderer::new
         );
 
-        // レールコアのブロックエンティティレンダラーを登録（MQOモデル描画）
-        // jp.ngt.rtm.rail の各コア BE に登録 (Phase 1 フリップ)
+        // レールコアのブロックエンティティレンダラーを登録（MQOモデル描画） jp.ngt.rtm.rai…
         event.registerBlockEntityRenderer(
             jp.ngt.rtm.rail.RTMRailBlockEntities.LARGE_RAIL_NORMAL_CORE.get(),
             RailCoreBlockEntityRenderer::new
@@ -207,8 +197,7 @@ public final class RealTrainModUnofficialClientModEvents {
             com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.CAR.get(),
             CarRenderer::new
         );
-        // 本家 EntityInstalledObject 系 (ATC / 列車検知器 / 車止め)。レンダラ未登録だと
-        // EntityRenderDispatcher が null を返して描画時にクラッシュする。
+        // 本家 EntityInstalledObject 系 (ATC / 列車検知器 / 車止め)。
         event.registerEntityRenderer(
             com.portofino.realtrainmodunofficial.registry.RealTrainModUnofficialEntities.ATC.get(),
             com.portofino.realtrainmodunofficial.client.renderer.InstalledObjectEntityRenderer::new
@@ -247,12 +236,11 @@ public final class RealTrainModUnofficialClientModEvents {
     @SubscribeEvent
     public static void registerPackFinders(AddPackFindersEvent event) {
         ExternalSoundPackBridge.register(event);
-        // mods フォルダの 1.7.10 建材ブロックぶんの blockstate/model/texture/lang を生成注入。
+        // mods フォルダの 1.7.10 建材ブロックぶんの blockstate/model/text…
         com.portofino.realtrainmodunofficial.client.building.ExternalBuildingPackBridge.register(event);
     }
 
     // 本家RTM同様、テクスチャ(白の marker_0 等)は変えず tint 色だけ変える。
-    // 普通マーカー=赤、分岐マーカー=青。
     private static final int MARKER_COLOR = 0xFF3B30;        // 赤
     private static final int MARKER_SWITCH_COLOR = 0x0028C8; // 濃い青(本家寄り)
 

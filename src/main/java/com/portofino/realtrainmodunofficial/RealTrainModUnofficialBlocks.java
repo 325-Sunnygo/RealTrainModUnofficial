@@ -17,14 +17,10 @@ public class RealTrainModUnofficialBlocks {
     public static final DeferredBlock<CrossingGateBlock> CROSSING_GATE
         = BLOCKS.register("crossing_gate", () -> new CrossingGateBlock());
 
-    /** 設置済みミニチュア (neo mcte)。中身は MiniatureBlockEntity が丸ごと持つ。 */
+    /** 設置済みミニチュア (neo mcte)。 */
     public static final net.neoforged.neoforge.registries.DeferredBlock<com.portofino.realtrainmodunofficial.block.MiniatureBlock> MINIATURE
         = BLOCKS.register("miniature", () -> new com.portofino.realtrainmodunofficial.block.MiniatureBlock());
-    // 旧 Remaster レール系ブロック (legacy_*)。新規の敷設は本家 jp.ngt マーカー/レールを
-    // 使うが、既に設置済みのワールドを活かすため登録は維持する。
-    //★legacy_* は本家 BlockMarker にエイリアスする (同じクラス = 同じ敷設処理)。
-    //  既設ワールドの legacy_marker / legacy_marker_switch ブロックはそのまま残り、
-    //  以後は本家と同じ挙動になる (BE は本家 TileEntityMarker)。
+    // 旧 Remaster レール系ブロック (legacy_*)。
     public static final DeferredBlock<jp.ngt.rtm.rail.BlockMarker> MARKER
         = BLOCKS.register("legacy_marker",
             () -> new jp.ngt.rtm.rail.BlockMarker(0, net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()));
@@ -47,18 +43,18 @@ public class RealTrainModUnofficialBlocks {
     public static final DeferredBlock<InstalledObjectBlock> INSTALLED_OBJECT
         = BLOCKS.register("installed_object", () -> new InstalledObjectBlock());
 
-    /** 本家 electric: 信号変換器 (RSIn/RSOut/Increment/Decrement) */
+    /** 本家 electric: 信号変換器 (RSIn/RSOut/Increment/Decremen… */
     public static final DeferredBlock<jp.ngt.rtm.electric.BlockSignalConverter> SIGNAL_CONVERTER
         = BLOCKS.register("signal_converter", () -> new jp.ngt.rtm.electric.BlockSignalConverter(
             net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()
                 .strength(1.5F).sound(net.minecraft.world.level.block.SoundType.STONE)));
 
-    /** SignalControllerMod (masa300) 移植: 信号制御器 (閉塞信号の自動制御) */
+    /** SignalControllerMod (masa300) 移植: 信号制御器 (閉塞信号の自動制… */
     public static final DeferredBlock<jp.masa.signalcontrollermod.SignalController> SIGNAL_CONTROLLER
         = BLOCKS.register("signal_controller", () -> new jp.masa.signalcontrollermod.SignalController(
             net.minecraft.world.level.block.state.BlockBehaviour.Properties.of()));
 
-    // ───── 本家 RTM_工業 タブのブロック (RTMBlock.init と同じ並び) ─────
+    // ───── 本家 RTM_工業 タブのブロック (RTMBlock.init と同じ並び) ───…
 
     /** 本家 steel_material: ただの鋼のブロック。 */
     public static final DeferredBlock<net.minecraft.world.level.block.Block> STEEL_MATERIAL
@@ -81,10 +77,7 @@ public class RealTrainModUnofficialBlocks {
     public static final DeferredBlock<jp.ngt.rtm.block.BlockFireBrick> HOT_STOVE_BRICK
         = BLOCKS.register("hot_stove_brick", () -> new jp.ngt.rtm.block.BlockFireBrick(true));
 
-    /**
-     * 本家 steel_slab: 固まった鋼材。金ノコで鋼インゴットにする。
-     * ★本家もクリエイティブタブには出さない (溶けた金属が冷えて生まれる)。
-     */
+    /** 本家 steel_slab: 固まった鋼材。金ノコで鋼インゴットにする。 */
     public static final DeferredBlock<jp.ngt.rtm.block.BlockMetalSlab> STEEL_SLAB
         = BLOCKS.register("steel_slab", jp.ngt.rtm.block.BlockMetalSlab::new);
     /** 本家 iron_pillar: 鉄柱。 */

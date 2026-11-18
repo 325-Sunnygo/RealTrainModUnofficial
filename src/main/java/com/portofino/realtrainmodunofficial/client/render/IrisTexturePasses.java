@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 import java.util.*;
 
-/** Shader-pack fallback for legacy alpha tests; the original PNG and normal rendering stay untouched. */
+/** Shader-pack fallback for legacy alpha tests; */
 public final class IrisTexturePasses {
     private IrisTexturePasses() {}
     private record Key(ResourceLocation source,DynamicTexture texture,int function,float reference,float vertexAlpha) {}

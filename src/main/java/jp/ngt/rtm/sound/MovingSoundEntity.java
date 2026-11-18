@@ -3,7 +3,7 @@ package jp.ngt.rtm.sound;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 
-/** A real tickable sound with the original public stop/volume/pitch API. */
+/** A real tickable sound with the original public st… */
 public class MovingSoundEntity extends MovingSoundCustom<Entity> {
     public MovingSoundEntity(Entity entity, Object sound, boolean repeat) { this(entity,sound,repeat,16.0F); }
     public MovingSoundEntity(Entity entity, Object sound, boolean repeat, float range) {

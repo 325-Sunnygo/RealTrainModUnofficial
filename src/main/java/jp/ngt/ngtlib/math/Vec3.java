@@ -2,12 +2,7 @@ package jp.ngt.ngtlib.math;
 
 import net.minecraft.util.Mth;
 
-/**
- * 完全独立のVecクラス
- * S/C問わず使えるように
- * Scriptからの仕様も想定
- * (本家 NGTLib jp.ngt.ngtlib.math.Vec3 の忠実移植。rotateAround* は「度」入力)
- */
+/** 完全独立のVecクラス S/C問わず使えるように Scriptからの仕様も想定 (本家 NGTLi… */
 public class Vec3 {
     public static final Vec3 ZERO = new Vec3(0.0D, 0.0D, 0.0D);
 
@@ -15,7 +10,7 @@ public class Vec3 {
     private double y;
     private double z;
 
-    // === 1.7.10 net.minecraft.util.Vec3 の SRG フィールド (スクリプトが直接読む) ===
+    // === 1.7.10 net.minecraft.util.Vec3 の SRG フィールド (ス…
     /** xCoord */
     public double field_72450_a;
     /** yCoord */
@@ -52,15 +47,12 @@ public class Vec3 {
         return Math.sqrt(this.getX() * this.getX() + this.getY() * this.getY() + this.getZ() * this.getZ());
     }
 
-    /** 本家 Vec3.toNGTVec: 可変版 {@link NGTVec} へ変換する。 */
+    /** 本家 Vec3.toNGTVec: 可変版 NGTVec へ変換する。 */
     public NGTVec toNGTVec() {
         return new NGTVec(this.getX(), this.getY(), this.getZ());
     }
 
-    /**
-     * 1.7.10 {@code net.minecraft.util.Vec3.func_72443_a} (= createVectorHelper)。
-     * パックスクリプトが {@code Vec3.func_72443_a(x,y,z)} の形で静的に呼ぶ。
-     */
+    /** 1.7.10 net.minecraft.util.Vec3.func_72443_a (= cr… */
     public static Vec3 func_72443_a(double x, double y, double z) {
         return new Vec3(x, y, z);
     }
@@ -70,11 +62,7 @@ public class Vec3 {
         return new Vec3(x, y, z);
     }
 
-    /**
-     * 1.7.10 {@code net.minecraft.util.Vec3.func_72441_c} (= addVector)。
-     * パックスクリプトが {@code start.func_72441_c(dx, dy, dz)} の形で
-     * レイの終点を作る (NGTO Builder2 の getLookingPos)。
-     */
+    /** 1.7.10 net.minecraft.util.Vec3.func_72441_c (= ad… */
     public Vec3 func_72441_c(double x, double y, double z) {
         return this.add(x, y, z);
     }
@@ -86,7 +74,7 @@ public class Vec3 {
         return dx * dx + dy * dy + dz * dz;
     }
 
-    /** @param par1 度 */
+    
     public Vec3 rotateAroundX(float par1) {
         float rad = NGTMath.toRadians(par1);
         float f1 = Mth.cos(rad);
@@ -97,7 +85,7 @@ public class Vec3 {
         return new Vec3(d0, d1, d2);
     }
 
-    /** @param par1 度 */
+    
     public Vec3 rotateAroundY(float par1) {
         float rad = NGTMath.toRadians(par1);
         float f1 = Mth.cos(rad);
@@ -108,7 +96,7 @@ public class Vec3 {
         return new Vec3(d0, d1, d2);
     }
 
-    /** @param par1 度 */
+    
     public Vec3 rotateAroundZ(float par1) {
         float rad = NGTMath.toRadians(par1);
         float f1 = Mth.cos(rad);
@@ -181,10 +169,9 @@ public class Vec3 {
         return Math.min(d0, 1.0D);
     }
 
-    // NOTE: 本家には toNGTVec があるが、NGTVec (MC Vec3 依存) は必要になった時点で移植する
+    // NOTE: 本家には toNGTVec があるが、NGTVec (MC Vec3 依存) は必要に…
 
-    // 以下は本家に無い別名。旧 RTMU の JS スタブが提供していた名前で、
-    // それ向けに書かれたスクリプトが落ちないよう実クラス側にも用意する。
+    // 以下は本家に無い別名。旧 RTMU の JS スタブが提供していた名前で、 それ向けに書かれたスク…
 
     /** #multi(double) の別名。 */
     public Vec3 scale(double s) {

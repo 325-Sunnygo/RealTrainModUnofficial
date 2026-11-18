@@ -13,10 +13,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * 本家 BlockMachineBase の DataForm GUI ({@code customForm}) の移植。
- * 機械を右クリックすると開き、customForm の各フィールドを入力して DataMap に保存する。
- */
+/** 本家 BlockMachineBase の DataForm GUI (customForm) の… */
 public class MachineConfigScreen extends Screen {
 
     private final BlockPos pos;

@@ -16,21 +16,9 @@ import net.minecraft.world.phys.AABB;
 
 import java.util.List;
 
-/**
- * 柄杓 (かき混ぜ棒)。本家 {@code jp.ngt.rtm.item.ItemPaddle} の移植。
- *
- * <p>銑鉄を叩く / 右クリックすると炉の構造を判定し、条件を満たしていれば鋼鉄になる。
- */
+/** 柄杓 (かき混ぜ棒)。本家 jp.ngt.rtm.item.ItemPaddle の移植。 */
 public final class ItemPaddle extends Item {
-    /**
-     * [[煙突始点],[煙突終点],[天井始点],[天井終点],[熱源始点],[熱源終点]]
-     *
-     * <pre>
-     * ▲▲□※□■■
-     * ▲▲□□□□□
-     * ※銑鉄、▲熱源、■煙突
-     * </pre>
-     */
+    /** [[煙突始点],[煙突終点],[天井始点],[天井終点],[熱源始点],[熱源終点]] <pre>… */
     private static final int[][][] FURNACE_PATTERN = {
         {{-3, 1, 0}, {-2, 1, 0}, {0, 1, 0}, {3, 1, 0}, {2, -1, 0}, {3, 0, 0}},
         {{2, 1, 0}, {3, 1, 0}, {-3, 1, 0}, {0, 1, 0}, {-3, -1, 0}, {-2, 0, 0}},
@@ -170,7 +158,7 @@ public final class ItemPaddle extends Item {
         return count > 0 ? (float) (sum / (double) count) : 0.0F;
     }
 
-    /** @param dir +1 で押す、-1 で引く */
+    
     public static void pushPull(Player player, EntityFluid fluid, float dir) {
         if (fluid.getFluidType() == FluidType.PIG_IRON && stir(player, fluid)) {
             return;

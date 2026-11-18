@@ -4,26 +4,16 @@ package jp.ngt.rtm.modelpack.cfg;
 public class RailConfig extends ModelConfig {
     public static final String TYPE = "ModelRail";
 
-    /**
-     * 名前(重複不可)
-     */
+    /** 名前(重複不可) */
     public String railName;
-    /**
-     * モデル
-     */
+    /** モデル */
     public ModelSource model;
 
-    /**
-     * 道床幅, 1以上の奇数
-     */
+    /** 道床幅, 1以上の奇数 */
     public int ballastWidth;
-    /**
-     * 動物とかが線路を横切れるかどうか
-     */
+    /** 動物とかが線路を横切れるかどうか */
     public boolean allowCrossing;
-    /**
-     * クリエイティブタブに追加する際の道床ブロック
-     */
+    /** クリエイティブタブに追加する際の道床ブロック */
     public BallastSet[] defaultBallast;
 
     @Deprecated

@@ -32,14 +32,7 @@ import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/**
- * ExternalBuildingBlocks が発見した 1.7.10 建材ブロックぶんの
- * blockstate / block model / item model / texture / lang を、ランタイム生成の
- * クライアントリソースパックとして注入する。
- * 仕組みは ExternalSoundPackBridge と同一: {@code config/realtrainmodunofficial/
- * generated_building_pack} 以下にファイルを書き出し、AddPackFindersEvent で
- * PathPackResources として最優先で追加する。
- */
+/** ExternalBuildingBlocks が発見した 1.7.10 建材ブロックぶんの blo… */
 public final class ExternalBuildingPackBridge {
     private static final String PACK_ID = "realtrainmodunofficial:external_building_bridge";
     private static final Component PACK_TITLE = Component.literal("RTM External Building Blocks");
@@ -145,7 +138,7 @@ public final class ExternalBuildingPackBridge {
         // blockstate
         writeString(assets.resolve("blockstates").resolve(id + ".json"),
             "{\"variants\":{\"\":{\"model\":\"" + ns + ":block/" + id + "\"}}}");
-        // block model (cube_all)。アルファ持ちは cutout、不透明は solid で描く。
+        // block model (cube_all)。
         String renderType = e.transparent() ? "minecraft:cutout" : "minecraft:solid";
         writeString(assets.resolve("models").resolve("block").resolve(id + ".json"),
             "{\"parent\":\"minecraft:block/cube_all\",\"render_type\":\"" + renderType

@@ -7,7 +7,7 @@ import com.portofino.realtrainmodunofficial.client.camera.*;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.GL11;
 
-/** Executes actual Minecraft camera FBO passes without creating a Minecraft client/world. */
+/** Executes actual Minecraft camera FBO passes witho… */
 final class CameraFramebufferRegression {
     private static int checks;
     private static void check(boolean v,String reason) { checks++;if(!v) throw new AssertionError(reason); }

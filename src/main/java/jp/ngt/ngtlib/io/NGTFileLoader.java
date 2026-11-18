@@ -15,17 +15,14 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/**
- * 本家 jp.ngt.ngtlib.io.NGTFileLoader のスクリプト互換ファサード。
- * パックスクリプトは getInputStream(ResourceLocation) でパック内アセット
- * (scripts/xxx.gif 等) を読む。全パック zip/フォルダを走査して解決する。
- */
+/** 本家 jp.ngt.ngtlib.io.NGTFileLoader のスクリプト互換ファサード。 */
 public final class NGTFileLoader {
     /** 本家 NO_ZIP: 「zip の中ではなく素のファイル」を表す ScanResult のキー。 */
     public static final String NO_ZIP = "no_zip";
 
     /** 正規化パス (assets/minecraft/ 以降, 小文字) → コンテナ */
     private static Map<String, AssetRef> index;
+    private static Map<String, AssetRef> suffixIndex;
     private static final Map<String, byte[]> CONTENT_CACHE = new ConcurrentHashMap<>();
     /** 索引に無いと確定したキー。全走査の再実行を防ぐ。 */
     private static final java.util.Set<String> MISSING_CACHE = ConcurrentHashMap.newKeySet();
@@ -38,7 +35,7 @@ public final class NGTFileLoader {
     private NGTFileLoader() {
     }
 
-    /** スクリプト用: ResourceLocation (mccompat/実物) からパックアセットのストリームを開く。 */
+    /** スクリプト用: ResourceLocation (mccompat/実物) からパックアセットの… */
     public static InputStream getInputStream(Object resource) {
         String path = pathOf(resource);
         if (path == null) {
@@ -63,39 +60,22 @@ public final class NGTFileLoader {
         Map<String, AssetRef> idx = getIndex();
         AssetRef ref = idx.get(key);
         if (ref == null && !key.startsWith("assets/")) {
-            // サフィックス一致 (パス表記ゆれ対策)。
-            // (見つからない要求を毎回走査すると、スクリプトが欠落アセットを繰り返し要求したとき
-            // 索引サイズ×要求回数の走査になり描画が止まる)。
-            // ★ファイル名だけの一致は取らない (本家は完全パスでしか引かない)。
-            String suffix = "/" + key;
-            for (Map.Entry<String, AssetRef> e : idx.entrySet()) {
-                if (!e.getKey().startsWith("assets/") && e.getKey().endsWith(suffix)) {
-                    ref = e.getValue();
-                    break;
+            // サフィックス一致 (suffixIndex は初期化時に 1 度だけ作る。毎回走査しない)。
+            if (suffixIndex != null) {
+                ref = suffixIndex.get(key);
+                if (ref != null) {
+                    idx.put(key, ref);
                 }
             }
         }
         if (ref == null) {
             // mod 自身の同梱アセット (assets/minecraft/scripts/... 等)。
-            // 索引はワールドの mods/ や config/ の外部パックしか見ていないため、
-            // 同梱のレール描画スクリプトなどはここまで来ないと見つからない
-            // (開発環境では jar が mods/ に無いので索引にすら載らない)。
             byte[] bundled = findBundledAsset(key);
             if (bundled != null) {
                 if (bundled.length < 4 * 1024 * 1024) {
                     CONTENT_CACHE.put(key, bundled);
                 }
                 return bundled;
-            }
-            // ★TypeScript のパックへの配慮。定義 JSON が "scripts/Foo.js" のままでも、
-            // 同梱されているのが Foo.ts なら拾う。逆は起きない (.ts を書いた人は .ts を指す)。
-            String ts = com.portofino.realtrainmodunofficial.script.TypeScriptTranspiler
-                .toTypeScriptPath(key);
-            if (ts != null) {
-                byte[] alt = findAsset(ts);
-                if (alt != null) {
-                    return alt;
-                }
             }
             MISSING_CACHE.add(key);
             return null;
@@ -148,11 +128,7 @@ public final class NGTFileLoader {
         return null;
     }
 
-    /**
-     * パックアセットをテキスト行として読む安定 API (単一引数・オーバーロード無し)。
-     * スクリプトの自前 include (eval(append(NGTText.readText(getResource(path)))) ) は
-     * 最終的にここへ来る。見つからなければ空リスト。
-     */
+    /** パックアセットをテキスト行として読む安定 API (単一引数・オーバーロード無し)。 */
     public static List<String> readAssetLines(String path) {
         List<String> lines = new ArrayList<>();
         byte[] bytes = findAsset(path);
@@ -166,7 +142,7 @@ public final class NGTFileLoader {
         return lines;
     }
 
-    /** パック内画像を動的テクスチャとして登録し RL を返す (NGTUtilClient.bindTexture 用)。 */
+    /** パック内画像を動的テクスチャとして登録し RL を返す (NGTUtilClient.bindTe… */
     public static net.minecraft.resources.ResourceLocation resolvePackTexture(String path) {
         if (path == null) {
             return null;
@@ -223,10 +199,7 @@ public final class NGTFileLoader {
         return p;
     }
 
-    /**
-     * zip を開く。UTF-8 で開けないエントリ名 (Windows 製の Shift_JIS パック) は SJIS で開き直す。
-     * これをしないと SJIS パックが 1 つあるだけで "invalid CEN header" を出して索引から丸ごと漏れる。
-     */
+    /** zip を開く。UTF-8 で開けないエントリ名 (Windows 製の Shift_JIS パッ… */
     private static ZipFile openZip(Path container) throws IOException {
         try {
             return new ZipFile(container.toFile());
@@ -268,15 +241,22 @@ public final class NGTFileLoader {
                 }
             }
             index = map;
+            Map<String, AssetRef> suffix = new ConcurrentHashMap<>();
+            for (Map.Entry<String, AssetRef> e : map.entrySet()) {
+                String key = e.getKey();
+                int slash = key.indexOf('/');
+                while (slash >= 0) {
+                    suffix.putIfAbsent(key.substring(slash + 1), e.getValue());
+                    slash = key.indexOf('/', slash + 1);
+                }
+            }
+            suffixIndex = suffix;
             NGTLog.debug("[NGTFileLoader] indexed " + map.size() + " pack assets");
         }
         return index;
     }
 
-    /**
-     * 本家 getModsDir: パックを探すディレクトリ一覧。
-     * RTMU は mods/ に加えて config/realtrainmodunofficial/ 以下も見る。
-     */
+    /** 本家 getModsDir: パックを探すディレクトリ一覧。 */
     public static List<java.io.File> getModsDir() {
         List<java.io.File> out = new ArrayList<>();
         Path gameDir = FMLPaths.GAMEDIR.get();
@@ -290,7 +270,7 @@ public final class NGTFileLoader {
         return out;
     }
 
-    /** 本家 getArchiveSuffix: 絶対パスに含まれるアーカイブ拡張子 (".zip"/".jar")。無ければ空。 */
+    /** 本家 getArchiveSuffix: 絶対パスに含まれるアーカイブ拡張子 (".zip"/".… */
     public static String getArchiveSuffix(String absPath) {
         if (absPath == null) {
             return "";
@@ -304,7 +284,7 @@ public final class NGTFileLoader {
         return "";
     }
 
-    /** 本家 getArchivePath: "…/pack.zip/scripts/a.js" から "…/pack.zip" を切り出す。 */
+    /** 本家 getArchivePath: "…/pack.zip/scripts/a.js" から "… */
     public static String getArchivePath(String absPath, String suffix) {
         int index = absPath.indexOf(suffix);
         return index < 0 ? absPath : absPath.substring(0, index + suffix.length());
@@ -366,10 +346,7 @@ public final class NGTFileLoader {
         return Files.readAllBytes(file.toPath());
     }
 
-    /**
-     * 本家 findFile: 探索ディレクトリ以下から条件に合うファイルを集める。
-     * matcher は match(File) を持つオブジェクト (スクリプトの関数でも可)。
-     */
+    /** 本家 findFile: 探索ディレクトリ以下から条件に合うファイルを集める。 */
     public static List<java.io.File> findFile(Object matcher) {
         List<java.io.File> out = new ArrayList<>();
         for (java.io.File dir : getModsDir()) {
@@ -415,7 +392,7 @@ public final class NGTFileLoader {
         }
     }
 
-    /** All pack metadata, including archives with identical pack.json entry names. */
+    /** All pack metadata, including archives with identi… */
     public static List<byte[]> readPackMetadata() {
         var result=new ArrayList<byte[]>();
         for(Path container:collectContainers()) {
@@ -476,4 +453,31 @@ public final class NGTFileLoader {
         } catch (IOException ignored) {
         }
     }
+    /** 本家 NGTFileLoader.log。 */
+    public static void log(String message, Object... args) {
+        jp.ngt.ngtlib.io.NGTLog.debug("[NGTFileLoader] " + String.format(message.replace("%s", "%s"), args));
+    }
+
+    /** 本家 createTempFile。 */
+    public static java.nio.file.Path createTempFile(java.io.InputStream is, String name) {
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("rtmu");
+            java.nio.file.Path file = dir.resolve(name == null ? "temp" : name);
+            java.nio.file.Files.copy(is, file, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return file;
+        } catch (java.io.IOException e) {
+            return null;
+        }
+    }
+
+    /** 本家 saveFile: ゲーム内では使用しない (null)。 */
+    public static String saveFile(String[] extensions) {
+        return null;
+    }
+
+    /** 本家 selectFile: ゲーム内では使用しない (null)。 */
+    public static String selectFile(String[][] extensions) {
+        return null;
+    }
+
 }

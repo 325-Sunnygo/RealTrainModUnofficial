@@ -6,7 +6,7 @@ import org.joml.Vector4f;
 import org.joml.Quaternionf;
 import java.util.*;
 
-/** CPU equivalent of legacy GL_SELECT over recorded model geometry. */
+/** CPU equivalent of legacy GL_SELECT over recorded… */
 public final class LegacySelection {
     private LegacySelection() {}
     private record Context(Matrix4f clip, PolygonModel model, int width, int height) {}
@@ -99,7 +99,7 @@ public final class LegacySelection {
         List<Vector4f> polygon=new ArrayList<>();
         for(Vector4f vertex:vertices) { clip.transform(vertex); if(!vertex.isFinite()) return; polygon.add(vertex); }
         float x=session.range/session.context.width,y=session.range/session.context.height;
-        // Clip the polygon against the small center pick box and the near/far planes.
+        // Clip the polygon against the small center pick bo…
         Vector4f[] planes={new Vector4f(1,0,0,x),new Vector4f(-1,0,0,x),new Vector4f(0,1,0,y),new Vector4f(0,-1,0,y),new Vector4f(0,0,1,1),new Vector4f(0,0,-1,1)};
         for(Vector4f plane:planes) {
             if(polygon.isEmpty()) return;

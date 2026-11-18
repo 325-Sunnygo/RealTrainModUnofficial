@@ -5,9 +5,9 @@ import com.portofino.realtrainmodunofficial.entity.TrainEntity;
 public class FormationEntry {
     public final TrainEntity train;
     public int entryId;      // position in Formation.entries[]
-    public int dir;          // 0 or 1 — which bogie faces "beginning" of formation (RTM faithful)
-    public int leaderSide;   // side on the previous car that connects here (for movement)
-    public int followerSide; // side on THIS car that connects to leader (for movement)
+    public int dir;          // 0 or 1 — which bogie faces "beginning" of formati…
+    public int leaderSide;   // side on the previous car that connects here (for…
+    public int followerSide; // side on THIS car that connects to leader (for mov…
 
     public FormationEntry(TrainEntity train, int entryId, int dir) {
         this.train = train;

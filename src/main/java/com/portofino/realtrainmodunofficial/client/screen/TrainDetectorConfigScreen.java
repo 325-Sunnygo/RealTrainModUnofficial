@@ -10,10 +10,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/**
- * 列車検知器の設定画面。検知器を素手で右クリックすると開く。
- * 列車を検知したときに、指定した座標のレッドストーンブロックを「置く」か「消す」かを決める。
- */
+/** 列車検知器の設定画面。検知器を素手で右クリックすると開く。 */
 public class TrainDetectorConfigScreen extends Screen {
     private final InstalledObjectBlockEntity blockEntity;
 

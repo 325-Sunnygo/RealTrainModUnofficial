@@ -20,20 +20,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * 道床 (レールの下の砂利) を<b>チャンクのメッシュへ焼き込む</b>モデル。
- *
- * <p>本家 1.7.10 は {@code ISimpleBlockRenderingHandler} でチャンクに焼いていた。
- * ブロックエンティティ描画にすると、レール 1 本の脇に幅 3 で敷き詰めた道床が
- * 全部毎フレーム CPU を通ることになるので、同じ「焼く」側に合わせてある。
- * 形が変わるのはレールを敷いた/壊したときだけなので、焼き直しもそのときだけで足りる。
- *
- * <p>形は {@link BallastGeometry} が出す。テクスチャは
- * レールに設定されたブロック (砂利など) のモデルから借りる。
- */
+/** 道床 (レールの下の砂利) をチャンクのメッシュへ焼き込むモデル。 */
 public class BallastModel implements IDynamicBakedModel {
 
-    /** チャンクを組み立てるスレッドへ形を渡すための入れ物。実体は {@link BallastGeometry#SHAPE}。 */
+    /** チャンクを組み立てるスレッドへ形を渡すための入れ物。 */
     public static final ModelProperty<BallastGeometry.Shape> SHAPE = BallastGeometry.SHAPE;
 
     private final BakedModel fallback;
@@ -46,15 +36,12 @@ public class BallastModel implements IDynamicBakedModel {
     public @NotNull List<BakedQuad> getQuads(BlockState state, Direction side, @NotNull RandomSource random,
                                              @NotNull ModelData data, RenderType renderType) {
         // side != null は「隣のブロックで隠せる面」の問い合わせ。
-        // 道床は高さがまちまちで隣に隠してもらえないので、面引きは自分で済ませてある。
         if (side != null) {
             return Collections.emptyList();
         }
         BallastGeometry.Shape shape = data.get(SHAPE);
         if (shape == null) {
             // まだ形が出せない (レールコアが読み込まれていない等)。
-            // ここで元モデルを出すと、当たり判定ブロックが板や立方体として見えてしまう。
-            // 敷設途中の一瞬なので、何も描かないのが正しい
             return Collections.emptyList();
         }
 
@@ -70,14 +57,13 @@ public class BallastModel implements IDynamicBakedModel {
             baker.setSprite(sprite);
             baker.setDirection(face.dir());
             // shade=true にすると、バニラが面の向きで 0.5/0.6/0.8/1.0 を掛ける。
-            // 本家が手で書いていた係数とちょうど同じ値になる
             baker.setShade(true);
             baker.setTintIndex(-1);
             baker.setHasAmbientOcclusion(false);
             for (int i = 0; i < 4; i++) {
                 emit(baker, face, i, sprite);
             }
-            //頂点 4 つを入れてから焼く
+            // 頂点 4 つを入れてから焼く
             out.add(baker.bakeQuad());
         }
         return out;
@@ -118,7 +104,7 @@ public class BallastModel implements IDynamicBakedModel {
 
     @Override
     public boolean useAmbientOcclusion() {
-        // Original RenderBlockLargeRail submits fixed face shades, without AO.
+        // Original RenderBlockLargeRail submits fixed face…
         return false;
     }
 

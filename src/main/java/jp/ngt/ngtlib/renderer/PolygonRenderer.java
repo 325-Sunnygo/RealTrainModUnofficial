@@ -1,5 +1,5 @@
 package jp.ngt.ngtlib.renderer;
-/** Recorded equivalent of the original immediate-mode polygon renderer. */
+/** Recorded equivalent of the original immediate-mod… */
 public final class PolygonRenderer implements IRenderer {
     public static final PolygonRenderer INSTANCE=new PolygonRenderer();
     public static final float DIV_15=1.0F/15.0F;

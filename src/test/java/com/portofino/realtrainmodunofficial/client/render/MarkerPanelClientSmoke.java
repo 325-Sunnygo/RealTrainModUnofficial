@@ -10,7 +10,7 @@ import jp.ngt.rtm.rail.*;
 import jp.ngt.rtm.rail.util.*;
 import com.portofino.realtrainmodunofficial.client.renderer.MarkerPanel;
 
-/** Opt-in real in-world six-button interaction smoke test. */
+/** Opt-in real in-world six-button interaction smoke… */
 @EventBusSubscriber(modid="realtrainmodunofficial",value=Dist.CLIENT)
 public final class MarkerPanelClientSmoke {
     private static int ticks,expected,clicked;

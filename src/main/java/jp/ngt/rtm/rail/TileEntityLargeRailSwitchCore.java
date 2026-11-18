@@ -12,10 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.stream.IntStream;
 
-/**
- * 本家 jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore (KaizPatchX) の忠実移植。
- * NBT: Size / RP0..RPn / fixRTMRailMapVersion (本家キーそのまま。1.7.10.19 互換パスは省略)
- */
+/** 本家 jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore… */
 public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
     private SwitchType switchObj;
 
@@ -59,7 +56,6 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
             this.switchObj = (new RailMaker(this.level, this.railPositions, this.fixRTMRailMapVersion)).getSwitch();
         }
         // ★分岐もレールを引き直したら当たり判定を焼き直す (基底の createRailMap と同じ)。
-        //   これが無いとレンチで高さを変えても分岐だけ当たり判定が古いままになる。
         this.invalidateCollisionCache();
     }
 
@@ -79,12 +75,7 @@ public class TileEntityLargeRailSwitchCore extends TileEntityLargeRailCore {
         }
     }
 
-    /**
-     * ブロック更新時。
-     * 注意: ここでフル NBT 再同期 (markBlockForUpdate) を行うとクライアントの
-     * SwitchType/Point が再生成され moveCount=0 にリセットされて転てつアニメが
-     * 破綻する (OFF 時に即戻り)。
-     */
+    /** ブロック更新時。 注意: ここでフル NBT 再同期 (markBlockForUpdate) を… */
     public void onBlockChanged() {
         if (this.getSwitch() != null && this.level != null) {
             this.getSwitch().onBlockChanged(this.level);

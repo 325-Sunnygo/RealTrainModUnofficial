@@ -34,13 +34,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
     private RailPosition[] railPositions;
     private RailMap railMap;
     private String railDefinitionId = "";
-    /**
-     * このレールの道床ブロック (砂利など)。
-     *
-     * <p><b>敷いたときのアイテムで決まり、あとから変わらない。</b>
-     * 本家もレールアイテム 1 つ 1 つに道床が焼き込まれていて、
-     * 敷設後にレールをいじっても道床は変わらない。
-     */
+    /** このレールの道床ブロック (砂利など)。 敷いたときのアイテムで決まり、あとから変わらない。 */
     private String ballastBlockId = "";
     private int activeSegmentIndex;
     private int previousSegmentIndex;
@@ -151,9 +145,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         this.previousSegmentIndex = tag.getInt("PreviousSegmentIndex");
         this.switchProgress = tag.contains("SwitchProgress") ? tag.getFloat("SwitchProgress") : 1.0F;
         this.lastSignalStrength = tag.contains("LastSignalStrength") ? tag.getInt("LastSignalStrength") : -1;
-        // ロード時は switchType を再構築する(loadAdditwith で null 化)が、再構築直後は既定(直進)状態。
-        // 保存時の switchStateDirty=false をそのまま使うと再評価されず、レッドストーンブロックが
-        // 隣接していても直進へ「リセット」されてしまう。
+        // ロード時は switchType を再構築する(loadAdditwith で null 化)が、…
         this.switchStateDirty = true;
         clampActiveSegment();
     }
@@ -254,10 +246,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return this;
     }
 
-    /**
-     * 本家 TileEntityLargeRailBase.getRailFromCoordinates (KaizPatchX の 4 引数版) の移植。
-     * 指定座標から真下へ降りながらレールを探し、見つかったレールのコアを返す。
-     */
+    /** 本家 TileEntityLargeRailBase.getRailFromCoordinates… */
     public static LargeRailCoreBlockEntity getRailFromCoordinates(Object world, double px, double py, double pz) {
         return getRailFromCoordinates(world, px, py, pz, Integer.MIN_VALUE);
     }
@@ -307,7 +296,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return cachedAllRailMaps.clone();
     }
 
-    /** Returns the rail maps that should be used by moving trains. */
+    /** Returns the rail maps that should be used by movi… */
     public RailMap[] getActiveRailMaps() {
         RailMap[] maps = getAllRailMaps();
         if (maps.length <= 1) {
@@ -489,7 +478,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return activeSegmentIndex;
     }
 
-    /** Returns the previous branch index used during client-side animation. */
+    /** Returns the previous branch index used during cli… */
     public int getPreviousSegmentIndex() {
         return previousSegmentIndex;
     }
@@ -499,10 +488,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         return Mth.clamp(switchProgress + partialTick * 0.04F, 0.0F, 1.0F);
     }
 
-    /**
-     * レンチで手動操作: 次の分岐番線に切り替える。
-     * 信号が入っていない限り、次のリフレッシュまで維持される。
-     */
+    /** レンチで手動操作: 次の分岐番線に切り替える。 */
     public boolean cycleSwitch() {
         RailMap[] maps = getAllRailMaps();
         if (maps == null || maps.length < 2) return false;
@@ -527,8 +513,7 @@ public class LargeRailCoreBlockEntity extends BlockEntity {
         }
         if (be.switchProgress < 1.0F) {
             be.switchProgress = Math.min(1.0F, be.switchProgress + 0.04F);
-            //Fabric に requestModelDataUpdate は無い (NeoForge の ModelData 専用)。
-            //描画を作り直させるにはブロック更新を投げる
+            // Fabric に requestModelDataUpdate は無い (NeoForge の M…
             if (be.getLevel() != null && be.getLevel().isClientSide()) {
                 be.getLevel().sendBlockUpdated(be.getBlockPos(),
                     be.getBlockState(), be.getBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);

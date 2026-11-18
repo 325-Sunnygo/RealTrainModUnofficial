@@ -3,7 +3,7 @@ package com.portofino.realtrainmodunofficial.client.render;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import jp.ngt.ngtlib.renderer.LegacyRenderState;
 
-/** Bake legacy UV offsets into vertices when Iris owns the vertex shader. */
+/** Bake legacy UV offsets into vertices when Iris ow… */
 public final class LegacyShaderAttributes {
     private LegacyShaderAttributes() {}
     public static VertexConsumer wrap(VertexConsumer source) {

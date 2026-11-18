@@ -1,6 +1,6 @@
 package com.portofino.realtrainmodunofficial.script;
 import jp.ngt.ngtlib.renderer.model.*;
-/** Actual script renderer cache, after standalone registry bootstrap. */
+/** Actual script renderer cache, after standalone re… */
 public final class LegacyMutableMeshRegression {
     private static int checks;
     private static void check(boolean ok,String message) {checks++;if(!ok)throw new AssertionError(message);}

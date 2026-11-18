@@ -21,12 +21,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.Optional;
 
-/**
- * RTM 専用作業台の中身。本家 {@code ContainerRTMWorkBench} の移植。
- *
- * <p>本家は 5x5 のクラフト枠 + 出力 5 枠だが、ここは<b>5x5 + 出力 1 枠</b>。
- * 5x5 に収まらない本家レシピは無いので、出力を 5 枠持つ意味 (同時に複数種) は無い。
- */
+/** RTM 専用作業台の中身。本家 ContainerRTMWorkBench の移植。 */
 public class WorkBenchMenu extends AbstractContainerMenu {
     public static final int GRID = 5;
 
@@ -44,15 +39,15 @@ public class WorkBenchMenu extends AbstractContainerMenu {
         this.access = access;
         this.player = inventory.player;
 
-        //出力
+        // 出力
         this.addSlot(new ResultSlot(inventory.player, this.craftSlots, this.resultSlots, 0, 143, 53));
-        //5x5
+        // 5x5
         for (int row = 0; row < GRID; ++row) {
             for (int col = 0; col < GRID; ++col) {
                 this.addSlot(new Slot(this.craftSlots, col + row * GRID, 12 + col * 18, 17 + row * 18));
             }
         }
-        //プレイヤー
+        // プレイヤー
         for (int row = 0; row < 3; ++row) {
             for (int col = 0; col < 9; ++col) {
                 this.addSlot(new Slot(inventory, col + row * 9 + 9, 8 + col * 18, 122 + row * 18));
@@ -63,7 +58,7 @@ public class WorkBenchMenu extends AbstractContainerMenu {
         }
     }
 
-    /** 5x5 のクラフト枠。バニラの {@code TransientCraftingContainer} は 3x3 前提なので自前。 */
+    /** 5x5 のクラフト枠。バニラの TransientCraftingContainer は 3x3… */
     public static class CraftingContainer extends SimpleContainer implements net.minecraft.world.inventory.CraftingContainer {
         private final WorkBenchMenu menu;
 
@@ -107,7 +102,7 @@ public class WorkBenchMenu extends AbstractContainerMenu {
         }
         CraftingInput input = CraftingInput.of(GRID, GRID, this.craftSlots.getItems());
         ItemStack result = ItemStack.EMPTY;
-        //まず 5x5 の専用レシピ、無ければバニラの作業台レシピ
+        // まず 5x5 の専用レシピ、無ければバニラの作業台レシピ
         Optional<RecipeHolder<WorkBenchRecipeMarker>> unused = Optional.empty();
         var recipeManager = level.getRecipeManager();
         Optional<RecipeHolder<com.portofino.realtrainmodunofficial.recipe.WorkBenchRecipe>> custom =

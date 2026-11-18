@@ -16,10 +16,7 @@ import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * 駅コア。本家 {@code jp.ngt.rtm.block.BlockStation} の移植。
- * 右クリックで駅名を編集する。
- */
+/** 駅コア。本家 jp.ngt.rtm.block.BlockStation の移植。 */
 public class BlockStation extends BaseEntityBlock {
     public static final MapCodec<BlockStation> CODEC = simpleCodec(p -> new BlockStation());
 

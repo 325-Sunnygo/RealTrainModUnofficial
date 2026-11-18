@@ -2,15 +2,7 @@ package com.portofino.realtrainmodunofficial.npc;
 
 import java.util.Map;
 
-/**
- * NPC のパック定義 ({@code ModelNPC_*.json})。
- *
- * <p>本家には<b>2 つの書式</b>がある:
- * <ul>
- *   <li>{@code texture} だけ … バニラの人型モデルにその絵を貼る (PassengerNGT01 など)</li>
- *   <li>{@code model: { modelFile, textures }} … MQO モデル (CatMaid など)</li>
- * </ul>
- */
+/** NPC のパック定義 (ModelNPC_*.json)。 */
 public class NpcDefinition {
     private final String id;
     private final String packName;
@@ -42,8 +34,7 @@ public class NpcDefinition {
     public Map<String, String> getTextureOverrides() { return textureOverrides; }
     public boolean hasModel() { return !this.modelFile.isBlank(); }
 
-    // ---- 本家 NPCConfig.serverScriptPath (ModelConfig 由来) ----
-    // サーバー側で毎 tick onUpdate(npc, executer) が呼ばれる。Loader が読込後に設定する。
+    // ---- 本家 NPCConfig.serverScriptPath (ModelConfig 由…
     private String serverScriptPath = "";
 
     public String getServerScriptPath() { return serverScriptPath; }

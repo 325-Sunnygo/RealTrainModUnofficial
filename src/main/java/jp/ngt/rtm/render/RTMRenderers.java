@@ -6,22 +6,13 @@ import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
 
 import jp.ngt.rtm.modelpack.ModelPackManager;
 
-/**
- * 本家 jp.ngt.rtm.render.RTMRenderers の受け皿。
- * 1.7.10 (KaizPatchX) では getRendererWithScript は
- * PartsRenderer#getRendererWithScript にあり、RTMRenderers というクラスは
- * 1.12.2 で分離されたものだが、パック側の mc1710 ターゲットがこの名前で呼んでくる:
- */
+/** 本家 jp.ngt.rtm.render.RTMRenderers の受け皿。 */
 public final class RTMRenderers {
 
     private RTMRenderers() {
     }
 
-    /**
-     * 本家 getRendererWithScript(ResourceLocation par1, String... args)。
-     * リソースからスクリプトを読み、その renderClass で PartsRenderer を生成する。
-     * @param resource スクリプトのリソース (ResourceLocation 相当。文字列パスも受ける)
-     */
+    /** 本家 getRendererWithScript(ResourceLocation par1, S… */
     public static PartsRenderer getRendererWithScript(Object resource, String... args) {
         String script = ModelPackManager.INSTANCE.getScript(resource);
         if (script == null || script.isBlank()) {

@@ -4,9 +4,7 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * 商売メニューの 1 行。本家 {@code MenuEntry} の移植 (NBT 形式も同じ item/price)。
- */
+/** 商売メニューの 1 行。本家 MenuEntry の移植 (NBT 形式も同じ item/pric… */
 public class MenuEntry {
     public final ItemStack item;
     public final int price;

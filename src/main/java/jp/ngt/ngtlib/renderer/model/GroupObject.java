@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 本家 jp.ngt.ngtlib.renderer.model.GroupObject のスクリプト互換移植。 */
+/** 本家 jp.ngt.ngtlib.renderer.model.GroupObject のスクリプ… */
 public class GroupObject {
     public final String name;
     public final List<Face> faces = new ArrayList<>();
@@ -27,10 +27,7 @@ public class GroupObject {
         return this.name;
     }
 
-    /**
-     * 本家 calcVertexNormals: グループ内の面から「頂点→共有面」を作り、
-     * 各面にスムージング済みの頂点法線を計算させる。
-     */
+    /** 本家 calcVertexNormals: グループ内の面から「頂点→共有面」を作り、 各面にスム… */
     public void calcVertexNormals(VecAccuracy accuracy) {
         Map<Vertex, List<Face>> faceMap = new HashMap<>(this.faces.size() * 4);
         for (Face face : this.faces) {
@@ -64,7 +61,7 @@ public class GroupObject {
         tessellator.draw();
     }
 
-    /** 本家 render(tessellator, smoothing): 指定 tessellator へ頂点を積むだけ。 */
+    /** 本家 render(tessellator, smoothing): 指定 tessellator… */
     public void render(Object tessellator, boolean smoothing) {
         for (Face face : this.faces) {
             face.addFaceForRender(tessellator, smoothing);

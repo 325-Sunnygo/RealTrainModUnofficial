@@ -78,7 +78,7 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
             if (be instanceof LargeRailCoreBlockEntity core) {
                 RailMap[] maps = core.getAllRailMaps();
                 if (maps.length > 0) {
-                    // Prevent collision blocks from recursively trying to delete this core.
+                    // Prevent collision blocks from recursively trying…
                     boolean prev = jp.ngt.rtm.rail.util.RailMap.suppressRailRemoval;
                     jp.ngt.rtm.rail.util.RailMap.suppressRailRemoval = true;
                     try {
@@ -122,7 +122,7 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
 
     @Override
     public ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state) {
-        // 中ボタン(ピックブロック): レールコアから種類+形状(長さ)をコピーした RailItem を返す。
+        // 中ボタン(ピックブロック): レールコアから種類+形状(長さ)をコピーした RailItem を返…
         if (level.getBlockEntity(pos) instanceof LargeRailCoreBlockEntity core) {
             return createRailCloneStack(pos, core);
         }
@@ -183,11 +183,7 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
         }
     }
 
-    /**
-     * Builds a copyable rail item from a placed rail core.
-     * The returned stack reuses the same preview tag format as edited rails,
-     * so right-clicking a marker can recreate the copied geometry.
-     */
+    /** Builds a copyable rail item from a placed rail co… */
     public static ItemStack createRailCloneStack(BlockPos corePos, LargeRailCoreBlockEntity core) {
         ItemStack stack = new ItemStack(RealTrainModUnofficialItems.RAIL_ITEM.get());
         String railDefinitionId = core.getRailDefinitionId();
@@ -204,8 +200,7 @@ public class LargeRailCoreBlock extends BaseEntityBlock {
         preview.putInt("X", corePos.getX());
         preview.putInt("Y", corePos.getY());
         preview.putInt("Z", corePos.getZ());
-        // placeRailFromItem がコピー元の実ブロック不在でも復元できるように、
-        // レンチ由来と同じ互換フラグを持たせる。
+        // placeRailFromItem がコピー元の実ブロック不在でも復元できるように、 レンチ由来と…
         preview.putBoolean("WrenchMode", true);
         preview.put("StartRP", positions[0].writeToNBT());
 

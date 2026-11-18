@@ -3,7 +3,7 @@ package com.portofino.realtrainmodunofficial.client.model;
 import jp.ngt.ngtlib.renderer.model.*;
 import org.joml.Vector3f;
 
-/** CPU geometry expansion shared by script rendering and model verification. */
+/** CPU geometry expansion shared by script rendering… */
 public final class LegacyModelGeometry {
     private static final float[] FLAT_EMPTY = new float[0];
     private LegacyModelGeometry() {}
@@ -33,8 +33,7 @@ public final class LegacyModelGeometry {
                 Vector3f normal = face.faceNormal != null
                         ? new Vector3f(face.faceNormal.getX(), face.faceNormal.getY(), face.faceNormal.getZ())
                         : faceNormal(face, idx);
-                // ★頂点法線があればそちらを使う (本家 NGTRenderHelper.addFace の smoothing=true 側)。
-                // 無い場合だけ面法線 = フラット陰影。
+                // ★頂点法線があればそちらを使う (本家 NGTRenderHelper.addFace の smo…
                 Vertex[] vertexNormals = smoothing ? face.vertexNormals : null;
                 for (int k = 0; k < 4; k++) {
                     Vertex vert = face.vertices[idx[k]];
@@ -64,7 +63,7 @@ public final class LegacyModelGeometry {
         }
         return flat;
     }
-    /** Exact cache validation against live script-owned geometry; no hash collisions or allocations. */
+    /** Exact cache validation against live script-owned… */
     public static boolean matches(GroupObject group,boolean smoothing,float[] flat) {
         if(flat==null) return false;
         if(group==null) return flat.length==0;
@@ -81,7 +80,7 @@ public final class LegacyModelGeometry {
                     Vertex candidate=face.vertexNormals[index];
                     if(candidate.x*candidate.x+candidate.y*candidate.y+candidate.z*candidate.z>=1.0e-8F) normal=candidate;
                 }
-                // Faces without precomputed normals use the existing fallback builder.
+                // Faces without precomputed normals use the existin…
                 if(normal==null || w+8>flat.length) return false;
                 float u=coords!=null && index<coords.length && coords[index]!=null?coords[index].getU():0;
                 float v=coords!=null && index<coords.length && coords[index]!=null?coords[index].getV():0;

@@ -12,10 +12,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * 本家 jp.ngt.ngtlib.block.BlockUtil のスクリプト互換 (SRB3/NGTO Builder が使用)。
- * world 引数は WorldCompat / Level のどちらでも受ける。
- */
+/** 本家 jp.ngt.ngtlib.block.BlockUtil のスクリプト互換 (SRB3/N… */
 @SuppressWarnings("unused")
 public final class BlockUtil {
     private BlockUtil() {
@@ -59,10 +56,7 @@ public final class BlockUtil {
         return level.getBlockEntity(new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z)));
     }
 
-    /**
-     * 本家 getMOPFromPlayer(EntityPlayer, distance, liquid): 視線レイキャスト。
-     * player は PlayerCompat / 実 Player のどちらでも受ける。
-     */
+    /** 本家 getMOPFromPlayer(EntityPlayer, distance, liqui… */
     public static MovingObjectPosition getMOPFromPlayer(Object player, double distance, boolean liquid) {
         Player p = PlayerCompat.unwrap(player);
         if (p == null) {
@@ -77,7 +71,7 @@ public final class BlockUtil {
         return MovingObjectPosition.of(hit);
     }
 
-    /** 本家getConnectedBlock: 6方向の隣接ブロック(+x,-x,+y,-y,+z,-z)。 */
+    /** 本家getConnectedBlock: 6方向の隣接ブロック(+x,-x,+y,-y,+z,-z… */
     public static Block[] getConnectedBlock(Object world, int x, int y, int z) {
         return new Block[]{
             getBlock(world, x + 1, y, z), getBlock(world, x - 1, y, z),

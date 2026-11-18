@@ -3,10 +3,7 @@ package jp.ngt.ngtlib.util;
 import jp.ngt.mccompat.EntityCompatUtil;
 import net.minecraft.world.entity.Entity;
 
-/**
- * 本家 jp.ngt.ngtlib.util.MCWrapper のスクリプト互換。
- * エンティティ引数は 実 Entity / PlayerCompat のどちらでも受ける。
- */
+/** 本家 jp.ngt.ngtlib.util.MCWrapper のスクリプト互換。 */
 @SuppressWarnings("unused")
 public final class MCWrapper {
     private MCWrapper() {
@@ -43,7 +40,7 @@ public final class MCWrapper {
         return e != null ? e.getId() : -1;
     }
 
-    /** 本家 getEntityById。world は実 Level / WorldCompat のどちらでも受ける。 */
+    /** 本家 getEntityById。world は実 Level / WorldCompat のどち… */
     public static Entity getEntityById(Object world, int id) {
         net.minecraft.world.level.Level level = unwrapLevel(world);
         return level != null ? level.getEntity(id) : null;
@@ -90,10 +87,7 @@ public final class MCWrapper {
         level.removeBlock(net.minecraft.core.BlockPos.containing(x, y, z), false);
     }
 
-    /**
-     * 本家 breakBlock: 乗っているプレイヤーの手でブロックを壊す
-     * (除雪車/工事車両が線路上の障害物を撤去するのに使う)。
-     */
+    /** 本家 breakBlock: 乗っているプレイヤーの手でブロックを壊す (除雪車/工事車両が線路上… */
     public static void breakBlock(Object entity, double x, double y, double z) {
         Entity e = EntityCompatUtil.unwrapEntity(entity);
         if (e == null) {

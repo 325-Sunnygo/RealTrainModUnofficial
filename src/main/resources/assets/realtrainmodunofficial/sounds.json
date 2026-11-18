@@ -2,7 +2,10 @@
   "item.gun": {
     "category": "player",
     "sounds": [
-      { "name": "rtm:item/gun", "stream": false }
+      {
+        "name": "rtm:item/gun",
+        "stream": false
+      }
     ]
   }
 }

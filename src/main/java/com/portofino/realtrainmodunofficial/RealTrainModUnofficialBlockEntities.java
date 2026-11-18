@@ -16,8 +16,7 @@ public class RealTrainModUnofficialBlockEntities {
         BLOCK_ENTITY_TYPES.register("mirror",()->BlockEntityType.Builder.of(jp.ngt.rtm.block.tileentity.TileEntityMirror::new,
             RealTrainModUnofficialBlocks.MIRROR.get(),RealTrainModUnofficialBlocks.MIRROR_CUBE.get()).build(null));
 
-    // 旧 Remaster マーカーは本家 BlockMarker/TileEntityMarker へエイリアス済み。
-    // (legacy_marker ブロックの BE は jp.ngt.rtm.rail.RTMRailBlockEntities.MARKER が持つ)
+    // 旧 Remaster マーカーは本家 BlockMarker/TileEntityMarker へ…
 
     /** 設置済みミニチュア (neo mcte)。 */
     public static final net.neoforged.neoforge.registries.DeferredHolder<net.minecraft.world.level.block.entity.BlockEntityType<?>,

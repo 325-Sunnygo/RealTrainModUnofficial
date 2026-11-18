@@ -1,12 +1,12 @@
 package com.portofino.realtrainmodunofficial.client.model;
 
-/** Selects primitives while preserving vertex normals under Iris world rendering. */
+/** Selects primitives while preserving vertex normal… */
 public final class LegacyIrisGeometry {
     private LegacyIrisGeometry() {}
     public static boolean useTriangles(boolean shaderPack, boolean smoothNormals) {
         return !shaderPack || smoothNormals;
     }
-    /** Native storage uses four vertices, eight floats each, with XYZ normal at offsets 3..5. */
+    /** Native storage uses four vertices, eight floats e… */
     public static boolean hasVaryingNormals(float[] data) {
         for (int q=0; q+31<data.length; q+=32) {
             for (int v=1; v<4; v++) {

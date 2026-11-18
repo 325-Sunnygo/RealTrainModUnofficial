@@ -34,9 +34,7 @@ public final class ColorUtil {
         return Integer.decode(color);
     }
 
-    /**
-     * 乗算
-     */
+    /** 乗算 */
     public static int multiplicating(int src, int dst) {
         int r = multiplicating2(getR(src), getR(dst));
         int g = multiplicating2(getG(src), getG(dst));
@@ -48,9 +46,7 @@ public final class ColorUtil {
         return (src * dst) / 0xFF;
     }
 
-    /**
-     * @return {color, alpha}
-     */
+    
     public static int[] alphaBlending(int srcColor, int srcAlpha, int dstColor, int dstAlpha) {
         if (srcAlpha == 0xFF || dstAlpha == 0) {
             return new int[]{srcColor, srcAlpha};
@@ -61,11 +57,11 @@ public final class ColorUtil {
 
         int dtms = dstAlpha * (0xFF - srcAlpha);
         int alpha = correct(srcAlpha + (dtms / 0xFF));
-        //前景
+        // 前景
         int srcR = getR(srcColor);
         int srcG = getG(srcColor);
         int srcB = getB(srcColor);
-        //背景
+        // 背景
         int dstR = getR(dstColor);
         int dstG = getG(dstColor);
         int dstB = getB(dstColor);

@@ -23,11 +23,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-/**
- * 設置済みミニチュア (neo mcte)。本家 MCTE BlockMiniature 相当。
- * 見た目は全て com.portofino.realtrainmodunofficial.blockentity.MiniatureBlockEntity
- * が持つ中身を描く。ブロック自体は描かない (RenderShape#INVISIBLE)。
- */
+/** 設置済みミニチュア (neo mcte)。本家 MCTE BlockMiniature 相当。 */
 public class MiniatureBlock extends BaseEntityBlock {
 
     public static final MapCodec<MiniatureBlock> CODEC = simpleCodec(p -> new MiniatureBlock());
@@ -79,10 +75,7 @@ public class MiniatureBlock extends BaseEntityBlock {
         return 0;
     }
 
-    /**
-     * 壊したら中身ごとアイテムに戻す。
-     * これが無いと設置した瞬間に中身が失われる。設定 (縮尺/オフセット/モード) も往復させる。
-     */
+    /** 壊したら中身ごとアイテムに戻す。 これが無いと設置した瞬間に中身が失われる。 */
     @Override
     public ItemStack getCloneItemStack(net.minecraft.world.level.LevelReader level, BlockPos pos, BlockState state) {
         return createItem(level.getBlockEntity(pos));

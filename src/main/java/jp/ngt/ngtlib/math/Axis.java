@@ -2,10 +2,7 @@ package jp.ngt.ngtlib.math;
 
 import net.minecraft.core.Direction;
 
-/**
- * 本家 jp.ngt.ngtlib.math.Axis の移植。
- * 宣言順が本家と同一であること (ordinal がスクリプトから見える)。
- */
+/** 本家 jp.ngt.ngtlib.math.Axis の移植。 */
 public enum Axis {
     POSITIVE_X(Direction.EAST),
     NEGATIVE_X(Direction.WEST),

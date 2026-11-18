@@ -17,12 +17,7 @@ import net.minecraft.world.phys.AABB;
 
 import java.util.List;
 
-/**
- * コンテナ。本家 {@code jp.ngt.rtm.entity.train.parts.EntityContainer} の移植。
- *
- * <p>6×7 = 42 スロットの物入れ。設置してあるコンテナに<b>コンテナアイテムを右クリックで積める</b>。
- * 本家 {@code setSize(3.0F, 2.5F)}。
- */
+/** コンテナ。本家 jp.ngt.rtm.entity.train.parts.EntityConta… */
 public class EntityContainer extends EntityCargoWithModel implements Container {
     public static final int SLOTS = 6 * 7;
 
@@ -54,10 +49,7 @@ public class EntityContainer extends EntityCargoWithModel implements Container {
         ContainerHelper.saveAllItems(nbt, this.containerSlots, true, this.registryAccess());
     }
 
-    /**
-     * 本家 processInitialInteract: コンテナアイテムを持って右クリックすると<b>上に積む</b>。
-     * それ以外は中身を開く。スニークはモデル選択 (親クラス)。
-     */
+    /** 本家 processInitialInteract: コンテナアイテムを持って右クリックすると上に… */
     @Override
     public InteractionResult interact(Player player, InteractionHand hand) {
         InteractionResult parent = super.interact(player, hand);
@@ -74,7 +66,7 @@ public class EntityContainer extends EntityCargoWithModel implements Container {
             return InteractionResult.sidedSuccess(this.level().isClientSide());
         }
 
-        //本家: バールで右クリックすると壊れる
+        // 本家: バールで右クリックすると壊れる
         if (this.isIndependent && held.is(com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.CROWBAR_ITEM.get())) {
             if (!this.level().isClientSide()) {
                 this.dropCargoItem();
@@ -164,7 +156,7 @@ public class EntityContainer extends EntityCargoWithModel implements Container {
 
     @Override
     public void setChanged() {
-        //中身はアイテム側にも書き戻す (壊すとその中身のまま落ちる)
+        // 中身はアイテム側にも書き戻す (壊すとその中身のまま落ちる)
         this.writeCargoToItem();
     }
 

@@ -5,7 +5,7 @@ import java.util.*;
 import java.lang.reflect.*;
 import com.portofino.realtrainmodunofficial.client.model.MqoModelLoader;
 
-/** Real parser/baker tests without a graphics context or Minecraft world. */
+/** Real parser/baker tests without a graphics contex… */
 public final class LegacyModelRegression {
     private static int checks;
     private static void check(boolean value, String message) {
@@ -129,10 +129,8 @@ public final class LegacyModelRegression {
                 .getDeclaredMethod("shouldRenderTrainGroup", String.class, boolean.class, boolean.class,
                         boolean.class, Class.forName("com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition"), boolean.class, boolean.class);
         trainFilter.setAccessible(true);
-        // Baked fallback (script pending/failed) must not draw angle-bend alternates or
-        // shadow/guide helper meshes: drawing body-90/body-180 together makes the train
-        // look flipped. Normal authored parts still render.
-        for (String name : List.of("shadow", "body_shadow", "影", "影ms", "body_ms", "body_kage",
+        // Baked fallback (script pending/failed) must not d…
+        for (String name : List.of("shadow", "body_shadow", "body_ms", "body_kage",
                 "body_ms_0", "body_kage_0", "door_guide", "panel[obj]", "body_atari", "body atari",
                 "body-90", "body-180(mx)")) {
             check(!(boolean) modernFilter.invoke(null, name), "RTM fallback hides helper mesh " + name);

@@ -2,7 +2,7 @@ package jp.ngt.mccompat;
 
 import jp.ngt.ngtlib.renderer.GL11Facade;
 
-/** The instantiable 1.7.10 Gui drawing helper, distinct from the modern HUD. */
+/** The instantiable 1.7.10 Gui drawing helper, disti… */
 public class Gui {
     public float zLevel;
 

@@ -3,10 +3,7 @@ package jp.ngt.ngtlib.world;
 import jp.ngt.ngtlib.block.BlockSet;
 import jp.ngt.ngtlib.block.NGTObject;
 
-/**
- * 本家 jp.ngt.ngtlib.world.NGTWorld の移植。
- * 「NGTObject (ミニチュア) を仮想ワールドとして読む」ためのラッパ。
- */
+/** 本家 jp.ngt.ngtlib.world.NGTWorld の移植。 */
 @SuppressWarnings("unused")
 public class NGTWorld {
     public final Object baseWorld;

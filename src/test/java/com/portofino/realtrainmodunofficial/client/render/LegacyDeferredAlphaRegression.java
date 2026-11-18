@@ -5,7 +5,7 @@ import jp.ngt.ngtlib.renderer.LegacyRenderState;
 import java.lang.reflect.*;
 import java.util.List;
 
-/** Checks deferred ownership without opening a game or GL window. */
+/** Checks deferred ownership without opening a game… */
 public final class LegacyDeferredAlphaRegression {
     private static int checks;
     private static void check(boolean ok,String message) { checks++; if(!ok) throw new AssertionError(message); }

@@ -1,9 +1,6 @@
 package com.portofino.realtrainmodunofficial.signal;
 
-/**
- * RTM風の遠隔信号で使う現示一覧です。
- * ボタン順とIDを固定して、保存データとUIが同じ値を共有します。
- */
+/** RTM風の遠隔信号で使う現示一覧です。 ボタン順とIDを固定して、保存データとUIが同じ値を共有し… */
 public enum SignalAspect {
     STOP(0, "停止(R)", 1),
     WARNING(1, "警戒(YY)", 4),

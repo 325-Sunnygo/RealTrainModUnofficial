@@ -25,13 +25,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.List;
 
-/**
- * 貨物アイテム。本家 {@code jp.ngt.rtm.item.ItemCargo} の移植。
- *
- * <p>本家はメタ 0=コンテナ / 1=火砲 / 2=貨物用枕木。1.21 にメタが無いので
- * {@link RealTrainModUnofficialComponents#ITEM_VARIANT} に本家と同じ値を持たせている。
- * 選んだモデルは {@code CARGO_DATA} の {@code ModelId}。
- */
+/** 貨物アイテム。本家 jp.ngt.rtm.item.ItemCargo の移植。 */
 public class ItemCargo extends Item {
 
     public ItemCargo() {
@@ -86,7 +80,7 @@ public class ItemCargo extends Item {
 
             EntityCargo cargo = createCargoEntity(level, getVariant(stack));
             cargo.initPlaced(single);
-            //本家: プレイヤーの向きを 15 度刻みに丸める
+            // 本家: プレイヤーの向きを 15 度刻みに丸める
             float interval = 15.0F;
             int yaw = Mth.floor(Mth.wrapDegrees(-player.getYRot() + 180.0F + (interval / 2.0F)) / interval);
             cargo.moveTo(pos.getX() + 0.5D, pos.getY(), pos.getZ() + 0.5D, yaw * interval, 0.0F);

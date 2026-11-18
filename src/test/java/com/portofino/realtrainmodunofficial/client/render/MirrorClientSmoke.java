@@ -9,7 +9,7 @@ import net.minecraft.core.*;
 import com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks;
 import com.portofino.realtrainmodunofficial.client.mirror.MirrorRenderer;
 
-/** Opt-in isolated developer-world smoke check. Never included in production jars. */
+/** Opt-in isolated developer-world smoke check. */
 @EventBusSubscriber(modid="realtrainmodunofficial",value=Dist.CLIENT)
 public final class MirrorClientSmoke {
     private static int ticks;

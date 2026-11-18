@@ -23,24 +23,10 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * ActionParts の当たり判定用 色ピッキング FBO。
- *
- * <p>本家は PICK パスで ActionParts だけを {@code glLoadName(id)} 付きで描き、
- * GL_SELECT の選択バッファからパーツを決めていた。GL_SELECT は modern OpenGL core で
- * 削除されているため、その代替として <b>ActionParts だけ</b>をパーツ ID 色で
- * オフスクリーン (TextureTarget) に描き、画面中央ピクセルを読んでパーツを決める。
- *
- * <p>ピッキング頂点は専用の {@link MultiBufferSource.BufferSource} へ流すため、
- * 呼び出し側のバッファ種別 (車両描画の buffer) に依存しない。
- */
+/** ActionParts の当たり判定用 色ピッキング FBO。 */
 public final class ActionPartsPickBuffer {
 
-    /**
-     * ピッキング描画用 RenderType。色をそのまま出力する必要があるため
-     * POSITION_COLOR (position_color シェーダ) を使い、テクスチャ/ライトマップ/
-     * ブレンドを一切適用しない。
-     */
+    /** ピッキング描画用 RenderType。色をそのまま出力する必要があるため POSITION_CO… */
     public static final RenderType PICK_RT = RenderType.create(
         "rtmu_actionparts_pick",
         com.mojang.blaze3d.vertex.DefaultVertexFormat.POSITION_COLOR,
@@ -139,14 +125,7 @@ public final class ActionPartsPickBuffer {
         }
     }
 
-    /**
-     * 特定の {@link ActionParts} インスタンスだけを ID 色で流す。
-     *
-     * <p>名前一致 ({@link #emitGroups}) だけだと、<b>同じグループ名を複数箇所に描く</b>
-     * スクリプトで別パーツを区別できない。たとえば {@code RenderTorii.js} の数字キーは
-     * 10 個すべて {@code "key"} という同名グループで、スクリプトが位置を変えて 10 回描く。
-     * インスタンス単位で流すことで、押したキーに対応する ID が正しく返る。
-     */
+    /** 特定の ActionParts インスタンスだけを ID 色で流す。 */
     public static void emitParts(ActionParts ap, PoseStack poseStack, int light, int overlay) {
         if (!active || host == null || pickBuffer == null || ap == null) {
             return;
@@ -158,10 +137,7 @@ public final class ActionPartsPickBuffer {
         emitOne(pickBuffer.getBuffer(PICK_RT), model, ap, poseStack.last().pose(), null);
     }
 
-    /**
-     * @param nameFilter null ならインスタンスの全グループを流す。
-     *                   非 null ならこの名前 Set に含まれるグループだけ流す。
-     */
+    /** 非 null ならこの名前 Set に含まれるグループだけ流す。 */
     private static void emitOne(VertexConsumer vc, PolygonModel model, ActionParts ap, Matrix4f mat,
                                 Set<String> nameFilter) {
         float cr = ((ap.id >> 16) & 0xFF) / 255.0F;

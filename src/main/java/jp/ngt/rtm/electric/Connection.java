@@ -1,9 +1,6 @@
 package jp.ngt.rtm.electric;
 
-/**
- * 本家 jp.ngt.rtm.electric.Connection の移植。
- * 電線 1 本の「接続先」を表す。
- */
+/** 本家 jp.ngt.rtm.electric.Connection の移植。 */
 @SuppressWarnings("unused")
 public class Connection {
     /** 接続元側か (張った側が root)。 */
@@ -40,7 +37,15 @@ public class Connection {
         if (level == null) {
             return null;
         }
-        this.connectedObject = level.getBlockEntity(new net.minecraft.core.BlockPos(this.x, this.y, this.z));
+        net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(this.x, this.y, this.z);
+        if (this.type == ConnectionType.TO_ENTITY) {
+            Object entity = jp.ngt.rtm.entity.EntityElectricalWiring.find(level, pos);
+            if (entity != null) {
+                this.connectedObject = entity;
+                return entity;
+            }
+        }
+        this.connectedObject = level.getBlockEntity(pos);
         return this.connectedObject;
     }
 
@@ -66,7 +71,7 @@ public class Connection {
         if (level == null) {
             return null;
         }
-        // TO_PLAYER は x にエンティティ ID を入れる (本家の {eID, -1, 0} 形式)
+        // TO_PLAYER は x にエンティティ ID を入れる (本家の {eID, -1, 0} 形…
         net.minecraft.world.entity.Entity e = level.getEntity(this.x);
         return e instanceof net.minecraft.world.entity.player.Player p ? p : null;
     }

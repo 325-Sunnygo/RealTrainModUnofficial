@@ -9,18 +9,14 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
-import net.neoforged.neoforge.client.gui.ConfigurationScreen;
-import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 
-// このクラスは専用サーバーではロードされません。ここからクライアント側のコードにアクセスしても安全です。
+// このクラスは専用サーバーではロードされません。
 @Mod(value = RealTrainModUnofficial.MODID, dist = Dist.CLIENT)
-// EventBusSubscriber を使用すると、@SubscribeEvent でアノテーションされたクラス内のすべての静的メソッドを自動的に登録できます。
+// EventBusSubscriber を使用すると、@SubscribeEvent でアノテーショ…
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public class RealTrainModUnofficialClient {
     public RealTrainModUnofficialClient(ModContainer container) {
-        // NeoForgeがこのMODのコンフィグ画面を作成できるようにします。
-        // コンフィグ画面は、Mods画面＞自分のModをクリック＞コンフィグをクリックで表示されます。
-        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+        // RTM.cfg のゲーム内編集画面は登録しない (ファイルを直接編集する)。
     }
 
     @SubscribeEvent
@@ -29,6 +25,7 @@ public class RealTrainModUnofficialClient {
         com.portofino.realtrainmodunofficial.script.TrainScriptSystem.getInstance().initialize();
         VehicleModelPackManager.INSTANCE.initialize(Minecraft.getInstance().getResourceManager());
         PackRequirementWarnings.refresh();
+        com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.load();
         // オンライン連携 (GitHub アップデート確認)。バックグラウンドで実行。
         com.portofino.realtrainmodunofficial.online.RtmuOnlineServices.init();
         // RTMU 設定 (自動カント/自動高さ) をファイルから読み込む。
@@ -40,11 +37,7 @@ public class RealTrainModUnofficialClient {
         com.portofino.realtrainmodunofficial.client.ServerPackClient.begin();
     }
 
-    /**
-     * ワールドを抜けたら看板まわりのキャッシュを捨てる。
-     * 看板の文字は OS フォントを焼いた GL テクスチャなので、放っておくとワールドを
-     * 出入りするたびに溜まっていく。
-     */
+    /** ワールドを抜けたら看板まわりのキャッシュを捨てる。 */
     @SubscribeEvent
     static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
         com.portofino.realtrainmodunofficial.client.ServerPackClient.end();

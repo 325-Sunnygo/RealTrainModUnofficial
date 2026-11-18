@@ -2,30 +2,18 @@ package jp.ngt.rtm.modelpack.cfg;
 
 
 public abstract class ModelConfig extends ResourceConfig {
-    /**
-     * 選択ボタンのテクスチャのパス
-     */
+    /** 選択ボタンのテクスチャのパス */
     public String buttonTexture;
 
-    /**
-     * ngto専用
-     */
+    /** ngto専用 */
     public float scale;
     public float[] offset;
 
-    /**
-     * スムージング
-     */
+    /** スムージング */
     public boolean smoothing;
-    /**
-     * 片面表示を行う(Obj, MqoではONのほうが軽くなる)
-     */
+    /** 片面表示を行う(Obj, MqoではONのほうが軽くなる) */
     public boolean doCulling;
-    /**
-     * ポリゴンの精度<br>
-     * "LOW":+-16.000の範囲のみ正常に描画される<br>
-     * "MEDIUM":通常<br>
-     */
+    /** ポリゴンの精度 "LOW":+-16.000の範囲のみ正常に描画される "MEDIUM":通常 */
     public String accuracy;
 
     public String serverScriptPath;
@@ -37,9 +25,7 @@ public abstract class ModelConfig extends ResourceConfig {
 
     public String customIconTexture;
 
-    /**
-     * Configの初期化時に呼ばれる
-     */
+    /** Configの初期化時に呼ばれる */
     public void init() {
         super.init();
 
@@ -60,19 +46,13 @@ public abstract class ModelConfig extends ResourceConfig {
         }
     }
 
-    /**
-     * ModelSetのタイプ
-     */
+    /** ModelSetのタイプ */
     public abstract String getModelType();
 
     public static class Parts {
-        /**
-         * パーツを構成するオブジェクトの名前
-         */
+        /** パーツを構成するオブジェクトの名前 */
         public String[] objects;
-        /**
-         * 中心座標
-         */
+        /** 中心座標 */
         public float[] pos;
 
         public void initParts() {
@@ -87,16 +67,10 @@ public abstract class ModelConfig extends ResourceConfig {
     }
 
     public static class ModelSource {
-        /**
-         * モデルファイルのパス(拡張子つきで)
-         */
+        /** モデルファイルのパス(拡張子つきで) */
         public String modelFile;
 
-        /**
-         * マテリアル名と、それに対応するテクスチャファイルのパス<br>
-         * {マテリアル名, テクスチャパス, ("Light", "AlphaBlend")}<br>
-         * xxx_light0.png(消灯), xxx_light1.png(前照灯), xxx_light2.png（尾灯）
-         */
+        /** マテリアル名と、それに対応するテクスチャファイルのパス {マテリアル名, テクスチャパス, ("L… */
         public String[][] textures;
 
         public String rendererPath;

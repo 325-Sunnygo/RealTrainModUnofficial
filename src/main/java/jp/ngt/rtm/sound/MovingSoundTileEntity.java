@@ -4,10 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
-/**
- * 本家 {@code jp.ngt.rtm.sound.MovingSoundTileEntity} の移植。
- * 設置物 (TileEntity) に追従するループ音。スクリプトが {@code func_73660_a} を上書きする。
- */
+/** 本家 jp.ngt.rtm.sound.MovingSoundTileEntity の移植。 */
 public class MovingSoundTileEntity extends MovingSoundCustom<BlockEntity> {
 
     public MovingSoundTileEntity(BlockEntity tileEntity, ResourceLocation sound, boolean repeat) {

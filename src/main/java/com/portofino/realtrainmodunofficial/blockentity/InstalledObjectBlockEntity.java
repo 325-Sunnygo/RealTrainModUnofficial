@@ -31,56 +31,36 @@ import java.util.Map;
 public class InstalledObjectBlockEntity extends BlockEntity
         implements jp.ngt.rtm.electric.TileEntityInsulator, jp.ngt.ngtlib.block.TileEntityPlaceable,
                    jp.ngt.rtm.modelpack.IModelSelector {
-    /** 本家 BlockTurnstile.openGate: tile.setCount(30) — 開扉は 30 tick。 */
+    /** 本家 BlockTurnstile.openGate: tile.setCount(30) — 開… */
     private static final int TICKET_GATE_OPEN_TICKS = 30;
     private static final int TICKET_GATE_MOVE_TICKS = 12;
     private String definitionId = "";
-    /**
-     * 張ってある架線のモデル。<b>碍子の定義とは別に持つ</b>
-     * (本家は Connection がモデルを持ち、碍子の定義は触らない)。
-     * ★以前は definitionId をワイヤーのモデルで上書きしていたので、
-     *   「碍子として描くモデル」と「架線として描くモデル」が同じ物になり重なっていた。
-     */
+    /** 張ってある架線のモデル。碍子の定義とは別に持つ (本家は Connection がモデルを持ち、碍… */
     private String wireModel = "";
     private String category = InstalledObjectCategory.LIGHT.name();
-    // ATS 地上子ビーコン (server_ATS_Beacon.js) が、連動信号機の現示を
-    // NGTUtil.getField(TileEntitySignal.class, tile, ["signalLevel"])
-    // で読むためのフィールド。本家 TileEntitySignal.signalLevel 相当 (STOP=1, PROCEED=5 ... の legacy 値)。
-    // SIGNAL カテゴリのとき tick で毎回 getLegacySignalState を書き込む。
+    // ATS 地上子ビーコン (server_ATS_Beacon.js) が、連動信号機の現示を NG…
     @SuppressWarnings("unused")
     private int signalLevel;
-    // --- 派生値キャッシュ (definitionId から一意に決まる不変値を毎tick/毎frame 再計算しない) ---
-    // 軽量化: shouldHandleCrossingLogic=toLowerCase×4+contains×9、isBrokenFluorescent=substring
-    // +toLowerCase+contains を、設置物 1 個ずつ毎servertick/毎frame 走らせると駅 (設置物多数) で
-    // 無視できない CPU/GC になる。定義が変わらない限り結果は不変なので definitionId をキーに保持する。
-    // 見た目・挙動は一切変えない (NBT には保存しない = ロード後は最初のアクセスで再計算)。
+    // --- 派生値キャッシュ (definitionId から一意に決まる不変値を毎tick/毎fra…
     private transient String crossingLogicKey;
     private transient boolean crossingLogicVal;
     private transient String brokenFluorescentKey;
     private transient boolean brokenFluorescentVal;
     private float yaw;
     // 壁(横面)挿し時に碍子を横倒しにするためのピッチ(度)。0=通常(縦置き)。
-    // 列車検知器ではレールの勾配に使う (レンダラでは yaw の後 = モデル局所のX回転)。
     private float mountPitch;
     // yaw の後に掛けるロール(度)。列車検知器をレールのカント(横傾き)に合わせるために使う。
-    // 0 が既定なので、これを使わない設置物の見た目は変わらない。
     private float mountRoll;
     // 本家 meta 相当のクリック面 (0-5)。-1 = 旧方式
     private int mountFace = -1;
-    // 本家 ResourceState.color 相当 (電線の頂点色)。既定 0xFFFFFF = 白。0 だと電線が黒くなる。
+    // 本家 ResourceState.color 相当 (電線の頂点色)。
     private int wireColor = 0xFFFFFF;
-    // 本家 TileEntityPlaceable の微調整 (GuiChangeOffset): 追加回転とスケール。
-    // オフセットは renderOffset (offsetX/Y/Z) を共用する。
+    // 本家 TileEntityPlaceable の微調整 (GuiChangeOffset): 追加…
     private float adjustRoll;
     private float adjustPitch;
     private float adjustYaw;
     private float adjustScale = 1.0F;
-    /**
-     * 本家 TileEntityElectricalWiring.connections の移植。
-     * <b>1 つの碍子が複数本の架線を持てる</b>。張った側が {@code isRoot=true} で、
-     * 相手側には {@code isRoot=false} が入る。<b>描くのは root 側だけ</b>
-     * (本家 RenderElectricalWiring.renderAllWire の filter と同じ)。
-     */
+    /** 本家 TileEntityElectricalWiring.connections の移植。 */
     private final java.util.List<jp.ngt.rtm.electric.Connection> connections =
         new java.util.ArrayList<>();
 
@@ -93,31 +73,18 @@ public class InstalledObjectBlockEntity extends BlockEntity
     private double offsetX;
     private double offsetY;
     private double offsetZ;
-    /**
-     * 本家 TileEntitySignal.setOrigBlock 用: 信号を置くときに置き換えた元ブロック。
-     * 本家 ItemSignal はクリックした柱ブロックを信号に置き換えるため、壊すと元に戻す。
-     */
+    /** 本家 TileEntitySignal.setOrigBlock 用: 信号を置くときに置き換えた… */
     private BlockState signalOrigBlock;
-    /**
-     * 本家 TileEntitySignal.origTileEntity: 置き換えた元タイルの NBT。
-     * 碍子/架線柱の配線などを、信号を壊して元に戻したとき失わないために持つ。
-     */
+    /** 本家 TileEntitySignal.origTileEntity: 置き換えた元タイルの NB… */
     private CompoundTag signalOrigTileNbt;
-    /**
-     * 本家 TileEntitySignal の「本体向き (rotation)」。設置時のプレイヤー向きを 15 度刻み
-     * (スニーク時 1 度) で丸めた値。柱 (blockDirection) は 4 方位のままで、
-     * ヘッドだけ「この値 − 柱の向き」回転させる (BasicSignalPartsRenderer.rotateBody)。
-     */
+    /** 本家 TileEntitySignal の「本体向き (rotation)」。 */
     private float signalBodyYaw;
     private int signalChannel = -1;
     private int signalAspect = SignalAspect.STOP.getId();
     // 本家 electric: コネクタの信号レベル (配線網)
     private int electricity;
     private int prevConnectorInput = -1;
-    /**
-     * 本家 Connection(DIRECT): コネクタが取り付いている相手ブロック。
-     * 出力コネクタはここから信号を読み、入力コネクタはここへ信号を書く。
-     */
+    /** 本家 Connection(DIRECT): コネクタが取り付いている相手ブロック。 */
     private BlockPos directTarget;
     /** 本家 TileEntityConnector.prevOutputSignal。 */
     private int prevOutputSignal = Integer.MIN_VALUE;
@@ -125,7 +92,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
     private int speakerRange = 32;
     private final Map<String, String> scriptData = new HashMap<>();
 
-    /** DataMap (scriptData) の値設定。機械の customForm GUI / ネットワークから使う。 */
+    /** DataMap (scriptData) の値設定。 */
     public void putScriptData(String key, String value) {
         if (key == null || key.isBlank()) {
             return;
@@ -146,23 +113,18 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return this.scriptData.getOrDefault(key, "");
     }
 
-    // ---- 蛍光灯 (本家 TileEntityFluorescent) ----
-    // 本家 dirF: 設置面とプレイヤーの向きから決まる 0..7 の取付方向。
-    // RenderFluorescent.js が entity.getDir で読み、平行移動と Y90度回転を自分で行う。
+    // ---- 蛍光灯 (本家 TileEntityFluorescent) ---- 本家 dirF:…
     private byte fluorescentDir;
-    // 本家 BlockFluorescent.getLightValue: meta==2 (壊れた蛍光灯) はランダムに明滅する。
+    // 本家 BlockFluorescent.getLightValue: meta==2 (壊れた蛍光…
     private int fluorescentFlickerTick;
     private int fluorescentLight = 15;
 
-    // ---- 転轍機 (本家 TileEntityPoint) ----
-    // activated: レッドストーン出力 (ON=15)。右クリックで切り替わる。
+    // ---- 転轍機 (本家 TileEntityPoint) ---- activated: レッド…
     private boolean pointActivated;
     // move: 本家既定 24.0。符号がレバー/本体の向き(左右どちら側に付くか)を決める。
-    // MachinePartsRenderer.getLodState が move>0 ? 1 : -1 を返し、RenderPoint01.js が
-    // state<0 のとき本体を +2.75 ずらす。バールの右クリックで符号を反転する。
     private float pointMove = 24.0F;
 
-    // ---- 看板 (本家 TileEntitySignBoard / ResourceStateSignboard) ----
+    // ---- 看板 (本家 TileEntitySignBoard / ResourceStateSi…
     /** 板に貼り付けた文字。看板エディタ (SignboardScreen) で編集する。 */
     private final List<SignboardText> signTexts = new ArrayList<>();
     /** 時刻表の参照設定。本家形式 "tt=<file>,station=<駅名>,track=<番線>"。 */
@@ -171,31 +133,22 @@ public class InstalledObjectBlockEntity extends BlockEntity
     private byte signDirection;
     /** クライアント: フレームアニメ用カウンタ (frame * animationCycle で1周)。 */
     private int signCounter;
-    /**
-     * サーバー: lightValue == -16 (ランダム点滅) 用の現在の明るさ。保存も同期もしない
-     * (明るさ自体はライトエンジン経由でクライアントへ届く)。
-     */
+    /** サーバー: lightValue == -16 (ランダム点滅) 用の現在の明るさ。 */
     private int signFlicker;
-    /**
-     * サーバー: 最後にライトエンジンへ渡した明るさ。保存しないので、BE が作り直された
-     * 最初の tick では必ず -1 になり、設置直後やチャンク再読込でも必ず一度は再計算される。
-     */
+    /** サーバー: 最後にライトエンジンへ渡した明るさ。 */
     private int signLastLight = -1;
 
     // ---- 列車検知器 (本家 EntityTrainDetector) ----
     /** 検知したときにレッドストーンブロックを置く/消す座標。未設定なら null (何もしない)。 */
     private BlockPos detectorTarget;
-    /**
-     * true  = 列車を検知したら「置く」 (居なくなったら消す)
-     * false = 列車を検知したら「消す」 (居なくなったら置く)
-     */
+    /** true = 列車を検知したら「置く」 (居なくなったら消す) false = 列車を検知したら「… */
     private boolean detectorPlaceOnDetect = true;
     /** 真下のレールに列車が乗っているか。クライアントにも同期して GUI に出す。 */
     private boolean detectorTrainOnRail;
 
     private static final String DEFAULT_TT_SETTING = "tt=tt_sample.csv,station=西京,track=-1";
     private static final RandomSource SIGN_RANDOM = RandomSource.create();
-    /** 本家 EntityTrainDetector: 自分の位置から真下に最大 8 ブロックまでレールを探す。 */
+    /** 本家 EntityTrainDetector: 自分の位置から真下に最大 8 ブロックまでレールを… */
     private static final int DETECTOR_RAIL_SEARCH_DEPTH = 8;
     /** 検知の間隔(tick)。毎tickでなくても列車の検知には十分。 */
     private static final int DETECTOR_INTERVAL = 5;
@@ -203,15 +156,12 @@ public class InstalledObjectBlockEntity extends BlockEntity
     public InstalledObjectBlockEntity(BlockPos pos, BlockState blockState) {
         super(RealTrainModUnofficialBlockEntities.INSTALLED_OBJECT.get(), pos, blockState);
         // 本家スクリプト互換 (1.7.10 の TileEntity 座標フィールド)。
-        // 架線柱パックの描画スクリプトは周囲の碍子を探すのにこれを読む。
         this.field_145851_c = pos.getX();
         this.field_145848_d = pos.getY();
         this.field_145849_e = pos.getZ();
     }
 
-    // ---- 本家スクリプト互換 (SRG 名) ----
-    // 架線柱パックのスクリプトは RTMCore.VERSION が "1.7.10" を含むため 1.7.10 の
-    // API 名で書かれた分岐に入る。そこで読まれる名前だけをここで提供する。
+    // ---- 本家スクリプト互換 (SRG 名) ---- 架線柱パックのスクリプトは RTMCore…
 
     /** 1.7.10 TileEntity.xCoord */
     public int field_145851_c;
@@ -222,7 +172,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
 
     private jp.ngt.mccompat.WorldCompat worldCompat;
 
-    /** func_145831_w = getWorldObj。スクリプトは戻り値に func_147438_o(x,y,z) を呼ぶ。 */
+    /** func_145831_w = getWorldObj。 */
     public jp.ngt.mccompat.WorldCompat func_145831_w() {
         if (this.level == null) {
             return null;
@@ -233,10 +183,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return this.worldCompat;
     }
 
-    // ---- 本家 EntityInstalledObject 互換 (サーバースクリプト用) ----
-    // 本家の設置物は「エンティティ」なので、サーバースクリプトは設置物を Entity として扱い、
-    // 座標・向き・当たり判定・World を SRG 名で読む。
-    // ★ここは必ず public フィールドにすること。
+    // ---- 本家 EntityInstalledObject 互換 (サーバースクリプト用) ---…
 
     /** 1.7.10 Entity.worldObj */
     public jp.ngt.mccompat.WorldCompat field_70170_p;
@@ -258,8 +205,6 @@ public class InstalledObjectBlockEntity extends BlockEntity
         this.field_70170_p = this.func_145831_w();
         this.field_70165_t = this.worldPosition.getX() + 0.5D;
         // ATC 地上子はレール吸着でレールの 1 つ上のブロックに置かれる。
-        // server_ATS_Beacon.js は「自分の真下 (y-1) のコマンドブロックを設定として読む」「自分の高さの
-        // AABB で列車を検知する」— これは地上子がレール高さのエンティティだった前提。
         this.field_70163_u = getCategory() == InstalledObjectCategory.ATC
                 ? this.worldPosition.getY() - 1.0D
                 : this.worldPosition.getY();
@@ -283,15 +228,10 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return this.scriptExecuter;
     }
 
-    /**
-     * 本家 TileEntityInsulator.wirePos (電線の取付点)。碍子 (コネクタ) 以外は null。
-     * スクリプトは tile.wirePos と書き、Nashorn がこの getter に解決する。
-     */
+    /** 本家 TileEntityInsulator.wirePos (電線の取付点)。 */
     @Override
     public jp.ngt.ngtlib.math.Vec3 getWirePos() {
         // 碍子 (INSULATOR) も対象に含める。
-        // 碍子の wirePos (JSON の wirePos=[x,y,z]) を金具・接続点の計算に使い、
-        // null だと render_Wire2 の getAroundInsulatorPosData が wirePos.getX で落ちる。
         InstalledObjectCategory cat = getCategory();
         if (cat != InstalledObjectCategory.CONNECTOR_INPUT && cat != InstalledObjectCategory.CONNECTOR_OUTPUT
                 && cat != InstalledObjectCategory.INSULATOR) {
@@ -303,17 +243,10 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
         net.minecraft.world.phys.Vec3 wp = def.getWireAttachPos();
         // ★ここはモデル座標のままの生の取付点を返す。
-        // 本家 TileEntityConnectorBase.updateWirePos に相当する変換
-        // (取付面/pitch/yaw/roll の回転 + オフセット加算) は
-        // InstalledObjectBlockEntityRenderer.wireEndpoint 側が既に忠実に行っている。
         return wp == null ? null : new jp.ngt.ngtlib.math.Vec3(wp.x, wp.y, wp.z);
     }
 
-    /**
-     * NGTO Builder の Wire ツール互換: スクリプトの setModelName
-     * (NGTUtil.setValueToField(TileEntityConnectorBase.class, tile, name, "modelName")) を
-     * jp.ngt.ngtlib.util.NGTUtil がここへブリッジする。bare name から碍子定義を解決して適用する。
-     */
+    /** NGTO Builder の Wire ツール互換: スクリプトの setModelName (N… */
     /** 見つからなかったモデル名を 1 回だけ知らせる。 */
     private static final java.util.Set<String> WARNED_MODEL_NAME =
         java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -321,8 +254,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
     public void applyScriptModelName(String bareName) {
         InstalledObjectDefinition def = InstalledObjectRegistry.getByBareName(bareName, InstalledObjectCategory.INSULATOR);
         if (def == null && bareName != null) {
-            // 完全一致で見つからないときは末尾一致でも拾う
-            // ("pack:Name" 形式や接頭辞違いで来ることがある)。
+            // 完全一致で見つからないときは末尾一致でも拾う ("pack:Name" 形式や接頭辞違いで来ること…
             String needle = bareName.substring(bareName.lastIndexOf(':') + 1);
             for (InstalledObjectDefinition d : InstalledObjectRegistry.getAll()) {
                 if (d.getBareName().equalsIgnoreCase(needle)) {
@@ -332,8 +264,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             }
         }
         if (def == null) {
-            // ★黙って諦めない。ここで返すと「ブロックは置かれたのにモデルが付かない
-            //   (＝何も見えない)」になり、原因が一切分からなくなる。
+            // ★黙って諦めない。ここで返すと「ブロックは置かれたのにモデルが付かない (＝何も見えない)」になり…
             if (WARNED_MODEL_NAME.size() < 32 && WARNED_MODEL_NAME.add(String.valueOf(bareName))) {
                 com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
                     "[RTMU] スクリプトが指定したモデルが見つかりません: \"{}\" (碍子/設置物として解決できず)",
@@ -349,12 +280,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    // ---- 1.7.10 srg 名のシム (NGTO Builder 等のパックスクリプトが直接呼ぶ) ----
-    //
-    // ★NGTO Builder2 のビーム/ワイヤーツールは、ブロックを置いたあと
-    //   tile.func_145839_a(nbt) で NBT を丸ごと流し込んで碍子の種類とオフセットを決める。
-    //   この 2 つが無いとスクリプトがそこで落ち、<b>ブロックだけ置かれてモデルが付かない</b>
-    //   (置いても何も起きないように見える)。
+    // ---- 1.7.10 srg 名のシム (NGTO Builder 等のパックスクリプトが直接呼…
 
     /** 本家 TileEntity.readFromNBT。 */
     public void func_145839_a(Object nbt) {
@@ -362,12 +288,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         if (tag == null || this.level == null) {
             return;
         }
-        // ★パックの NBT は部分的 (ModelName/offset だけ等)。本家の readFromNBT は
-        //   自分のキーしか読まないため、書かれていないフィールドは変化しないのが正しい。
-        //   RTMU の loadAdditional は全キーを読む (無いキー = 既定値で上書き) ので、
-        //   タグに無いキーの分は退避して戻す。これを怠ると、NGTO Builder が続きのビームを
-        //   置いたとき既設碍子へ NBT を再適用して接続・定義・取付面が全部消える
-        //   (= 前のビームのワイヤーが消える)。
+        // ★パックの NBT は部分的 (ModelName/offset だけ等)。
         String prevDefinition = this.definitionId;
         String prevCategory = this.category;
         String prevWireModel = this.wireModel;
@@ -392,7 +313,6 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
         if (!tag.contains("MountFace")) {
             // 本家は取付面をブロックメタが持つので NBT 適用では変わらない。
-            // 一度も設定されていないタイルだけ本家の既定 = 1 (上面)。
             this.mountFace = prevMountFace >= 0 ? prevMountFace : 1;
         }
         if (!tag.contains("WireStartX")) {
@@ -477,7 +397,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         tag.putFloat("MountRoll", mountRoll);
         tag.putInt("MountFace", mountFace);
         if (directTarget != null) {
-            //本家 Connection(DIRECT) の相手座標
+            // 本家 Connection(DIRECT) の相手座標
             tag.putInt("DirectX", directTarget.getX());
             tag.putInt("DirectY", directTarget.getY());
             tag.putInt("DirectZ", directTarget.getZ());
@@ -503,15 +423,14 @@ public class InstalledObjectBlockEntity extends BlockEntity
         tag.putInt("BarMoveCount", barMoveCount);
         tag.putInt("LightCount", lightCount);
         tag.putInt("TickCountOnActive", tickCountOnActive);
-        // 本家 TileEntityPlaceable:33 と同じキー名・型 (小文字 offsetX / float)。
-        // スクリプトが設置時に NBT へ書くのもこの名前:
+        // 本家 TileEntityPlaceable:33 と同じキー名・型 (小文字 offsetX /…
         tag.putFloat("offsetX", (float) offsetX);
         tag.putFloat("offsetY", (float) offsetY);
         tag.putFloat("offsetZ", (float) offsetZ);
         tag.putInt("SignalChannel", signalChannel);
         tag.putInt("SignalAspect", signalAspect);
         tag.putInt("SpeakerRange", speakerRange);
-        // 蛍光灯 / 転轍機 (本家 TileEntityFluorescent.dir, TileEntityPoint.Activated/Move)
+        // 蛍光灯 / 転轍機 (本家 TileEntityFluorescent.dir, TileEnti…
         tag.putByte("FluorescentDir", fluorescentDir);
         tag.putBoolean("PointActivated", pointActivated);
         tag.putFloat("PointMove", pointMove);
@@ -520,7 +439,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             scriptData.forEach(scriptDataTag::putString);
             tag.put("ScriptData", scriptDataTag);
         }
-        // 看板: 本家 ResourceStateSignboard と同じキー名なので、本家ワールドのデータも読める。
+        // 看板: 本家 ResourceStateSignboard と同じキー名なので、本家ワールドのデー…
         if (!signTexts.isEmpty()) {
             ListTag list = new ListTag();
             for (SignboardText text : signTexts) {
@@ -569,7 +488,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         mountPitch = tag.getFloat("MountPitch");
         mountRoll = tag.getFloat("MountRoll");
         mountFace = tag.contains("MountFace") ? tag.getInt("MountFace") : -1;
-        // 未設定なら本家 ResourceState.color の既定 (0xFFFFFF = 白)。0 にすると電線が黒くなる。
+        // 未設定なら本家 ResourceState.color の既定 (0xFFFFFF = 白)。
         wireColor = tag.contains("Color") ? tag.getInt("Color") : 0xFFFFFF;
         adjustRoll = tag.getFloat("AdjustRoll");
         adjustPitch = tag.getFloat("AdjustPitch");
@@ -582,22 +501,20 @@ public class InstalledObjectBlockEntity extends BlockEntity
         barMoveCount = tag.getInt("BarMoveCount");
         lightCount = tag.contains("LightCount") ? tag.getInt("LightCount") : -1;
         tickCountOnActive = tag.getInt("TickCountOnActive");
-        // 本家キー (小文字 float) を優先し、旧 RTMU セーブ ("OffsetX" double) も読めるようにする。
+        // 本家キー (小文字 float) を優先し、旧 RTMU セーブ ("OffsetX" doubl…
         offsetX = tag.contains("offsetX") ? tag.getFloat("offsetX") : tag.getDouble("OffsetX");
         offsetY = tag.contains("offsetY") ? tag.getFloat("offsetY") : tag.getDouble("OffsetY");
         offsetZ = tag.contains("offsetZ") ? tag.getFloat("offsetZ") : tag.getDouble("OffsetZ");
         signalChannel = tag.contains("SignalChannel") ? tag.getInt("SignalChannel") : -1;
         signalAspect = tag.contains("SignalAspect") ? tag.getInt("SignalAspect") : SignalAspect.STOP.getId();
-        // 旧セーブ互換: 信号機は現示 (SignalAspect) と electricity を単一状態にミラーする。
-        // electricity 未保存 (0) の場合は現示側を正とする。
+        // 旧セーブ互換: 信号機は現示 (SignalAspect) と electricity を単一状態…
         if (getCategory() == InstalledObjectCategory.SIGNAL && electricity == 0) {
             electricity = SignalAspect.byId(signalAspect).getLegacyValue();
         }
         speakerRange = tag.contains("SpeakerRange") ? tag.getInt("SpeakerRange") : 32;
         fluorescentDir = tag.getByte("FluorescentDir");
         pointActivated = tag.getBoolean("PointActivated");
-        // 本家 TileEntityPoint の既定は 24.0。0 だと転轍機の本体が反対側にずれてしまうので、
-        // キーが無い旧データは既定値に戻す。
+        // 本家 TileEntityPoint の既定は 24.0。
         pointMove = tag.contains("PointMove") ? tag.getFloat("PointMove") : 24.0F;
         scriptData.clear();
         if (tag.contains("ScriptData")) {
@@ -636,11 +553,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         this.setChanged();
     }
 
-    /**
-     * 取り付け先ブロック。本家 ItemInstalledObject はコネクタを置いた瞬間に
-     * {@code setConnectionTo(クリックしたブロック, DIRECT)} を張る。
-     * 保存が無い古い設置物は、取付面の反対側 = クリックしたブロックとして復元する。
-     */
+    /** 取り付け先ブロック。本家 ItemInstalledObject はコネクタを置いた瞬間に set… */
     public BlockPos getDirectTarget() {
         if (this.directTarget != null) {
             return this.directTarget;
@@ -649,11 +562,11 @@ public class InstalledObjectBlockEntity extends BlockEntity
         if (face < 0 || face >= net.minecraft.core.Direction.values().length) {
             return null;
         }
-        //取付面 = クリックした面。コネクタはその面の 1 つ手前に置かれるので、逆向きが相手
+        // 取付面 = クリックした面。コネクタはその面の 1 つ手前に置かれるので、逆向きが相手
         return this.worldPosition.relative(net.minecraft.core.Direction.values()[face].getOpposite());
     }
 
-    /** 取り付け先が持っている信号 (本家 Connection.getIProvideElectricity → getElectricity)。 */
+    /** 取り付け先が持っている信号 (本家 Connection.getIProvideElectrici… */
     private int readAttachedElectricity() {
         BlockPos target = this.getDirectTarget();
         if (this.level == null || target == null) {
@@ -666,8 +579,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         if (be instanceof InstalledObjectBlockEntity io) {
             return io.getElectricity();
         }
-        // ★本家はエンティティ (EntityElectricalWiring: ATC/列車検知器/車止め) も取り付け先になれる。
-        //   その座標に居る配線エンティティから getElectricity() を読む。
+        // ★本家はエンティティ (EntityElectricalWiring: ATC/列車検知器/車止め…
         jp.ngt.rtm.entity.EntityElectricalWiring wiring =
             jp.ngt.rtm.entity.EntityElectricalWiring.find(this.level, target);
         if (wiring != null) {
@@ -676,10 +588,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return 0;
     }
 
-    /**
-     * 本家 TileEntityConnector.sendElectricity (INPUT かつ DIRECT):
-     * 受け取った信号を取り付け先ブロックへ流し込む。
-     */
+    /** 本家 TileEntityConnector.sendElectricity (INPUT かつ… */
     public void deliverToAttached(int levelValue) {
         BlockPos target = this.getDirectTarget();
         if (this.level == null || target == null) {
@@ -691,6 +600,13 @@ public class InstalledObjectBlockEntity extends BlockEntity
                 this.worldPosition.getZ(), levelValue);
         } else if (be instanceof InstalledObjectBlockEntity io) {
             io.setElectricity(levelValue);
+        } else {
+            // 本家は ATC/列車検知器/車止め (EntityElectricalWiring) も取り付け先…
+            jp.ngt.rtm.entity.EntityElectricalWiring wiring =
+                    jp.ngt.rtm.entity.EntityElectricalWiring.find(this.level, target);
+            if (wiring != null) {
+                wiring.setElectricity(levelValue);
+            }
         }
     }
 
@@ -715,11 +631,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         setChanged();
     }
 
-    /**
-     * 本家 ModelConfig.defaultValues を DataMap (scriptData) へ適用する。
-     * 未設定のキーだけに入れる (既にスクリプトが書いた値を上書きしない)。
-     * List は {@code "a|b|c"} 形式で保存し、DataMapCompat.getArray が Vec3 等へ復元する。
-     */
+    /** 本家 ModelConfig.defaultValues を DataMap (scriptDat… */
     private void applyDefaultScriptData() {
         InstalledObjectDefinition def = this.getDefinition();
         if (def == null) {
@@ -781,10 +693,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         setChanged();
     }
 
-    /**
-     * 本家 ItemInstalledObject の meta (クリック面 0-5)。-1 = 旧方式 (持ち上げハック)。
-     * 碍子等は本家 RenderElectricalWiring と同じブロック中心ピボット+面回転で描画する。
-     */
+    /** 本家 ItemInstalledObject の meta (クリック面 0-5)。 */
     public int getMountFace() {
         return mountFace;
     }
@@ -848,7 +757,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return this.signalOrigBlock;
     }
 
-    /** 本家 TileEntitySignal.origTileEntity: 置き換えた元タイルの NBT。 */
+    /** 本家 TileEntitySignal.origTileEntity: 置き換えた元タイルの NB… */
     public void setSignalOrigTileNbt(CompoundTag nbt) {
         this.signalOrigTileNbt = nbt;
         setChanged();
@@ -858,7 +767,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return this.signalOrigTileNbt;
     }
 
-    /** 本家 TileEntitySignal.getRotation (= 本体向き)。柱の向きとの差だけヘッドを回す。 */
+    /** 本家 TileEntitySignal.getRotation (= 本体向き)。 */
     public float getSignalBodyYaw() {
         return this.signalBodyYaw;
     }
@@ -888,8 +797,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
     }
 
     public void setElectricity(int levelValue) {
-        //★本家 TileEntitySignal.setElectricity: 現示はモデルが出せる上限 (SignalConfig.maxSignalLevel)
-        //  で頭打ちにする。上限は json の maxSignalLevel、無ければ lights の S(n) の最大値。
+        // ★本家 TileEntitySignal.setElectricity: 現示はモデルが出せる上限…
         if (getCategory() == InstalledObjectCategory.SIGNAL) {
             com.portofino.realtrainmodunofficial.installedobject.InstalledObjectDefinition def =
                 com.portofino.realtrainmodunofficial.installedobject.InstalledObjectRegistry
@@ -901,20 +809,16 @@ public class InstalledObjectBlockEntity extends BlockEntity
                 }
             }
         }
-        // 信号機は「電気値は同じだが現示 (aspect) がズレている」ことがある
-        // (ミラー導入前の設置物や手動変更との競合) — その場合も書き込む
+        // 信号機は「電気値は同じだが現示 (aspect) がズレている」ことがある (ミラー導入前の設置物…
         boolean signalDesynced = getCategory() == InstalledObjectCategory.SIGNAL
                 && getLegacySignalState() != levelValue;
         if (this.electricity != levelValue || signalDesynced) {
             this.electricity = levelValue;
-            // 本家 TileEntitySpeaker.setElectricity: レベル 1-64 = そのスロットの音を再生
+            // 本家 TileEntitySpeaker.setElectricity: レベル 1-64 = そ…
             if (isSpeaker() && levelValue >= 1 && levelValue <= 64) {
                 playSpeakerSound(levelValue);
             }
-            // 本家 TileEntitySignal.setElectricity 同様、信号機は電気レベル=現示。
-            // 現示 (SignalAspect) と electricity の二重管理が「UI で変えた現示と
-            // 配線/変換器で変えた現示がバラバラ」の原因だったため、
-            // 信号カテゴリでは常に両方向ミラーして単一状態にする。
+            // 本家 TileEntitySignal.setElectricity 同様、信号機は電気レベル=現…
             if (getCategory() == InstalledObjectCategory.SIGNAL) {
                 this.signalAspect = com.portofino.realtrainmodunofficial.signal.SignalAspect
                         .byLegacyValue(levelValue).getId();
@@ -992,15 +896,12 @@ public class InstalledObjectBlockEntity extends BlockEntity
         setChanged();
     }
 
-    /** クライアント: フレームアニメの現在位置 (0 .. frame*animationCycle-1)。 */
+    /** クライアント: フレームアニメの現在位置 (0 .. */
     public int getSignCounter() {
         return signCounter;
     }
 
-    /**
-     * 描画結果を左右する状態のシグネチャ (スクリプト描画キャッシュ用)。
-     * これが変わらない間はスクリプト (Nashorn) を再実行せず記録を再生する。
-     */
+    /** 描画結果を左右する状態のシグネチャ (スクリプト描画キャッシュ用)。 */
     public long renderStateSignature() {
         long h = 1125899906842597L;
         for (Map.Entry<String, String> e : scriptData.entrySet()) {
@@ -1014,12 +915,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return h;
     }
 
-    /**
-     * 本家 BlockSignBoard.getLightValue の移植。
-     * lightValue >= 0 … 常にその明るさ
-     * lightValue == -16 … ランダム点滅 (0,3,6,9,12,15)
-     * lightValue < 0 … レッドストーン通電時に -lightValue
-     */
+    /** 本家 BlockSignBoard.getLightValue の移植。 */
     public int getSignboardLightEmission() {
         InstalledObjectDefinition definition = getDefinition();
         if (definition == null) {
@@ -1065,10 +961,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    /**
-     * 本家 EntityTrainDetector 準拠: 自分の真下 8 ブロック以内で最初に見つかったレールの
-     * 在線状態を返す。レールが無ければ false。
-     */
+    /** 本家 EntityTrainDetector 準拠: 自分の真下 8 ブロック以内で最初に見つかっ… */
     private static boolean detectTrainOnRailBelow(Level level, BlockPos pos) {
         for (int i = 0; i < DETECTOR_RAIL_SEARCH_DEPTH; i++) {
             BlockPos p = pos.below(i);
@@ -1082,11 +975,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return false;
     }
 
-    /**
-     * 検知結果を対象座標のレッドストーンブロックに反映する。
-     * 建築物を壊さないため、置くのは対象が空気のときだけ・消すのは対象がレッドストーン
-     * ブロックのときだけにしてある。それ以外のブロックには一切触れない。
-     */
+    /** 検知結果を対象座標のレッドストーンブロックに反映する。 */
     private void applyDetectorOutput(Level level, boolean detected) {
         BlockPos target = detectorTarget;
         if (target == null || level.isClientSide || !level.isLoaded(target)) {
@@ -1140,10 +1029,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
     }
 
     /** スピーカーが音を鳴らす範囲(ブロック)。 */
-    /**
-     * 本家 TileEntitySpeaker.setSound/getSound 相当 (スピーカーごとの音登録)。
-     * 未登録スロットはグローバル設定 (SpeakerSoundConfig) にフォールバック (旧ワールド互換)。
-     */
+    /** 本家 TileEntitySpeaker.setSound/getSound 相当 (スピーカーご… */
     public void setSpeakerSound(int index, String sound) {
         scriptData.put("SpeakerSound" + index, sound == null ? "" : sound);
         setChanged();
@@ -1160,11 +1046,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return com.portofino.realtrainmodunofficial.installedobject.SpeakerSoundConfig.getSound(index);
     }
 
-    /**
-     * 本家 TileEntitySpeaker.setElectricity 相当の発音 (index = 電気レベル 1-64)。
-     * 音量は可聴範囲 (speakerRange ブロック) から算出し、離れるほど減衰する
-     * (MC LINEAR 減衰: 可聴距離 ≒ volume × 16 ブロック)。
-     */
+    /** 本家 TileEntitySpeaker.setElectricity 相当の発音 (index… */
     public void playSpeakerSound(int index) {
         if (level == null || level.isClientSide || !isSpeaker()) {
             return;
@@ -1177,12 +1059,11 @@ public class InstalledObjectBlockEntity extends BlockEntity
         double cy = worldPosition.getY() + 0.5D;
         double cz = worldPosition.getZ() + 0.5D;
         int range = getSpeakerRange();
-        float volume = Math.max(0.05F, range / 16.0F);
-        var payload = new com.portofino.realtrainmodunofficial.network.SpeakerPlayPayload(cx, cy, cz, sound, volume, 1.0F);
-        double rangeSq = (double) range * (double) range;
+        var payload = new com.portofino.realtrainmodunofficial.network.SpeakerPlayPayload(
+                -1, cx, cy, cz, sound, -1.0F, 1.0F, range);
         if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
             for (net.minecraft.server.level.ServerPlayer p : serverLevel.players()) {
-                if (p.distanceToSqr(cx, cy, cz) <= rangeSq * 1.44D) {
+                if (p.distanceToSqr(cx, cy, cz) <= 256.0D * 256.0D) {
                     net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, payload);
                 }
             }
@@ -1201,39 +1082,58 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    /** Legacy RTM signal scripts read the current aspect through entity.getSignal. */
+    /** Legacy RTM signal scripts read the current aspect… */
     public int getSignal() {
         return Math.max(0, getLegacySignalState());
     }
 
-    /** Legacy RTM signal scripts query a resource-state wrapper to read config values. */
+    /** Legacy RTM signal scripts query a resource-state… */
     public ResourceStateCompat getResourceState() {
         return new ResourceStateCompat(this);
     }
 
-    /** Legacy 1.7-style scripts sometimes access modelSet directly. */
+    /** Legacy 1.7-style scripts sometimes access modelSe… */
     public javax.script.ScriptEngine getServerScriptEngine() {
-        if (this.level == null || this.level.isClientSide()) return null;
-        return com.portofino.realtrainmodunofficial.script.InstalledObjectServerScripts.getEngine(this.getDefinition());
+        return this.getModelSet().serverSE;
     }
 
-    public ModelSetCompat getModelSet() {
-        ModelSetCompat set = new ModelSetCompat(this);
-        set.serverSE = this.getServerScriptEngine();
+    /** 本家 IModelSelector.getModelSet。 */
+    public jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getModelSet() {
+        InstalledObjectDefinition def = this.getDefinition();
+        String key = "machine:" + (def == null ? "" : def.getId());
+        float[] offset = null;
+        float[] bodyPos = null;
+        if (def != null) {
+            var mo = def.getModelOffset();
+            offset = new float[]{(float) mo.x, (float) mo.y, (float) mo.z};
+            var bp = def.getScriptBodyPos();
+            bodyPos = new float[]{(float) bp.x, (float) bp.y, (float) bp.z};
+        }
+        jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> set =
+                jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getScriptOnlyModelSet(
+                        key,
+                        def == null ? "" : def.getBareName(),
+                        "ModelMachine",
+                        def == null ? null : def.getServerScriptPath(),
+                        null, null, def == null ? null : def.getButtonTexture(),
+                        offset, bodyPos);
+        if (def != null && set instanceof jp.ngt.rtm.modelpack.modelset.ModelSetScriptOnly scriptOnly) {
+            var config = scriptOnly.getConfig();
+            config.machineType = def.getSubType();
+            config.followRailAngle = def.isFollowRailAngle();
+            config.smoothing = def.isSmoothing();
+            config.doCulling = def.isDoCulling();
+        }
         return set;
     }
 
-    /** 本家 EntityInstalledObject.getModelType は設置物では常に "ModelMachine"。 */
+    /** 本家 EntityInstalledObject.getModelType は設置物では常に "M… */
     @Override
     public String getModelType() {
         return "ModelMachine";
     }
 
-    /**
-     * 本家 IModelSelector.setModelName: 設置物のモデルを差し替える。
-     * フル ID ("pack:name") でも素の名前でも解決し、実際に定義を差し替えて同期する
-     * (無行為スタブにしない — スクリプトから見て「変えたのに変わらない」を防ぐ)。
-     */
+    /** 本家 IModelSelector.setModelName: 設置物のモデルを差し替える。 */
     @Override
     public void setModelName(String name) {
         if (name == null || name.isBlank()) {
@@ -1252,15 +1152,10 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    /**
-     * The installed-object renderer already applies block yaw before the script runs,
-     * so returning zero here avoids rotating scripted signals twice.
-     */
+    /** The installed-object renderer already applies blo… */
     @Override
     public float getRotation() {
-        // 本家 TileEntityPlaceable.getRotation。NGTO Builder は
-        // rotation = tile.getRotation + yaw;  tile.setRotation(rotation, true);
-        // と現在値に加算する。0 固定だと設置ごとに向きが失われる。
+        // 本家 TileEntityPlaceable.getRotation。
         return this.yaw;
     }
 
@@ -1288,10 +1183,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return (float) this.offsetZ;
     }
 
-    /**
-     * Slanted placement is not implemented for installed objects yet, so the block
-     * direction is exposed as zero for script compatibility.
-     */
+    /** Slanted placement is not implemented for installe… */
     public float getBlockDirection() {
         return 0.0F;
     }
@@ -1312,7 +1204,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return SignalAspect.byId(signalAspect);
     }
 
-    /** RTM signal scripts use sparse numeric states rather than the compact UI ids. */
+    /** RTM signal scripts use sparse numeric states rath… */
     public int getLegacySignalState() {
         return getSignalAspect().getLegacyValue();
     }
@@ -1333,17 +1225,13 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return index >= 0 ? definitionId.substring(index + 1) : definitionId;
     }
 
-    // ---- Legacy RTM script position/direction accessors ----
+    // ---- Legacy RTM script position/direction accesso…
 
     public int getX() { return worldPosition.getX(); }
     public int getY() { return worldPosition.getY(); }
     public int getZ() { return worldPosition.getZ(); }
 
-    /**
-     * 0–3 facing direction derived from yaw (0=south,1=west,2=north,3=east).
-     * ただし蛍光灯だけは本家 TileEntityFluorescent.getDir と同じく
-     * 取付方向 0..7 を返す (RenderFluorescent.js がこれで平行移動と回転を決める)。
-     */
+    /** 0–3 facing direction derived from yaw (0=south,1=… */
     public int getDir() {
         if (getCategory() == InstalledObjectCategory.FLUORESCENT) {
             return fluorescentDir;
@@ -1358,7 +1246,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         setChanged();
     }
 
-    /** 壊れた蛍光灯 (本家 meta==2 / モデル名 *Broken) か。定義から不変なので definitionId でキャッシュ。 */
+    /** 壊れた蛍光灯 (本家 meta==2 / モデル名 *Broken) か。 */
     public boolean isBrokenFluorescent() {
         if (!definitionId.equals(brokenFluorescentKey)) {
             brokenFluorescentKey = definitionId;
@@ -1368,10 +1256,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return brokenFluorescentVal;
     }
 
-    /**
-     * 本家 BlockFluorescent.getLightValue: 壊れた蛍光灯は 0/4/8/12 をランダムに返して明滅する。
-     * 通常の蛍光灯は常に 15。
-     */
+    /** 本家 BlockFluorescent.getLightValue: 壊れた蛍光灯は 0/4/8/… */
     public int getFluorescentLightValue() {
         return isBrokenFluorescent() ? fluorescentLight : 15;
     }
@@ -1393,14 +1278,14 @@ public class InstalledObjectBlockEntity extends BlockEntity
         };
         if (next != be.fluorescentLight) {
             be.fluorescentLight = next;
-            // 本家 world.checkLight(pos) 相当。これを呼ばないと明るさが変わっても再描画されない。
+            // 本家 world.checkLight(pos) 相当。
             level.getLightEngine().checkBlock(pos);
         }
     }
 
     // ---- 転轍機 (本家 TileEntityPoint) ----
 
-    /** 本家 (1.12 系) TileEntityPoint.isActivated。パックのスクリプトが読む。 */
+    /** 本家 (1.12 系) TileEntityPoint.isActivated。 */
     public boolean isActivated() {
         return this.isPointActivated();
     }
@@ -1419,7 +1304,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return pointMove;
     }
 
-    /** バールでの右クリックで符号が反転し、転轍機の本体が線路の反対側に移る (本家 BlockPoint)。 */
+    /** バールでの右クリックで符号が反転し、転轍機の本体が線路の反対側に移る (本家 BlockPoint… */
     public void setPointMove(float move) {
         this.pointMove = move;
         setChanged();
@@ -1432,11 +1317,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    /**
-     * 指定方向 (RTM side 0-5) の隣に接続相手がいるか。
-     * RTM の side 番号 (0=下,1=上,2=北,3=南,4=西,5=東) は MC の net.minecraft.core.Direction#from3DDataValue
-     * と一致する。パイプは隣接パイプ同士で接続する (RenderConnectablePipe.js が partXP..partZN の腕を出す)。
-     */
+    /** 指定方向 (RTM side 0-5) の隣に接続相手がいるか。 */
     public boolean isConnected(int side) {
         if (level == null || side < 0 || side > 5 || getCategory() != InstalledObjectCategory.PIPE) {
             return false;
@@ -1446,10 +1327,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             && io.getCategory() == InstalledObjectCategory.PIPE;
     }
 
-    /**
-     * このブロックが貼り付いている面 (0=下,1=上,2-5=NSWE)。
-     * パイプ: 設置時のクリック面 (mountFace)。
-     */
+    /** このブロックが貼り付いている面 (0=下,1=上,2-5=NSWE)。 */
     public int getAttachedSide() {
         if (getCategory() == InstalledObjectCategory.PIPE) {
             return mountFace >= 0 ? mountFace : 1;
@@ -1457,17 +1335,14 @@ public class InstalledObjectBlockEntity extends BlockEntity
         return 1;
     }
 
-    /** Random decorative scale factor (used by RenderPalm etc.). */
+    /** Random decorative scale factor (used by RenderPal… */
     public float getRandomScale() { return 1.0F; }
 
     public InstalledObjectDefinition getDefinition() {
         return InstalledObjectRegistry.getById(definitionId);
     }
 
-    /**
-     * 本家 ResourceState.color 相当。
-     * renderer.getColor(tileEntity) で読み、頂点色にそのまま使う。
-     */
+    /** 本家 ResourceState.color 相当。 */
     public int getWireColor() {
         return wireColor;
     }
@@ -1479,7 +1354,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
 
     // --- NGTO Builder の Wire ツール互換 ---
 
-    /** Wire ツールが碍子の微調整オフセットを設定する (本家 TileEntityConnectorBase.setOffset)。 */
+    /** Wire ツールが碍子の微調整オフセットを設定する (本家 TileEntityConnector… */
     @Override
     public void setOffset(double x, double y, double z, boolean sync) {
         this.offsetX = x;
@@ -1491,10 +1366,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    /**
-     * Wire ツールが「この碍子から (x,y,z) の碍子へワイヤーを張る」ときに呼ぶ (本家 setConnectionTo)。
-     * RTMU の配線描画は wireStart/wireEnd を持つ設置物に対して行われるので、両端を設定して描画対象にする。
-     */
+    /** Wire ツールが「この碍子から (x,y,z) の碍子へワイヤーを張る」ときに呼ぶ (本家 se… */
     /** 本家 getConnectionList。描画側が root だけを拾う。 */
     public java.util.List<jp.ngt.rtm.electric.Connection> getConnectionList() {
         return this.connections;
@@ -1511,13 +1383,17 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
+    /** 逆接続 (張られた側) を削除する。エンティティ側の接続解除から呼ばれる。 */
+    public void removeConnectionAt(int x, int y, int z) {
+        this.connections.removeIf(c -> c.x == x && c.y == y && c.z == z);
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
+    }
+
     public void setConnectionTo(int x, int y, int z, Object connectionType, Object modelState) {
         // 本家 TileEntityElectricalWiring.setConnectionTo の移植。
-        // ★碍子の定義は触らない (ワイヤーモデルは接続が持つ)。
-        //   以前は definitionId をワイヤーモデルで上書きして category=WIRE にしていたが、
-        //   NGTO Builder2 が続きのビームを置くとき既設碍子が「同じブロック」に見えなくなり、
-        //   NBT ごと置き直されて接続 (= 前のビームのワイヤー) が消えていた。
-        //   本家は碍子が碍子のままなので BlockBuilder のスキップ判定に通る。
         jp.ngt.rtm.electric.Connection.ConnectionType type =
             connectionType instanceof jp.ngt.rtm.electric.Connection.ConnectionType ct
                 ? ct : jp.ngt.rtm.electric.Connection.ConnectionType.WIRE;
@@ -1548,7 +1424,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         } else if (modelState instanceof String s) {
             wireModelId = s;
         }
-        // 本家: 自分に root の接続を足し、相手には root でない接続を足す (setConnectionFrom)。
+        // 本家: 自分に root の接続を足し、相手には root でない接続を足す (setConnec…
         this.connections.removeIf(c -> c.x == x && c.y == y && c.z == z);
         this.connections.add(new jp.ngt.rtm.electric.Connection(
             true, x, y, z, type, wireModelId == null ? "" : wireModelId));
@@ -1565,7 +1441,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    /** ロード済み設置物 (WebCTC の信号地図 API が使用。レールコアの LOADED_CORES と同じ方式)。 */
+    /** ロード済み設置物 (WebCTC の信号地図 API が使用。 */
     private static final java.util.Set<InstalledObjectBlockEntity> LOADED_OBJECTS =
             java.util.Collections.synchronizedSet(
                     java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>()));
@@ -1617,7 +1493,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             }
             jp.ngt.rtm.electric.WireManager.INSTANCE.removeWire(level, wireStart, wireEnd);
         }
-        // 本家 EntityATC.attackEntityFrom: ATC を撤去したらレールの信号を 0 に戻す。
+        // 本家 EntityATC.attackEntityFrom: ATC を撤去したらレールの信号を…
         if (level != null && !level.isClientSide && getCategory() == InstalledObjectCategory.ATC) {
             setRailSignal(level, worldPosition, 0);
         }
@@ -1637,13 +1513,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         super.setRemoved();
     }
 
-    /**
-     * ATC 地上子: 下のレールの signal に値を書き込む。
-     *
-     * <p>★本家 {@code EntityATC.setElectricity(int)} と同じく、<b>電気配線 (Connection) で
-     * 給電された値</b>をそのまま書く。RTMU は以前「隣接レッドストーンの最大強度」を読む
-     * 独自実装だったが、本家の ATC はコネクタ/配線で給電される (レッドストーンではない)。
-     */
+    /** ATC 地上子: 下のレールの signal に値を書き込む。 */
     private void emitAtcSignal(Level level, BlockPos pos) {
         int value = Math.max(0, Math.min(15, this.electricity));
         setRailSignal(level, pos, value);
@@ -1656,10 +1526,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             || category == InstalledObjectCategory.BUMPING_POST;
     }
 
-    /**
-     * 旧ワールドの該当設置物ブロックを、本家と同じエンティティへ変換する (移行処理)。
-     * モデル名・向きを引き継ぎ、ブロックは消す。
-     */
+    /** 旧ワールドの該当設置物ブロックを、本家と同じエンティティへ変換する (移行処理)。 */
     private void convertToInstalledEntity(Level level, BlockPos pos) {
         jp.ngt.rtm.entity.EntityInstalledObject entity = switch (getCategory()) {
             case ATC -> new jp.ngt.rtm.entity.EntityATC(
@@ -1676,8 +1543,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             return;
         }
         entity.setModelName(this.getDefinitionId());
-        // 移行も本家の位置 (レールブロックの Y) に合わせる。既存ブロックはレールの 1 つ上に
-        // 置かれていたので、そのぶん下げて引き継ぐ。
+        // 移行も本家の位置 (レールブロックの Y) に合わせる。
         net.minecraft.world.phys.Vec3 off = this.getRenderOffset();
         entity.moveTo(pos.getX() + 0.5D + off.x, pos.getY() - 1.0D + off.y, pos.getZ() + 0.5D + off.z,
             this.getYaw(), 0.0F);
@@ -1685,7 +1551,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         level.removeBlock(pos, false);
     }
 
-    /** レールの signal へ書き込む (本家 EntityATC.setSignalToRail 相当)。 */
+    /** レールの signal へ書き込む (本家 EntityATC.setSignalToRail 相… */
     private void setRailSignal(Level level, BlockPos pos, int value) {
         jp.ngt.rtm.rail.TileEntityLargeRailBase rail =
                 jp.ngt.rtm.rail.TileEntityLargeRailBase.getRailFromCoordinates(
@@ -1698,19 +1564,17 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    /** 本家 TileEntityMachineBase.isGettingPower: スクリプトが<b>フィールド</b>として読む。 */
+    /** 本家 TileEntityMachineBase.isGettingPower: スクリプトがフィ… */
     public boolean isGettingPower;
 
     public static void tick(Level level, BlockPos pos, BlockState state, InstalledObjectBlockEntity be) {
-        // 本家 TileEntityMachineBase.isGettingPower を毎 tick 更新 (スクリプトが括弧なしで読む)
+        // 本家 TileEntityMachineBase.isGettingPower を毎 tick 更…
         be.isGettingPower = be.isPowered();
-        // ATS 連動: 信号機は現示 (legacy 値) を signalLevel フィールドに毎 tick 反映しておく。
-        // ATS-Ps 地上子ビーコンが NGTUtil.getField(..., "signalLevel") でこれを読む (GAP C)。
+        // ATS 連動: 信号機は現示 (legacy 値) を signalLevel フィールドに毎 t…
         if (be.getCategory() == InstalledObjectCategory.SIGNAL) {
             be.signalLevel = be.getLegacySignalState();
         }
-        // 蛍光灯は明滅以外にやることが無い。明るさはクライアント/サーバー両方で使うので
-        // サイド分岐より前に処理する (壊れていない蛍光灯なら何もせず抜ける)。
+        // 蛍光灯は明滅以外にやることが無い。明るさはクライアント/サーバー両方で使うので サイド分岐より前に…
         if (be.getCategory() == InstalledObjectCategory.FLUORESCENT) {
             tickFluorescentFlicker(level, pos, be);
             return;
@@ -1722,26 +1586,16 @@ public class InstalledObjectBlockEntity extends BlockEntity
                 int period = signDef == null ? 1 : Math.max(1, signDef.getSignFrame() * signDef.getAnimationCycle());
                 be.signCounter = (be.signCounter + 1) % period;
             }
-            // sound_Running を持つ設置オブジェクト(スピーカー/サイレン/踏切など)は種別を問わず、
-            // powered の間ループ再生する。実際の再生可否(powered・音名)は CrossingGateSoundManager 側で判定。
+            // sound_Running を持つ設置オブジェクト(スピーカー/サイレン/踏切など)は種別を問わず…
             InstalledObjectDefinition definition = be.getDefinition();
             String running = definition == null ? null : definition.getRunningSound();
             if (running != null && !running.isBlank()) {
                 ClientHooks.tickCrossingGateSound(be);
             }
-            // 軽量化: 走行音を持たない設置物 (標識/照明/架線柱/信号機など大多数) は「鳴らす音が無い＝
-            // 止める音も無い」。
-            // リフレクション + 文字列キー生成の空振り。
+            // 軽量化: 走行音を持たない設置物 (標識/照明/架線柱/信号機など大多数) は「鳴らす音が無い＝…
             return;
         }
-        // 本家 EntityInstalledObject.onUpdate: サーバー側では毎 tick、パックの
-        // serverScriptPath を onUpdate(entity, executer) として呼ぶ。
-        // 列車検知器パック (hi03TrainDetector 等) は全処理をこのスクリプトに書くので、
-        // スクリプトを持つ設置物はパック側の実装に任せて RTMU 内蔵の検知器処理は動かさない
-        // (両方が出力を書くと奪い合いになる)。
-        // ★本家エンティティ化 移行: 旧ワールドに残っている ATC/列車検知器/車止め ブロックを
-        //   エンティティ (EntityInstalledObject) へ自動変換する。これを入れないと、既存の設置が
-        //   本家と違う構造のまま残ってしまう。
+        // 本家 EntityInstalledObject.onUpdate: サーバー側では毎 tick、…
         if (isLegacyEntityCategory(be.getCategory())) {
             be.convertToInstalledEntity(level, pos);
             return;
@@ -1753,26 +1607,19 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
         if (be.getDefinition() != null && be.getDefinition().hasServerScript()) {
             if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
-                com.portofino.realtrainmodunofficial.script.InstalledObjectServerScripts.tick(serverLevel, be);
+                be.refreshScriptFields();
+                be.getScriptExecuter(serverLevel).execScript(be);
             }
             // ★ここで return してよいのは検知器だけ。
-            // 検知器は出力の奪い合いになるのでパック任せにするが、それ以外の設置物の
-            // サーバースクリプトは「おまけ」であって内蔵処理の代わりではない。
-            // 例: ミラーボールの scripts/server/MirrorBall.js はジャンプ強化を配るだけで、
-            // 通電判定は持っていない。ここで抜けていたため powered が更新されず、
-            // 照明が一切光らず回らなかった。
             if (be.getCategory() == InstalledObjectCategory.TRAIN_DETECTOR) {
                 return;
             }
         }
-        // 看板: 本家 TileEntitySignBoard.update — レッドストーン状態とランダム点滅を更新し、
-        // 明るさが変わったらライトエンジンに再計算させる。
-        // 設置直後は setBlock の時点でまだ BE が空 (definitionId 未設定) なので、
-        // そのままだと明るさ 0 がチャンクに焼き付いてしまう。
+        // 看板: 本家 TileEntitySignBoard.update — レッドストーン状態とランダ…
         if (be.isSpeaker()) {
             boolean sig = be.redstoneOn(level, pos);
             if (sig && !be.powered) {
-                be.playSpeakerSound(1);   //立ち上がりでスロット1の音を再生
+                be.playSpeakerSound(1);   // 立ち上がりでスロット1の音を再生
             }
             be.powered = sig;
             return;
@@ -1797,9 +1644,6 @@ public class InstalledObjectBlockEntity extends BlockEntity
             return;
         }
         // 列車検知器: 本家 EntityTrainDetector — 真下のレールの在線を見る。
-        // 本家は配線網へ STOP/PROCEED を流していたが、RTMU の配線は信号機に届かないので、
-        // 代わりに「指定座標のレッドストーンブロックを置く/消す」で出力する
-        // (座標と動作は右クリックの GUI で設定)。
         if (be.getCategory() == InstalledObjectCategory.TRAIN_DETECTOR) {
             if ((level.getGameTime() + pos.asLong()) % DETECTOR_INTERVAL != 0L) {
                 return;
@@ -1810,10 +1654,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
                 be.setChanged();
                 level.sendBlockUpdated(pos, state, state, 3);
             }
-            // ★本家 EntityTrainDetector.getElectricity(): 検知=STOP(0) / 未検知=PROCEED(5)。
-            //   本家は配線網が getElectricity() を読みに来る (プル型)。RTMU には
-            //   「出力コネクタが取り付け先の getElectricity() を読んで配線網へ流す」経路が
-            //   既にあるので、検知器の electricity をこの値にしておけば配線 (=信号機/ATC) へ届く。
+            // ★本家 EntityTrainDetector.getElectricity(): 検知=STOP…
             int detectLevel = onRail ? 0 : 5;
             if (be.electricity != detectLevel) {
                 be.setElectricity(detectLevel);
@@ -1824,11 +1665,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             be.applyDetectorOutput(level, onRail);
             return;
         }
-        // ★本家 TileEntityConnector.checkSignalOutput:
-        //   <b>出力</b>コネクタが「取り付け先ブロックから信号出力」して配線網へ流す。
-        //   (本家 usage.item.istlobj.connector_out = 取付け先ブロックから信号出力)
-        //   入力コネクタは配線から受けて取り付け先へ書き込むだけで、
-        //   レッドストーンには一切触らない (RS との橋渡しは信号変換機の役目)。
+        // ★本家 TileEntityConnector.checkSignalOutput: 出力コネクタ…
         if (be.getCategory() == InstalledObjectCategory.CONNECTOR_OUTPUT) {
             int sig = be.readAttachedElectricity();
             if (sig != be.prevOutputSignal) {
@@ -1843,7 +1680,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
         if (be.getCategory() == InstalledObjectCategory.TICKET_GATE) {
             boolean changed = false;
-            // 本家 BlockTurnstile は<b>切符で開く</b>だけ (RS 開扉は本家に無い独自拡張だったため撤去)。
+            // 本家 BlockTurnstile は切符で開くだけ (RS 開扉は本家に無い独自拡張だったため撤…
             if (be.powered) {
                 if (be.barMoveCount < 90) {
                     be.barMoveCount = Math.min(90, be.barMoveCount + Math.max(1, 90 / TICKET_GATE_MOVE_TICKS));
@@ -1868,16 +1705,13 @@ public class InstalledObjectBlockEntity extends BlockEntity
             return;
         }
         // 照明 (ミラーボール・赤色灯・サーチライト等): レッドストーンで点灯/回転する。
-        // ★ここが丸ごと抜けていて powered が一度も更新されず、
-        // renderer.getLightState が常に -1 (消灯) を返していた。
-        // 本家のスクリプトは state == 1 のときだけ回すので、回転が始まらなかった。
         if (be.getCategory() == InstalledObjectCategory.LIGHT) {
             boolean redstone = be.redstoneOn(level, pos);
             if (be.powered != redstone) {
                 be.powered = redstone;
                 be.setChanged();
                 level.sendBlockUpdated(pos, state, state, 3);
-                // 光源レベルが powered で変わる (InstalledObjectBlock.getLightEmission)
+                // 光源レベルが powered で変わる (InstalledObjectBlock.getLigh…
                 level.getLightEngine().checkBlock(pos);
             }
             return;
@@ -1887,8 +1721,6 @@ public class InstalledObjectBlockEntity extends BlockEntity
             return;
         }
         // 踏切のレッドストーン受信を毎tick再評価する。
-        // ワールド再読込・ワイヤ隣接(hasNeighborSignal が拾いにくいケース)に強くするため、
-        // getBestNeighborSignal(>0)で判定して powered を常に信号と同期させる。
         boolean redstone = be.redstoneOn(level, pos);
         boolean changed = false;
         if (be.powered != redstone) {
@@ -1932,8 +1764,8 @@ public class InstalledObjectBlockEntity extends BlockEntity
             this.blockEntity = blockEntity;
         }
 
-        public ModelSetCompat getResourceSet() {
-            return new ModelSetCompat(blockEntity);
+        public jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getResourceSet() {
+            return blockEntity == null ? null : blockEntity.getModelSet();
         }
 
         public DataMapCompat getDataMap() {
@@ -2010,6 +1842,26 @@ public class InstalledObjectBlockEntity extends BlockEntity
             return 0.0D;
         }
 
+        public jp.ngt.ngtlib.math.Vec3 getVec(String key) {
+            Object value = this.get(key);
+            if (value instanceof jp.ngt.ngtlib.math.Vec3 vec) {
+                return vec;
+            }
+            String text = value == null ? "" : String.valueOf(value);
+            Object parsed = parseVecLike(text);
+            return parsed instanceof jp.ngt.ngtlib.math.Vec3 vec ? vec : jp.ngt.ngtlib.math.Vec3.ZERO;
+        }
+
+        public void setVec(String key, jp.ngt.ngtlib.math.Vec3 value, int syncType) {
+            jp.ngt.ngtlib.math.Vec3 vec = value == null ? jp.ngt.ngtlib.math.Vec3.ZERO : value;
+            String text = vec.getX() + " " + vec.getY() + " " + vec.getZ();
+            values.put(key, vec);
+            if (blockEntity != null) {
+                blockEntity.scriptData.put(key, text);
+                blockEntity.setChanged();
+            }
+        }
+
         public boolean getBoolean(String key) {
             Object value = get(key);
             if (value instanceof Boolean bool) {
@@ -2062,12 +1914,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             }
         }
 
-        /**
-         * 本家 (1.12 系) DataMap: 配列。
-         * {@code getArray("speakerPosList")} のように使い、要素は {@link jp.ngt.ngtlib.math.Vec3}
-         * (getX/getY/getZ を持つ) として返す。scriptData は文字列のみ保持できるため
-         * {@code "x y z|x y z"} 形式で保存する。
-         */
+        /** 本家 (1.12 系) DataMap: 配列。 */
         public Object[] getArray(String key) {
             Object value = get(key);
             if (value instanceof Object[] arr) {
@@ -2130,7 +1977,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
             }
             values.put("powered", blockEntity.isPowered() ? 1 : 0);
             values.put("isPowered", blockEntity.isPowered());
-            // 本家 TileEntityMachineBase.isGettingPower。同梱の MirrorBall.js 等が読む
+            // 本家 TileEntityMachineBase.isGettingPower。
             values.put("isGettingPower", blockEntity.isPowered());
             values.put("barMoveCount", blockEntity.getBarMoveCount());
             values.put("lightCount", blockEntity.getLightCount());
@@ -2141,54 +1988,8 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
     }
 
-    public static final class ModelSetCompat {
-        public javax.script.ScriptEngine serverSE;
-        private final InstalledObjectBlockEntity blockEntity;
-
-        public ModelSetCompat(InstalledObjectBlockEntity blockEntity) {
-            this.blockEntity = blockEntity;
-        }
-
-        public String getName() {
-            return blockEntity == null ? "" : blockEntity.getModelName();
-        }
-
-        public String getModelName() {
-            return getName();
-        }
-
-        public String getTextureName() {
-            return getName();
-        }
-
-        public ConfigCompat getConfig() {
-            return new ConfigCompat(blockEntity);
-        }
-    }
-
-    public static final class ConfigCompat {
-        public final float[] offset;
-        public final ModelPartsBodyCompat modelPartsBody;
-
-        public ConfigCompat(InstalledObjectBlockEntity blockEntity) {
-            InstalledObjectDefinition definition = blockEntity == null ? null : blockEntity.getDefinition();
-            Vec3 modelOffset = definition == null ? Vec3.ZERO : definition.getModelOffset();
-            Vec3 scriptBodyPos = definition == null ? Vec3.ZERO : definition.getScriptBodyPos();
-            this.offset = new float[] {(float) modelOffset.x, (float) modelOffset.y, (float) modelOffset.z};
-            this.modelPartsBody = new ModelPartsBodyCompat(scriptBodyPos);
-        }
-    }
-
-    public static final class ModelPartsBodyCompat {
-        public final float[] pos;
-
-        public ModelPartsBodyCompat(Vec3 pos) {
-            this.pos = new float[] {(float) pos.x, (float) pos.y, (float) pos.z};
-        }
-    }
-
     private boolean shouldHandleCrossingLogic() {
-        // 定義から不変。definitionId が同じ間はキャッシュを返す (毎servertick の toLowerCase×4+contains×9 を排除)。
+        // 定義から不変。definitionId が同じ間はキャッシュを返す (毎servertick の…
         if (definitionId.equals(crossingLogicKey)) {
             return crossingLogicVal;
         }
@@ -2199,7 +2000,7 @@ public class InstalledObjectBlockEntity extends BlockEntity
         }
         InstalledObjectDefinition definition = getDefinition();
         if (definition == null) {
-            return false;  //定義未解決: まだキャッシュしない (登録が読めたら次tickで再計算)
+            return false;  // 定義未解決: まだキャッシュしない (登録が読めたら次tickで再計算)
         }
         String id = definition.getId() == null ? "" : definition.getId().toLowerCase(java.util.Locale.ROOT);
         String name = definition.getDisplayName() == null ? "" : definition.getDisplayName().toLowerCase(java.util.Locale.ROOT);

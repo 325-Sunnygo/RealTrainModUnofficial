@@ -43,14 +43,11 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * 本家 jp.ngt.rtm.rail.BlockMarker (KaizPatchX) の忠実移植。
- * metadata (0-7: 下位2bit=方角, bit2=斜め) は META ブロックステートで代替。
- */
+/** 本家 jp.ngt.rtm.rail.BlockMarker (KaizPatchX) の忠実移植。 */
 public class BlockMarker extends BaseEntityBlock {
     public static final MapCodec<BlockMarker> CODEC = simpleCodec(props -> new BlockMarker(0, props));
 
-    /** 本家 metadata 相当 (0-7)。ID は既存アセット (blockstates) と互換の "facing"。 */
+    /** 本家 metadata 相当 (0-7)。 */
     public static final IntegerProperty META = IntegerProperty.create("facing", 0, 7);
 
     private static final VoxelShape SHAPE = Shapes.box(0.0D, 0.0D, 0.0D, 1.0D, 0.0625D, 1.0D);
@@ -124,12 +121,11 @@ public class BlockMarker extends BaseEntityBlock {
     @Override
     public void setPlacedBy(Level world, BlockPos pos, BlockState state, LivingEntity placer, ItemStack stack) {
         super.setPlacedBy(world, pos, state, placer, stack);
-        // 設置直後に自動プレビュー (距離表示のため)。本家は右クリックで作るが、
-        // 旧 Remaster 同様「2本目を置いた瞬間に距離が出る」体感に合わせる。
+        // 設置直後に自動プレビュー (距離表示のため)。
         if (!world.isClientSide && placer instanceof Player player && (this.markerType == 0 || this.markerType == 1)) {
             BlockEntity be = world.getBlockEntity(pos);
             if (be instanceof TileEntityMarker marker) {
-                marker.tick();//rp 初期化
+                marker.tick();// rp 初期化
                 this.onMarkerActivated(world, pos.getX(), pos.getY(), pos.getZ(), player, false);
             }
         }
@@ -154,7 +150,7 @@ public class BlockMarker extends BaseEntityBlock {
         }
 
         if (!item.isEmpty()) {
-            // 本家: レンチ = makeRailMap + ItemWrench.onRightClickMarker (C/S 両方)
+            // 本家: レンチ = makeRailMap + ItemWrench.onRightClickMa…
             if (item.getItem() instanceof com.portofino.realtrainmodunofficial.item.RtmWrenchItem wrench
                     && (this.markerType == 0 || this.markerType == 1)) {
                 // シフト右クリック = カント設定 GUI (数値入力)
@@ -279,12 +275,7 @@ public class BlockMarker extends BaseEntityBlock {
         return createRail(world, x, y, z, rps, prop, makeRail, isCreative, RailMapBasic.fixRTMRailMapVersionCurrent);
     }
 
-    /**
-     * 版 1 以上は「アンカーの向きが dir から導かれる値と違えば必ずベジェにする」という
-     * 条件が入る (fixRTM 由来)。
-     * 独自のアンカー規約を持ち、本来 版 0 で敷く (new RailMapBasic(start, end))。
-     * @param railMapVersion レールマップの版。
-     */
+    /** 版 1 以上は「アンカーの向きが dir から導かれる値と違えば必ずベジェにする」という 条件が入… */
     public static boolean createRail(Level world, int x, int y, int z, List<RailPosition> rps, RailProperty prop,
                                      boolean makeRail, boolean isCreative, int railMapVersion) {
         rps = rps.stream().sorted(Comparator.comparingInt(o -> o.blockY)).collect(Collectors.toList());
@@ -300,24 +291,13 @@ public class BlockMarker extends BaseEntityBlock {
         return false;
     }
 
-    /**
-     * 通常のレール
-     * y0 <= y1でなければならない
-     */
-    /**
-     * そのブロックに別のレールのコアが既に居るか。
-     * コアはレールの全情報 (RailPosition / RailProperty) を持っている唯一のブロックで、
-     * ここを setBlock で潰すとそのレールが丸ごと消える。
-     */
+    /** 通常のレール y0 <= y1でなければならない */
+    /** そのブロックに別のレールのコアが既に居るか。 */
     public static boolean hasRailCore(Level world, int x, int y, int z) {
         return world.getBlockEntity(new BlockPos(x, y, z)) instanceof TileEntityLargeRailCore;
     }
 
-    /**
-     * ソートせずに 2 点でレールを敷く (ペンマーカー用)。
-     * #createRail は blockY で並べ替えるため「どちらの点がコアになるか」を呼び出し側で
-     * 決められない。ペンは既存レールのコアを踏まない点をコアにしたいので、順序を保つ入口を出す。
-     */
+    /** ソートせずに 2 点でレールを敷く (ペンマーカー用)。 */
     public static boolean createRailKeepOrder(Level world, RailPosition start, RailPosition end,
                                               RailProperty prop, boolean makeRail, boolean isCreative) {
         return createRail0(world, start, end, prop, makeRail, isCreative);
@@ -524,10 +504,7 @@ public class BlockMarker extends BaseEntityBlock {
         return null;
     }
 
-    /**
-     * 最後にレールアイテムから使われた RailProperty。
-     * 素手でマーカーを右クリックしてレールを敷く際に再利用する (ユーザー要望)。
-     */
+    /** 最後にレールアイテムから使われた RailProperty。 */
     private static RailProperty lastUsedProperty;
 
     public static void setLastUsedProperty(RailProperty prop) {
@@ -540,10 +517,7 @@ public class BlockMarker extends BaseEntityBlock {
         return lastUsedProperty;
     }
 
-    /**
-     * 本家: 手持ちの ItemRail から RailProperty を取得。
-     * TODO(Phase 4): ItemRail 移植後に接続。暫定: Remaster の RailItem 選択中モデルを反映。
-     */
+    /** 本家: 手持ちの ItemRail から RailProperty を取得。 */
     public RailProperty hasRail(Player player, boolean par2) {
         if (player == null) {
             return RailProperty.getDefaultProperty();
@@ -559,7 +533,7 @@ public class BlockMarker extends BaseEntityBlock {
             }
             return RailProperty.getDefaultProperty();
         }
-        // Remaster RailItem: アイテム自身の選択モデル ID を最優先 (本家 ItemRail.getProperty(item) 相当)
+        // Remaster RailItem: アイテム自身の選択モデル ID を最優先 (本家 ItemR…
         if (!item.isEmpty() && item.getItem() instanceof com.portofino.realtrainmodunofficial.item.RailItem) {
             RailProperty prop = jp.ngt.rtm.item.ItemRail.getProperty((Object)item);
             setLastUsedProperty(prop);
@@ -567,8 +541,7 @@ public class BlockMarker extends BaseEntityBlock {
         }
 
         if (player.getAbilities().instabuild || !par2) {
-            // 空手: 最後に使ったレールを最優先 (ユーザー要望)、
-            // 無ければ 選択中 or 先頭のレール定義 (railModel="" だと描画もスクリプトも無い)
+            // 空手: 最後に使ったレールを最優先 (ユーザー要望)、 無ければ 選択中 or 先頭のレール定義…
             if (lastUsedProperty != null) {
                 return lastUsedProperty;
             }
@@ -588,29 +561,19 @@ public class BlockMarker extends BaseEntityBlock {
         return null;
     }
 
-    /**
-     * レール種類と道床から RailProperty を組む。
-     *
-     * <p>道床 (block / meta / 厚み) は本家と同じく<b>アイテムに焼き込まれたもの</b>を使う。
-     * ここで決めた {@code prop.block} がそのまま道床のテクスチャになり、
-     * {@code prop.blockHeight} が道床の厚みの下限になる (RenderBlockLargeRail と同じ)。
-     * 以前は常に砂利・厚み 1/16 決め打ちだったので、パックの defaultBallast が効かなかった。
-     *
-     * @param ballastId アイテムに焼き込まれた道床ブロック ID。null ならレール定義の既定
-     */
+    /** レール種類と道床から RailProperty を組む。 */
     public static RailProperty propertyFor(String railModel, @javax.annotation.Nullable String ballastId) {
         com.portofino.realtrainmodunofficial.rail.RailDefinition def =
                 (railModel == null || railModel.isEmpty()) ? null
                         : com.portofino.realtrainmodunofficial.rail.RailRegistry.getById(railModel);
 
-        // Model selection and ballast selection are independent in ItemRail.setModelName.
-        // Never silently replace an explicitly selected block with another model's list.
+        // Model selection and ballast selection are indepen…
         java.util.List<com.portofino.realtrainmodunofficial.rail.RailDefinition.Ballast> sets =
                 def == null ? java.util.List.of() : def.getBallastSets();
         String blockId = ballastId != null && !ballastId.isBlank() ? ballastId
                 : !sets.isEmpty() ? sets.get(0).blockId() : "minecraft:gravel";
 
-        //その道床に対応する厚み/メタ (本家 RailConfig.defaultBallast の 1 行)
+        // その道床に対応する厚み/メタ (本家 RailConfig.defaultBallast の 1…
         int meta = 0;
         float height = 0.0625F;
         if (def != null) {
@@ -629,10 +592,7 @@ public class BlockMarker extends BaseEntityBlock {
         return new RailProperty(railModel == null ? "" : railModel, block, meta, height);
     }
 
-    /**
-     * 本家 getFacing: 設置者の向きからマーカーの向き (0〜7) を決める。
-     * 斜め設置は 45 度刻みで割り当てる。
-     */
+    /** 本家 getFacing: 設置者の向きからマーカーの向き (0〜7) を決める。 */
     public static int getFacing(net.minecraft.world.entity.LivingEntity placer, boolean isDiagonal) {
         int facing = net.minecraft.util.Mth.floor(
                 jp.ngt.ngtlib.math.NGTMath.normalizeAngle(placer.getYRot() + 180.0F) / 45.0D + 0.5D) & 7;

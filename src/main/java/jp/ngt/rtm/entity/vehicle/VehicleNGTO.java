@@ -4,9 +4,7 @@ import jp.ngt.ngtlib.block.NGTObject;
 import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * ブロックから作った乗り物のモデル。本家 {@code jp.ngt.rtm.entity.vehicle.VehicleNGTO} の移植。
- */
+/** ブロックから作った乗り物のモデル。本家 jp.ngt.rtm.entity.vehicle.Veh… */
 public final class VehicleNGTO {
     /** 移動装置での一時保存時は null。 */
     @Nullable

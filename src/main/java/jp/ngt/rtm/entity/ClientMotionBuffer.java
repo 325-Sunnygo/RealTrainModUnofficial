@@ -2,38 +2,7 @@ package jp.ngt.rtm.entity;
 
 import net.minecraft.util.Mth;
 
-/**
- * クライアント側の位置・姿勢の<b>遅延バッファ</b>。
- *
- * <h2>なぜ要るか</h2>
- * バニラのエンティティ補間は「目標との差を毎 tick 1/inc ずつ詰める」漸近方式。
- * 位置パケットは 1 tick ごとに届き、そのたび {@code inc} が 3 に戻るので、
- *
- * <pre>
- *   定常状態の遅れ g は  g = g − g/3 + d   →  g = 3d   (d = 1 tick の移動量)
- * </pre>
- *
- * となり<b>常に約 3 tick 遅れ、しかも速度が一定にならない</b>。
- * 列車のように速く一定に動く物ではこのガタつきがはっきり見える。
- *
- * <h2>やること</h2>
- * 届いた位置を貯めて、<b>少しだけ後ろを一定の速さで再生する</b>。
- *
- * <p>★<b>到着時刻でタグ付けしてはいけない。</b> それだと通信のゆらぎがそのまま
- * 再生位置のゆらぎになる (実測: 1 tick の進みが 1.30〜2.98m とばらついた。漸近方式より悪い)。
- * サーバーは {@code updateInterval(1)} で<b>毎 tick 1 個</b>送ってくるので、
- * 標本は「サーバーの tick 1 個ぶん」に等間隔で対応している。
- * だから並び順で再生し、再生ヘッドを実時間で 1 tick/50ms 進める。
- * 到着のゆらぎは<b>バッファの深さ</b>が吸収する。
- *
- * <p>遅延は既定 100ms (2 tick)。今の漸近方式が実質 3 tick 遅れているので、
- * <b>遅れは減って滑らかさだけ上がる</b>。
- *
- * <h2>曲線での追加の滑らかさ</h2>
- * 2 点を直線で結ぶと、標本ごとに進行方向がわずかに折れる (カーブで顕著)。
- * 前後 1 点ずつを使う Catmull-Rom で通せば折れ目が消える。
- * 標本が 4 点に満たない間は直線に落とす。
- */
+/** クライアント側の位置・姿勢の遅延バッファ。 */
 public final class ClientMotionBuffer {
 
     /** 貯める標本の数。1 tick 1 個で 1 秒分あれば足りる。 */
@@ -79,7 +48,7 @@ public final class ClientMotionBuffer {
         this.x[this.head] = px;
         this.y[this.head] = py;
         this.z[this.head] = pz;
-        //角度は直前の値の近くへ展開して入れる (179→−179 で逆回りしないように)
+        // 角度は直前の値の近くへ展開して入れる (179→−179 で逆回りしないように)
         if (this.size > 0) {
             int last = (this.head - 1 + CAPACITY) % CAPACITY;
             this.yaw[this.head] = this.yaw[last] + Mth.wrapDegrees(pyaw - this.yaw[last]);
@@ -97,14 +66,7 @@ public final class ClientMotionBuffer {
         }
     }
 
-    /**
-     * 一番新しい標本の姿勢だけ入れ替える。
-     *
-     * <p>位置はバニラの移動パケット、姿勢は float 同期 (entityData) と<b>別便で届く</b>。
-     * 同じ tick でもどちらが先に着くかは決まっていないので、
-     * 姿勢が後から来たときにその tick の標本へ入れ直す。
-     * これをしないとカーブで<b>向きだけ 1 tick 遅れる</b>。
-     */
+    /** 一番新しい標本の姿勢だけ入れ替える。 位置はバニラの移動パケット、姿勢は float 同期 (en… */
     public void setLatestRotation(float pyaw, float ppitch, float proll) {
         if (this.size == 0) {
             return;
@@ -132,15 +94,7 @@ public final class ClientMotionBuffer {
         return (this.head - this.size + i + CAPACITY * 2) % CAPACITY;
     }
 
-    /**
-     * 再生ヘッドの状態を取り出して {@code out*} に入れる。
-     *
-     * <p>ヘッドは<b>実時間で 1 tick/50ms 進める</b>ので、標本の到着が乱れても
-     * 出てくる動きの速さは変わらない。ずれは毎回わずかに寄せて直す
-     * (一気に直すとそこで飛ぶので、5% ずつ)。
-     *
-     * @return 取り出せたら true。標本が足りなければ false (呼び出し側は従来の方式に落とす)
-     */
+    /** 再生ヘッドの状態を取り出して out* に入れる。 */
     public boolean sample() {
         if (this.size < 2) {
             return false;
@@ -157,12 +111,12 @@ public final class ClientMotionBuffer {
         } else {
             double dt = (now - this.lastSampleNanos) / TICK_NANOS;
             this.lastSampleNanos = now;
-            //暴れた分は捨てる (一時停止・画面切替でまとめて進むのを防ぐ)
+            // 暴れた分は捨てる (一時停止・画面切替でまとめて進むのを防ぐ)
             this.playhead += Math.max(0.0D, Math.min(4.0D, dt));
-            //ずれをゆっくり直す。急に直すとそこで飛ぶ
+            // ずれをゆっくり直す。急に直すとそこで飛ぶ
             this.playhead += (desired - this.playhead) * 0.05D;
         }
-        //貯まっている範囲から出さない (先へ進めない・古すぎる所へ戻さない)
+        // 貯まっている範囲から出さない (先へ進めない・古すぎる所へ戻さない)
         this.playhead = Math.max(oldest, Math.min(newest, this.playhead));
 
         int i1i = (int) Math.floor(this.playhead - oldest);
@@ -172,12 +126,12 @@ public final class ClientMotionBuffer {
         int i1 = idx(i1i);
         int i2 = idx(i1i + 1);
 
-        //角度は素直に線形。角度に曲線を当てるとラップの扱いで壊れやすい
+        // 角度は素直に線形。角度に曲線を当てるとラップの扱いで壊れやすい
         this.outYaw = (float) (this.yaw[i1] + (this.yaw[i2] - this.yaw[i1]) * f);
         this.outPitch = (float) (this.pitch[i1] + (this.pitch[i2] - this.pitch[i1]) * f);
         this.outRoll = (float) (this.roll[i1] + (this.roll[i2] - this.roll[i1]) * f);
 
-        //位置は前後 1 点ずつ取れるなら Catmull-Rom で折れ目を消す
+        // 位置は前後 1 点ずつ取れるなら Catmull-Rom で折れ目を消す
         if (i1i - 1 >= 0 && i1i + 2 <= this.size - 1) {
             int i0 = idx(i1i - 1);
             int i3 = idx(i1i + 2);

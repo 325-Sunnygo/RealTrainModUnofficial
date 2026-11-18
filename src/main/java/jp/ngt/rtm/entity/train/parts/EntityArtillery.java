@@ -22,14 +22,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * 火砲。本家 {@code jp.ngt.rtm.entity.train.parts.EntityArtillery} の移植。
- *
- * <p>右クリックで乗り、乗ると<b>視線で砲を向ける</b> (パックの yaw/pitch の範囲内)。
- * 弾薬アイテムを持って右クリックで装填、パドルで発射。本家 {@code setSize(3.0F, 2.5F)}。
- *
- * <p>★本家の「発射キー」(onFireKeyDown) は移植していない。装填→パドルで撃つ経路のみ。
- */
+/** 火砲。本家 jp.ngt.rtm.entity.train.parts.EntityArtille… */
 public class EntityArtillery extends EntityCargoWithModel {
     private static final EntityDataAccessor<Float> BARREL_YAW =
         SynchedEntityData.defineId(EntityArtillery.class, EntityDataSerializers.FLOAT);
@@ -93,7 +86,7 @@ public class EntityArtillery extends EntityCargoWithModel {
         nbt.putInt("ammoCount", this.ammoCount);
     }
 
-    /** 本家: 乗っている人の視線で砲を回す。範囲はパックの yaw/pitch (Max, Min の順)。 */
+    /** 本家: 乗っている人の視線で砲を回す。範囲はパックの yaw/pitch (Max, Min の順… */
     @Override
     public void tick() {
         super.tick();
@@ -110,7 +103,7 @@ public class EntityArtillery extends EntityCargoWithModel {
 
         float yaw = Mth.wrapDegrees(rider.getYRot() - this.getYRot());
         float pitch = -rider.getXRot();
-        //本家の配列は [Max, Min]
+        // 本家の配列は [Max, Min]
         this.entityData.set(BARREL_YAW, clampRange(yaw, yawRange));
         this.entityData.set(BARREL_PITCH, clampRange(pitch, pitchRange));
     }
@@ -138,7 +131,7 @@ public class EntityArtillery extends EntityCargoWithModel {
         CargoDefinition def = this.getDefinition();
         int magazine = def == null ? 1 : def.getMagazineSize();
 
-        //装填: 弾薬アイテム (弾種 * 4 + 1 = 弾) を入れる
+        // 装填: 弾薬アイテム (弾種 * 4 + 1 = 弾) を入れる
         if (held.getItem() instanceof ItemAmmunition) {
             int type = ItemAmmunition.getVariant(held) / 4;
             if (!this.level().isClientSide()) {
@@ -153,7 +146,7 @@ public class EntityArtillery extends EntityCargoWithModel {
             return InteractionResult.sidedSuccess(this.level().isClientSide());
         }
 
-        //発射: パドル
+        // 発射: パドル
         if (held.is(RealTrainModUnofficialItems.PADDLE_ITEM.get())) {
             if (!this.level().isClientSide() && this.getAmmoType() >= 0 && this.ammoCount > 0) {
                 BulletType type = BulletType.getBulletType(this.getAmmoType());
@@ -172,10 +165,7 @@ public class EntityArtillery extends EntityCargoWithModel {
         return InteractionResult.sidedSuccess(this.level().isClientSide());
     }
 
-    /**
-     * 本家 fireOnServer: 砲口の位置と向きを、パーツの位置差を順に回して出す。
-     * {@code 砲身 → X回転 → Y回転 → 車体の向き} の順。
-     */
+    /** 本家 fireOnServer: 砲口の位置と向きを、パーツの位置差を順に回して出す。 */
     protected void fireOnServer(BulletType type) {
         CargoDefinition cfg = this.getDefinition();
         if (cfg == null) {
@@ -192,7 +182,7 @@ public class EntityArtillery extends EntityCargoWithModel {
         bullet.setOwner(this);
         bullet.setBulletType(type);
         bullet.setPos(muzzle.x, muzzle.y, muzzle.z);
-        //本家 EntityArtillery 用のコンストラクタ: ロケットだけ初速 1.25、他は 10.0
+        // 本家 EntityArtillery 用のコンストラクタ: ロケットだけ初速 1.25、他は 10…
         float speed = (type == BulletType.rocket) ? 1.25F : 10.0F;
         bullet.shootFrom(dir.x, dir.y, dir.z, speed);
         this.level().addFreshEntity(bullet);

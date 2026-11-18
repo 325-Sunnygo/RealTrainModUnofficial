@@ -8,11 +8,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-/**
- * 本家 SignboardText の描画/アニメ部の移植 (クライアント専用)。
- * SignboardText はデータだけを持つので、こちらがフォント画像 (FontImage) の
- * 生成とアニメーションの進行を受け持つ。
- */
+/** 本家 SignboardText の描画/アニメ部の移植 (クライアント専用)。 */
 public final class SignboardTextRenderer {
     private static final Map<SignboardText, SignboardTextRenderer> CACHE =
             Collections.synchronizedMap(new WeakHashMap<>());
@@ -27,10 +23,7 @@ public final class SignboardTextRenderer {
     private String builtKey = "";
     /** images を作ったときの時刻表設定。変わったら焼き直す。 */
     private String builtTtSetting = "";
-    /**
-     * images を作ったときの FontImage キャッシュ世代。ワールドを抜けてテクスチャが
-     * 解放されたら作り直す。
-     */
+    /** images を作ったときの FontImage キャッシュ世代。 */
     private int builtGeneration = -1;
     private StationTimeTable stationTimeTable;
 
@@ -41,10 +34,7 @@ public final class SignboardTextRenderer {
     private SignboardTextRenderer() {
     }
 
-    /**
-     * この文字の「今このフレームで描くべき内容」を返す。
-     * @param ttSetting 看板の時刻表設定 ("tt=...,station=...,track=...")
-     */
+    /** この文字の「今このフレームで描くべき内容」を返す。 */
     public static Frame frameFor(SignboardText text, String ttSetting) {
         return CACHE.computeIfAbsent(text, k -> new SignboardTextRenderer()).nextFrame(text, ttSetting);
     }
@@ -88,8 +78,7 @@ public final class SignboardTextRenderer {
                     return Frame.HIDDEN;
                 }
             }
-            // 本家: 指定した幅に収まるぶんだけ UV を切り出す。文字が幅より短ければ
-            // 自然な縦横比になるようにクアッド側を縮める。
+            // 本家: 指定した幅に収まるぶんだけ UV を切り出す。
             int tw = (int) (IMAGE_SIZE * text.width / text.size);
             maxU = (float) tw / image.getWidth();
             if (maxU > 1.0F) {
@@ -157,14 +146,7 @@ public final class SignboardTextRenderer {
         }
     }
 
-    /**
-     * このフレームで描くべき内容。
-     * @param image   貼るフォント画像
-     * @param minU    UV の左端 (SCROLL で動く)
-     * @param maxU    UV の右端
-     * @param width   クアッドの幅(ブロック単位)。文字が短いときは自然比まで縮む。
-     * @param visible FLASH の消灯中は false
-     */
+    /** このフレームで描くべき内容。 */
     public record Frame(FontImage image, float minU, float maxU, float width, boolean visible) {
         static final Frame HIDDEN = new Frame(null, 0.0F, 1.0F, 0.0F, false);
 

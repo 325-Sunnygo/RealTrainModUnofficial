@@ -6,11 +6,7 @@ import javax.script.Invocable;
 import javax.script.ScriptEngine;
 import javax.script.ScriptException;
 
-/**
- * 本家 NGTLib (jp.ngt.ngtlib.io.ScriptUtil) の忠実移植。
- * 本家は JDK 同梱 Nashorn (jdk.nashorn.*) を使用していたが、Java 21 では
- * スタンドアロン版 (org.openjdk.nashorn) を使用する。
- */
+/** 本家 NGTLib (jp.ngt.ngtlib.io.ScriptUtil) の忠実移植。 */
 public final class ScriptUtil {
     private static NashornScriptEngineFactory SEM;
 
@@ -21,21 +17,16 @@ public final class ScriptUtil {
         SEM = new NashornScriptEngineFactory();
     }
 
-    /**
-     * エンジン生成。本家 ScriptUtil:40 と同一 (-doe / --language=es6)。
-     * RTMU 内でエンジンを作る箇所は全てここを通す (以前は別実装が並立していた)。
-     */
+    /** エンジン生成。本家 ScriptUtil:40 と同一 (-doe / --language=es… */
     public static ScriptEngine createEngine() {
         if (SEM == null) {
             init();
         }
-        // MOD のクラスローダを appLoader として渡す (Packages.jp.ngt.* 解決の鍵)
+        // MOD のクラスローダを appLoader として渡す (Packages.jp.ngt.* 解…
         ScriptEngine se = SEM.getScriptEngine(
                 new String[]{"-doe", "--language=es6"},
                 ScriptUtil.class.getClassLoader());
-        // ★本家 doScript:47-51 と同じ mozilla_compat ロードをここへ引き上げる。
-        // 本家は doScript の中でだけ読んでいたが、RTMU はエンジン生成箇所が複数あり、
-        // 読んでいない経路 (サーバー/サウンドスクリプト) で importPackage が未定義になる。
+        // ★本家 doScript:47-51 と同じ mozilla_compat ロードをここへ引き上げ…
         try {
             se.eval("load(\"nashorn:mozilla_compat.js\");");
         } catch (javax.script.ScriptException e) {
@@ -44,26 +35,17 @@ public final class ScriptUtil {
         return se;
     }
 
-    /** JavaScriptの実行 (本家 ScriptUtil.doScript(String) と同じ名前無し実行)。 */
+    /** JavaScriptの実行 (本家 ScriptUtil.doScript(String) と同じ… */
     public static ScriptEngine doScript(String s) {
         return doScript(s, "<unnamed script>");
     }
 
-    /**
-     * 本家 ScriptUtil.doScript(String, String) 完全移植。
-     * 本家は ScriptEngine.FILENAME を設定してから mozilla_compat を読み、本文を評価する。
-     * FILENAME は Nashorn のスタックトレース/行番号表示に使われるため、
-     * 欠落するとエラー箇所が "<eval>" になり原因が追えなくなる。
-     */
+    /** 本家 ScriptUtil.doScript(String, String) 完全移植。 */
     public static ScriptEngine doScript(String s, String fileName) {
         ScriptEngine se = createEngine();
         try {
             se.put(ScriptEngine.FILENAME, fileName);
-            if (se.toString().contains("Nashorn") || se.getClass().getName().contains("nashorn")) {
-                // Java8ではimportPackageが使えないので、その対策 (本家コメントのまま)
-                se.eval("load(\"nashorn:mozilla_compat.js\");");
-            }
-
+            // createEngine() が本家と同じ mozilla_compat を読み込み済み。
             se.eval(s);
             Object bindFails = se.get("__bindFails");
             if (bindFails != null && !bindFails.toString().isBlank()) {
@@ -75,10 +57,7 @@ public final class ScriptUtil {
         }
     }
 
-    /**
-     * 本家 ScriptUtil.doScript(ResourceLocation) 完全移植。
-     * パック内スクリプトを NGTText.getText(rl, true) で読み、そのパスを FILENAME にして実行する。
-     */
+    /** 本家 ScriptUtil.doScript(ResourceLocation) 完全移植。 */
     public static ScriptEngine doScript(jp.ngt.mccompat.ResourceLocation resource) {
         return doScript(NGTText.getText(resource, true), resource.getResourcePath());
     }
@@ -96,11 +75,8 @@ public final class ScriptUtil {
         }
     }
 
-    /**
-     * そのスクリプトに関数が定義されているか。
-     * Nashorn は function foo{} をグローバルに束縛するので、束縛を引けば分かる。
-     */
-    /** Inspect the current binding: scripts can install callbacks after their first tick. */
+    /** そのスクリプトに関数が定義されているか。 Nashorn は function foo{} をグロ… */
+    /** Inspect the current binding: scripts can install… */
     public static boolean hasFunction(ScriptEngine se, String func) {
         if (se == null || func == null) {
             return false;
@@ -114,10 +90,7 @@ public final class ScriptUtil {
     private static final java.util.Set<String> LOGGED_FAILURES =
         java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    /**
-     * 失敗しても続行するスクリプト呼び出し。
-     * 関数は後から定義され得るため、呼び出すたびに現在の定義を使う。
-     */
+    /** 失敗しても続行するスクリプト呼び出し。 関数は後から定義され得るため、呼び出すたびに現在の定義を使… */
     public static Object doScriptIgnoreError(ScriptEngine se, String func, Object... args) {
         if (se == null || func == null) {
             return null;

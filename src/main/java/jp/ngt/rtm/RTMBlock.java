@@ -11,12 +11,10 @@ public final class RTMBlock {
     public static Block marker;
     public static Block markerSwitch;
     public static Block markerStraight;
-    // NGTO Builder の Wire ツールが setBlock(..., RTMBlock.insulator, ...) で碍子を置く。
-    // RTMU では碍子は汎用 INSTALLED_OBJECT ブロック (定義=INSULATOR カテゴリ) なのでそれを指す。
+    // NGTO Builder の Wire ツールが setBlock(..., RTMBlock.i…
     public static Block insulator;
 
-    // 本家の renderId* は 1.7.10 の ISimpleBlockRenderingHandler 用 ID。
-    // 1.21 に相当物は無いが、スクリプトが数値比較に使うことがあるので本家の並びで持つ。
+    // 本家の renderId* は 1.7.10 の ISimpleBlockRenderingHan…
     public static int renderIdBlockRail;
     public static int renderIdLiquid = 1;
     public static int renderIdScaffold = 2;
@@ -35,8 +33,5 @@ public final class RTMBlock {
         }
     }
 
-    // 本家の signal / speaker / turnstile / fluorescent 等の個別ブロックは、RTMU では
-    // すべて単一の INSTALLED_OBJECT ブロック + カテゴリで表現される。
-    // INSTALLED_OBJECT を割り当てると world.getBlock(...) == RTMBlock.signal が
-    // 「あらゆる設置物」に対して true になり誤判定を招くため、あえて未定義のままにする。
+    // 本家の signal / speaker / turnstile / fluorescent 等の…
 }

@@ -7,17 +7,13 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.common.world.chunk.TicketController;
 
-/**
- * 本家 RTM のチャンクローダー (TrainState State_ChunkLoader) 相当。
- * ON の列車の周囲 3×3 チャンクを NeoForge の TicketController で強制ロードする。
- */
+/** 本家 RTM のチャンクローダー (TrainState State_ChunkLoader) 相… */
 public final class TrainChunkLoader {
 
     public static final TicketController CONTROLLER = new TicketController(
             ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "train_chunk_loader"),
             (level, ticketHelper) -> {
-                // ワールドロード時の残チケット掃除: 所有エンティティが復元されなければ
-                // 列車側の tick で再登録されるため、一旦すべて破棄して良い
+                // ワールドロード時の残チケット掃除: 所有エンティティが復元されなければ 列車側の tick で再登…
                 ticketHelper.getEntityTickets().keySet().forEach(ticketHelper::removeAllTickets);
             });
 
@@ -27,11 +23,7 @@ public final class TrainChunkLoader {
     private TrainChunkLoader() {
     }
 
-    /**
-     * 列車の現在位置に合わせてチケットを更新する。
-     * @param lastChunk 前回のチャンク (ChunkPos.toLong)。Long.MIN_VALUE = 未登録
-     * @return 新しい lastChunk 値 (無効時は Long.MIN_VALUE)
-     */
+    /** 列車の現在位置に合わせてチケットを更新する。 */
     public static long update(Entity train, boolean enabled, long lastChunk) {
         if (!(train.level() instanceof ServerLevel level)) {
             return lastChunk;

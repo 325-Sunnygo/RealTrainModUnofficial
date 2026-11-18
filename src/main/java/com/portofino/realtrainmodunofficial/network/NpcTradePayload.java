@@ -18,13 +18,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.Map;
 import java.util.TreeMap;
 
-/**
- * NPC の商売 (C2S)。本家 GuiSalesperson の buy/sell/register/delete。
- *
- * <p>本家はお金をスロットへ入れてクライアント側で判定するが、RTMU は
- * <b>サーバーがインベントリの紙幣を数えて精算する</b> (釣り銭は紙幣で返す)。
- * action: 0=買う(salesperson) 1=売る(buyer) 2=登録(owner) 3=削除(owner)
- */
+/** NPC の商売 (C2S)。本家 GuiSalesperson の buy/sell/regist… */
 public record NpcTradePayload(int entityId, int action, int menuIndex, int count, int price)
         implements CustomPacketPayload {
 
@@ -58,7 +52,7 @@ public record NpcTradePayload(int entityId, int action, int menuIndex, int count
             EntityNPC.Role role = npc.getRole();
             Menu menu = new Menu(npc.getMenu(), role, player.registryAccess());
             switch (payload.action()) {
-                case 0 -> {   //買う (salesperson が売る)
+                case 0 -> {   // 買う (salesperson が売る)
                     MenuEntry entry = menu.get(payload.menuIndex());
                     int count = Math.max(1, payload.count());
                     if (role != EntityNPC.Role.SALESPERSON || entry == null || count > entry.maxCount) {
@@ -74,7 +68,7 @@ public record NpcTradePayload(int entityId, int action, int menuIndex, int count
                             net.minecraft.network.chat.Component.translatable("gui.npc.can_not_buy"), true);
                     }
                 }
-                case 1 -> {   //売る (buyer が買い取る)
+                case 1 -> {   // 売る (buyer が買い取る)
                     MenuEntry entry = menu.get(payload.menuIndex());
                     int count = Math.max(1, payload.count());
                     if (role != EntityNPC.Role.BUYER || entry == null || count > entry.maxCount) {
@@ -88,7 +82,7 @@ public record NpcTradePayload(int entityId, int action, int menuIndex, int count
                             net.minecraft.network.chat.Component.translatable("gui.npc.can_not_sell"), true);
                     }
                 }
-                case 2 -> {   //登録 (メインハンドの品を price で)
+                case 2 -> {   // 登録 (メインハンドの品を price で)
                     if (!player.equals(npc.getOwner())) {
                         return;
                     }
@@ -99,7 +93,7 @@ public record NpcTradePayload(int entityId, int action, int menuIndex, int count
                     menu.add(new MenuEntry(held.copy(), payload.price()));
                     npc.setMenu(menu.toNbtString(player.registryAccess()));
                 }
-                case 3 -> {   //削除
+                case 3 -> {   // 削除
                     if (!player.equals(npc.getOwner())) {
                         return;
                     }
@@ -130,7 +124,7 @@ public record NpcTradePayload(int entityId, int action, int menuIndex, int count
         if (total < price) {
             return false;
         }
-        //全部回収して釣りを返す (額面の組合せ問題を避ける)
+        // 全部回収して釣りを返す (額面の組合せ問題を避ける)
         int collected = 0;
         for (int i = 0; i < player.getInventory().getContainerSize() && collected < price; ++i) {
             ItemStack stack = player.getInventory().getItem(i);

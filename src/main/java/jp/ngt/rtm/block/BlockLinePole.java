@@ -6,20 +6,13 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 本家 jp.ngt.rtm.block.BlockLinePole の スクリプト互換ファサード。
- * 本家では架線柱は専用ブロックだったが、RTMU では他の設置物と同じ
- * InstalledObjectBlock (カテゴリ OVERHEAD_LINE_POLE) に載っている。
- */
+/** 本家 jp.ngt.rtm.block.BlockLinePole の スクリプト互換ファサード。 */
 public final class BlockLinePole {
 
     private BlockLinePole() {
     }
 
-    /**
-     * 本家 BlockLinePole.isConnected。指定座標が「柱として繋がる相手」かを返す。
-     * @param type 0=柱(架線柱/信号柱)のみ / 1=柱または不透過ブロック / 2=空気と液体以外 / それ以外=常に true
-     */
+    /** 本家 BlockLinePole.isConnected。指定座標が「柱として繋がる相手」かを返す。 */
     public static boolean isConnected(Object world, int x, int y, int z, int type) {
         if (type != 0 && type != 1 && type != 2) {
             return true;
@@ -29,8 +22,7 @@ public final class BlockLinePole {
         }
         BlockPos pos = new BlockPos(x, y, z);
         BlockState state = level.getBlockState(pos);
-        // 本家: linePole / framework / signal が「柱」。RTMU ではどれも InstalledObjectBlock なので
-        // ブロックの種類ではなくブロックエンティティのカテゴリで見る。
+        // 本家: linePole / framework / signal が「柱」。
         boolean isPole = false;
         if (level.getBlockEntity(pos) instanceof InstalledObjectBlockEntity be) {
             InstalledObjectCategory category = be.getCategory();

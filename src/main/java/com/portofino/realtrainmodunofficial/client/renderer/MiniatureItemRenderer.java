@@ -14,10 +14,7 @@ import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 
-/**
- * ミニチュアアイテムの描画 (neo mcte)。本家 MCTE RenderItemMiniature 相当。
- * インベントリや手元で中身が見えるようにする。
- */
+/** ミニチュアアイテムの描画 (neo mcte)。 */
 public class MiniatureItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     /** アイコン用の描画ブロック数上限。インベントリに何十個も並ぶので厳しめ。 */

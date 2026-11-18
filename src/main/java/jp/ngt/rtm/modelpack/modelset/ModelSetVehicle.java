@@ -1,7 +1,19 @@
 package jp.ngt.rtm.modelpack.modelset;
+
 import jp.ngt.rtm.modelpack.cfg.VehicleConfig;
-public final class ModelSetVehicle extends ModelSetBase<VehicleConfig> {
-    public ModelSetVehicle() {super();}
-    public ModelSetVehicle(VehicleConfig config) {super(config);}
-    public VehicleConfig getDummyConfig() {return VehicleConfig.getDummy();}
+
+/** 本家 jp.ngt.rtm.modelpack.modelset.ModelSetVehicle… */
+public class ModelSetVehicle extends ModelSetVehicleBase<VehicleConfig> {
+    public ModelSetVehicle() {
+        super();
+    }
+
+    public ModelSetVehicle(VehicleConfig config) {
+        super(config);
+    }
+
+    @Override
+    public VehicleConfig getDummyConfig() {
+        return VehicleConfig.getDummy();
+    }
 }

@@ -22,8 +22,7 @@ public class RealTrainModUnofficialEntities {
             .build("car")
     );
 
-    // === 本家 EntityInstalledObject 系 (レール上に置く設置物。ブロックではなくエンティティ) ===
-    // 本家 EntityElectricalWiring の setSize(1.0F, 0.0625F) に合わせる。
+    // === 本家 EntityInstalledObject 系 (レール上に置く設置物。
 
     public static final Supplier<EntityType<jp.ngt.rtm.entity.EntityATC>> ATC = ENTITY_TYPES.register(
         "atc",

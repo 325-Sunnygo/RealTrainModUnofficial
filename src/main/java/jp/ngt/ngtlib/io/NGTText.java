@@ -3,16 +3,13 @@ package jp.ngt.ngtlib.io;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 本家 NGTLib jp.ngt.ngtlib.io.NGTText の移植 (スクリプトが触る範囲)。
- * パックのスクリプトは Packages.jp.ngt.ngtlib.io.NGTText で直接参照してくる。
- */
+/** 本家 NGTLib jp.ngt.ngtlib.io.NGTText の移植 (スクリプトが触る範… */
 public final class NGTText {
 
     private NGTText() {
     }
 
-    /** KaizPatchX keeps the encoding parameter for source compatibility. */
+    /** KaizPatchX keeps the encoding parameter for sourc… */
     public static List<String> readText(Object resource, String encoding) {
         if (resource instanceof java.io.File file) {
             try {
@@ -33,10 +30,7 @@ public final class NGTText {
         return readTextLines(resource);
     }
 
-    /**
-     * パック内アセット (ResourceLocation / パス文字列) をテキストとして 1 行ずつ読む。
-     * スクリプトの自前 include (eval(append(readText(getResource(path)))) 等) が使う。
-     */
+    /** パック内アセット (ResourceLocation / パス文字列) をテキストとして 1 行ず… */
     public static List<String> readTextLines(Object resource) {
         List<String> lines = new ArrayList<>();
         try (java.io.InputStream in = NGTFileLoader.getInputStream(resource)) {
@@ -44,7 +38,7 @@ public final class NGTText {
                 return lines;
             }
             String text = decodeText(in.readAllBytes());
-            // 本家 readTextList: indention=true で読んだ結果を行へ分解する (改行種別は問わない)。
+            // 本家 readTextList: indention=true で読んだ結果を行へ分解する (改行…
             for (String line : text.split(LINE_SEPARATOR_PATTERN, -1)) {
                 lines.add(line);
             }
@@ -54,12 +48,7 @@ public final class NGTText {
         return lines;
     }
 
-    /**
-     * 本家 jp.kaiz.kaizpatch.util.MCFileUtil.readText 完全移植。
-     * 既定文字コードで読み、置換文字 (U+FFFD) が出たときだけ MS932 (Shift_JIS) で読み直す。
-     * 1.7.10 時代のパックは Shift_JIS の .js を持つものが多く、
-     * これをやらないと日本語コメント/文字列が壊れて構文エラーになる。
-     */
+    /** 本家 jp.kaiz.kaizpatch.util.MCFileUtil.readText 完全移… */
     public static String decodeText(byte[] bytes) {
         String utf8 = new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
         if (utf8.indexOf('\ufffd') >= 0) {
@@ -104,12 +93,7 @@ public final class NGTText {
         return sb.toString();
     }
 
-    /**
-     * 本家 NGTText.getText(ResourceLocation, boolean) 完全移植。
-     * 全文を読み、改行を indention=true なら \n、false なら除去して連結する。
-     * (本家 ModelPackManager.loadScript は indention=true で読み、//include を行単位で置換する。
-     *  indention=false のときは改行が消え、"//" 以降がコメントとして残りを飲み込む。)
-     */
+    /** 本家 NGTText.getText(ResourceLocation, boolean) 完全移… */
     public static String getText(Object resource, boolean indention) {
         try (java.io.InputStream in = NGTFileLoader.getInputStream(resource)) {
             if (in == null) {

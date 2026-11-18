@@ -25,12 +25,7 @@ import org.lwjgl.glfw.GLFW;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 装飾ブロックのモデル編集画面。本家 {@code GuiDecorationBlock} の移植。
- *
- * <p>本家と同じ 3 列構成 (Element / Face / Vertex+UV)。列の背景パネル・選択ハイライトも
- * 本家の配色 (0x707070 / 0xA0A0A0 / 0xD0D0D0 + 赤枠)。プレビューは左側、右ドラッグで回転。
- */
+/** 装飾ブロックのモデル編集画面。本家 GuiDecorationBlock の移植。 */
 public class DecorationEditScreen extends Screen {
 
     private static final int W_ELEMENT = 60;
@@ -61,10 +56,10 @@ public class DecorationEditScreen extends Screen {
     private final List<EditBox> uvList = new ArrayList<>();
 
     private float[] selectedVertex;
-    /** move の対象 (Element / Face / float[])。本家 selectedObject。 */
+    /** move の対象 (Element / Face / float[])。 */
     private Object selectedObject;
 
-    //初期角は見やすい斜め (本家は 0,0 だが正面だと 1 面しか見えない)
+    // 初期角は見やすい斜め (本家は 0,0 だが正面だと 1 面しか見えない)
     private float rotationYaw = -45.0F;
     private float rotationPitch = 25.0F;
 
@@ -74,7 +69,7 @@ public class DecorationEditScreen extends Screen {
         DecorationModel stored = DecorationStore.INSTANCE.getModel(
             ItemDecoration.getModelName(player.getMainHandItem()));
         DecorationModel copy = stored.clone();
-        copy.name = stored.name;   //clone は "_copy" を付けるので戻す
+        copy.name = stored.name;   // clone は "_copy" を付けるので戻す
         this.setModel(copy);
     }
 
@@ -120,14 +115,14 @@ public class DecorationEditScreen extends Screen {
         int buttonY = Y_START - 20 - THICKNESS * 2;
         int hInc = H_FIELD + THICKNESS * 2;
 
-        //左上: load/save + モデル名 (本家と同配置)
+        // 左上: load/save + モデル名 (本家と同配置)
         this.addRenderableWidget(Button.builder(Component.literal("load model"), b -> this.openLoadModelGUI())
             .bounds(30, Y_START - 22, 62, 20).build());
         this.addRenderableWidget(Button.builder(Component.literal("save model"), b -> this.saveModel())
             .bounds(94, Y_START - 22, 62, 20).build());
         this.modelNameField = this.addField(30, Y_START, 126, H_FIELD, this.model.name);
 
-        //左下: move + lock UV
+        // 左下: move + lock UV
         this.addRenderableWidget(Button.builder(Component.literal("move"), b -> {
             this.saveFieldToModel();
             this.strToVtx(this.moveVecField.getValue(), this.moveVec, 0);
@@ -140,7 +135,7 @@ public class DecorationEditScreen extends Screen {
         }).bounds(72, this.height - 82, 84, 20).build());
         this.moveVecField = this.addField(30, this.height - 60, 126, H_FIELD, this.vtxToStr(this.moveVec, 0, 3));
 
-        //Element 列
+        // Element 列
         this.addRenderableWidget(Button.builder(Component.literal("+"), b -> this.editElement(0))
             .bounds(startX, buttonY, 20, 20).build());
         this.addRenderableWidget(Button.builder(Component.literal("C"), b -> this.editElement(1))
@@ -154,7 +149,7 @@ public class DecorationEditScreen extends Screen {
                 this.model.elements[i].name));
         }
 
-        //Face 列
+        // Face 列
         int faceX = startX + W_ELEMENT + THICKNESS * 2;
         this.addRenderableWidget(Button.builder(Component.literal("+"), b -> this.editFace(0))
             .bounds(faceX, buttonY, 20, 20).build());
@@ -169,7 +164,7 @@ public class DecorationEditScreen extends Screen {
                 this.selectedElement.faces[i].name));
         }
 
-        //Vertex 列: テクスチャサムネ (32x32 ボタン) + 面タイプ + shadow + 頂点/UV
+        // Vertex 列: テクスチャサムネ (32x32 ボタン) + 面タイプ + shadow +…
         int vtxX = faceX + W_FACE + THICKNESS * 2;
         this.addRenderableWidget(Button.builder(Component.empty(), b -> this.openIconSelectGUI())
             .bounds(vtxX, Y_START - 12, 32, 32)
@@ -377,19 +372,19 @@ public class DecorationEditScreen extends Screen {
         int y2 = 20 + t2;
         int startY = Y_START - THICKNESS - y2;
 
-        //Element 列
+        // Element 列
         graphics.fill(startX, startY, startX + W_ELEMENT + t2,
             startY + this.elementList.size() * hInc + y2 + THICKNESS, 0xFF707070);
-        //Face 列
+        // Face 列
         int faceX = startX + W_ELEMENT + t2;
         graphics.fill(faceX, startY, faceX + W_FACE + t2,
             startY + this.faceList.size() * hInc + y2 + THICKNESS, 0xFFA0A0A0);
-        //Vertex + UV 列
+        // Vertex + UV 列
         int vtxX = faceX + W_FACE + t2;
         graphics.fill(vtxX, startY, vtxX + W_VERTEX + t2 + W_UV + t2,
             startY + (this.vertexList.size() + 2) * hInc + y2 + THICKNESS, 0xFF8A8A8A);
 
-        //選択行のハイライト
+        // 選択行のハイライト
         int elemIndex = indexOf(this.model.elements, this.selectedElement);
         if (elemIndex >= 0 && elemIndex < this.elementList.size()) {
             EditBox f = this.elementList.get(elemIndex);
@@ -412,7 +407,7 @@ public class DecorationEditScreen extends Screen {
         int faceX = startX + W_ELEMENT + THICKNESS * 2;
         int vtxX = faceX + W_FACE + THICKNESS * 2;
 
-        //選択中オブジェクト (move の対象) の赤枠
+        // 選択中オブジェクト (move の対象) の赤枠
         EditBox target = null;
         int targetW = W_ELEMENT;
         int elemIndex = indexOf(this.model.elements, this.selectedElement);
@@ -431,7 +426,7 @@ public class DecorationEditScreen extends Screen {
             graphics.renderOutline(target.getX() - 2, target.getY() - 2, targetW + 4, H_FIELD + 4, 0xFFFF0000);
         }
 
-        //面テクスチャのサムネイル (32x32 のボタンの上へ直バインドで貼る)
+        // 面テクスチャのサムネイル (32x32 のボタンの上へ直バインドで貼る)
         ResourceLocation texture = DecorationRenderer.toTexture(this.selectedFace.texture);
         MultiBufferSource.BufferSource buffer = this.minecraft.renderBuffers().bufferSource();
         var pose = graphics.pose().last();
@@ -445,11 +440,11 @@ public class DecorationEditScreen extends Screen {
         consumer.addVertex(pose, tx + 32, ty, 200).setColor(255, 255, 255, 255).setUv(1, 0).setLight(light);
         buffer.endBatch();
 
-        //面テクスチャ名
+        // 面テクスチャ名
         graphics.drawString(this.font, this.selectedFace.texture == null ? "-" : this.selectedFace.texture,
             30, this.height - 96, 0xA0A0A0);
 
-        //プレビュー: 右ドラッグで回転 (本家はポインタ位置、こちらはドラッグ量で回す)
+        // プレビュー: 右ドラッグで回転 (本家はポインタ位置、こちらはドラッグ量で回す)
         long window = this.minecraft.getWindow().getWindow();
         if (GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS) {
             this.rotationYaw = (this.width / 2.0F - mouseX) * 1.0F;

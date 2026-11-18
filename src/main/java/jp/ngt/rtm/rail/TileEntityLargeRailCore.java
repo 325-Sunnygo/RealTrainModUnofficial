@@ -22,16 +22,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * 本家 jp.ngt.rtm.rail.TileEntityLargeRailCore (KaizPatchX) の忠実移植。
- * NBT 形式は本家準拠: Property / SubRails / StartRP / EndRP / fixRTMRailMapVersion。
- */
+/** 本家 jp.ngt.rtm.rail.TileEntityLargeRailCore (KaizP… */
 public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
 
-    /**
-     * 本家 sendPacket: レールコアの状態をクライアントへ配る。
-     * SRB3 は敷設の最後に必ずこれを呼ぶ:
-     */
+    /** 本家 sendPacket: レールコアの状態をクライアントへ配る。 */
     public void sendPacket() {
         this.setChanged();
         if (this.level != null && !this.level.isClientSide()) {
@@ -57,7 +51,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     // see RailMapBasic.fixRTMRailMapVersion
     public int fixRTMRailMapVersion;
 
-    // WebCTC (別mod) 用: ロード済みレールコアの一覧。weak なのでチャンクアンロードで自然に消える。
+    // WebCTC (別mod) 用: ロード済みレールコアの一覧。
     private static final java.util.Set<TileEntityLargeRailCore> LOADED_CORES =
             java.util.Collections.synchronizedSet(
                     java.util.Collections.newSetFromMap(new java.util.WeakHashMap<>()));
@@ -76,8 +70,6 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         super.onLoad();
         LOADED_CORES.add(this);
         // ★道床はレールベース側のブロックが描くが、形はこのコアの線形から引く。
-        // ベースのチャンクが先に焼かれているとコアが無い状態で焼かれていて道床が出ない。
-        // コアが届いた今、レール一帯を焼き直させる。
         this.refreshBallastArea();
     }
 
@@ -90,16 +82,12 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
             return;
         }
         // ★線形がまだ入っていない時点で諦めてはいけない。
-        //   新規に敷いたレールは「BE が置かれる → 少し後に線形が届く」順なので、
-        //   ここで return すると<b>焼き直しの機会が二度と来ない</b>
-        //   (入り直すと直るのはこれ。長い＝浅い分岐ほど派手に崩れて見える)。
         if (!this.isLoaded()) {
             this.pendingBallastRefresh = true;
             return;
         }
         this.pendingBallastRefresh = false;
-        // ★レールの線 (焼き込みメッシュ) も一緒に捨てる。道床だけ作り直すと、
-        //   ブロック側は新しい線形・レールの線は古い線形になって<b>ずれて見える</b>。
+        // ★レールの線 (焼き込みメッシュ) も一緒に捨てる。
         com.portofino.realtrainmodunofficial.ClientHooks.invalidateRailMesh(this.level,
                 this.worldPosition.getX(), this.worldPosition.getY(), this.worldPosition.getZ());
         this.shouldRerenderRail = true;
@@ -180,20 +168,14 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     }
 
     public void createRailMap() {
-        if (this.isLoaded())//同期ができてない状態でのRailMapの生成を防ぐ
+        if (this.isLoaded())// 同期ができてない状態でのRailMapの生成を防ぐ
         {
             this.railmap = new RailMapBasic(this.railPositions[0], this.railPositions[1], this.fixRTMRailMapVersion);
             this.invalidateCollisionCache();
         }
     }
 
-    /**
-     * 当たり判定の焼き直しを促す。レールを引き直した (レンチでの高さ変更など) ら必ず呼ぶ。
-     *
-     * <p>★分岐 (Switch) / 坂 (Slope) / 転車台 (Turntable) の createRailMap はこれを呼んでおらず、
-     * レンチで高さを変えても各レールブロックの当たり判定キャッシュ (cachedShape) が
-     * 古い世代のまま残っていた。そのため<b>分岐レールだけ</b>当たり判定が高さに追従しなかった。
-     */
+    /** 当たり判定の焼き直しを促す。レールを引き直した (レンチでの高さ変更など) ら必ず呼ぶ。 */
     protected void invalidateCollisionCache() {
         this.collisionGrids = null;
         this.collisionVersion++;
@@ -201,17 +183,10 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
 
     // ===== 当たり判定 (レール曲線をサンプリングして焼く) =====
 
-    /**
-     * 列 (x, z) → その列の #COLLISION_SPLIT×#COLLISION_SPLIT マスごとの
-     * レール面の高さ (絶対 Y)。
-     * Y を含めない「列」で持つのが要点。
-     */
+    /** 列 (x, z) → その列の #COLLISION_SPLIT×#COLLISION_SPLIT… */
     private java.util.Map<Long, float[]> collisionGrids;
 
-    /**
-     * レールを引き直すたびに進む。各レールブロックは自分の形状キャッシュがこの世代の
-     * ものかを見て、古ければ作り直す。
-     */
+    /** レールを引き直すたびに進む。各レールブロックは自分の形状キャッシュがこの世代の ものかを見て、古け… */
     private int collisionVersion;
 
     /** 当たり判定をブロック内で何分割するか。 */
@@ -221,10 +196,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         return this.collisionVersion;
     }
 
-    /**
-     * このレールの当たり判定グリッドを引く。無ければ作る。
-     * @return 指定ブロックの列のマスごとのレール面 (絶対 Y)。レールが通っていなければ null。
-     */
+    /** このレールの当たり判定グリッドを引く。無ければ作る。 */
     public float[] getCollisionGrid(BlockPos pos) {
         java.util.Map<Long, float[]> grids = this.collisionGrids;
         if (grids == null) {
@@ -238,18 +210,14 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         return ((long) x << 32) | (z & 0xFFFFFFFFL);
     }
 
-    /**
-     * レール曲線を直接サンプリングして、ブロックごとの高さグリッドを焼く。
-     * 従来は TileEntityLargeRailBase.getBlockHeights が「ブロックの 4 隅から
-     * 最も近い曲線上の点」を探して高さを決め、それをブロック内で双線形補間していた。
-     */
+    /** レール曲線を直接サンプリングして、ブロックごとの高さグリッドを焼く。 */
     private java.util.Map<Long, float[]> buildCollisionGrids() {
         java.util.Map<Long, float[]> grids = new java.util.HashMap<>();
         RailMap[] rms = this.getAllRailMaps();
         if (rms == null) {
             return grids;
         }
-        // 道床の外縁まで撒く。createRailList が置くレールブロックは中心から ±(ballastWidth>>1)。
+        // 道床の外縁まで撒く。createRailList が置くレールブロックは中心から ±(ballas…
         double halfWidth = (this.getProperty().getBallastWidth() >> 1) + 0.5D;
         // マスの取りこぼしが出ない程度に細かく撒く (マスは 1/COLLISION_SPLIT ブロック)。
         double step = 1.0D / (COLLISION_SPLIT * 2);
@@ -270,7 +238,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
                 double rad = Math.toRadians(yaw + 90.0F);
                 double dx = Math.sin(rad);
                 double dz = Math.cos(rad);
-                // カントによる左右の高低差。getBlockHeights と同じ符号 (中心から距離 w で sin(cant) * w)
+                // カントによる左右の高低差。getBlockHeights と同じ符号 (中心から距離 w で si…
                 double cantSlope = jp.ngt.ngtlib.math.NGTMath.sin(cant);
 
                 for (double w = -halfWidth; w <= halfWidth + 1.0E-6D; w += step) {
@@ -298,7 +266,6 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         }
 
         // 撒き漏らしたマス (ブロックの角など) を、そのブロックの最大値で埋める。
-        // 穴が残ると床が抜けて見えるので、レール面のあるブロックは必ず全面を塞ぐ。
         for (float[] grid : grids.values()) {
             float max = Float.NaN;
             for (float v : grid) {
@@ -407,7 +374,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     }
 
 
-    /** 本家 updateEntity 相当。Block 側の BlockEntityTicker から毎 tick 呼ばれる。 */
+    /** 本家 updateEntity 相当。Block 側の BlockEntityTicker から毎… */
     public void tick() {
         // 焼き直しを取りこぼしていたら、線形が届いた時点でやり直す
         if (this.pendingBallastRefresh && this.level != null && this.level.isClientSide()) {
@@ -455,15 +422,12 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
             this.renderAABB = this.getRenderAABB();
             if (this.renderAABB == null) {
                 return AABB.INFINITE;
-            }//ぬるぽ回避
+            }// ぬるぽ回避
         }
         return this.renderAABB;
     }
 
-    /**
-     * レールの描画用AABBを取得
-     * 呼び出しは最初の1回のみ
-     */
+    /** レールの描画用AABBを取得 呼び出しは最初の1回のみ */
     protected AABB getRenderAABB() {
         int[] size = this.getRailSize();
         AABB aabb = new AABB(size[0] - 3.5, size[1] - 10, size[2] - 3.5, size[3] + 5.5, size[4] + 2, size[5] + 5.5);
@@ -494,7 +458,7 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
     /** レール形状の説明を取得(アイテム表示用) */
     public abstract String getRailShapeName();
 
-    // ================= Remaster 暫定互換 API (旧レンダラ用、Phase 4 で削除予定) =================
+    // ================= Remaster 暫定互換 API (旧レンダラ用、Phase…
 
     /** @deprecated Remaster 独自。property.railModel を返す。 */
     @Deprecated
@@ -502,16 +466,12 @@ public abstract class TileEntityLargeRailCore extends TileEntityLargeRailBase {
         return this.getProperty().railModel;
     }
 
-    /**
-     * 本家 TileEntityLargeRailCore.getResourceState。
-     * レールのスクリプトは shouldRenderObject の中でこれを呼び、
-     * レールの名前 (ResourceName) や設定を見て「このオブジェクトを描くか」を決める。
-     */
+    /** 本家 TileEntityLargeRailCore.getResourceState。 */
     public ResourceStateCompat getResourceState() {
         return new ResourceStateCompat(this);
     }
 
-    /** func_174877_v = getPos (1.12 の SRG 名)。パックのスクリプトが呼ぶ。 */
+    /** func_174877_v = getPos (1.12 の SRG 名)。 */
     public net.minecraft.core.BlockPos func_174877_v() {
         return this.getBlockPos();
     }

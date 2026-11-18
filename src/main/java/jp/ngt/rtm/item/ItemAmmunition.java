@@ -6,29 +6,23 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * 弾薬。本家 {@code jp.ngt.rtm.item.ItemAmmunition} の移植。
- *
- * <p>本家は 1 アイテム + メタで「弾薬 / 弾 / 薬莢」×弾種を出す。
- * 1.21 にメタが無いので {@link RealTrainModUnofficialComponents#ITEM_VARIANT} に
- * <b>本家と同じ値</b> ({@code BulletType.id * 4 + 0..2}) を持たせている。
- */
+/** 弾薬。本家 jp.ngt.rtm.item.ItemAmmunition の移植。 */
 public class ItemAmmunition extends Item {
 
     public ItemAmmunition() {
         super(new Properties());
     }
 
-    /** 本家 {@code getSubItems}: 5.56mm は飛ばし、弾種ごとに 弾薬/弾/薬莢 の 3 つを出す。 */
+    /** 本家 getSubItems: 5.56mm は飛ばし、弾種ごとに 弾薬/弾/薬莢 の 3 つを出… */
     public static void forEachSubItem(java.util.function.Consumer<ItemStack> consumer, Item item) {
         for (BulletType type : BulletType.values()) {
             if (type == BulletType.rifle_5_56mm) {
                 continue;
             }
             int i0 = type.id * 4;
-            consumer.accept(create(item, i0));      //弾薬
-            consumer.accept(create(item, i0 + 1));  //弾
-            consumer.accept(create(item, i0 + 2));  //薬莢
+            consumer.accept(create(item, i0));      // 弾薬
+            consumer.accept(create(item, i0 + 1));  // 弾
+            consumer.accept(create(item, i0 + 2));  // 薬莢
         }
     }
 
@@ -43,9 +37,7 @@ public class ItemAmmunition extends Item {
         return value == null ? 0 : value;
     }
 
-    /**
-     * 本家 {@code getItemStackDisplayName}: 「弾種名」+「(弾薬)/(弾)/(薬莢)」。
-     */
+    /** 本家 getItemStackDisplayName: 「弾種名」+「(弾薬)/(弾)/(薬莢)」。 */
     @Override
     public Component getName(ItemStack stack) {
         int variant = getVariant(stack);
@@ -55,7 +47,7 @@ public class ItemAmmunition extends Item {
             .append(Component.translatable("item." + RealTrainModUnofficial.MODID + "." + suffix));
     }
 
-    /** 本家 {@code ItemAmmunition.BulletIconType}。 */
+    /** 本家 ItemAmmunition.BulletIconType。 */
     public enum BulletIconType {
         CANNON,
         HANDGUN,
@@ -63,7 +55,7 @@ public class ItemAmmunition extends Item {
         ROCKET
     }
 
-    /** 本家 {@code ItemAmmunition.BulletType}。値は一切変えていない。 */
+    /** 本家 ItemAmmunition.BulletType。値は一切変えていない。 */
     public enum BulletType {
         cannon_40cm(0, 40.0F, false, BulletIconType.CANNON),
         handgun_9mm(1, 8.0F, true, BulletIconType.HANDGUN),

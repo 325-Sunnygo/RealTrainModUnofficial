@@ -5,18 +5,11 @@ import jp.ngt.ngtlib.math.NGTMath;
 import jp.ngt.ngtlib.math.Vec3;
 import jp.ngt.ngtlib.renderer.GLRecorder;
 
-/**
- * 本家 jp.ngt.rtm.render.WirePartsRenderer の移植。
- * 架線・架線柱パック (ModelWire_*.json の rendererPath) はこのクラスを renderClass に指定し、
- * 描画を renderWireStatic / renderWireDynamic に書く。
- */
+/** 本家 jp.ngt.rtm.render.WirePartsRenderer の移植。 */
 public class WirePartsRenderer extends TileEntityPartsRenderer {
     private boolean useScript = true;
 
-    /**
-     * 定義 (ModelWire_*.json) の値。本家は ModelSetWire/WireConfig から引くが、
-     * こちらは呼び出し側 (WireScriptRenderers) が設置物定義から流し込む。
-     */
+    /** 定義 (ModelWire_*.json) の値。 */
     public float sectionLength = 1.0F;
     public float deflectionCoefficient = 0.0F;
     public float lengthCoefficient = 0.0F;
@@ -82,11 +75,7 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
         if (this.useScript) callWireScript("renderWireStatic", tile, connection, vec, partialTicks, pass);
     }
 
-    /**
-     * 本家 renderWireDynamic。
-     * スクリプトを持たないモデルは、ここで直接敷き詰めるのが本家
-     * (レンダラ側に別経路を持たせない)。pass0 でのみ描くのは発光防止。
-     */
+    /** 本家 renderWireDynamic。 */
     public void renderWireDynamic(Object tile, Object connection, Object vec, float partialTicks, int pass) {
         if (this.useScript && this.script != null) {
             callWireScript("renderWireDynamic", tile, connection, vec, partialTicks, pass);
@@ -102,14 +91,7 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
     /** 既にログした失敗 (関数名, 例外) の組。 */
     private final java.util.Set<String> loggedFailures = new java.util.HashSet<>();
 
-    /**
-     * 架線スクリプトを呼ぶ。
-     *
-     * <p>★例外を握りつぶさない。以前は {@code doScriptIgnoreError} で捨てていたので、
-     * スクリプトが未対応 API で落ちても「何も描かない」だけになり、
-     * RTMU 内蔵の素ケーブルへフォールバックして<b>既定のワイヤーに見えていた</b>。
-     * 原因が一切ログに出ないので追えなかった。
-     */
+    /** 架線スクリプトを呼ぶ。 ★例外を握りつぶさない。 */
     private void callWireScript(String function, Object tile, Object connection, Object vec,
                                 float partialTicks, int pass) {
         if (this.script == null) {
@@ -144,7 +126,7 @@ public class WirePartsRenderer extends TileEntityPartsRenderer {
         return true;
     }
 
-    /** 本家 renderWireStraight: 取付点から相手までを sectionLength ごとに真っ直ぐ敷き詰める。 */
+    /** 本家 renderWireStraight: 取付点から相手までを sectionLength ご… */
     public void renderWireStraight(Object tile, Object connection, Object vecObj, float partialTicks, int pass, Parts parts) {
         GLRecorder rec = GLRecorder.active();
         Vec3 target = toVec3(vecObj);

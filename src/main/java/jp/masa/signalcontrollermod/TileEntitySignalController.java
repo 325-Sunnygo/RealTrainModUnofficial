@@ -16,11 +16,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * SignalControllerMod (作者: masa300, https://github.com/masa300/SignalControllerMod)
- * の TileEntitySignalController 1.21.1 移植。制御ロジック・NBT キーは原作のまま。
- * 信号機の読み書きは当 MOD の信号 (InstalledObjectBlockEntity, SIGNAL カテゴリ) に接続。
- */
+/** SignalControllerMod (作者: masa300, https://github.… */
 public class TileEntitySignalController extends BlockEntity {
     private SignalType signalType = SignalType.signal3;
     private List<BlockPos> nextSignal = new ArrayList<>();
@@ -38,7 +34,7 @@ public class TileEntitySignalController extends BlockEntity {
         this(com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlockEntities.SIGNAL_CONTROLLER.get(), pos, state);
     }
 
-    /** 信号状態の毎5秒フルダンプ + RS変化ログ (NGTLog.debug は INFO 出力)。ログを埋め尽くすので既定オフ。 */
+    /** 信号状態の毎5秒フルダンプ + RS変化ログ (NGTLog.debug は INFO 出力)。 */
     private static final boolean DEBUG_LOG = false;
     private long lastDebugLog;
     private boolean prevRSPowered;
@@ -67,8 +63,7 @@ public class TileEntitySignalController extends BlockEntity {
         }
         int nextSignalLevel = (this.last) ? 1 : nextSignalList.stream().mapToInt(v -> v).max().orElse(0);
 
-        // RS入力(停止現示)。getBestNeighborSignal に加え、直接通電 (hasNeighborSignal /
-        // 強い動力で通電されたブロック経由) も見る — 原作 isBlockIndirectlyGettingPowered 相当
+        // RS入力(停止現示)。getBestNeighborSignal に加え、直接通電 (hasNei…
         boolean isRSPowered = world.getBestNeighborSignal(this.worldPosition) > 0
                 || world.hasNeighborSignal(this.worldPosition)
                 || world.getDirectSignalTo(this.worldPosition) > 0;
@@ -117,11 +112,7 @@ public class TileEntitySignalController extends BlockEntity {
         }
     }
 
-    /**
-     * 当 MOD の信号機 (SIGNAL カテゴリ) から現示レベルを取得。信号機以外は null。
-     * 信号機の見た目 (現示) は electricity でなく SignalAspect が持つため、
-     * RTM レベル互換の legacy 値 (1=停止..6=高速進行) で読み書きする。
-     */
+    /** 当 MOD の信号機 (SIGNAL カテゴリ) から現示レベルを取得。信号機以外は null。 */
     private Integer getSignal(Level world, BlockPos pos) {
         BlockEntity tile = world.getBlockEntity(pos);
         if (tile instanceof InstalledObjectBlockEntity be && be.getCategory() == InstalledObjectCategory.SIGNAL) {
@@ -133,7 +124,7 @@ public class TileEntitySignalController extends BlockEntity {
     private void setSignal(Level world, BlockPos pos, int level) {
         BlockEntity tile = world.getBlockEntity(pos);
         if (tile instanceof InstalledObjectBlockEntity be && be.getCategory() == InstalledObjectCategory.SIGNAL) {
-            // 本家 TileEntitySignal.setElectricity 同様 — 信号機は電気レベル=現示 (BE 側でミラー)
+            // 本家 TileEntitySignal.setElectricity 同様 — 信号機は電気レベル…
             be.setElectricity(level);
         }
     }

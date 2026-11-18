@@ -13,37 +13,21 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * レール 1 本ぶんの描画を「1 つの統合メッシュ (VBO)」に焼いて使い回す。
- * 本家 RTM 1.7.10 はレール 1 本をディスプレイリストに 1 回だけ焼き、以後は GPU 側に
- * 置きっぱなしにしていた。
- */
+/** レール 1 本ぶんの描画を「1 つの統合メッシュ (VBO)」に焼いて使い回す。 */
 public final class RailMeshCache {
 
-    /**
-     * 1 本のレールが統合メッシュ化できる頂点数の上限 (異常に巨大なレール対策)。
-     * 超えた場合は従来の逐次描画にフォールバックする。
-     */
+    /** 1 本のレールが統合メッシュ化できる頂点数の上限 (異常に巨大なレール対策)。 */
     private static final long MAX_MERGED_VERTICES = 4_000_000L;
 
     /** 同時に保持するレールメッシュ数の上限 (VRAM 上限)。超えたら古いものから解放する。 */
     private static final int MAX_ENTRIES = 512;
 
-    /**
-     * 1 フレームあたりに新規/再焼き込みするレールの上限。スパイク対策の要。
-     * 駅・車両基地に入るとチャンクロードで多数のレールが一斉に初回焼き込みされ、
-     * 1 フレームに集中して「レール負荷が普通 10 なのに時々 190」というスタッタになる
-     * (焼き込みは約 2.8ms/本)。
-     */
+    /** 1 フレームあたりに新規/再焼き込みするレールの上限。スパイク対策の要。 */
     private static final int MAX_BAKES_PER_FRAME = 8;
 
     private static int bakesThisFrame;
 
-    /**
-     * 同一レールを再焼き込みする最短フレーム間隔。クロスポイント等の churn 対策。
-     * variant (トング位置) は 8 段階に量子化済みだが、量子化の境界でトングが揺れると
-     * variant が毎tick変わり得る。
-     */
+    /** 同一レールを再焼き込みする最短フレーム間隔。クロスポイント等の churn 対策。 */
     private static final int REBAKE_MIN_FRAMES = 8;
 
     /** 毎フレーム +1 される描画フレーム番号 (再焼き間隔の判定用)。 */
@@ -51,21 +35,12 @@ public final class RailMeshCache {
 
     private static final Map<BlockPos, RailMesh> CACHE = new LinkedHashMap<>(64, 0.75F, true);
 
-    /**
-     * 「焼き直せ」と言われたのに、そのフレームの焼き込み枠 ({@link #MAX_BAKES_PER_FRAME}) を
-     * 使い切っていて見送ったレール。
-     *
-     * <p>★これが無いと、敷いた直後のレールが古いメッシュのまま固定される。
-     * 呼び出し側 (RailScriptRenderers) は記録を作り直した時点で
-     * {@code shouldRerenderRail} を false に戻すので、ここで見送ると
-     * 「焼き直せ」がどこにも残らず、次フレーム以降は二度と焼き直されない。
-     * リログ (レベル切替でキャッシュ破棄) でしか直らなかったのはこれが原因。
-     */
+    /** 「焼き直せ」と言われたのに、そのフレームの焼き込み枠 (#MAX_BAKES_PER_FRAME)… */
     private static final java.util.Set<BlockPos> PENDING_REBAKE = new java.util.HashSet<>();
 
     private static Level lastLevel;
 
-    /** 毎フレーム先頭 (RailDrawQueue.flush 前) に呼ぶ。焼き込み枠をリセットし、フレーム番号を進める。 */
+    /** 毎フレーム先頭 (RailDrawQueue.flush 前) に呼ぶ。 */
     public static void beginFrame() {
         bakesThisFrame = 0;
         frameCounter++;
@@ -74,7 +49,7 @@ public final class RailMeshCache {
     private RailMeshCache() {
     }
 
-    /** @param variant 同じレールでも見た目が変わる要因 (分岐の開通方向など)。変われば焼き直す。 */
+    
     private record RailMesh(List<MeshCapture.Section> sections, MqoModelLoader.MqoModel model,
                             int light, long variant, int bakeFrame) {
         void close() {
@@ -84,11 +59,7 @@ public final class RailMeshCache {
         }
     }
 
-    /**
-     * 統合メッシュで 1 本を描く。
-     * @param rebuilt true = 記録 (GLRecorder) が作り直された → メッシュも焼き直す
-     * @return true = 描画した (呼び出し元は逐次描画をスキップする)
-     */
+    /** 統合メッシュで 1 本を描く。 */
     public static boolean draw(BlockPos pos, GLRecorder rec, MqoModelLoader.MqoModel model,
                                PoseStack poseStack, int packedLight, int packedOverlay, boolean rebuilt) {
         if (rec == null || model == null || rec.isEmpty()) {
@@ -101,13 +72,7 @@ public final class RailMeshCache {
             (ps, buffer) -> RailScriptRenderers.replayForCapture(rec, ps, buffer, packedLight, packedOverlay, model));
     }
 
-    /**
-     * 描画コードを渡して統合メッシュに焼き、以後は VBO を描くだけにする汎用版。
-     * GLRecorder を持たない経路 (分岐の旧パイプライン) からも使えるようにしたもの。
-     * @param variant      見た目が変わる要因 (分岐の開通方向など)。変われば焼き直す
-     * @param forceRebuild true = 強制的に焼き直す
-     * @return true = 描画を予約した (呼び出し元は逐次描画をスキップする)
-     */
+    /** 描画コードを渡して統合メッシュに焼き、以後は VBO を描くだけにする汎用版。 */
     public static boolean drawBaked(BlockPos pos, long variant, MqoModelLoader.MqoModel model,
                                     PoseStack poseStack, int packedLight, int packedOverlay,
                                     boolean forceRebuild, Baker baker) {
@@ -116,11 +81,6 @@ public final class RailMeshCache {
             return false;
         }
         // ★ Iris/Oculus (シェーダーパック) 使用中は統合メッシュ (VBO) を使わない。
-        //   Iris は自前の行列・頂点フォーマットで描くため、CPU で合成した ModelView を
-        //   drawWithShader で渡すと行列が一致せず、レールがカメラ方向へ引き伸ばされる
-        //   (空へ飛ぶ)。呼び出し元 (RailCoreBlockEntityRenderer) は false で
-        //   従来の逐次描画 (renderLegacy) に落ちるので、シェーダーでも正しく描ける。
-        //   MqoModelLoader の VBO 経路も同じ理由でシェーダー使用時は使っていない。
         if (com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.countRailFallback();
             return false;
@@ -129,34 +89,24 @@ public final class RailMeshCache {
 
         RailMesh mesh = CACHE.get(pos);
         // 必ず焼く要因: 強制再焼き (パック再読込)・未焼き・モデル差替。
-        // ★PENDING_REBAKE も見る。焼き込み枠切れで見送った「焼き直せ」を覚えておくため。
         boolean mustBake = forceRebuild || PENDING_REBAKE.contains(pos)
                 || mesh == null || mesh.model() != model;
         // 任意で焼く要因: ライト or 見た目 (variant=トング位置) が変わった。
         boolean lightChanged = !mustBake && mesh.light() != packedLight;
         boolean variantChanged = !mustBake && mesh.variant() != variant;
         boolean optionalBake = lightChanged || variantChanged;
-        // churn 対策: 任意再焼きは、直近に焼いてから REBAKE_MIN_FRAMES 経つまで見送り、古いメッシュを
-        // 描く。
-        // (静止して見えるクロスポイントが再焼きされ続けて重い、を解消)。見た目は最大数フレーム古いだけ。
-        // ★ただしライト変化はこの遅延の対象外にする。
-        // ★再焼き込みの間隔制限は撤去した (本家に無い)。
+        // churn 対策: 任意再焼きは、直近に焼いてから REBAKE_MIN_FRAMES 経つまで見…
         boolean needsBake = mustBake || optionalBake;
         if (needsBake) {
             if (bakesThisFrame >= MAX_BAKES_PER_FRAME) {
                 // ★スパイク対策: このフレームの焼き込み枠を使い切った → 次フレームへ回す。
-                // 「必ず焼く」要求はここで覚えておく。呼び出し側のフラグは既に降ろされているので、
-                // 覚えておかないと要求が消えて古いメッシュのまま固定される。
                 if (mustBake) {
                     PENDING_REBAKE.add(pos.immutable());
                 }
                 if (mesh != null) {
-                    // 再焼き待ち: 古いメッシュをそのまま描く (光/形が最大数フレーム古いだけ・
-                    // 不可視にはしない)。needsBake は次フレームも真なので枠が空き次第焼き直る。
-                    // (下の描画へフォールスルー)
+                    // 再焼き待ち: 古いメッシュをそのまま描く (光/形が最大数フレーム古いだけ・ 不可視にはしない)。
                 } else {
-                    // 初回焼き待ち: まだ焼けていない。
-                    // ここは「描かない」で次フレームへ回す (数フレームで焼けて出る = 分散)。
+                    // 初回焼き待ち: まだ焼けていない。 ここは「描かない」で次フレームへ回す (数フレームで焼けて出る…
                     return true;
                 }
             } else {
@@ -179,8 +129,7 @@ public final class RailMeshCache {
         }
 
         for (MeshCapture.Section section : mesh.sections()) {
-            // 即時描画はしない。RenderType ごとにまとめて描くためキューへ積む
-            // (GL のステート設定/破棄をレール 1 本ごとに走らせるのが重さの正体だった)。
+            // 即時描画はしない。RenderType ごとにまとめて描くためキューへ積む (GL のステート設定…
             if (!RailDrawQueue.enqueue(section.vbo(), section.renderType(), poseStack)) {
                 // VBO が無効になった → このレールは統合メッシュを諦めて逐次描画に戻す
                 CACHE.remove(pos);
@@ -193,10 +142,7 @@ public final class RailMeshCache {
         return true;
     }
 
-    /**
-     * 記録済みの描画コマンドを再生し、既存コードが吐いた頂点をそのまま 1 つの VBO に焼く。
-     * 単位行列の PoseStack で再生するので、頂点はレール原点 (ブロック隅) 基準になる。
-     */
+    /** 記録済みの描画コマンドを再生し、既存コードが吐いた頂点をそのまま 1 つの VBO に焼く。 */
     /** 統合メッシュに焼く描画コード。単位行列の PoseStack と捕獲用バッファが渡される。 */
     public interface Baker {
         void render(PoseStack poseStack, net.minecraft.client.renderer.MultiBufferSource buffer);

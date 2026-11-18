@@ -18,16 +18,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.material.MapColor;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * スロット (吸込口)。本家 {@code jp.ngt.rtm.block.BlockSlot} の移植。
- *
- * <p>レッドストーン信号を受けている間、向いている先の液体ブロックを吸い込み、
- * 反対側 (パイプが繋がっていればパイプの先) へ吐き出す。
- * フイゴを当てる相手でもある ({@link jp.ngt.rtm.item.ItemBellows})。
- *
- * <p>★本家はパイプ ({@code BlockPipe}) を辿って吐き出し先を選ぶが、RTMU のパイプは
- * 設置物 (InstalledObject) で別物なので<b>真後ろへ吐き出すだけ</b>にしてある。
- */
+/** スロット (吸込口)。本家 jp.ngt.rtm.block.BlockSlot の移植。 */
 public class BlockSlot extends Block implements EntityBlock {
     public static final MapCodec<BlockSlot> CODEC = simpleCodec(p -> new BlockSlot());
     public static final DirectionProperty FACING = BlockStateProperties.FACING;
@@ -53,7 +44,7 @@ public class BlockSlot extends Block implements EntityBlock {
 
     @Override
     public BlockState getStateForPlacement(BlockPlaceContext context) {
-        //本家 getStateForPlacement: クリックした面の反対を向く
+        // 本家 getStateForPlacement: クリックした面の反対を向く
         return this.defaultBlockState().setValue(FACING, context.getClickedFace().getOpposite());
     }
 
@@ -77,7 +68,7 @@ public class BlockSlot extends Block implements EntityBlock {
         };
     }
 
-    /** 本家 {@code inhaleLiquid}: 向いている先の液体を吸い、反対側へ移す。 */
+    /** 本家 inhaleLiquid: 向いている先の液体を吸い、反対側へ移す。 */
     public void inhaleLiquid(Level level, BlockPos pos) {
         BlockState state = level.getBlockState(pos);
         if (!(state.getBlock() instanceof BlockSlot)) {

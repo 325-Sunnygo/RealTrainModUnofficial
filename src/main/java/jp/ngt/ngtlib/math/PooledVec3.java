@@ -5,10 +5,7 @@ import net.minecraft.util.Mth;
 
 import java.util.stream.IntStream;
 
-/**
- * メモリ使用削減
- * (本家 NGTLib jp.ngt.ngtlib.math.PooledVec3 の忠実移植。本家同様プールは無効化されている)
- */
+/** メモリ使用削減 (本家 NGTLib jp.ngt.ngtlib.math.PooledVec3… */
 public final class PooledVec3 extends Vec3 {
     private static final ObjectPool<PooledVec3> POOL;
 
@@ -32,7 +29,7 @@ public final class PooledVec3 extends Vec3 {
         return new Vec3(x, y, z);
     }
 
-    /** @param par1 度 */
+    
     @Override
     public Vec3 rotateAroundX(float par1) {
         float rad = NGTMath.toRadians(par1);
@@ -44,7 +41,7 @@ public final class PooledVec3 extends Vec3 {
         return create(d0, d1, d2);
     }
 
-    /** @param par1 度 */
+    
     @Override
     public Vec3 rotateAroundY(float par1) {
         float rad = NGTMath.toRadians(par1);
@@ -56,7 +53,7 @@ public final class PooledVec3 extends Vec3 {
         return create(d0, d1, d2);
     }
 
-    /** @param par1 度 */
+    
     @Override
     public Vec3 rotateAroundZ(float par1) {
         float rad = NGTMath.toRadians(par1);

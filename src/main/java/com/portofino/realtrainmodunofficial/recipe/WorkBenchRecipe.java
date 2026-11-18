@@ -16,12 +16,7 @@ import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 
-/**
- * RTM 専用作業台のレシピ。本家 {@code ShapedRecipes55} 相当で、<b>最大 5x5</b>。
- *
- * <p>3x3 に収まる本家レシピは、本家と同じくバニラのレシピ ({@code crafting_shaped}) として
- * 出してあるので普通の作業台でも作れる。ここは 4x4 以上のぶんだけを持つ。
- */
+/** RTM 専用作業台のレシピ。本家 ShapedRecipes55 相当で、最大 5x5。 */
 public record WorkBenchRecipe(String group, CraftingBookCategory category,
                               WorkBenchPattern pattern, ItemStack result) implements CraftingRecipe {
 

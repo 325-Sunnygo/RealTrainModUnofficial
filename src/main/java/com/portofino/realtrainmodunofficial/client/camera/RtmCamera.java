@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.client.camera;
 
 import net.minecraft.client.Minecraft;
 
-/** Original camera activation and numeric control, shared by HUD/FOV/post processing. */
+/** Original camera activation and numeric control, s… */
 public final class RtmCamera {
     public static final RtmCamera INSTANCE=new RtmCamera();
     private final CameraState state=new CameraState();
@@ -13,7 +13,7 @@ public final class RtmCamera {
     public double computeFov(double base) { return state.fov(base); }
     public void setActive(boolean value) { if(!value && active) CameraPostProcessor.reset();active=value; }
     public void close() { setActive(false);modeDown=debugDown=false; }
-    /** Kept for old call sites; actual activation is determined by the original held-item rule. */
+    /** Kept for old call sites; */
     public void toggle() { setActive(!active); }
     public void tick(Minecraft mc) {
         if(!active || mc.screen!=null || mc.isPaused()) { modeDown=debugDown=false;return; }

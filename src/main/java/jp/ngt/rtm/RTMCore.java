@@ -1,21 +1,13 @@
 package jp.ngt.rtm;
 
-/**
- * 本家 jp.ngt.rtm.RTMCore の段階的移植。
- * VERSION はパックスクリプトが isLegacy 判定 (indexOf("1.7.10")) に使うため
- * "1.7.10" を含む文字列にする (legacy パス = RailProperty API を使わせる)。
- */
+/** 本家 jp.ngt.rtm.RTMCore の段階的移植。 */
 @SuppressWarnings("unused")
 public final class RTMCore {
     public static final String MODID = "RTM";
     public static final String NAME = "RealTrainMod";
     public static final String VERSION = "1.7.10.41 KaizPatchX/remaster-1.21.1";
 
-    /**
-     * 本家 {@code RTMCore.proxy} (CommonProxy/ClientProxy)。
-     * スクリプトは {@code RTMCore.proxy.playSound(entity, new ResourceLocation(name), vol, pitch, range)}
-     * のように使う。
-     */
+    /** 本家 RTMCore.proxy (CommonProxy/ClientProxy)。 */
     public static final RTMProxy proxy = new RTMProxy();
 
     /** 運転操作のキー種別 (スクリプトがキー入力で分岐する)。 */

@@ -31,8 +31,8 @@
   ],
 
   "soundScriptPath": "scripts/sound_223.js",
-  "sound_Horn": "rtm:train.rtm_wh_00l",
-  "sound_BrakeRelease": "rtm:train.rtm_223_release",
+  "sound_Horn": "train.rtm_wh_00l",
+  "sound_BrakeRelease": "train.rtm_223_release",
 
   "headLights": [
     {

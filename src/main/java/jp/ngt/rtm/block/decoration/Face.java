@@ -1,12 +1,9 @@
 package jp.ngt.rtm.block.decoration;
 
-/**
- * 装飾ブロックの 1 面。本家 {@code jp.ngt.rtm.block.decoration.Face} の移植。
- * JSON にそのまま出入りする (Gson)。
- */
+/** 装飾ブロックの 1 面。本家 jp.ngt.rtm.block.decoration.Face の… */
 public class Face implements Cloneable {
     public String name;
-    /** 1.12 形式のテクスチャパス (例 {@code minecraft:blocks/log_birch})。 */
+    /** 1.12 形式のテクスチャパス (例 minecraft:blocks/log_birch)。 */
     public String texture;
     /** 上:1.0, 前後:0.8, 左右:0.6, 下:0.5 */
     public float shadow;

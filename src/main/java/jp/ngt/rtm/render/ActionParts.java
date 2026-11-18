@@ -6,16 +6,7 @@ import jp.ngt.ngtlib.renderer.model.GroupObject;
 import jp.ngt.ngtlib.renderer.model.VecAccuracy;
 import jp.ngt.ngtlib.renderer.model.Vertex;
 
-/**
- * 本家 jp.ngt.rtm.render.ActionParts の移植。
- * クリック/ドラッグで操作できるパーツ (運転台のマスコン・ブレーキ弁・スイッチ類)。
- *
- * <p>本家は LIGHT パスで「カーソルが当たっているパーツ」に輪郭線を描く
- * (通常は白、右クリック中は橙)。本家は {@code glCullFace(GL_FRONT)} で前面を落として
- * リムを作るが、RTMU の RenderType は前面カリングを表現できないため、
- * <b>三角形の巻き順を逆にして</b>通常の裏面カリングで前面を落とす (見た目は同じリム)。
- * 当たり判定 (PICK パス) は {@code client.ActionPartsPicker} が三角形レイキャストで代替する。
- */
+/** 本家 jp.ngt.rtm.render.ActionParts の移植。 */
 public class ActionParts extends Parts {
     private static final float OUTLINE_THICKNESS = 0.005F;
     /** 本家 RenderPass.PICK の id (定数参照の循環を避けるため数値で持つ)。 */
@@ -48,10 +39,7 @@ public class ActionParts extends Parts {
         }
     }
 
-    /**
-     * 本家 setupOutlineModel: 頂点を法線方向へ 0.005 膨らませた輪郭用グループを作る。
-     * 列車経路と車経路の両方から使えるよう、モデルを引数に取りキャッシュする。
-     */
+    /** 本家 setupOutlineModel: 頂点を法線方向へ 0.005 膨らませた輪郭用グループ… */
     public GroupObject[] getOutlineModels(jp.ngt.ngtlib.renderer.model.PolygonModel polygonModel) {
         if (polygonModel == null) {
             return new GroupObject[0];
@@ -86,7 +74,7 @@ public class ActionParts extends Parts {
     @Override
     public void render(PartsRenderer renderer) {
         if (renderer.currentPass == PASS_PICK) {
-            // CPU selection and the normal pick buffer both preserve the part identifier.
+            // CPU selection and the normal pick buffer both pre…
             jp.ngt.ngtlib.renderer.GL11Facade.glLoadName(this.id);
             super.render(renderer);
             return;
@@ -131,18 +119,14 @@ public class ActionParts extends Parts {
         for (GroupObject go : outline) {
             float[] arr = buildOutlineTriangles(go, r, g, b);
             if (arr.length > 0) {
-                // cullFront = true: 描画側が RenderSystem.cullFace(FRONT) を設定して即時 flush する
-                // (= 本家 glCullFace(GL_FRONT))。
+                // cullFront = true: 描画側が RenderSystem.cullFace(FRON…
                 rec.drawTess(new GLRecorder.TessDraw(GL_TRIANGLES, arr, false, true));
             }
         }
         rec.brightness(-1);
     }
 
-    /**
-     * 輪郭三角形 (stride 9, 元の巻き順) を作る。
-     * 前面カリングは描画側 (RenderSystem.cullFace(FRONT)) が行う。
-     */
+    /** 輪郭三角形 (stride 9, 元の巻き順) を作る。 */
     public static float[] buildOutlineTriangles(GroupObject group, float r, float g, float b) {
         if (group == null || group.faces == null) {
             return new float[0];

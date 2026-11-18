@@ -35,8 +35,7 @@ public class RailPackLoader {
         if (loaded) return;
         loaded = true;
         LOADED.clear();
-        // jar 同梱の本家レール定義。以前は loadFromModJar がどこからも呼ばれておらず
-        // (デッドコード)、既定レールが 1 つも登録されていなかった。
+        // jar 同梱の本家レール定義。以前は loadFromModJar がどこからも呼ばれておらず (…
         try(var tasks=OrderedPackTasks.begin()) {
         loadFromModJar();
         loadFromExternalDirectories();
@@ -56,10 +55,7 @@ public class RailPackLoader {
         }
     }
 
-    /**
-     * MOD の jar に同梱した本家レール定義 (assets/minecraft/models/json/ModelRail_*.json) を読む。
-     * ここが無かったため、レール定義はパック zip からしか読めなかった。
-     */
+    /** MOD の jar に同梱した本家レール定義 (assets/minecraft/models/j… */
     private static void loadBuiltinRailsFromModJar() {
         try {
             var modFileEntry = net.neoforged.fml.ModList.get().getModFileById(RealTrainModUnofficial.MODID);
@@ -127,7 +123,7 @@ public class RailPackLoader {
 
     private static void loadArchiveDirectory(Path dir) throws IOException {
         try (var stream = Files.list(dir)) {
-            // RTM 系 pack は zip / jar の両方で配られるので、入口は archive に寄せる。
+            // RTM 系 pack は zip / jar の両方で配られるので、入口は archive に寄せ…
             stream.filter(RailPackLoader::isSupportedArchive)
                 .forEach(zipPath -> {
                     // README 同意ゲート: 未同意/拒否のパックはロードしない。
@@ -148,8 +144,7 @@ public class RailPackLoader {
         if (!fileName.endsWith(".zip") && !fileName.endsWith(".jar")) {
             return false;
         }
-        // 自分自身の jar を「パック」として読み直すと、jar 同梱の本家レール定義が
-        // 二重登録される。ファイル名だけだとリネームされた jar をすり抜けるので実体でも見る。
+        // 自分自身の jar を「パック」として読み直すと、jar 同梱の本家レール定義が 二重登録される。
         return !fileName.contains("realtrainmodunofficial")
             && !fileName.contains("rtm-official-assets")
             && !fileName.contains("kaizpatchx")
@@ -166,10 +161,7 @@ public class RailPackLoader {
         loadRailPack(zipInput, packName, 0, java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    /**
-     * パスから読む版。エントリ名が Shift-JIS の zip (Windows 製の日本語名パック) は
-     * UTF-8 では読めないので、その場合だけ Shift-JIS で開き直す。
-     */
+    /** パスから読む版。エントリ名が Shift-JIS の zip (Windows 製の日本語名パック… */
     private static void loadRailPackFile(java.nio.file.Path path, String packName) throws Exception {
         com.portofino.realtrainmodunofficial.util.PackZip.readWithFallback(
             () -> Files.newInputStream(path), packName,
@@ -245,11 +237,7 @@ public class RailPackLoader {
                 modelFile = getString(model, "modelFile");
                 tex = parseTextures(model);
             } else {
-                // ★ 旧形式 (本家 RailConfig.init): "model" オブジェクトが無いパックは
-                // "railModel" (モデルのパス) と "railTexture" (テクスチャのパス) を
-                // 文字列で直接持っている。
-                // this.model.modelFile = this.railModel;
-                // this.model.textures  = {{"default", this.railTexture}};
+                // ★ 旧形式 (本家 RailConfig.init): "model" オブジェクトが無いパックは…
                 modelFile = getString(obj, "railModel");
                 if (modelFile == null || modelFile.isBlank()) {
                     return;
@@ -269,8 +257,7 @@ public class RailPackLoader {
             String buttonTexture = firstNonBlank(getString(obj, "buttonTexture"), getString(model, "buttonTexture"));
             Vec3 offset = parseVec3(model, "offset", 1.0 / 16.0);
             float scale = parseFloat(model, "scale", 1.0F);
-            // ballastWidth / defaultBallast (RTM 公式パック互換) / model.ballastWidth のいずれか。
-            // RTM 公式の defaultBallast は配列 [{blockName, blockMetadata, height}, ...]。
+            // ballastWidth / defaultBallast (RTM 公式パック互換) / mod…
             int ballast = 0;
             String ballastBlockId = "";
             if (obj.has("ballastWidth")) {
@@ -278,7 +265,7 @@ public class RailPackLoader {
             } else if (model.has("ballastWidth")) {
                 ballast = readIntSafe(model.get("ballastWidth"), 0);
             }
-            // defaultBallast から敷設ブロック (gravel=砂利 等) を拾う。幅未指定ならここで既定 3。
+            // defaultBallast から敷設ブロック (gravel=砂利 等) を拾う。
             JsonElement ballastEl = obj.has("defaultBallast") ? obj.get("defaultBallast")
                 : (model.has("defaultBallast") ? model.get("defaultBallast") : null);
             java.util.List<RailDefinition.Ballast> ballastSets = allBallastSets(ballastEl);
@@ -292,9 +279,7 @@ public class RailPackLoader {
                     ballast = readIntSafe(ballastEl, ballast);
                 }
             }
-            //本家 RailConfig.init: ballastWidth は常に 1 以上の奇数 (未指定なら 3)。
-            //  ★幅と「道床を敷くか」は別物。敷くかどうかは defaultBallast の有無で決まる
-            //   (書いていなければ空気 = 何も置かない)。
+            // 本家 RailConfig.init: ballastWidth は常に 1 以上の奇数 (未指定…
             if (ballast <= 0) {
                 ballast = 3;
             } else if ((ballast & 1) == 0) {
@@ -317,12 +302,7 @@ public class RailPackLoader {
         return def;
     }
 
-    /**
-     * defaultBallast の<b>全部</b>を取り出す。
-     *
-     * <p>本家はこの 1 つ 1 つが別々のレールアイテムになる (「00_砂利」のような並び)。
-     * 以前は最初の 1 つしか見ていなかったので、道床の種類を選べなかった。
-     */
+    /** defaultBallast の全部を取り出す。 */
     private static java.util.List<RailDefinition.Ballast> allBallastSets(JsonElement el) {
         java.util.List<RailDefinition.Ballast> out = new java.util.ArrayList<>();
         if (el == null) {
@@ -337,7 +317,7 @@ public class RailPackLoader {
                 addBallastSet(out, el);
             }
         } catch (Exception ignored) {
-            //壊れた記述は黙って捨てる。1 件でも読めれば道床は選べる
+            // 壊れた記述は黙って捨てる。1 件でも読めれば道床は選べる
         }
         return out;
     }
@@ -366,7 +346,7 @@ public class RailPackLoader {
             height <= 0.0F ? 0.0625F : height));
     }
 
-    /** defaultBallast (配列/オブジェクト/文字列) から最初の blockName を取り出す。 */
+    /** defaultBallast (配列/オブジェクト/文字列) から最初の blockName を取… */
     private static String firstBallastBlockName(JsonElement el) {
         try {
             if (el.isJsonArray()) {
@@ -522,18 +502,13 @@ public class RailPackLoader {
             Path modJar = BundledPackStore.getModJarPath();
             if (modJar != null) return modJar;
         }
-        // packName が mod ID 自身 ("realtrainmodunofficial") のとき = MOD の jar に同梱した
-        // 本家定義 (assets/minecraft/models/json/*.json)。
-        // assets/minecraft/models/ に入っているので、jar そのものをパックとして返す。
-        // ★ここが null を返すと、定義は読めるのにモデルの実体が見つからず「当たり判定は
-        // あるのにモデルが透明」になる。
+        // packName が mod ID 自身 ("realtrainmodunofficial") の…
         if (com.portofino.realtrainmodunofficial.RealTrainModUnofficial.MODID.equalsIgnoreCase(packName)) {
             Path modJar = BundledPackStore.getModJarPath();
             if (modJar != null) {
                 return modJar;
             }
             // 開発環境 (jar でなく展開済みクラスパス) では jar パスが取れないことがある。
-            // その場合は従来どおり mods フォルダの RTM-Official-Assets*.zip を探す。
             Path officialModsDir = gameDir.resolve("mods");
             try (var stream = java.nio.file.Files.list(officialModsDir)) {
                 java.util.Optional<Path> hit = stream
@@ -564,7 +539,6 @@ public class RailPackLoader {
     public static String readScriptContent(RailDefinition definition) {
         if (definition == null || definition.getScriptPath() == null || definition.getScriptPath().isBlank()) return null;
         // ★同梱パック (mod jar) は resolvePackPath が null を返す。
-        // 同梱レールのスクリプトが永久に読めず、黙ってスクリプト無し描画に落ちていた。
         Path packPath = resolvePackPath(definition.getPackName());
         String scriptPath = normalize(definition.getScriptPath());
         String scriptFileName = scriptPath.contains("/")
@@ -585,8 +559,7 @@ public class RailPackLoader {
             RealTrainModUnofficial.LOGGER.warn("Failed to read script {} from pack {}", definition.getScriptPath(), definition.getPackName(), e);
         }
         }
-        // 自パックに無い: 前提/ベーススクリプトパックを横断する資産索引 (NGTFileLoader) から探す。
-        // 車両スクリプトと同じく、レールの実体スクリプトが別の前提パックにある分割構成に対応する。
+        // 自パックに無い: 前提/ベーススクリプトパックを横断する資産索引 (NGTFileLoader)…
         try {
             byte[] bytes = jp.ngt.ngtlib.io.NGTFileLoader.findAsset(scriptPath);
             if (bytes != null) {

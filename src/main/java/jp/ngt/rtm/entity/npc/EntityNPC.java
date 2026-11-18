@@ -40,24 +40,11 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.food.FoodProperties;
 import net.minecraft.world.level.Level;
 
-/**
- * NPC。本家 {@code jp.ngt.rtm.entity.npc.EntityNPC} の移植。
- *
- * <p>パック ({@code ModelNPC_*.json}) の {@code role} で振る舞いが決まる:
- * <ul>
- *   <li>mannequin … 何もしない人形。設置者かクリエイティブしか壊せない</li>
- *   <li>passenger / attendant … うろつき、プレイヤーを見る</li>
- *   <li>guard … 銃を持たせると撃つ。素手なら殴る。飼い主 (設置者) を守る</li>
- *   <li>salesperson / buyer … その場でプレイヤーを見る</li>
- * </ul>
- * 手持ち・防具は右クリックの装備画面で入れる。食べ物を持たせると体力が減ったとき食べる (本家 healNPC)。
- *
- * <p>★本家の乗車 AI (EntityAITravelByTrain = 駅から列車に乗って移動する) は未移植。
- */
-public class EntityNPC extends TamableAnimal implements RangedAttackMob {
+/** NPC。本家 jp.ngt.rtm.entity.npc.EntityNPC の移植。 */
+public class EntityNPC extends TamableAnimal implements RangedAttackMob, jp.ngt.rtm.modelpack.IModelSelector {
     private static final EntityDataAccessor<String> MODEL_ID =
         SynchedEntityData.defineId(EntityNPC.class, EntityDataSerializers.STRING);
-    /** 本家 menu: 商売メニュー (NBT 文字列 {list:[{item,price}...]})。 */
+    /** 本家 menu: 商売メニュー (NBT 文字列 {list:[{item,price}...]}… */
     private static final EntityDataAccessor<String> MENU =
         SynchedEntityData.defineId(EntityNPC.class, EntityDataSerializers.STRING);
 
@@ -70,7 +57,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
     private Role role = Role.MANNEQUIN;
     private boolean roleDirty = true;
 
-    /** 本家 EntityNPC.executer: NPC 1 体に 1 個。serverScriptPath の onUpdate に渡る。 */
+    /** 本家 EntityNPC.executer: NPC 1 体に 1 個。 */
     public final jp.ngt.rtm.modelpack.ScriptExecuter scriptExecuter = new jp.ngt.rtm.modelpack.ScriptExecuter();
     /** 銃使用の経過 tick (本家 useItemCount)。 */
     private int useItemCount;
@@ -118,8 +105,44 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
     }
 
     public javax.script.ScriptEngine getServerScriptEngine() {
-        if (this.level().isClientSide()) return null;
-        return com.portofino.realtrainmodunofficial.script.NpcServerScripts.getEngine(this.getDefinition());
+        return this.getModelSet().serverSE;
+    }
+
+    /** 本家 EntityNPC.getModelSet。 */
+    public jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getModelSet() {
+        NpcDefinition def = this.getDefinition();
+        String key = "npc:" + (def == null ? "" : def.getId());
+        return jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getScriptOnlyModelSet(
+                key,
+                def == null ? "" : def.getId(),
+                "ModelNPC",
+                def == null ? null : def.getServerScriptPath(),
+                null, null, def == null ? null : def.getButtonTexture());
+    }
+
+    public String getModelName() {
+        NpcDefinition def = this.getDefinition();
+        return def == null ? "" : def.getId();
+    }
+
+    public void setModelName(String name) {
+        if (name != null && !name.isBlank()) {
+            this.setModelId(name);
+        }
+    }
+
+    private final jp.ngt.rtm.modelpack.state.ResourceState resourceState =
+            new jp.ngt.rtm.modelpack.state.ResourceState(this::getModelName, this::getModelSet);
+
+    private jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> dataFormatterSet;
+
+    public jp.ngt.rtm.modelpack.state.ResourceState getResourceState() {
+        jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> set = this.getModelSet();
+        if (set != null && set != this.dataFormatterSet) {
+            this.dataFormatterSet = set;
+            set.dataFormatter.initDataMap(this.resourceState.getDataMap());
+        }
+        return this.resourceState;
     }
 
     public NpcDefinition getDefinition() {
@@ -144,7 +167,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
         switch (this.role) {
             case PASSENGER -> {
                 this.goalSelector.addGoal(1, new FloatGoal(this));
-                //本家 RolePassenger: EntityAITravelByTrain(entity, 0.45F)
+                // 本家 RolePassenger: EntityAITravelByTrain(entity, 0…
                 this.goalSelector.addGoal(2, new jp.ngt.rtm.entity.ai.EntityAITravelByTrain(this, 1.0D));
                 this.goalSelector.addGoal(3, new WaterAvoidingRandomStrollGoal(this, SPEED));
                 this.goalSelector.addGoal(4, new LookAtPlayerGoal(this, Player.class, 4.0F));
@@ -160,7 +183,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
                 this.goalSelector.addGoal(1, new FloatGoal(this));
                 ItemStack held = this.getMainHandItem();
                 if (held.getItem() instanceof ItemGun) {
-                    //本家 EntityAIRangedAttackWithItem(entity, SPEED*1.5, 20, 30, 20.0F)
+                    // 本家 EntityAIRangedAttackWithItem(entity, SPEED*1.5…
                     this.goalSelector.addGoal(3, new RangedAttackGoal(this, SPEED * 1.5D, 25, 20.0F));
                 } else {
                     this.goalSelector.addGoal(2, new LeapAtTargetGoal(this, SPEED));
@@ -179,7 +202,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
                 this.goalSelector.addGoal(3, new RandomLookAroundGoal(this));
             }
             case MANNEQUIN, MOTORMAN -> {
-                //人形: AI 無し。本家は onLivingUpdate を丸ごと飛ばす (= その場で固まる)
+                // 人形: AI 無し。本家は onLivingUpdate を丸ごと飛ばす (= その場で固まる)
                 this.setNoGravity(false);
             }
         }
@@ -194,8 +217,8 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
         }
         if (!this.level().isClientSide()) {
             this.healNPC();
-            // 本家 EntityNPC.onUpdate: executer.execScript(this) で serverSE の onUpdate を回す。
-            com.portofino.realtrainmodunofficial.script.NpcServerScripts.onUpdate(this);
+            // 本家 EntityNPC.onUpdate: executer.execScript(this)…
+            this.scriptExecuter.execScript(this);
         }
     }
 
@@ -244,7 +267,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
             return;
         }
         this.lookAt(net.minecraft.commands.arguments.EntityAnchorArgument.Anchor.EYES, target.getEyePosition());
-        //本家 getBullet: 目標が居れば目標へ向けて撃つ
+        // 本家 getBullet: 目標が居れば目標へ向けて撃つ
         EntityBullet bullet = new EntityBullet(this.level(), this, gun.gunType.speed, gun.gunType.bulletType);
         this.level().addFreshEntity(bullet);
         this.level().playSound(null, this.getX(), this.getY(), this.getZ(),
@@ -263,7 +286,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
             }
             return InteractionResult.sidedSuccess(this.level().isClientSide());
         }
-        //本家: salesperson/buyer は取引 GUI (GuiSalesperson)
+        // 本家: salesperson/buyer は取引 GUI (GuiSalesperson)
         if (this.role == Role.SALESPERSON || this.role == Role.BUYER) {
             if (this.level().isClientSide()) {
                 com.portofino.realtrainmodunofficial.ClientHooks.openNpcTradeScreen(this.getId());
@@ -278,7 +301,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
         return InteractionResult.sidedSuccess(this.level().isClientSide());
     }
 
-    /** 装備が変わったら役割の AI を組み直す (本家 onInventoryChanged: 銃の有無で警備の型が変わる)。 */
+    /** 装備が変わったら役割の AI を組み直す (本家 onInventoryChanged: 銃の有無… */
     public void onInventoryChanged() {
         this.roleDirty = true;
     }
@@ -302,7 +325,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
     @Override
     protected void dropCustomDeathLoot(ServerLevel level, DamageSource source, boolean hitByPlayer) {
         super.dropCustomDeathLoot(level, source, hitByPlayer);
-        //本家 onDeath: 持ち物を全部落とし、プレイヤーに壊されたら NPC アイテムも落とす
+        // 本家 onDeath: 持ち物を全部落とし、プレイヤーに壊されたら NPC アイテムも落とす
         for (var slot : net.minecraft.world.entity.EquipmentSlot.values()) {
             ItemStack stack = this.getItemBySlot(slot);
             if (!stack.isEmpty()) {
@@ -320,7 +343,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
 
     @Override
     public boolean removeWhenFarAway(double distance) {
-        return false;   //本家 canDespawn=false
+        return false;   // 本家 canDespawn=false
     }
 
     @Override
@@ -335,7 +358,7 @@ public class EntityNPC extends TamableAnimal implements RangedAttackMob {
 
     @Override
     protected int getBaseExperienceReward() {
-        return 0;   //本家 getExperiencePoints=0
+        return 0;   // 本家 getExperiencePoints=0
     }
 
     /** 本家 Role。パックの role 文字列に対応。 */

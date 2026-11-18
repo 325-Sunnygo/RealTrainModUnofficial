@@ -15,10 +15,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/**
- * ミニチュアの設定画面 (neo mcte)。本家 MCTE GuiItemMiniature の移植。
- * 本家と同じ「左に操作ボタン・右に数値入力」の配置にしてある。
- */
+/** ミニチュアの設定画面 (neo mcte)。 */
 public class MiniatureSettingsScreen extends Screen {
 
     private final InteractionHand hand;
@@ -176,7 +173,7 @@ public class MiniatureSettingsScreen extends Screen {
         }
     }
 
-    /** 末尾の余計な 0 を落とす (本家は String.valueOf そのまま。読みやすさ優先で少しだけ整える)。 */
+    /** 末尾の余計な 0 を落とす (本家は String.valueOf そのまま。 */
     private static String trim(float v) {
         String s = String.format("%.4f", v);
         if (s.contains(".")) {

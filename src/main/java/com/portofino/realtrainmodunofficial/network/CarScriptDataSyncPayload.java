@@ -13,11 +13,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * サーバ→クライアントの CarEntity scriptData(DataMap) 同期。
- * SuperRailBuilder3 の render(クライアント)スクリプトは、サーバ onUpdate が設定した
- * hostPlayerEntityId 等を読んで GUI を起動する。
- */
+/** サーバ→クライアントの CarEntity scriptData(DataMap) 同期。 */
 public record CarScriptDataSyncPayload(int entityId, Map<String, String> data) implements CustomPacketPayload {
     public static final Type<CarScriptDataSyncPayload> TYPE = new Type<>(
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "car_script_data_sync")

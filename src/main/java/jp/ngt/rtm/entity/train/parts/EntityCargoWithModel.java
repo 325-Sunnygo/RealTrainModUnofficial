@@ -12,12 +12,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
-/**
- * モデルを選べる貨物の基底。本家 {@code EntityCargoWithModel} の移植。
- *
- * <p>本家は {@code ResourceState} を持つが、RTMU はモデルを<b>id 文字列</b>で持つ
- * (車両/設置物と同じやり方)。スニーク右クリックでモデル選択画面が開く。
- */
+/** モデルを選べる貨物の基底。本家 EntityCargoWithModel の移植。 */
 public abstract class EntityCargoWithModel extends EntityCargo {
     private static final EntityDataAccessor<String> MODEL_ID =
         SynchedEntityData.defineId(EntityCargoWithModel.class, EntityDataSerializers.STRING);

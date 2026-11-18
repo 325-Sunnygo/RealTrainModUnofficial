@@ -5,7 +5,7 @@ import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/** 本家 jp.ngt.rtm.RTMItem のアイテム登録 (段階的移植、1.21 DeferredRegister 版)。 */
+/** 本家 jp.ngt.rtm.RTMItem のアイテム登録 (段階的移植、1.21 Deferre… */
 public final class RTMItems {
     public static final DeferredRegister.Items REGISTER = DeferredRegister.createItems(RealTrainModUnofficial.MODID);
 

@@ -8,7 +8,7 @@ import jp.ngt.rtm.entity.train.EntityTrainBase;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 
-/** 本家 jp.ngt.rtm.entity.train.util.BogieController (KaizPatchX) の忠実移植。 */
+/** 本家 jp.ngt.rtm.entity.train.util.BogieController (… */
 public class BogieController {
     private final EntityBogie[] bogies = new EntityBogie[2];
 
@@ -132,10 +132,7 @@ public class BogieController {
         y += vec.getY() - EntityTrainBase.TRAIN_HEIGHT;
         z += vec.getZ();
 
-        // ★車体を上下に揺らす仕掛けは持たない。
-        // 以前 RTMU 独自の「車体サスペンション」(継ぎ目や勾配で沈んで揺り戻す上下動) を
-        // 入れていたが、坂で列車が沈んでは戻るのを繰り返して見えるため撤去した。
-        // 車体 Y は台車中点の理想値をそのまま使い、レールにぴったり乗せる。
+        // ★車体を上下に揺らす仕掛けは持たない。 以前 RTMU 独自の「車体サスペンション」(継ぎ目や勾配…
 
         train.setPositionAndRotationDirect(x, y, z, yaw, pitch);
         train.updateRoll(roll);
@@ -144,10 +141,7 @@ public class BogieController {
         this.updateBogiePos(train, 1, UpdateFlag.ALL);
     }
 
-    /**
-     * 車体位置を元に台車位置を更新
-     * 台車位置を再計算することで、車体とのずれを解消する
-     */
+    /** 車体位置を元に台車位置を更新 台車位置を再計算することで、車体とのずれを解消する */
     public void updateBogiePos(EntityTrainBase train, int bogieIndex, UpdateFlag flag) {
         float[][] pos = train.getConfig().getBogiePos();
         Vec3 v31 = new Vec3(pos[bogieIndex][0], pos[bogieIndex][1], pos[bogieIndex][2]);

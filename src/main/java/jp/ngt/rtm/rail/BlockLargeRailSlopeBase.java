@@ -14,10 +14,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 
 import javax.annotation.Nullable;
 
-/**
- * 本家 jp.ngt.rtm.rail.BlockLargeRailSlopeBase の忠実移植。
- * 本家は高さを metadata (0-15) に格納。1.21 では HEIGHT ブロックステートで代替。
- */
+/** 本家 jp.ngt.rtm.rail.BlockLargeRailSlopeBase の忠実移植。 */
 public class BlockLargeRailSlopeBase extends BlockLargeRailBase {
     public static final MapCodec<BlockLargeRailSlopeBase> CODEC = simpleCodec(props -> new BlockLargeRailSlopeBase(2, props));
 
@@ -53,7 +50,7 @@ public class BlockLargeRailSlopeBase extends BlockLargeRailBase {
 
     @Override
     protected VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos pos, CollisionContext context) {
-        // 本家 getCollisionBoundingBoxFromPool: 高さ = metadata * 0.0625
+        // 本家 getCollisionBoundingBoxFromPool: 高さ = metadata…
         int l = state.getValue(HEIGHT);
         float f = l * 0.0625F;
         if (f <= 0.0F) {

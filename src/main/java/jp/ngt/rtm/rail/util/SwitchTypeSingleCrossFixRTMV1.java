@@ -4,10 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/**
- * KaizPatchX (fixRTM) の jp.kaiz.kaizpatch.fixrtm.rtm.rail.util.SwitchTypeSingleCrossFixRTMV1 (Kotlin) の Java 移植。
- * fixRTMRailMapVersion >= 1 の N字分岐 (渡り線) 生成を改良したもの。
- */
+/** KaizPatchX (fixRTM) の jp.kaiz.kaizpatch.fixrtm.rt… */
 public final class SwitchTypeSingleCrossFixRTMV1 extends SwitchType.SwitchSingleCross {
 
     public SwitchTypeSingleCrossFixRTMV1(int fixRTMRailMapVersion) {
@@ -31,9 +28,7 @@ public final class SwitchTypeSingleCrossFixRTMV1 extends SwitchType.SwitchSingle
         normalPairs.add(new RailPosition[]{normal0, normal1});
         normalPairs.add(new RailPosition[]{normal1, normal0});
 
-        // first, check the lines will never cross
-        // in the case the lines cross, switch - switch line is a edge (expected to be diagonal)
-        // so return false
+        // first, check the lines will never cross in the ca…
         for (RailPosition[] pair : normalPairs) {
             if (crossLineSegments(
                     switch0.posX, switch0.posZ, pair[0].posX, pair[0].posZ,
@@ -55,7 +50,7 @@ public final class SwitchTypeSingleCrossFixRTMV1 extends SwitchType.SwitchSingle
         RailDir directionLine1 = switch1.getDir(switch0, normalB);
         RailMapSwitch rmsLine1 = new RailMapSwitch(switch1, normalB, directionLine1.invert(), RailDir.NONE, 1);
 
-        // assertion: directionLine0 or directionLine1 cannot be NONE
+        // assertion: directionLine0 or directionLine1 canno…
         if (directionLine0 == RailDir.NONE || directionLine1 == RailDir.NONE) {
             return false;
         }
@@ -77,7 +72,7 @@ public final class SwitchTypeSingleCrossFixRTMV1 extends SwitchType.SwitchSingle
         // initial score: sum of distance
         score += distance(switch0.posX, switch0.posZ, normalA.posX, normalA.posZ);
         score += distance(switch1.posX, switch1.posZ, normalB.posX, normalB.posZ);
-        // if line maker is opposite direction, that can be better. add 10
+        // if line maker is opposite direction, that can be…
         if (Math.abs(switch0.direction - normalA.direction) == 4) {
             score += 10;
         }

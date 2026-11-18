@@ -33,11 +33,11 @@
     }
   ],
 
-  "sound_BrakeRelease": "rtm:train.o220_release",
-  "sound_BrakeRelease2": "rtm:train.brakeR_w",
-  "sound_DoorOpen": "rtm:train.door",
-  "sound_DoorClose": "rtm:train.door",
-  "sound_Horn": "rtm:train.rtm_wh_00l",
+  "sound_BrakeRelease": "train.o220_release",
+  "sound_BrakeRelease2": "train.brakeR_w",
+  "sound_DoorOpen": "train.door",
+  "sound_DoorClose": "train.door",
+  "sound_Horn": "train.rtm_wh_00l",
   "soundScriptPath": "scripts/sound_o220.js",
 
   "headLights": [

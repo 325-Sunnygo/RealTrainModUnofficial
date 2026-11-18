@@ -13,14 +13,7 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix4f;
 
-/**
- * 溶けた金属 / コークスの粒の描画。本家 {@code jp.ngt.rtm.entity.fluid.RenderFluid} の移植。
- *
- * <p>テクスチャ無しの球を、近くの粒へ向かって膨らませて描く (メタボール)。
- * 色は上下グラデーション × 温度。
- *
- * <p>★本家 pass 1 の「熱いコークスから出る炎」は未移植。
- */
+/** 溶けた金属 / コークスの粒の描画。本家 jp.ngt.rtm.entity.fluid.Rend… */
 public class FluidRenderer extends EntityRenderer<EntityFluid> {
 
     public FluidRenderer(EntityRendererProvider.Context context) {
@@ -39,7 +32,7 @@ public class FluidRenderer extends EntityRenderer<EntityFluid> {
         poseStack.scale(scale, scale, scale);
 
         if (entity.getFluidType().type == FluidType.Type.SOLID) {
-            //本家: 固体は個体ごとに少しだけ傾ける
+            // 本家: 固体は個体ごとに少しだけ傾ける
             switch (entity.getId() % 4) {
                 case 0 -> poseStack.mulPose(Axis.XP.rotationDegrees(5.0F));
                 case 1 -> poseStack.mulPose(Axis.ZP.rotationDegrees(5.0F));
@@ -54,7 +47,7 @@ public class FluidRenderer extends EntityRenderer<EntityFluid> {
         super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
     }
 
-    /** 本家 renderMetaball。GL_TRIANGLE_STRIP を 1.21 の QUADS に組み直している。 */
+    /** 本家 renderMetaball。GL_TRIANGLE_STRIP を 1.21 の QUAD… */
     private void renderMetaball(EntityFluid entity, PoseStack poseStack, MultiBufferSource buffer) {
         float normTemp = entity.getNormalizedTemperture();
         boolean isSolid = (entity.getFluidType().type == FluidType.Type.SOLID);
@@ -62,8 +55,8 @@ public class FluidRenderer extends EntityRenderer<EntityFluid> {
         VertexConsumer consumer = buffer.getBuffer(RenderType.debugQuads());
         Matrix4f mat = poseStack.last().pose();
 
-        for (int i = 0; i < FluidVertexHolder.SPLIT_H; ++i) {      //縦
-            for (int j = 0; j < splitW; ++j) {                     //横
+        for (int i = 0; i < FluidVertexHolder.SPLIT_H; ++i) {      // 縦
+            for (int j = 0; j < splitW; ++j) {                     // 横
                 int j0 = j % splitW;
                 int j1 = (j + 1) % splitW;
                 int upper0 = (i + 1) * FluidVertexHolder.SPLIT_W + j0;

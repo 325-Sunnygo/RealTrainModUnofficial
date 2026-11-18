@@ -1,15 +1,6 @@
 package jp.ngt.rtm.entity.fluid;
 
-/**
- * 溶けた金属などの種別。本家 {@code jp.ngt.rtm.entity.fluid.FluidType} の移植。
- * 値は一切変えていない。
- *
- * <pre>
- * メモ
- * 鉄鉱石+コークス→(高炉)→銑鉄
- * 銑鉄+O2→(転炉、反射炉)→鋼鉄
- * </pre>
- */
+/** 溶けた金属などの種別。本家 jp.ngt.rtm.entity.fluid.FluidType の… */
 public enum FluidType {
     PIG_IRON(0xFFFB4C, 0xE63300, 0xBEB3B0, 0x000000, 1200.0F, 0.15F, 0.01F, -1, Type.LIQUID),
     STEEL(0xFFFD4C, 0xE63300, 0x9090A0, 0x000000, 1500.0F, 0.15F, 0.01F, -1, Type.LIQUID),

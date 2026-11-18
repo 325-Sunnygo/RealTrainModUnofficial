@@ -11,11 +11,7 @@ import net.minecraft.world.phys.Vec3;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-/**
- * 立ち乗り (standing-ride): 走行中の列車の床に立っているプレイヤーを、列車の移動・旋回に
- * 合わせて毎 tick 運ぶ「動く床 (moving platform)」。
- * 位置だけを追従させるので、プレイヤーは車内を自由に歩き回れる。
- */
+/** 立ち乗り (standing-ride): 走行中の列車の床に立っているプレイヤーを、列車の移動・… */
 public final class StandingRideClient {
 
     /** 取得判定: 床面から上下この範囲に足があれば「乗った」とみなす (歩いて乗り込む用)。 */
@@ -28,7 +24,7 @@ public final class StandingRideClient {
     private static final double Y_CORRECTION_FACTOR = 0.35D;
     private static final double MAX_Y_CORRECTION = 0.6D;
 
-    /** 列車ごとの前 tick 位置 {x, y, z, yaw}。WeakHashMap なのでアンロード時に自動破棄。 */
+    /** 列車ごとの前 tick 位置 {x, y, z, yaw}。 */
     private static final Map<EntityTrainBase, double[]> PREV = new WeakHashMap<>();
     /** この game tick で既にローカルプレイヤーを運んだ車両があるか (二重加算防止)。 */
     private static long lastCarriedGameTime = -1000L;
@@ -37,12 +33,7 @@ public final class StandingRideClient {
     private StandingRideClient() {
     }
 
-    /**
-     * この車両で、その足元の高さに一番近い車内床の Y。
-     *
-     * <p>床は客席 (slotPos) の高さから出す ({@link EntityTrainBase#getInteriorFloorY()} 参照)。
-     * 2 階建てのように床が複数ある車両でも、今いる段の床に合わせる。
-     */
+    /** この車両で、その足元の高さに一番近い車内床の Y。 */
     private static double floorY(EntityTrainBase train, double feetY) {
         double[] levels = train.getInteriorFloorLevels();
         if (levels.length == 0) {
@@ -61,10 +52,7 @@ public final class StandingRideClient {
         return best;
     }
 
-    /**
-     * EntityTrainBase#tick (クライアント) から毎 tick 呼ぶ。この車両の床に
-     * ローカルプレイヤーが立っていれば、車両の移動・旋回ぶんだけプレイヤーを運ぶ。
-     */
+    /** EntityTrainBase#tick (クライアント) から毎 tick 呼ぶ。 */
     public static void tick(EntityTrainBase train) {
         double curX = train.getX();
         double curY = train.getY();
@@ -138,7 +126,7 @@ public final class StandingRideClient {
         return feetY >= floorY - yMargin && feetY <= floorY + 0.5D;
     }
 
-    /** 車体中心から端までの長さ (config trainDistance)。取れなければ幅の半分でフォールバック。 */
+    /** 車体中心から端までの長さ (config trainDistance)。 */
     private static double getHalfLength(EntityTrainBase train) {
         TrainConfig cfg = train.getConfig();
         if (cfg != null && cfg.trainDistance > 0.0F) {
@@ -153,8 +141,7 @@ public final class StandingRideClient {
         double addX;
         double addZ;
         if (dYaw != 0.0F) {
-            // 車体中心 (前 tick) まわりにプレイヤー相対位置を回す。並進 (dx/dz) も
-            // 現在の車体中心を基準に取ることで同時に含まれる。
+            // 車体中心 (前 tick) まわりにプレイヤー相対位置を回す。
             double relX = player.getX() - prevX;
             double relZ = player.getZ() - prevZ;
             double rad = Math.toRadians(dYaw);

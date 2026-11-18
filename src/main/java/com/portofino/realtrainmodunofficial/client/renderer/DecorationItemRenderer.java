@@ -10,10 +10,7 @@ import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * 装飾ブロックアイテムの描画。本家はモデル json {@code builtin/entity} +
- * RenderDecoration.renderItem でアイテムに実モデルを出す。その移植。
- */
+/** 装飾ブロックアイテムの描画。本家はモデル json builtin/entity + Render… */
 public class DecorationItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     public DecorationItemRenderer() {

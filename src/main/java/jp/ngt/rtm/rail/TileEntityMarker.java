@@ -22,14 +22,11 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 本家 jp.ngt.rtm.rail.TileEntityMarker (KaizPatchX) の忠実移植。
- * NBT: RP / MarkerState (本家キーのまま)。
- */
+/** 本家 jp.ngt.rtm.rail.TileEntityMarker (KaizPatchX)… */
 public class TileEntityMarker extends BlockEntity {
     private RailPosition rp;
 
-    public boolean displayDistance = true;//同期必要なし
+    public boolean displayDistance = true;// 同期必要なし
     /** 0:なし, 1:グリッド, 2:ベジェ */
     private byte displayMode;
     private TileEntityMarker coreMarker;
@@ -70,10 +67,7 @@ public class TileEntityMarker extends BlockEntity {
         this.markerState = MarkerState.FIT_NEIGHBOR.set(this.markerState, true);
     }
 
-    /**
-     * クライアントでアンカー編集中のマーカー (レンダラーが設定)。
-     * 編集中は同期パケットの RP で上書きしない (編集値が巻き戻るため)。サーバーでは常に null。
-     */
+    /** クライアントでアンカー編集中のマーカー (レンダラーが設定)。 */
     public static TileEntityMarker clientEditingMarker;
 
     @Override
@@ -136,9 +130,7 @@ public class TileEntityMarker extends BlockEntity {
     @Override
     public void setLevel(Level level) {
         super.setLevel(level);
-        // Fabric の BLOCK_ENTITY_LOAD はチャンク読込時しか呼ばれないため、
-        // 設置直後のマーカーはここで登録する。登録しないと MarkerManager が空のままになり、
-        // 2 本目のマーカーを右クリックしてもレールが敷けない。
+        // Fabric の BLOCK_ENTITY_LOAD はチャンク読込時しか呼ばれないため、 設置直…
         if (level != null) {
             MarkerManager.add(this);
         }
@@ -156,7 +148,7 @@ public class TileEntityMarker extends BlockEntity {
         super.setRemoved();
     }
 
-    /** 本家 updateEntity 相当 (rp の遅延生成)。BlockMarker の ticker から呼ばれる。 */
+    /** 本家 updateEntity 相当 (rp の遅延生成)。 */
     public void tick() {
         if (this.rp == null && this.level != null) {
             BlockState state = this.getBlockState();
@@ -286,8 +278,7 @@ public class TileEntityMarker extends BlockEntity {
 
     /** マーカーのグリッド表示用RailMap生成 */
     public void setMarkersPos(List<int[]> list) {
-        // loadAdditional (同期パケット) が markerPosList を差し替えても
-        // イテレーションが壊れないよう防御コピーで処理する
+        // loadAdditional (同期パケット) が markerPosList を差し替えても イ…
         list = new ArrayList<>(list);
         if (list.size() == 2) {
             RailPosition rp0 = this.getMarkerRP(list.get(0));
@@ -322,7 +313,7 @@ public class TileEntityMarker extends BlockEntity {
             if (tile instanceof TileEntityMarker) {
                 TileEntityMarker marker = (TileEntityMarker) tile;
                 marker.setStartPos(this.worldPosition.getX(), this.worldPosition.getY(), this.worldPosition.getZ());
-                marker.railMaps = this.railMaps;//RailMap同期
+                marker.railMaps = this.railMaps;// RailMap同期
                 marker.markerPosList = list;
             }
         }

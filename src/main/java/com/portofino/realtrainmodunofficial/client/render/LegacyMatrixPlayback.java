@@ -5,7 +5,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.MultiBufferSource;
 import org.joml.Matrix4f;
 
-/** Flush at projection boundaries so deferred world vertices cannot use the GUI projection. */
+/** Flush at projection boundaries so deferred world… */
 final class LegacyMatrixPlayback implements AutoCloseable {
     private final PoseStack pose;
     private final MultiBufferSource buffer;

@@ -9,7 +9,7 @@ import net.minecraft.client.renderer.*;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
 
-/** Original 1.12 marker's six in-world buttons and dimensions, with ray picking. */
+/** Original 1.12 marker's six in-world buttons and d… */
 public final class MarkerPanel {
     public static final MarkerState[] BUTTONS={MarkerState.ANCHOR21,MarkerState.LINE2,MarkerState.LINE1,MarkerState.GRID,MarkerState.DISTANCE,MarkerState.FIT_NEIGHBOR};
     public record Hit(int button,double distance){}

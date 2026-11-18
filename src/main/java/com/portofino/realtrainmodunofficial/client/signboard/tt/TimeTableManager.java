@@ -19,10 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 本家 jp.ngt.rtm.block.tt.TimeTableManager の移植。
- * 看板の時刻表表示は描画時にしか使わないのでクライアント専用。
- */
+/** 本家 jp.ngt.rtm.block.tt.TimeTableManager の移植。 */
 public final class TimeTableManager {
     public static final String SAMPLE = "tt_sample.csv";
     public static final TimeTableManager INSTANCE = new TimeTableManager();
@@ -33,15 +30,12 @@ public final class TimeTableManager {
     private TimeTableManager() {
     }
 
-    /** config/realtrainmodunofficial/timetable/ (ユーザーが tt_*.csv を置く場所)。 */
+    /** config/realtrainmodunofficial/timetable/ (ユーザーが t… */
     public static Path userDir() {
         return FMLPaths.CONFIGDIR.get().resolve(RealTrainModUnofficial.MODID).resolve("timetable");
     }
 
-    /**
-     * 読み込み済みの時刻表を捨てる。次に使われたときに読み直す。
-     * ワールドを抜けたときに呼ばれるので、ユーザーが tt_*.csv を足しても再入場で反映される。
-     */
+    /** 読み込み済みの時刻表を捨てる。次に使われたときに読み直す。 */
     public synchronized void invalidate() {
         entries.clear();
         loaded = false;
@@ -89,7 +83,7 @@ public final class TimeTableManager {
         }
     }
 
-    /** config/realtrainmodunofficial/timetable/*.csv (ユーザー配置、最優先)。 */
+    /** config/realtrainmodunofficial/timetable/*.csv (ユー… */
     private void loadFromUserDir() {
         Path dir = userDir();
         if (!Files.isDirectory(dir)) {
@@ -123,11 +117,7 @@ public final class TimeTableManager {
         put(name, in.readAllBytes());
     }
 
-    /**
-     * 本家 NGTText.readCSV 相当。
-     * 本家は String.split(",") をそのまま使っており、末尾の空フィールドが落ちる
-     * (= "," だけの行は長さ0の配列になり読み飛ばされる) 挙動に依存している。ここも同じにする。
-     */
+    /** 本家 NGTText.readCSV 相当。 */
     private static List<String[]> readCsv(byte[] bytes) throws IOException {
         List<String[]> out = new ArrayList<>();
         try (BufferedReader r = new BufferedReader(new InputStreamReader(

@@ -3,14 +3,7 @@ package jp.ngt.mcte.item;
 import jp.ngt.ngtlib.block.NGTObject;
 import net.minecraft.nbt.CompoundTag;
 
-/**
- * MCTE jp.ngt.mcte.item.ItemMiniature の static API 移植 (neo mcte)。
- * ミニチュアの中身と設定を格納/取得する唯一の窓口。
- * ★データは ItemStack 自身が持つ (最重要)
- * MCTEU は中身を miniatureId という文字列だけスタックに持たせ、実体は
- * その ID をキーにした外部テーブル (PlacedMiniatureManager /
- * MiniatureWorldData) に置いていた。
- */
+/** MCTE jp.ngt.mcte.item.ItemMiniature の static API… */
 public final class ItemMiniature {
 
     public static final String KEY_BLOCKS = "BlocksData";
@@ -26,10 +19,7 @@ public final class ItemMiniature {
     private ItemMiniature() {
     }
 
-    /**
-     * 本家 MiniatureMode。設置したときの振る舞い。
-     * 宣言順が id になる (本家は nextId++)。NBT に byte で入るので順序を変えないこと。
-     */
+    /** 本家 MiniatureMode。設置したときの振る舞い。 */
     public enum MiniatureMode {
         /** 縮小した模型として 1 ブロックに収める。 */
         MINIATURE,
@@ -50,10 +40,7 @@ public final class ItemMiniature {
 
     // ---- BlocksData ----
 
-    /**
-     * NBT から NGTObject を復元。無ければ null。
-     * ラッパー NBT (jp.ngt.mccompat.nbt.NBTTagCompound) と実 CompoundTag の両対応。
-     */
+    /** NBT から NGTObject を復元。無ければ null。 */
     public static NGTObject getNGTObject(Object nbtLike) {
         CompoundTag tag = unwrap(nbtLike);
         if (tag == null) {
@@ -116,11 +103,7 @@ public final class ItemMiniature {
 
     // ---- Offset ----
 
-    /**
-     * 本家 getOffset。
-     * ★本家は private static float[] offset を使い回して返していたが、
-     * 呼び出し側が保持すると別のミニチュアの値に書き換わる。ここでは毎回新しい配列を返す。
-     */
+    /** 本家 getOffset。 ★本家は private static float[] offset… */
     public static float[] getOffset(Object nbtLike) {
         CompoundTag tag = unwrap(nbtLike);
         if (tag == null) {

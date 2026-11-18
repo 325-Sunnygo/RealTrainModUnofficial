@@ -13,10 +13,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
-/**
- * 設置済みミニチュア (neo mcte)。本家 MCTE TileEntityMiniature 相当。
- * 中身はこのブロックエンティティが丸ごと持つ。外部テーブルに ID で預けない。
- */
+/** 設置済みミニチュア (neo mcte)。 */
 public class MiniatureBlockEntity extends BlockEntity {
 
     /** アイテムの NBT をそのまま保持する (ItemMiniature の契約がそのまま効く)。 */
@@ -119,10 +116,7 @@ public class MiniatureBlockEntity extends BlockEntity {
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    /**
-     * 縮尺次第で 1 ブロックからはみ出すので、描画範囲を中身の大きさから決める。
-     * これが無いと大きなミニチュアがブロック境界で切れる。
-     */
+    /** 縮尺次第で 1 ブロックからはみ出すので、描画範囲を中身の大きさから決める。 */
     public AABB getRenderBoundingBox() {
         NGTObject obj = getNGTObject();
         BlockPos p = getBlockPos();

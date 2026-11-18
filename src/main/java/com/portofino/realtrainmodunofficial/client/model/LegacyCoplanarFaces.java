@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.client.model;
 
 import java.util.*;
 
-/** Reject only repeated, identically shaded/UV-mapped triangles of the same material batch. */
+/** Reject only repeated, identically shaded/UV-mappe… */
 public final class LegacyCoplanarFaces {
     private LegacyCoplanarFaces() {}
     private record Vertex(int x,int y,int z,int nx,int ny,int nz,int u,int v) {}

@@ -11,10 +11,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * DataMap 同期の client → server 方向。
- * DataMapSyncPayload は server → client だけで、逆向きが無かった。
- */
+/** DataMap 同期の client → server 方向。 */
 public record DataMapClientSyncPayload(int entityId, Map<String, String> data) implements CustomPacketPayload {
 
     public static final Type<DataMapClientSyncPayload> TYPE = new Type<>(

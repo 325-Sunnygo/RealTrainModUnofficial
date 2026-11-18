@@ -14,12 +14,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 貨物のモデル選択をサーバーへ送る。
- *
- * @param entityId 設置済み貨物のエンティティ id。アイテム側なら -1
- * @param offHand  アイテム側のときだけ意味がある
- */
+/** 貨物のモデル選択をサーバーへ送る。 */
 public record CargoModelPayload(int entityId, boolean offHand, String modelId) implements CustomPacketPayload {
 
     public static final Type<CargoModelPayload> TYPE = new Type<>(

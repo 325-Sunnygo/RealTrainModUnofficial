@@ -5,7 +5,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/** Vanilla's camera-cube offset loop assumes a centered frustum; mirrors are off-axis. */
+/** Vanilla's camera-cube offset loop assumes a cente… */
 @Mixin(Frustum.class)
 public abstract class MirrorFrustumMixin {
     @Inject(method="offsetToFullyIncludeCameraCube",at=@At("HEAD"),cancellable=true)

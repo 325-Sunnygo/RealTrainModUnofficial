@@ -15,13 +15,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * SignalControllerMod (作者: masa300, https://github.com/masa300/SignalControllerMod)
- * の GUISignalController 1.21.1 移植。
- * SignalType [切替ボタン]
- * Option     [x]last [ ]repeat [ ]Reduced Speed
- * ("above" は未使用かつ画面からはみ出すため非表示。
- */
+/** SignalControllerMod (作者: masa300, https://github.… */
 public class SignalControllerScreen extends Screen {
     private final TileEntitySignalController controller;
     private SignalType signalType;
@@ -72,7 +66,7 @@ public class SignalControllerScreen extends Screen {
             b.setMessage(typeLabel());
         }).bounds(cx - 40, cy - 82, 150, 20).build());
 
-        // Option チェックボックス (原作: last / repeat / Reduced Speed 並び)
+        // Option チェックボックス (原作: last / repeat / Reduced Spee…
         this.lastBox = addRenderableWidget(Checkbox.builder(Component.literal("last"), this.font)
                 .pos(cx - 40, cy - 55).selected(this.last)
                 .onValueChange((box, value) -> this.last = value).build());
@@ -83,7 +77,6 @@ public class SignalControllerScreen extends Screen {
                 .pos(cx + 85, cy - 55).selected(this.reducedSpeed)
                 .onValueChange((box, value) -> this.reducedSpeed = value).build());
         // "above" は使われていないうえ、画面外にはみ出して見切れていたので出さない。
-        // 値そのものは読み込んだままサーバーへ送り返すので、既存の設定は壊れない。
 
         // 座標行 (x/y/z の EditBox ×3 + 最終行の "+" 追加ボタン)
         this.nextBoxes.clear();

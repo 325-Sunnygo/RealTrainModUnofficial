@@ -10,7 +10,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 public class RailCollisionBlockEntity extends BlockEntity {
     private BlockPos corePos;
-    // ブロック内のレール面の高さ(0.0=底, 1.0=上面)。坂では端数になり、ここに薄い当たり判定を出す。
+    // ブロック内のレール面の高さ(0.0=底, 1.0=上面)。
     private float surfaceY = 0.0f;
 
     public RailCollisionBlockEntity(BlockPos pos, BlockState state) {

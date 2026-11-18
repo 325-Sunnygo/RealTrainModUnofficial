@@ -1,6 +1,6 @@
 package jp.ngt.ngtlib;
 import jp.ngt.ngtlib.network.PacketNBT;
-/** Server-owned legacy NBT broadcasts using the ordered vanilla block/tile protocol. */
+/** Server-owned legacy NBT broadcasts using the orde… */
 public final class NGTCore {
     public static final NetworkWrapper NETWORK_WRAPPER=new NetworkWrapper();
     private NGTCore() {}

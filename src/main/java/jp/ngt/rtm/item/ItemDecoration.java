@@ -20,12 +20,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.List;
 
-/**
- * 装飾ブロックのアイテム。本家 {@code jp.ngt.rtm.item.ItemDecoration} の移植。
- *
- * <p>空右クリックでモデル編集画面 (本家 guiIdDecoration)、
- * ブロックへの右クリックでクリック面の隣に装飾ブロックを設置する。
- */
+/** 装飾ブロックのアイテム。本家 jp.ngt.rtm.item.ItemDecoration の移植。 */
 public class ItemDecoration extends Item {
 
     public ItemDecoration() {
@@ -58,7 +53,7 @@ public class ItemDecoration extends Item {
         tooltip.add(Component.literal("Model:" + getModelName(stack)).withStyle(ChatFormatting.GRAY));
     }
 
-    /** 本家はモデル json builtin/entity + RenderDecoration.renderItem。NeoForge 21.1 の作法。 */
+    /** 本家はモデル json builtin/entity + RenderDecoration.ren… */
     @Override
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {

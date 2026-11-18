@@ -69,10 +69,7 @@ public final class LegacyItemStackBridge {
         CustomData.set(DataComponents.CUSTOM_DATA, stack, tag);
     }
 
-    /**
-     * 本家 GuiSelectModel のカスタム名 (State.Name) と色 (State.Color) も併せて確定させる版。
-     * dataMap の有無に関わらず State.Name / State.Color を書く。
-     */
+    /** 本家 GuiSelectModel のカスタム名 (State.Name) と色 (State.C… */
     public static void setSelectedModelData(ItemStack stack, String modelId, String dataMapValue,
                                             String customName, int color) {
         if (stack == null || stack.isEmpty()) {

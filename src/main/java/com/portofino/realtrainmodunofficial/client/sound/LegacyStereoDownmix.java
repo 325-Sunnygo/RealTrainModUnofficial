@@ -13,10 +13,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * レガシー音源パック (MugenSoundLib 等) のステレオ音源をロード時にモノラルへ落とす。
- * なぜ必要か: OpenAL はステレオ音源を距離減衰・3D定位しない (モノラルのみ)。
- */
+/** レガシー音源パック (MugenSoundLib 等) のステレオ音源をロード時にモノラルへ落とす。 */
 public final class LegacyStereoDownmix {
 
     private static final Map<ResourceLocation, CompletableFuture<SoundBuffer>> CACHE = new ConcurrentHashMap<>();
@@ -24,7 +21,7 @@ public final class LegacyStereoDownmix {
     private LegacyStereoDownmix() {
     }
 
-    /** SoundBufferLibrary.getCompleteBuffer の戻り値を包む (Mixin から)。 */
+    /** SoundBufferLibrary.getCompleteBuffer の戻り値を包む (Mix… */
     public static CompletableFuture<SoundBuffer> wrap(ResourceLocation id, CompletableFuture<SoundBuffer> original) {
         if (id == null || original == null || !isLegacySoundNamespace(id.getNamespace())) {
             return original;
@@ -32,7 +29,7 @@ public final class LegacyStereoDownmix {
         return CACHE.computeIfAbsent(id, key -> original.thenApply(buffer -> downmixIfStereo(key, buffer)));
     }
 
-    /** SoundBufferLibrary.clear に合わせて自前キャッシュも破棄 (リソースリロード時)。 */
+    /** SoundBufferLibrary.clear に合わせて自前キャッシュも破棄 (リソースリロー… */
     public static void clearCache() {
         for (CompletableFuture<SoundBuffer> future : CACHE.values()) {
             if (future.isDone() && !future.isCompletedExceptionally()) {
@@ -66,11 +63,11 @@ public final class LegacyStereoDownmix {
             ByteBuffer data = ((SoundBufferAccessor) buffer).rtmu$data();
             if (format == null || data == null
                     || format.getChannels() != 2 || format.getSampleSizeInBits() != 16) {
-                return buffer; //モノラル or 想定外フォーマットはそのまま
+                return buffer; // モノラル or 想定外フォーマットはそのまま
             }
             data.order(format.isBigEndian() ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
             int base = data.position();
-            int frames = data.remaining() / 4; //16bit × 2ch = 4 bytes/frame
+            int frames = data.remaining() / 4; // 16bit × 2ch = 4 bytes/frame
             for (int i = 0; i < frames; i++) {
                 short left = data.getShort(base + i * 4);
                 short right = data.getShort(base + i * 4 + 2);

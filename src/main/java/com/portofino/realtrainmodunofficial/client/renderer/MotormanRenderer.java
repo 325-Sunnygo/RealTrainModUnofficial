@@ -11,10 +11,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.Calendar;
 
-/**
- * 本家 jp.ngt.rtm.entity.npc.RenderNPC の運転士ぶんの移植。
- * バニラのプレイヤーモデル + 同梱の運転士スキン (assets/rtm/textures/motorman.png)。
- */
+/** 本家 jp.ngt.rtm.entity.npc.RenderNPC の運転士ぶんの移植。 */
 @OnlyIn(Dist.CLIENT)
 public class MotormanRenderer extends MobRenderer<EntityMotorman, PlayerModel<EntityMotorman>> {
 
@@ -36,9 +33,9 @@ public class MotormanRenderer extends MobRenderer<EntityMotorman, PlayerModel<En
         int month = calendar.get(Calendar.MONTH) + 1;
         int day = calendar.get(Calendar.DAY_OF_MONTH);
         if (month == 1 && day >= 1 && day <= 3) {
-            return TEX_SHISHI; //本家: 正月は獅子舞
+            return TEX_SHISHI; // 本家: 正月は獅子舞
         } else if (month == 12 && day >= 24 && day <= 26) {
-            return TEX_SANTA; //本家: クリスマスはサンタ
+            return TEX_SANTA; // 本家: クリスマスはサンタ
         }
         return TEXTURE;
     }
@@ -54,7 +51,7 @@ public class MotormanRenderer extends MobRenderer<EntityMotorman, PlayerModel<En
             case "default" -> TEXTURE;
             case "santa" -> TEX_SANTA;
             case "shishi" -> TEX_SHISHI;
-            default -> MotormanSkinLoader.getOrLoad(skin); //npc_skins/ のカスタムスキン
+            default -> MotormanSkinLoader.getOrLoad(skin); // npc_skins/ のカスタムスキン
         };
     }
 }

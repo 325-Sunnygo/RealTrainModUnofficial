@@ -27,11 +27,7 @@ import java.util.List;
 import java.util.Locale;
 
 public class TrainItem extends Item {
-    /**
-     * 本家 KaizPatchX の customIconTexture 用の描画器。
-     * 実際に使われるのは、選択中のモデルが customIconTexture を持つときだけ
-     * (com.portofino.realtrainmodunofficial.client.renderer.CustomIconItemModel が判定する)。
-     */
+    /** 本家 KaizPatchX の customIconTexture 用の描画器。 */
     @Override
     public void initializeClient(java.util.function.Consumer<
             net.neoforged.neoforge.client.extensions.common.IClientItemExtensions> consumer) {
@@ -50,19 +46,13 @@ public class TrainItem extends Item {
 
     private static final double PLACEMENT_OCCUPANCY_HALF_WIDTH = 0.45D;
 
-    /**
-     * 本家 ItemTrain のメタ (0=DC/1=EC/2=FC/3=TC/127=TEST) に対応する種別。
-     * 1.21 にメタは無いのでアイテムを 5 つに分ける。
-     *
-     * <p>並びは本家のメタ順。パックは {@code trainType} に "DC"/"EC"/"FC"/"TC" を書く
-     * (実測: 同梱車両は CC 10 / EC 15 / Test 8 / DC 4 / TC 1、外部パックは EC 67 / DC 14)。
-     */
+    /** 本家 ItemTrain のメタ (0=DC/1=EC/2=FC/3=TC/127=TEST) に… */
     public enum Category {
         /** 気動車 (メタ 0)。 */
         DIESEL("DC"),
         /** 電車 (メタ 1)。 */
         ELECTRIC("EC"),
-        /** 貨物列車 (メタ 2)。★実データは "CC" (Cargo Car)。本家のアイコン名 itemFC に釣られない。 */
+        /** 貨物列車 (メタ 2)。★実データは "CC" (Cargo Car)。 */
         FREIGHT("CC", "FC"),
         /** タンク車 (メタ 3)。 */
         TANKER("TC"),
@@ -110,10 +100,7 @@ public class TrainItem extends Item {
         if (level.isClientSide()) {
             boolean canSpawn = findNearestRailSpawn(level, context.getClickedPos(), context.getClickLocation(), player.getYRot()) != null;
             if (canSpawn) {
-                // 専用サーバー保険 (アイテム同期に一切依存しない確実版): 設置直前に、クライアントが
-                // 持っている選択IDをサーバーへ送る。
-                // 先に送られる (startPrediction はクライアント側 useOn を実行してから使用パケットを送る)
-                // ので、サーバーの useOn は ServerVehicleSelection から確実に読める。
+                // 専用サーバー保険 (アイテム同期に一切依存しない確実版): 設置直前に、クライアントが 持っている…
                 ItemStack held = context.getItemInHand();
                 String sel = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(held);
                 if (sel != null && !sel.isBlank()) {
@@ -133,23 +120,18 @@ public class TrainItem extends Item {
         }
         ItemStack stack = context.getItemInHand();
         // 自動車 (CarItem) と同じく getSelectedModelId で読む。
-        // null のとき minecraft:custom_data NBT (LEGACY_MODEL_NAME) にフォールバックする。
         String itemSel = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedModelId(stack);
         String serverSel = com.portofino.realtrainmodunofficial.vehicle.ServerVehicleSelection.get(player.getUUID());
         String selectedId = (itemSel == null || itemSel.isBlank()) ? serverSel : itemSel;
         VehicleDefinition def = VehicleRegistry.getById(selectedId);
         if (def == null || !accepts(def)) {
-            // 選択があった (serverSel 非空) のに解決できない = サーバーにそのパックが無い可能性を
-            // ログにだけ残す。無選択で既定車両になるのは正常なので、プレイヤーへの通知は出さない
-            // (毎回「選択が届いていません」と出て邪魔だったため撤去)。
+            // 選択があった (serverSel 非空) のに解決できない = サーバーにそのパックが無い可能性…
             if (serverSel != null && !serverSel.isBlank()
                     && com.portofino.realtrainmodunofficial.vehicle.VehicleRegistry.getById(serverSel) == null) {
                 RealTrainModUnofficial.LOGGER.warn(
                     "[RTMU] selected train '{}' not found in registry; placing default", serverSel);
             }
-            // ★勝手に既定車両を出さない。
-            // 何も選ばずに置くと登録順の先頭 (戦艦などの重いモデル) が出てしまい、
-            // 意図しない上に重かった。選ばせる。
+            // ★勝手に既定車両を出さない。 何も選ばずに置くと登録順の先頭 (戦艦などの重いモデル) が出てしま…
             def = null;
         }
         if (def == null) {
@@ -159,7 +141,7 @@ public class TrainItem extends Item {
             }
             return InteractionResult.FAIL;
         }
-        // 本家 ItemTrain.onItemUse 準拠 (Phase 2: jp.ngt.rtm.entity.train.EntityTrain をスポーン)
+        // 本家 ItemTrain.onItemUse 準拠 (Phase 2: jp.ngt.rtm.en…
         BlockPos cp = context.getClickedPos();
         RailMap rm0 = jp.ngt.rtm.rail.TileEntityLargeRailBase.getRailMapFromCoordinates(
                 level, player, cp.getX(), cp.getY(), cp.getZ());
@@ -189,8 +171,7 @@ public class TrainItem extends Item {
 
         int i0 = rm0.getNearlestPoint(128, cp.getX() + 0.5D, cp.getZ() + 0.5D);
         float yw0 = Mth.wrapDegrees(rm0.getRailYaw(128, i0));
-        // 本家 ItemTrain: yaw = fixBogieYaw(-playerYaw, railYaw)
-        // fixBogieYaw は「レールの向き (yw0) か、その 180 度反対か」のうち第1引数に近い方を返す。
+        // 本家 ItemTrain: yaw = fixBogieYaw(-playerYaw, railY…
         float yaw = jp.ngt.rtm.entity.train.EntityBogie.fixBogieYaw(
                 Mth.wrapDegrees(-player.getYRot()), yw0);
         float pitch = jp.ngt.rtm.entity.train.EntityBogie.fixBogiePitch(rm0.getRailPitch(128, i0), yw0, yaw);
@@ -200,18 +181,13 @@ public class TrainItem extends Item {
 
         jp.ngt.rtm.entity.train.EntityTrain train =
                 new jp.ngt.rtm.entity.train.EntityTrain(jp.ngt.rtm.entity.RTMEntities.TRAIN.get(), level);
-        // 本家 ItemTrain.onItemUse:84-89 と同じ順序:
-        // setPositionAndRotation → getResourceState.readFromNBT(アイテムの State)
-        // → setModelName → spawnTrain → onModelChanged
-        // 状態の取り込みは setModelName より前。
+        // 本家 ItemTrain.onItemUse:84-89 と同じ順序: setPositionAn…
         train.moveTo(posX, posY, posZ, yaw, pitch);
 
         // アイテム側で設定した State (DataMap / 名前 / 色) をエンティティへ移送する。
-        // RTMU はここが丸ごと抜けており、モデル選択画面で入れた DataMap・名前・色が
-        // 設置した瞬間に消えていた (本家 ItemTrain.onItemUse:86)。
         String dataMap = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedDataMap(stack);
         if (dataMap != null && !dataMap.isBlank()) {
-            // DataMap.setArg は本家 getArg 形式 "key=(Type)value,..." をそのまま取り込む
+            // DataMap.setArg は本家 getArg 形式 "key=(Type)value,...…
             train.getResourceState().setArg(dataMap, true);
         }
         String customName = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge.getSelectedCustomName(stack);
@@ -223,14 +199,13 @@ public class TrainItem extends Item {
 
         train.setModelName(def.getId());
         train.spawnTrain(level);
-        // 本家 ItemTrain.onItemUse:88  モデル確定後の後始末。
+        // 本家 ItemTrain.onItemUse:88 モデル確定後の後始末。
         train.onModelChanged();
-        // 本家 ItemTrain.onItemUse:89  --itemStack.stackSize (本家はクリエイティブでも消費する)
+        // 本家 ItemTrain.onItemUse:89 --itemStack.stackSize (…
         if (!player.getAbilities().instabuild) {
             stack.shrink(1);
         }
-        // クールダウン付与（RTMU 独自。本家はアイテム消費で連打を抑えているが、
-        // 消費が効かないクリエイティブでの多重生成を防ぐため残す）
+        // クールダウン付与（RTMU 独自。本家はアイテム消費で連打を抑えているが、 消費が効かないクリエイ…
         player.getCooldowns().addCooldown(this, SPAWN_COOLDOWN_TICKS);
         return InteractionResult.sidedSuccess(false);
     }
@@ -279,7 +254,7 @@ public class TrainItem extends Item {
         String type = safe(definition.getVehicleType()).toUpperCase(java.util.Locale.ROOT);
         Category c = category == null ? Category.ELECTRIC : category;
         if ("TEST".equals(type)) {
-            //試験用車両は試験用のアイテムにだけ出す
+            // 試験用車両は試験用のアイテムにだけ出す
             return c == Category.TEST;
         }
         if (c == Category.TEST) {
@@ -288,8 +263,7 @@ public class TrainItem extends Item {
         if (c.matches(type)) {
             return true;
         }
-        //★trainType が無い/知らない値のパックは<b>電車で拾う</b>。
-        // 種別で弾くと、書いていない古いパックの車両がどのアイテムからも選べなくなる。
+        // ★trainType が無い/知らない値のパックは電車で拾う。
         boolean known = false;
         for (Category k : Category.values()) {
             if (k != Category.TEST && k.matches(type)) {
@@ -468,24 +442,15 @@ public class TrainItem extends Item {
                 }
             }
         }
-        // 吸着距離を約2ブロックに制限する。以前は 8 ブロック(64)圏内の最寄りレールを掴むため、
-        // 隣の平行レールに列車が吸い付いていた (ユーザー報告)。クリックしたレール付近にのみ置く。
+        // 吸着距離を約2ブロックに制限する。以前は 8 ブロック(64)圏内の最寄りレールを掴むため、 隣の…
         if (bestDistSq <= 4.0 && best != null) {
             return best;
         }
-        // フォールバック: 検出ブロック(当たり判定/道床)が無いレール(ballastWidth=0 や本修正前に
-        // 敷設した既存レール)は、上のブロック走査ではコア(=端)から16ブロック以内しか見つからず
-        // 「レール端しか列車が置けない」状態になる。周辺チャンクの BlockEntity からレールコアを
-        // 直接拾い、クリック近傍を通るレールを探すことで、コア位置・レール長・敷設時期に依らず
-        // レール全長のどこでも設置できるようにする(本家RTM準拠の挙動)。
+        // フォールバック: 検出ブロック(当たり判定/道床)が無いレール(ballastWidth=0 や本…
         return scanNearbyCoresForSpawn(level, clickedPos, clickedPoint, preferredYaw);
     }
 
-    /**
-     * クリック位置周辺のチャンクに含まれるレールコア(LargeRailCoreBlockEntity)を直接走査し、
-     * クリック点に最も近いレール上の点(約2ブロック以内)を返す。検出用の当たり判定ブロックが
-     * 無いレールでも、コアの位置に依らずレール全長のどこでも列車を設置できるようにするための保険。
-     */
+    /** クリック位置周辺のチャンクに含まれるレールコア(LargeRailCoreBlockEntity)… */
     private static RailSpawnData scanNearbyCoresForSpawn(Level level, BlockPos clickedPos, Vec3 clickedPoint, float preferredYaw) {
         final int chunkRadius = 3; // ±3 チャンク(約 112 ブロック)を走査。コアは疎なので軽量。
         int baseChunkX = clickedPos.getX() >> 4;

@@ -10,7 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** 運転士のスキン変更 (GUI で選択 → サーバーで entityData に設定 → 全クライアントへ同期)。 */
+/** 運転士のスキン変更 (GUI で選択 → サーバーで entityData に設定 → 全クライア… */
 public record MotormanSkinPayload(int entityId, String skin) implements CustomPacketPayload {
 
     public static final Type<MotormanSkinPayload> TYPE = new Type<>(

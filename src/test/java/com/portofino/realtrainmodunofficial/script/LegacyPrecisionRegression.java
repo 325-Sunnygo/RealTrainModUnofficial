@@ -3,7 +3,7 @@ package com.portofino.realtrainmodunofficial.script;
 import jp.ngt.ngtlib.renderer.model.*;
 import java.util.*;
 
-/** Numerical source oracles and real parser/API behavior. */
+/** Numerical source oracles and real parser/API beha… */
 public final class LegacyPrecisionRegression {
     private static int checks;
     private static void check(boolean ok,String reason) {checks++;if(!ok)throw new AssertionError(reason);}

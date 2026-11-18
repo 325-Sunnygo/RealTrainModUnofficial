@@ -10,10 +10,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/**
- * レールのカント設定 (レンチでマーカーをシフト右クリック)。
- * 本家 1122 のカント線ドラッグの代わりに数値入力式 (度)。
- */
+/** レールのカント設定 (レンチでマーカーをシフト右クリック)。 */
 public class MarkerCantScreen extends Screen {
     private final TileEntityMarker marker;
     private EditBox fieldCantEdge;

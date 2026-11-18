@@ -17,10 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.CustomData;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 保存済み NGTO をミニチュアへ読み込む (neo mcte)。
- * ファイル名だけを送り、実体はサーバ側のゲームフォルダから読む。
- */
+/** 保存済み NGTO をミニチュアへ読み込む (neo mcte)。 */
 public record MiniatureLoadPayload(boolean offHand, String fileName) implements CustomPacketPayload {
 
     public static final Type<MiniatureLoadPayload> TYPE = new Type<>(

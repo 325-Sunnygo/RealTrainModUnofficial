@@ -3,13 +3,7 @@ package com.portofino.realtrainmodunofficial.item;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * IC カード (本家 icCard)。
- *
- * <p>見た目を<b>常にきらめかせる</b> (エンチャントの光沢)。
- * 実際にエンチャントを付けているわけではないので、
- * エンチャント一覧には何も出ないし、金床や砥石の対象にもならない。
- */
+/** IC カード (本家 icCard)。 見た目を常にきらめかせる (エンチャントの光沢)。 */
 public class IcCardItem extends Item {
 
     public IcCardItem() {

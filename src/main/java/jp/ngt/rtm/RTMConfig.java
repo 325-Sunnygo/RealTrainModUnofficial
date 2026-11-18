@@ -1,9 +1,6 @@
 package jp.ngt.rtm;
 
-/**
- * 本家 jp.ngt.rtm.RTMConfig の段階的移植 (レール関連のみ)。
- * RTMConfigOptions defines the original keys and connects platform configuration.
- */
+/** 本家 jp.ngt.rtm.RTMConfig の段階的移植 (レール関連のみ)。 */
 @SuppressWarnings("unused")
 public final class RTMConfig {
     // 設定カテゴリ名 (本家)

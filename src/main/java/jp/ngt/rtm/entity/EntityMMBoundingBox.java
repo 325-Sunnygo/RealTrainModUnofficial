@@ -12,13 +12,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
-/**
- * 移動装置が動かすブロック 1 個ぶんの当たり判定。
- * 本家 {@code jp.ngt.rtm.entity.EntityMMBoundingBox} の移植。
- *
- * <p>ブロックは動かせないので、動いている間だけ「見えない箱」を置いて、
- * その上に乗っている物を一緒に運ぶ。
- */
+/** 移動装置が動かすブロック 1 個ぶんの当たり判定。 */
 public class EntityMMBoundingBox extends Entity {
 
     /** このブロックの当たり判定 (ブロック中心からの相対)。 */
@@ -96,7 +90,7 @@ public class EntityMMBoundingBox extends Entity {
     }
 
     private void applyCollisionToEntities(double dx, double dy, double dz) {
-        //本家: 上に乗っている物を拾うため、判定箱を少し上へ広げる
+        // 本家: 上に乗っている物を拾うため、判定箱を少し上へ広げる
         double d0 = 0.41999998688697815D + (dy < 0.0D ? -dy : 0.0D);
         this.work = this.shape.move(this.getX(), this.getY() + d0, this.getZ());
 
@@ -117,7 +111,7 @@ public class EntityMMBoundingBox extends Entity {
             return;
         }
         if (this.onY(entity, dy)) {
-            //上に乗っている
+            // 上に乗っている
             if (this.topFree && this.inXAndZ(entity)) {
                 double y1 = myBB.maxY - (entityBB.minY + dy);
                 if (y1 != 0.0D) {
@@ -125,11 +119,11 @@ public class EntityMMBoundingBox extends Entity {
                 }
                 entity.fallDistance = 0.0F;
                 entity.setDeltaMovement(entity.getDeltaMovement().x, 0.0D, entity.getDeltaMovement().z);
-                entity.setOnGround(true);   //false だと XZ 移動がぬるっとする
+                entity.setOnGround(true);   // false だと XZ 移動がぬるっとする
                 flag = true;
             }
         } else if (this.inXOrZ(entity)) {
-            //横から当たっている
+            // 横から当たっている
             dy = 0.0D;
             dx = 0.0D;
             dz = 0.0D;
@@ -184,7 +178,7 @@ public class EntityMMBoundingBox extends Entity {
 
     @Override
     public boolean shouldBeSaved() {
-        //動いている間だけの一時的な物。ワールドには残さない
+        // 動いている間だけの一時的な物。ワールドには残さない
         return false;
     }
 }

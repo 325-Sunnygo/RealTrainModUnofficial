@@ -3,17 +3,11 @@ package jp.ngt.rtm.render;
 import jp.ngt.ngtlib.renderer.model.TextureSet;
 import jp.ngt.ngtlib.renderer.model.Material;
 
-/**
- * 本家 jp.ngt.rtm.render.ModelObject の最小移植。
- * スクリプトは renderer.getModelObject.textures[0].material.texture を参照する。
- */
+/** 本家 jp.ngt.rtm.render.ModelObject の最小移植。 */
 public class ModelObject {
     public TextureSet[] textures;
 
-    /**
-     * 本家 IModelNGT 相当 (スクリプトは modelObj.model を Parts.getObjects に渡す)。
-     * 実体は jp.ngt.ngtlib.renderer.model.PolygonModel。
-     */
+    /** 本家 IModelNGT 相当 (スクリプトは modelObj.model を Parts.ge… */
     public jp.ngt.ngtlib.renderer.model.PolygonModel model;
 
     /** このモデルを描く PartsRenderer (本家は final フィールド)。 */
@@ -66,10 +60,7 @@ public class ModelObject {
         return this.textures;
     }
 
-    /**
-     * 本家 getTextureMap: マテリアル名 → テクスチャの対応表。
-     * RTMU は TextureSet 配列で持つので、そこから名前引きの Map を組む。
-     */
+    /** 本家 getTextureMap: マテリアル名 → テクスチャの対応表。 */
     public java.util.Map<String, Object> getTextureMap(Object textures) {
         java.util.Map<String, Object> map = new java.util.LinkedHashMap<>();
         for (int i = 0; i < this.textures.length; i++) {

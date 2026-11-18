@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.client;
 
 import java.lang.reflect.Method;
 
-/** Optional Iris/Oculus pack detection. Active packs use entity-space vertex submission and vanilla shader suppliers. */
+/** Optional Iris/Oculus pack detection. */
 public final class ShaderCompat {
     private static Boolean available;
     private static Object irisApiInstance;
@@ -17,7 +17,7 @@ public final class ShaderCompat {
 
     /** フレーム頭で 1 回呼ぶ。切り替わったら #epoch が動く。 */
     public static void refresh() {
-        // A secondary sky view temporarily uses Iris's vanilla pipeline. This is not a user shader toggle.
+        // A secondary sky view temporarily uses Iris's vani…
         if(com.portofino.realtrainmodunofficial.client.mirror.MirrorRenderer.rendering())return;
         boolean now = isShaderPackInUse();
         if (now != cachedActive) {

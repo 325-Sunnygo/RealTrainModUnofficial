@@ -4,7 +4,7 @@ import java.io.*;
 import java.nio.charset.StandardCharsets;
 import com.google.gson.JsonParser;
 
-/** SimpleTexture's PNG metadata sampling options, independent of pixel alpha. */
+/** SimpleTexture's PNG metadata sampling options, in… */
 public record LegacyTextureSampling(boolean blur, boolean clamp) {
     public static final LegacyTextureSampling DEFAULT = new LegacyTextureSampling(false,false);
     public static LegacyTextureSampling read(InputStream input) throws IOException {

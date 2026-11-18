@@ -8,10 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 
-/**
- * 本家 jp.ngt.rtm.rail.util.RailProperty の忠実移植。
- * 1.21 移植差分:
- */
+/** 本家 jp.ngt.rtm.rail.util.RailProperty の忠実移植。 */
 public final class RailProperty {
     public final boolean autoSplit;
     public final String railModel;
@@ -20,7 +17,7 @@ public final class RailProperty {
     public final float blockHeight;
     public final String unlocalizedName;
 
-    /** 本家では ItemRail.getDefaultProperty。TODO(Phase 4): ItemRail 移植後に移動。 */
+    /** 本家では ItemRail.getDefaultProperty。 */
     public static RailProperty getDefaultProperty() {
         return new RailProperty("1067mm_Wood", Blocks.GRAVEL, 0, 0.0625F);
     }
@@ -44,7 +41,7 @@ public final class RailProperty {
         return new RailProperty(s0, block, i0, b0,!nbt.contains("AutoSplit") || nbt.getBoolean("AutoSplit"));
     }
 
-    /** Resolve legacy names such as carpet + color metadata without losing mod namespaces. */
+    /** Resolve legacy names such as carpet + color metad… */
     public static Block resolveBlock(String name,int metadata) {
         ResourceLocation key=ResourceLocation.tryParse(name);
         if(key==null) return Blocks.AIR;
@@ -70,18 +67,38 @@ public final class RailProperty {
         nbt.putFloat("BlockHeight", this.blockHeight);
     }
 
-    /**
-     * 道床幅。本家では getModelSet.getConfig.ballastWidth。
-     * TODO(Phase 4): ModelPackManager/ModelSetRail 移植後に本家 API へ置換。
-     */
+    /** 道床幅。本家では getModelSet.getConfig.ballastWidth。 */
+    /** モデル定義ごとに 1 個だけ ModelSet を作る (serverSE/guiSE の二重読み… */
+    private static final java.util.Map<String, jp.ngt.rtm.modelpack.modelset.ModelSetRail> MODEL_SET_CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    public static void clearModelSetCache() {
+        MODEL_SET_CACHE.clear();
+    }
+
     public jp.ngt.rtm.modelpack.modelset.ModelSetRail getModelSet() {
-        var config=new jp.ngt.rtm.modelpack.cfg.RailConfig();config.railName=railModel;config.ballastWidth=getBallastWidth();
-        var definition=RailRegistry.getById(railModel);
-        if(definition!=null) {
-            config.model=new jp.ngt.rtm.modelpack.cfg.ModelConfig.ModelSource();config.model.modelFile=definition.getModelFile();config.model.rendererPath=definition.getScriptPath();
-            config.scale=definition.getModelScale();var offset=definition.getModelOffset();config.offset=new float[]{(float)offset.x,(float)offset.y,(float)offset.z};
+        String key = this.railModel + "|" + this.getBallastWidth() + "|" + this.blockHeight;
+        jp.ngt.rtm.modelpack.modelset.ModelSetRail cached = MODEL_SET_CACHE.get(key);
+        if (cached != null) {
+            return cached;
         }
-        config.init();return new jp.ngt.rtm.modelpack.modelset.ModelSetRail(config);
+        var config = new jp.ngt.rtm.modelpack.cfg.RailConfig();
+        config.railName = this.railModel;
+        config.ballastWidth = this.getBallastWidth();
+        var definition = RailRegistry.getById(this.railModel);
+        if (definition != null) {
+            config.model = new jp.ngt.rtm.modelpack.cfg.ModelConfig.ModelSource();
+            config.model.modelFile = definition.getModelFile();
+            config.model.rendererPath = definition.getScriptPath();
+            config.scale = definition.getModelScale();
+            var offset = definition.getModelOffset();
+            config.offset = new float[]{(float) offset.x, (float) offset.y, (float) offset.z};
+        }
+        config.init();
+        jp.ngt.rtm.modelpack.modelset.ModelSetRail created =
+                new jp.ngt.rtm.modelpack.modelset.ModelSetRail(config);
+        jp.ngt.rtm.modelpack.modelset.ModelSetRail previous = MODEL_SET_CACHE.putIfAbsent(key, created);
+        return previous != null ? previous : created;
     }
 
     public int getBallastWidth() {

@@ -30,15 +30,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.List;
 
-/**
- * 弾。本家 {@code jp.ngt.rtm.entity.EntityBullet} の移植。
- *
- * <p>本家は {@code EntityArrow} を継承しているが、{@code onUpdate} を丸ごと差し替えて
- * 着地判定・寿命・回転まで自前で持っているので、1.21 では素の {@link Projectile} に載せている
- * (矢の当たり判定や回収処理は本家でも一切使っていない)。
- *
- * <p>参考 : 初速 拳銃:340m/s, 徹甲弾:1800m/s ･･･ここでの処理とは関係ない
- */
+/** 弾。本家 jp.ngt.rtm.entity.EntityBullet の移植。 */
 public class EntityBullet extends Projectile {
     private static final EntityDataAccessor<Byte> BREAKABLE =
         SynchedEntityData.defineId(EntityBullet.class, EntityDataSerializers.BYTE);
@@ -115,9 +107,7 @@ public class EntityBullet extends Projectile {
         this.shootBullet(dx, dy, dz, speed);
     }
 
-    /**
-     * 本家 {@code shoot}: 向きへ speed 倍の速度を与え、撃った人に反動を返す。
-     */
+    /** 本家 shoot: 向きへ speed 倍の速度を与え、撃った人に反動を返す。 */
     private void shootBullet(double par1, double par3, double par5, float par7) {
         double f2 = Math.sqrt(par1 * par1 + par3 * par3 + par5 * par5);
         double d0 = par7 / f2;
@@ -191,7 +181,7 @@ public class EntityBullet extends Projectile {
         Vec3 motion = this.getDeltaMovement();
         Vec3 vecPos = this.position();
         Vec3 vec3 = vecPos.add(motion);
-        //ブロックをすり抜けないように
+        // ブロックをすり抜けないように
         BlockHitResult blockHit = this.level().clip(new ClipContext(
             vecPos, vec3, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
         if (blockHit.getType() != HitResult.Type.MISS) {
@@ -204,7 +194,7 @@ public class EntityBullet extends Projectile {
         if (!list.isEmpty()) {
             double d0 = 0.0D;
             for (Entity entity : list) {
-                //撃った人には当たらないように
+                // 撃った人には当たらないように
                 if (entity.equals(this.getOwner())) {
                     continue;
                 }
@@ -263,7 +253,7 @@ public class EntityBullet extends Projectile {
         if (bullet == BulletType.cannon_40cm || bullet == BulletType.cannon_Atomic) {
             this.setDeltaMovement(motion.x * d3, motion.y - 0.025D, motion.z * d3);
         } else if (bullet == BulletType.rocket) {
-            //X,Zは加速,Yはゆるく落下
+            // X,Zは加速,Yはゆるく落下
             double len = Math.sqrt(motion.x * motion.x + motion.z * motion.z);
             double accXZ = 0.125D * (1.0D - (len / 10.0D));
             double accY = -0.01D;
@@ -342,7 +332,7 @@ public class EntityBullet extends Projectile {
         }
     }
 
-    /** 着弾時のアクション。本家 {@code onLanding}。 */
+    /** 着弾時のアクション。本家 onLanding。 */
     protected void onLanding(int x, int y, int z) {
         BlockPos pos = new BlockPos(x, y, z);
         BlockState state = this.level().getBlockState(pos);
@@ -391,11 +381,7 @@ public class EntityBullet extends Projectile {
         this.setCanBreakBlock(false);
     }
 
-    /**
-     * 本家 {@code isBreakableBlock}: 弾種ごとに壊せる材質が違う。
-     * 1.21 に {@code Material} が無いので、本家の材質一覧と同じ顔ぶれになるよう
-     * ブロックの性質 (硬さ・爆破耐性) と代表的なタグで判定する。
-     */
+    /** 本家 isBreakableBlock: 弾種ごとに壊せる材質が違う。 */
     protected boolean isBreakableBlock(BulletType bullet, BlockState state, BlockPos pos, boolean doMobGriefing) {
         if (!doMobGriefing) {
             return false;
@@ -405,7 +391,7 @@ public class EntityBullet extends Projectile {
             return false;
         }
         if (bullet == BulletType.rifle_12_7mm) {
-            //本家: 硬さ 5 未満かつ爆破耐性 6 以下
+            // 本家: 硬さ 5 未満かつ爆破耐性 6 以下
             return hardness < 5.0F && state.getBlock().getExplosionResistance() <= 6.0F;
         }
         boolean fragile = state.is(net.minecraft.tags.BlockTags.LEAVES)
@@ -413,13 +399,13 @@ public class EntityBullet extends Projectile {
             || state.is(net.minecraft.tags.BlockTags.WOOL_CARPETS)
             || state.is(net.minecraft.tags.BlockTags.FLOWERS)
             || state.is(net.minecraft.tags.BlockTags.SAPLINGS)
-            || state.is(net.minecraft.tags.BlockTags.IMPERMEABLE)   //ガラス
+            || state.is(net.minecraft.tags.BlockTags.IMPERMEABLE)   // ガラス
             || state.is(net.minecraft.tags.BlockTags.CORAL_BLOCKS)
             || state.is(net.minecraft.tags.BlockTags.CANDLES)
             || state.is(Blocks.REDSTONE_LAMP) || state.is(Blocks.CACTUS) || state.is(Blocks.CAKE)
             || state.is(Blocks.SNOW) || state.is(Blocks.SNOW_BLOCK) || state.is(Blocks.VINE);
         if (bullet == BulletType.handgun_9mm) {
-            //拳銃弾は木を壊せない
+            // 拳銃弾は木を壊せない
             return fragile && !state.is(net.minecraft.tags.BlockTags.LOGS)
                 && !state.is(net.minecraft.tags.BlockTags.PLANKS);
         }
@@ -441,7 +427,7 @@ public class EntityBullet extends Projectile {
 
     @Override
     protected double getDefaultGravity() {
-        //落下は tick 側で本家と同じ式で入れているのでバニラの重力は掛けない
+        // 落下は tick 側で本家と同じ式で入れているのでバニラの重力は掛けない
         return 0.0D;
     }
 

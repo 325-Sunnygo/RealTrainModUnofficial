@@ -5,14 +5,7 @@ import jp.ngt.ngtlib.math.Vec3;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 本家 PartsRenderer.renderLightEffectS の幾何計算 (共通)。
- *
- * <p>列車経路 ({@code GLRecorder} に記録) と 車経路 ({@code ScriptModelRenderer} に
- * 即時描画) の両方から使うため、頂点生成だけをここへ切り出す。
- *
- * <p>頂点は stride 9 = {x,y,z,u,v,r,g,b,a}。色は 0..1。加算合成前提。
- */
+/** 本家 PartsRenderer.renderLightEffectS の幾何計算 (共通)。 */
 public final class LightEffectGeometry {
 
     public static final int GL_TRIANGLES = 4;
@@ -36,11 +29,7 @@ public final class LightEffectGeometry {
     private LightEffectGeometry() {
     }
 
-    /**
-     * @param normal    {@link Vec3} なら視線角を計算する (それ以外/ null は正面扱い)
-     * @param viewerVec 光源→視点ベクトル (normal が Vec3 のときのみ使う)。null 可
-     * @param type      0 = フレア(TRIANGLE_FAN) / 1 = ボリューム(円錐)
-     */
+    
     public static List<Piece> compute(Object normal, Vec3 viewerVec, float rL, float rS,
                                       float length, int color, int type, boolean reverse) {
         List<Piece> out = new ArrayList<>(2);

@@ -8,9 +8,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 装飾ブロックのモデル配布 (S2C)。本家 PacketNotice "decoration:json" の移植。
- */
+/** 装飾ブロックのモデル配布 (S2C)。本家 PacketNotice "decoration:js… */
 public record DecorationSyncPayload(String json) implements CustomPacketPayload {
 
     public static final Type<DecorationSyncPayload> TYPE = new Type<>(

@@ -18,14 +18,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * 装飾ブロックの描画。本家 {@code RenderDecoration} の移植。
- *
- * <p>本家はブロックアトラスのスプライトを引くが、1.21 のアトラスはモデルが参照した
- * テクスチャしか繋がないので、面ごとのテクスチャを<b>ファイル直バインド</b>で描く。
- * UV はそのまま 0〜1 (アトラス内挿が無い分、本家より素直)。
- * 本家はライティングを切って描く (=フルブライト)。
- */
+/** 装飾ブロックの描画。本家 RenderDecoration の移植。 */
 public class DecorationRenderer implements BlockEntityRenderer<TileEntityDecoration> {
 
     public DecorationRenderer(BlockEntityRendererProvider.Context context) {
@@ -50,11 +43,11 @@ public class DecorationRenderer implements BlockEntityRenderer<TileEntityDecorat
             ns = texture.substring(0, colon);
             path = texture.substring(colon + 1);
         }
-        //1.13 で blocks/ → block/ に変わった。1.12 形式の指定も生かす
+        // 1.13 で blocks/ → block/ に変わった。1.12 形式の指定も生かす
         if (path.startsWith("blocks/")) {
             path = "block/" + path.substring("blocks/".length());
         }
-        //本家 rtm: のブロックテクスチャは RTMU 名前空間へ取り込んである
+        // 本家 rtm: のブロックテクスチャは RTMU 名前空間へ取り込んである
         if (ns.equals("rtm")) {
             ns = "realtrainmodunofficial";
         }
@@ -67,7 +60,7 @@ public class DecorationRenderer implements BlockEntityRenderer<TileEntityDecorat
         if (model == null || model.elements == null) {
             return;
         }
-        //テクスチャごとにバッファをまとめる (面の数だけ bind しない)
+        // テクスチャごとにバッファをまとめる (面の数だけ bind しない)
         Map<ResourceLocation, VertexConsumer> consumers = new HashMap<>();
         PoseStack.Pose pose = poseStack.last();
         for (Element element : model.elements) {
@@ -82,7 +75,7 @@ public class DecorationRenderer implements BlockEntityRenderer<TileEntityDecorat
                     toTexture(face.texture),
                     tex -> buffer.getBuffer(RenderType.entityCutoutNoCull(tex)));
                 float shadow = face.shadow;
-                //法線 (最初の3頂点から)
+                // 法線 (最初の3頂点から)
                 float[] v0 = face.vertex[0];
                 float[] v1 = face.vertex[1];
                 float[] v2 = face.vertex[2];

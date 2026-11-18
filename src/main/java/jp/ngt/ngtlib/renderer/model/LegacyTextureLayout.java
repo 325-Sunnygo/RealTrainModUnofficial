@@ -2,13 +2,13 @@ package jp.ngt.ngtlib.renderer.model;
 
 import java.util.Map;
 
-/** ModelObject's 1.7.10 material-name/default lookup and ordered light texture slots. */
+/** ModelObject's 1.7.10 material-name/default lookup… */
 public final class LegacyTextureLayout {
     private LegacyTextureLayout() {}
 
     public static String resolve(String materialName, Map<String, String> textures) {
         if (textures == null) return null;
-        // MQO permits faces without a Material chunk. Immutable definition maps reject null keys.
+        // MQO permits faces without a Material chunk.
         String value = materialName == null ? null : textures.get(materialName);
         return value == null ? textures.get("default") : value;
     }

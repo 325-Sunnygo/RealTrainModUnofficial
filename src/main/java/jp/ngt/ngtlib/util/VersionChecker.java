@@ -6,7 +6,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Original name:version manifests; no network or wait on the game thread. */
+/** Original name:version manifests; */
 public final class VersionChecker {
     public record Update(String name,String version,String homepage) {}
     private static final Map<String,PackInfo> CHECKS=new ConcurrentHashMap<>();

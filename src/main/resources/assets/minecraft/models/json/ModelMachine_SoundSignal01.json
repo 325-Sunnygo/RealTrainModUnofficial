@@ -6,7 +6,7 @@
   },
   "buttonTexture": "textures/machine/button_SoundSignal01.png",
   "machineType": "Gate",
-  "sound_Running": "rtm:block.toryanse",
+  "sound_Running": "block.toryanse",
   "smoothing": true,
   "doCulling": true,
   "accuracy": "LOW",

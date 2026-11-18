@@ -12,10 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/**
- * 本家 jp.ngt.rtm.entity.ai.EntityAIDrivingWithDiagram の移植。
- * 「本と羽根ペン」に書いたダイヤ (1 行 = 時刻 コマンド x y z) に従って運転する。
- */
+/** 本家 jp.ngt.rtm.entity.ai.EntityAIDrivingWithDiagra… */
 public class DrivingWithDiagramGoal extends DrivingWithSignalGoal {
 
     private final List<TrainDiagram> diagram = new ArrayList<>();
@@ -98,7 +95,7 @@ public class DrivingWithDiagramGoal extends DrivingWithSignalGoal {
             return;
         }
 
-        int worldTime = (int) (this.motorman.level().getDayTime() % 24000L); //0~23999, 1=3.6sec
+        int worldTime = (int) (this.motorman.level().getDayTime() % 24000L); // 0~23999, 1=3.6sec
         int signalLevel = this.train.getSignal();
 
         if (td.command.equals("start")) {
@@ -114,7 +111,7 @@ public class DrivingWithDiagramGoal extends DrivingWithSignalGoal {
         float distance = this.getDistanceTrain(this.train, td.pointX, td.pointZ);
         float margin = (float) (td.time - worldTime);
         float prevSpeed = this.train.getSpeed();
-        float ac1; //目標加速度
+        float ac1; // 目標加速度
         int notch = 0;
         int notchS = 0;
         if (signalLevel > 0) {
@@ -131,7 +128,7 @@ public class DrivingWithDiagramGoal extends DrivingWithSignalGoal {
             case "pass": {
                 ac1 = 2 * (distance - prevSpeed * margin) / (margin * margin);
                 if (ac1 > 0) {
-                    float sp0 = prevSpeed + ac1 * margin; //目標速度
+                    float sp0 = prevSpeed + ac1 * margin; // 目標速度
                     notch = EnumNotch.getSuitableNotchFromSpeed(sp0).id;
                 } else if (ac1 < 0) {
                     notch = EnumNotch.getSuitableNotchFromAcceleration(ac1).id;

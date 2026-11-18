@@ -19,10 +19,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.List;
 
-/**
- * NPC アイテム。本家 {@code ItemNPC} のメタ 1 (運転士はメタ 0 で別アイテム)。
- * 右クリックでモデルを選び、地面へ置くとその姿の NPC が立つ。
- */
+/** NPC アイテム。本家 ItemNPC のメタ 1 (運転士はメタ 0 で別アイテム)。 */
 public class NpcItem extends Item {
 
     public NpcItem() {
@@ -59,14 +56,14 @@ public class NpcItem extends Item {
         }
         if (!level.isClientSide()) {
             var pos = context.getClickedPos();
-            //本家: プレイヤーの向きを 15 度刻みに丸める
+            // 本家: プレイヤーの向きを 15 度刻みに丸める
             float interval = 15.0F;
             int yaw = Mth.floor(Mth.wrapDegrees(-player.getYRot() + 180.0F + (interval / 2.0F)) / interval);
             EntityNPC npc = new EntityNPC(level);
             npc.moveTo(pos.getX() + 0.5D, pos.getY() + 1.0D, pos.getZ() + 0.5D, yaw * interval, 0.0F);
             npc.setYHeadRot(yaw * interval);
             npc.setModelId(getModelId(context.getItemInHand()));
-            //本家: 置いた人が飼い主 (owner)。飼い主の一撃で壊せる / 警備が守る相手
+            // 本家: 置いた人が飼い主 (owner)。飼い主の一撃で壊せる / 警備が守る相手
             npc.setOwnerUUID(player.getUUID());
             npc.setTame(true, false);
             level.addFreshEntity(npc);

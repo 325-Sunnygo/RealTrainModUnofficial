@@ -5,34 +5,26 @@ import net.minecraft.world.entity.player.Player;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-/**
- * 1.7.10 スクリプト互換のプレイヤーラッパー。
- * SRB3/NGTO Builder 等のパックスクリプトは entity.field_70153_n (rider) や
- * MCWrapperClient.getPlayer で得たプレイヤーの SRG フィールド
- * (field_71071_by = inventory 等) を直接読むため、実 Player を包んで公開する。
- */
+/** 1.7.10 スクリプト互換のプレイヤーラッパー。 */
 public final class PlayerCompat {
     private static final Map<Player, PlayerCompat> CACHE = new WeakHashMap<>();
 
     public final Player player;
 
     // === SRG フィールド (refresh で更新) ===
-    public double field_70165_t;//posX
-    public double field_70163_u;//posY
-    public double field_70161_v;//posZ
-    public double field_70169_q;//prevPosX
-    public double field_70167_r;//prevPosY
-    public double field_70166_s;//prevPosZ
+    public double field_70165_t;// posX
+    public double field_70163_u;// posY
+    public double field_70161_v;// posZ
+    public double field_70169_q;// prevPosX
+    public double field_70167_r;// prevPosY
+    public double field_70166_s;// prevPosZ
     /** Entity.yOffset (1.7.10)。1.21 に相当が無いので常に 0。 */
     public double field_70129_M;
-    public float field_70177_z;//yaw
-    public float field_70125_A;//pitch
+    public float field_70177_z;// yaw
+    public float field_70125_A;// pitch
     public final InventoryCompat field_71071_by = new InventoryCompat();
     public WorldCompat field_70170_p;
-    /**
-     * EntityPlayerMP.playerNetServerHandler (パケット送信用)。
-     * NGTO Builder2 の syncBiomeChunk が {@code player.field_71135_a.func_147359_a(p)} と呼ぶ。
-     */
+    /** EntityPlayerMP.playerNetServerHandler (パケット送信用)。 */
     public final ConnectionCompat field_71135_a = new ConnectionCompat();
 
     private PlayerCompat(Player player) {
@@ -40,17 +32,13 @@ public final class PlayerCompat {
         this.refresh();
     }
 
-    /** 空プレイヤー (player=null)。field_71439_g を絶対 null にしないための null-object。 */
+    /** 空プレイヤー (player=null)。 */
     private PlayerCompat() {
         this.player = null;
-        // refresh は呼ばない。field_71071_by は空のまま = func_70448_g が null を返す。
+        // refresh は呼ばない。field_71071_by は空のまま = func_70448_g…
     }
 
-    /**
-     * mc.player が null の瞬間 (ワールド遷移・特定の描画パス等) 用の共有インスタンス。
-     * スクリプトが getMinecraft.field_71439_g.field_71071_by.func_70448_g を
-     * ノーガードで呼んでも (hi03 ATS 地上子 / Baru's Roof 等)、null 手ぶら扱いで落ちない。
-     */
+    /** mc.player が null の瞬間 (ワールド遷移・特定の描画パス等) 用の共有インスタンス。 */
     public static final PlayerCompat EMPTY = new PlayerCompat();
 
     public static synchronized PlayerCompat of(Player player) {
@@ -78,7 +66,7 @@ public final class PlayerCompat {
 
     public void refresh() {
         if (this.player == null) {
-            return; //EMPTY (空プレイヤー) は更新しない
+            return; // EMPTY (空プレイヤー) は更新しない
         }
         this.field_70165_t = player.getX();
         this.field_70163_u = player.getY();
@@ -124,7 +112,7 @@ public final class PlayerCompat {
         return player.getName().getString();
     }
 
-    /** func_70676_i = EntityLivingBase.getLookVec (視線ベクトル)。 */
+    /** func_70676_i = EntityLivingBase.getLookVec (視線ベクト… */
     public jp.ngt.mccompat.Vec3Compat func_70676_i(float partialTicks) {
         if (player == null) {
             return new jp.ngt.mccompat.Vec3Compat(0.0D, 0.0D, 0.0D);
@@ -137,10 +125,7 @@ public final class PlayerCompat {
         return "PlayerCompat[" + player.getName().getString() + "]";
     }
 
-    /**
-     * 1.7.10 InventoryPlayer 互換。field_70462_a は ItemStack ラッパーの配列
-     * (スクリプトが inventory.field_70462_a[index] と添字アクセスする)。
-     */
+    /** 1.7.10 InventoryPlayer 互換。 */
     public static final class InventoryCompat {
         /** currentItem (選択スロット) */
         public int field_70461_c;
@@ -155,11 +140,7 @@ public final class PlayerCompat {
             }
         }
 
-        /**
-         * func_70448_g = getCurrentItem (今持っているアイテム)。手ぶらなら null。
-         * Baru's Roof の照明スクリプトは「設置物アイテムを持っている間だけ
-         * 目印を描く」ために使う。無いと毎フレーム TypeError で落ちていた。
-         */
+        /** func_70448_g = getCurrentItem (今持っているアイテム)。 */
         public ItemStackCompat func_70448_g() {
             int i = this.field_70461_c;
             return i >= 0 && i < this.field_70462_a.length ? this.field_70462_a[i] : null;

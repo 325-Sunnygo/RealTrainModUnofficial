@@ -5,14 +5,7 @@ import net.neoforged.fml.loading.FMLPaths;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/**
- * MOD 同梱デフォルトアセット (E257_DefaultPack 等) の展開先。
- *
- * <p>★ゲーム直下に専用フォルダ (旧: rtm_default_assets) を作らない。
- * 同梱パックは jar の中に埋め込まれており、ファイルパスが要るローダ向けに
- * 既存のキャッシュフォルダ config/realtrainmodunofficial/bundled_pack_cache へ
- * 展開する。ユーザーの目に付く新しいフォルダは増えない。
- */
+/** MOD 同梱デフォルトアセット (E257_DefaultPack 等) の展開先。 */
 public final class DefaultAssetsFolder {
     private DefaultAssetsFolder() {
     }

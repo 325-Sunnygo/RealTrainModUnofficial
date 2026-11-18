@@ -5,18 +5,7 @@ import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCateg
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 
-/**
- * 足場の階段の接続判定。本家 {@code jp.ngt.rtm.block.BlockScaffoldStairs} のうち、
- * <b>描画スクリプトから呼ばれる静的メソッドだけ</b>を移植したもの。
- *
- * <p>{@code RenderStair.js} / {@code RenderEscalatorUp/Down.js} が
- * {@code BlockScaffoldStairs.getConnectionType(world, x, y, z, dir)} を直に呼ぶ。
- * ★このクラスが無いとスクリプトが例外で止まり、全パーツが描かれてぐちゃぐちゃに見える
- * ({@link BlockScaffold} と同じ罠)。
- *
- * <p>本家との違い: 階段の一致判定は「<b>同じ向き (dir == dir2)</b> のときだけ 3」。
- * 足場側 ({@link BlockScaffold}) の 3 とは条件が違うので共用しない。
- */
+/** 足場の階段の接続判定。本家 jp.ngt.rtm.block.BlockScaffoldStair… */
 public final class BlockScaffoldStairs {
 
     /** なし:0 / 足場(Z向き):1 / 足場(X向き):2 / 同じ向きの階段:3 / 立方体:4 */
@@ -33,7 +22,7 @@ public final class BlockScaffoldStairs {
         if (category == InstalledObjectCategory.STAIR) {
             return sameDir(level, pos, dir);
         }
-        //本家は上下 1 ブロックの階段も見る (上り口/下り口)
+        // 本家は上下 1 ブロックの階段も見る (上り口/下り口)
         if (categoryAt(level, pos.below()) == InstalledObjectCategory.STAIR) {
             return sameDir(level, pos.below(), dir);
         }

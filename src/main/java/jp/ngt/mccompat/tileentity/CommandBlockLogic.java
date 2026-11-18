@@ -1,9 +1,6 @@
 package jp.ngt.mccompat.tileentity;
 
-/**
- * 1.7.10 net.minecraft.tileentity.CommandBlockLogic のスクリプト互換。
- * スクリプトはコマンド文字列をリフレクションで抜く:
- */
+/** 1.7.10 net.minecraft.tileentity.CommandBlockLogic… */
 @SuppressWarnings("unused")
 public final class CommandBlockLogic {
 

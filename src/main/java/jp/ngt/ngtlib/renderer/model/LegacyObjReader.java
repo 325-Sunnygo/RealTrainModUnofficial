@@ -3,7 +3,7 @@ package jp.ngt.ngtlib.renderer.model;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/** OBJ/MTL graph semantics from KaizPatchX ObjModel and MtlParser. */
+/** OBJ/MTL graph semantics from KaizPatchX ObjModel… */
 final class LegacyObjReader {
     private LegacyObjReader() {}
     static PolygonModel parse(byte[] bytes,byte[] mtl,String name,VecAccuracy accuracy) {
@@ -49,7 +49,7 @@ final class LegacyObjReader {
                         }
                         face.calculateFaceNormal(accuracy);group.faces.add(face);
                     }
-                    default -> { /* mtllib and smoothing records do not override original defaults. */ }
+                    default -> { /* mtllib and smoothing records do not override orig… */ }
                 }
             }
             for(GroupObject object:model.groupObjects)object.calcVertexNormals(accuracy);

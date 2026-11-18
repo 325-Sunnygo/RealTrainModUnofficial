@@ -18,10 +18,7 @@ public class RailDefinition {
     private final int ballastWidth;
     /** 道床に敷くブロックID (例: "minecraft:gravel")。空なら道床無し。 */
     private final String ballastBlockId;
-    /**
-     * 道床の候補一式 (本家 RailConfig.defaultBallast)。
-     * 本家はこの 1 つ 1 つが「00_砂利」のような別々のレールアイテムになる。
-     */
+    /** 道床の候補一式 (本家 RailConfig.defaultBallast)。 */
     private final java.util.List<Ballast> ballastSets;
 
     /** 道床 1 種類。ブロック名・メタ・厚み。 */

@@ -7,11 +7,7 @@ import net.minecraft.nbt.Tag;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 本家 jp.ngt.ngtlib.block.NGTObject (MCTE ミニチュアの中身 = ブロックの3D集合) の
- * 最低限実装。NGTO Builder のスクリプトが xSize/ySize/zSize/getBlockSet を使う。
- * ブロックは (x,y,z) → index = x + z*xSize + y*xSize*zSize で平坦化して保持。
- */
+/** 本家 jp.ngt.ngtlib.block.NGTObject (MCTE ミニチュアの中身 =… */
 public class NGTObject {
     public long objId;
     public List<BlockSet> blockList = new ArrayList<>();
@@ -136,12 +132,7 @@ public class NGTObject {
         }
     }
 
-    /**
-     * 本家 load: ストリームから読む (パック内の .ngto 用)。
-     *
-     * <p>本家 .ngto は<b>非圧縮 NBT</b> (中身の ByteData が gzip) なので、まず素の NBT として読む。
-     * RTMU 独自の export (gzip NBT) も読めるよう、失敗時は gzip として読み直す。
-     */
+    /** 本家 load: ストリームから読む (パック内の .ngto 用)。 */
     public static NGTObject load(java.io.InputStream stream) {
         try {
             byte[] bytes = stream.readAllBytes();
@@ -196,7 +187,7 @@ public class NGTObject {
         return readRtmFromNBT(data);
     }
 
-    /** 本家 .ngto の ByteData (gzip された本家 NBT) を展開する。無ければそのまま。 */
+    /** 本家 .ngto の ByteData (gzip された本家 NBT) を展開する。 */
     private static CompoundTag decompressByteData(CompoundTag tag) {
         if (!tag.contains("ByteData", Tag.TAG_BYTE_ARRAY)) {
             return tag;
@@ -213,16 +204,13 @@ public class NGTObject {
         }
     }
 
-    /** 本家 (1.7.10/KaizPatchX) 形式か (IdList パレット + セル id 配列)。 */
+    /** 本家 (1.7.10/KaizPatchX) 形式か (IdList パレット + セル id 配… */
     private static boolean isLegacyFormat(CompoundTag tag) {
         return tag.contains("IdList") || tag.contains("BData")
                 || tag.contains("IData") || tag.contains("Blocks");
     }
 
-    /**
-     * 本家形式を読む。セル id 配列は本家 index = x*(ySize*zSize) + y*zSize + z の順なので、
-     * 座標へ逆算して RTMU の grid へ入れる。
-     */
+    /** 本家形式を読む。セル id 配列は本家 index = x*(ySize*zSize) + y*z… */
     private static NGTObject readLegacyFromNBT(CompoundTag data) {
         NGTObject obj = new NGTObject();
         obj.objId = data.getLong("ObjId");

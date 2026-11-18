@@ -4,10 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 本家 jp.ngt.rtm.modelpack.state.DataMap のスクリプト互換移植。
- * set 系の第3引数は本家では同期フラグ (0:なし, 1:server→client)。
- */
+/** 本家 jp.ngt.rtm.modelpack.state.DataMap のスクリプト互換移植。 */
 public class DataMap {
     /** server→client 同期する。 */
     public static final byte SYNC_FLAG = 1;
@@ -20,10 +17,7 @@ public class DataMap {
     /** このマップの持ち主 (エンティティ / ブロックエンティティ)。本家 setEntity。 */
     private Object entity;
 
-    /**
-     * 同期対象か。フラグはビット和なので == SYNC_FLAG で見てはいけない。
-     * SYNC|SAVE (=3) で書くスクリプトが同期されなくなる。
-     */
+    /** 同期対象か。フラグはビット和なので == SYNC_FLAG で見てはいけない。 */
     private boolean shouldSync(int flag) {
         return (flag & SYNC_FLAG) != 0;
     }
@@ -89,11 +83,7 @@ public class DataMap {
         }
     }
 
-    /**
-     * 本家 (1.12 系) DataMap: 配列。未設定は空配列。
-     * スクリプトは {@code posList.length} / {@code posList[i]} で使うため
-     * {@code Object[]} で返す (Nashorn は Java 配列の length と添字をそのまま扱える)。
-     */
+    /** 本家 (1.12 系) DataMap: 配列。未設定は空配列。 */
     public Object[] getArray(String key) {
         Object v = this.map.get(key);
         if (v instanceof Object[] arr) {
@@ -116,11 +106,31 @@ public class DataMap {
         }
     }
 
-    /**
-     * 本家 getHex: 16 進で持つ整数 (主に色)。
-     * 内部表現は int だが、getArg では "Hex" 型として 0x 付きで出す必要があるため
-     * 専用のキー集合で型を覚えておく。
-     */
+    /** 本家 getHex: 16 進で持つ整数 (主に色)。 */
+    /** 本家 (1.12) getList: 配列。 */
+    public Object[] getList(String key) {
+        return this.getArray(key);
+    }
+
+    /** 本家 (1.12) setList: 配列。 */
+    public void setList(String key, Object value, int flag) {
+        this.setArray(key, value, flag);
+    }
+
+    /** 本家 remove: キーを削除する。 */
+    public void remove(String key) {
+        this.map.remove(key);
+        this.pendingSync.remove(key);
+        this.hexKeys.remove(key);
+    }
+
+    /** 本家 clear。 */
+    public void clear() {
+        this.map.clear();
+        this.pendingSync.clear();
+        this.hexKeys.clear();
+    }
+
     public int getHex(String key) {
         Object v = this.map.get(key);
         return v instanceof Number n ? n.intValue() : 0;
@@ -150,10 +160,7 @@ public class DataMap {
     public void setFormatter(Object formatter) {
     }
 
-    /**
-     * 本家 set(key, "(Type)value", flag): 型付き文字列 1 本で書き込む。
-     * 型が省略された場合は既存の値の型に合わせる。
-     */
+    /** 本家 set(key, "(Type)value", flag): 型付き文字列 1 本で書き込む。 */
     public boolean set(String key, String value, int flag) {
         if (key == null || value == null) {
             return false;
@@ -229,10 +236,7 @@ public class DataMap {
         return String.valueOf(v);
     }
 
-    /**
-     * 本家 getArg: 全エントリを key=(Type)value,key2=(Type)value2 形式で出す。
-     * モデル選択 GUI や設置物アイテムの NBT 引数に使われる。
-     */
+    /** 本家 getArg: 全エントリを key=(Type)value,key2=(Type)valu… */
     public String getArg() {
         StringBuilder sb = new StringBuilder();
         for (Map.Entry<String, Object> e : this.map.entrySet()) {
@@ -245,7 +249,7 @@ public class DataMap {
         return sb.toString();
     }
 
-    /** 本家 setArg: getArg 形式の文字列を取り込む。overwrite=false なら既存キーは触らない。 */
+    /** 本家 setArg: getArg 形式の文字列を取り込む。 */
     public void setArg(String arg, boolean overwrite) {
         if (arg == null || arg.isEmpty()) {
             return;
@@ -261,7 +265,7 @@ public class DataMap {
         }
     }
 
-    /** 本家 convertArg: key=(Type)value,... を {key, Type, value} の配列へ分解する。 */
+    /** 本家 convertArg: key=(Type)value,... */
     public static String[][] convertArg(String arg) {
         if (arg == null || arg.isEmpty()) {
             return new String[0][0];
@@ -288,6 +292,88 @@ public class DataMap {
     /** 全エントリのコピー (DataMapEditor 等の閲覧用)。 */
     public Map<String, Object> getEntries() {
         return new HashMap<>(this.map);
+    }
+
+    /** 本家 DataMap.writeToNBT: DataList へ保存する。 */
+    public net.minecraft.nbt.CompoundTag writeToNBT() {
+        net.minecraft.nbt.CompoundTag root = new net.minecraft.nbt.CompoundTag();
+        net.minecraft.nbt.ListTag list = new net.minecraft.nbt.ListTag();
+        for (Map.Entry<String, Object> entry : this.map.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+            tag.putString("Name", key);
+            tag.putInt("Flag", SAVE_FLAG);
+            if (value instanceof Integer i) {
+                tag.putString("Type", this.hexKeys.contains(key) ? "Hex" : "Int");
+                tag.putString("Value", Integer.toString(i));
+            } else if (value instanceof Double d) {
+                tag.putString("Type", "Double");
+                tag.putString("Value", Double.toString(d));
+            } else if (value instanceof Boolean b) {
+                tag.putString("Type", "Boolean");
+                tag.putString("Value", Boolean.toString(b));
+            } else if (value instanceof jp.ngt.ngtlib.math.Vec3 vec) {
+                tag.putString("Type", "Vec");
+                tag.putString("Value", vec.getX() + " " + vec.getY() + " " + vec.getZ());
+            } else if (value instanceof Object[] array) {
+                tag.putString("Type", "List");
+                net.minecraft.nbt.ListTag values = new net.minecraft.nbt.ListTag();
+                for (Object element : array) {
+                    values.add(net.minecraft.nbt.StringTag.valueOf(String.valueOf(element)));
+                }
+                tag.put("Values", values);
+            } else {
+                tag.putString("Type", "String");
+                tag.putString("Value", String.valueOf(value));
+            }
+            list.add(tag);
+        }
+        root.put("DataList", list);
+        return root;
+    }
+
+    /** 本家 DataMap.readFromNBT: DataList から復元する。 */
+    public void readFromNBT(net.minecraft.nbt.CompoundTag root) {
+        if (root == null || !root.contains("DataList", net.minecraft.nbt.Tag.TAG_LIST)) {
+            return;
+        }
+        net.minecraft.nbt.ListTag list = root.getList("DataList", net.minecraft.nbt.Tag.TAG_COMPOUND);
+        for (int i = 0; i < list.size(); i++) {
+            net.minecraft.nbt.CompoundTag tag = list.getCompound(i);
+            String key = tag.getString("Name");
+            if (key == null || key.isEmpty()) {
+                continue;
+            }
+            String type = tag.getString("Type");
+            int flag = tag.getInt("Flag");
+            try {
+                switch (type) {
+                    case "Int" -> this.setInt(key, Integer.parseInt(tag.getString("Value")), flag);
+                    case "Hex" -> this.setHex(key, Integer.decode(tag.getString("Value")), flag);
+                    case "Double" -> this.setDouble(key, Double.parseDouble(tag.getString("Value")), flag);
+                    case "Boolean" -> this.setBoolean(key, Boolean.parseBoolean(tag.getString("Value")), flag);
+                    case "Vec" -> {
+                        String[] parts = tag.getString("Value").trim().split("\\s+");
+                        if (parts.length >= 3) {
+                            this.setVec(key, new jp.ngt.ngtlib.math.Vec3(
+                                    Double.parseDouble(parts[0]), Double.parseDouble(parts[1]),
+                                    Double.parseDouble(parts[2])), flag);
+                        }
+                    }
+                    case "List" -> {
+                        net.minecraft.nbt.ListTag values = tag.getList("Values", net.minecraft.nbt.Tag.TAG_STRING);
+                        Object[] array = new Object[values.size()];
+                        for (int k = 0; k < values.size(); k++) {
+                            array[k] = values.getString(k);
+                        }
+                        this.setArray(key, array, flag);
+                    }
+                    default -> this.setString(key, tag.getString("Value"), flag);
+                }
+            } catch (RuntimeException ignored) {
+            }
+        }
     }
 
     /** 同期待ちエントリを取り出してクリアする (サーバーの配信処理用)。空なら空マップ。 */
@@ -318,7 +404,7 @@ public class DataMap {
         }
     }
 
-    /** 同期パケット用に値を型プレフィクス付き文字列へ ("I:5" / "D:1.5" / "B:true" / "S:xxx")。 */
+    /** 同期パケット用に値を型プレフィクス付き文字列へ ("I:5" / "D:1.5" / "B:tru… */
     public static String encodeSyncedValue(Object value) {
         if (value instanceof Integer i) {
             return "I:" + i;
@@ -332,10 +418,7 @@ public class DataMap {
         return "S:" + value;
     }
 
-    /**
-     * 本家 receivePacket: 同期パケット "DM,対象,ID,キー,型,値,フラグ" を適用する。
-     * RTMU は DataMapSyncPayload を使うが、スクリプトがこの形式を組むことがあるので受ける。
-     */
+    /** 本家 receivePacket: 同期パケット "DM,対象,ID,キー,型,値,フラグ" を適… */
     public static void receivePacket(String msg, Object packet, Object world, boolean onClient) {
         if (msg == null) {
             return;

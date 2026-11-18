@@ -4,7 +4,7 @@ import jp.ngt.ngtlib.renderer.model.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** Parses all available MQO/MQOZ model files through the production script-model loader. */
+/** Parses all available MQO/MQOZ model files through… */
 public final class LegacyModelCorpus {
     public static void main(String[] args) throws Exception {
         List<Path> roots = List.of(Path.of("src/main/resources/assets/minecraft/models"),

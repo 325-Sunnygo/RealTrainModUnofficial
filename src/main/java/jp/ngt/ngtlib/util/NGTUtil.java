@@ -2,16 +2,13 @@ package jp.ngt.ngtlib.util;
 
 import net.neoforged.fml.util.thread.EffectiveSide;
 
-/**
- * 本家 NGTLib jp.ngt.ngtlib.util.NGTUtil の段階的移植。
- * Phase 0 時点では ObjectPool 等が必要とする最小限のみ。
- */
+/** 本家 NGTLib jp.ngt.ngtlib.util.NGTUtil の段階的移植。 */
 public final class NGTUtil {
 
     private NGTUtil() {
     }
 
-    /** 実効サイドがサーバーか (本家: FMLCommonHandler の effective side 判定) */
+    /** 実効サイドがサーバーか (本家: FMLCommonHandler の effective sid… */
     public static boolean isServer() {
         return EffectiveSide.get().isServer();
     }
@@ -25,10 +22,7 @@ public final class NGTUtil {
         return System.currentTimeMillis();
     }
 
-    /**
-     * 本家: クライアントプレイヤー (Client Only, スクリプト用)
-     * ★ このクラスから net.minecraft.client.* を直接参照してはいけない。
-     */
+    /** 本家: クライアントプレイヤー (Client Only, スクリプト用) ★ このクラスから n… */
     public static net.minecraft.world.entity.player.Player getClientPlayer() {
         Object player = invokeClientOnly("getClientPlayer");
         return player instanceof net.minecraft.world.entity.player.Player p ? p : null;
@@ -39,11 +33,7 @@ public final class NGTUtil {
         return invokeClientOnly("getClientWorld");
     }
 
-    /**
-     * クライアント専用処理を NGTUtilClient に投げる。専用サーバーでは何もしない。
-     * リフレクションなのは、このクラスのバイトコードにクライアント型を一切登場させない
-     * ため。クラス名を文字列で持てば、専用サーバーでは NGTUtilClient がロードされない。
-     */
+    /** クライアント専用処理を NGTUtilClient に投げる。専用サーバーでは何もしない。 */
     private static Object invokeClientOnly(String methodName) {
         if (net.neoforged.fml.loading.FMLEnvironment.dist != net.neoforged.api.distmarker.Dist.CLIENT) {
             return null;
@@ -56,10 +46,7 @@ public final class NGTUtil {
         }
     }
 
-    /**
-     * 本家 NGTUtil.setValueToField : リフレクションでフィールドへ書込
-     * (NGTO Builder が使用。SRG/現行名どちらでも探す)
-     */
+    /** 本家 NGTUtil.setValueToField : リフレクションでフィールドへ書込 (NG… */
     public static void setValueToField(Object target, String fieldName, Object value) {
         if (target == null || fieldName == null) {
             return;
@@ -67,17 +54,12 @@ public final class NGTUtil {
         trySetField(target.getClass(), target, value, fieldName);
     }
 
-    /**
-     * 本家 NGTUtil.setValueToField の 4 引数版 (NGTO Builder の Wire ツールが使用):
-     * setValueToField(TileEntityConnectorBase.class, tileEntity, value, "modelName")。
-     */
+    /** 本家 NGTUtil.setValueToField の 4 引数版 (NGTO Builder… */
     public static void setValueToField(Class<?> startClass, Object target, Object value, String fieldName) {
         if (target == null || fieldName == null) {
             return;
         }
-        // NGTO Builder の Wire ツール: setModelName が TileEntityConnectorBase.modelName へ reflection で
-        // 書き込むが、RTMU の碍子は InstalledObjectBlockEntity (definitionId 管理) なのでブリッジする。
-        // これが無いと Enter で置いた碍子が「選んだモデル」にならない。
+        // NGTO Builder の Wire ツール: setModelName が TileEntit…
         if ("modelName".equals(fieldName) && value instanceof String name
                 && target instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be) {
             be.applyScriptModelName(name);
@@ -126,10 +108,7 @@ public final class NGTUtil {
     }
 
     /** 本家 NGTUtil.reverse : 配列を逆順に */
-    /**
-     * 本家 NGTUtil.getMethod: リフレクションでメソッドを呼び、戻り値を返す。
-     * パックはこれで private なメソッド (Formation.getControlCar 等) を叩く。
-     */
+    /** 本家 NGTUtil.getMethod: リフレクションでメソッドを呼び、戻り値を返す。 */
     public static Object getMethod(Object... params) {
         if (params == null || params.length < 2 || params[1] == null) {
             return null;
@@ -308,10 +287,7 @@ public final class NGTUtil {
     public static void sendPacketToClient(Object packet, Object player) {
     }
 
-    /**
-     * 旧 RTMU の JS スタブが持っていた補助 API。
-     * 実クラスへ一本化するにあたり、同名で使うスクリプトが落ちないよう本体側にも用意する。
-     */
+    /** 旧 RTMU の JS スタブが持っていた補助 API。 */
     public static long getCurrentTime() {
         return System.currentTimeMillis();
     }

@@ -25,10 +25,7 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> CROSSING_GATE_ITEM = ITEMS.register(
         "crossing_gate", () -> new InstalledObjectItem(InstalledObjectCategory.CROSSING)
     );
-    // 以下の RTMU オリジナル機能はユーザー要望により完全削除:
-    // 受信機(signal_receiver) / 受信機シグナル値(signal_value_receiver) / 旧RTMU列車検知ブロック
-    // 状態ブロック(signal_state) / スクリプトブロック(script_block) / 通信機(signal_communicator)
-    // 道床(ballast)アイテムも廃止済み。ブロック自体は本家 RTM のため残るがアイテム(入手手段)は登録しない。
+    // 以下の RTMU オリジナル機能はユーザー要望により完全削除: 受信機(signal_receiv…
     public static final DeferredItem<MarkerItem> MARKER_ITEM = ITEMS.register(
         "marker", () -> new MarkerItem(jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get(), false)
     );
@@ -41,10 +38,7 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<RailItem> RAIL_ITEM = ITEMS.register(
         "rail", RailItem::new
     );
-    /**
-     * 本家 ItemTrain のメタ 0-3/127 を、1.21 ではアイテム 5 つに分ける。
-     * ★{@code train} (電車) の ID は変えないこと。変えると既存ワールドの持ち物が消える。
-     */
+    /** 本家 ItemTrain のメタ 0-3/127 を、1.21 ではアイテム 5 つに分ける。 */
     public static final DeferredItem<TrainItem> TRAIN_DIESEL_ITEM = ITEMS.register(
         "diesel_train", () -> new TrainItem(TrainItem.Category.DIESEL)
     );
@@ -60,11 +54,11 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<TrainItem> TRAIN_ITEM = ITEMS.register(
         "train", () -> new TrainItem(TrainItem.Category.ELECTRIC)
     );
-    // 試験用車両(test_train)は本家 ItemTrain のメタ127として復活 (ユーザー確認済み)。
+    // 試験用車両(test_train)は本家 ItemTrain のメタ127として復活 (ユーザー確…
     public static final DeferredItem<CarItem> CAR_ITEM = ITEMS.register(
         "car", CarItem::new
     );
-    // 本家 itemMotorman (運転士)。列車に使うと運転台に乗り、信号/ダイヤ/マクロで自動運転する
+    // 本家 itemMotorman (運転士)。
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.MotormanItem> MOTORMAN_ITEM = ITEMS.register(
         "motorman", com.portofino.realtrainmodunofficial.item.MotormanItem::new
     );
@@ -84,20 +78,18 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<CrowbarItem> CROWBAR_ITEM = ITEMS.register(
         "crowbar", CrowbarItem::new
     );
-    // 本家 ItemWrench 忠実移植版 (旧 WrenchItem はレガシー系の参照維持のため残置)
+    // 本家 ItemWrench 忠実移植版 (旧 WrenchItem はレガシー系の参照維持のため残…
     public static final DeferredItem<RtmWrenchItem> WRENCH_ITEM = ITEMS.register(
         "wrench", RtmWrenchItem::new
     );
     public static final DeferredItem<WireItem> WIRE_ITEM = ITEMS.register(
         "wire", WireItem::new
     );
-    // 照明(light): 本家RTM の照明アイテム。外部パックのモデルを使用し、レッドストーン
-    // 信号を受けると点灯する(InstalledObjectBlock 側で発光処理)。
+    // 照明(light): 本家RTM の照明アイテム。
     public static final DeferredItem<InstalledObjectItem> LIGHT_ITEM = ITEMS.register(
         "light", () -> new InstalledObjectItem(InstalledObjectCategory.LIGHT)
     );
-    // 看板(signboard): 本家RTM の看板アイテム。パックの SignBoard_*.json からテクスチャと
-    // 板のサイズ(width/height/depth)を読み、文字(SignboardText)を貼り付けられる。
+    // 看板(signboard): 本家RTM の看板アイテム。
     public static final DeferredItem<InstalledObjectItem> SIGNBOARD_ITEM = ITEMS.register(
         "signboard", () -> new InstalledObjectItem(InstalledObjectCategory.SIGNBOARD)
     );
@@ -110,8 +102,7 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<InstalledObjectItem> SIGNAL_ITEM = ITEMS.register(
         "signal", () -> new InstalledObjectItem(InstalledObjectCategory.SIGNAL)
     );
-    // 列車検知器(train_detector): 本家 RTM の列車検知器 (EntityTrainDetector)。
-    // レールの上に置くと、真下のレールに列車が乗っているかを見る。
+    // 列車検知器(train_detector): 本家 RTM の列車検知器 (EntityTrain…
     public static final DeferredItem<InstalledObjectItem> TRAIN_DETECTOR_ITEM = ITEMS.register(
         "train_detector", () -> new InstalledObjectItem(InstalledObjectCategory.TRAIN_DETECTOR)
     );
@@ -135,9 +126,7 @@ public class RealTrainModUnofficialItems {
         "connector_output", () -> new InstalledObjectItem(InstalledObjectCategory.CONNECTOR_OUTPUT)
     );
     // 本家 electric: 信号変換器
-    /**
-     * 本家 signalConverter メタ 0 (RS入力)。★id は既存互換のため signal_converter のまま。
-     */
+    /** 本家 signalConverter メタ 0 (RS入力)。 */
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.SignalConverterItem> SIGNAL_CONVERTER_ITEM = ITEMS.register(
         "signal_converter", () -> new com.portofino.realtrainmodunofficial.item.SignalConverterItem(0)
     );
@@ -159,7 +148,7 @@ public class RealTrainModUnofficialItems {
         "signal_converter_wireless", () -> new com.portofino.realtrainmodunofficial.item.SignalConverterItem(4)
     );
 
-    // SignalControllerMod (masa300) 移植: 信号制御器 + 位置設定ツール×2
+    // SignalControllerMod (masa300) 移植: 信号制御器 + 位置設定ツール…
     public static final DeferredItem<net.minecraft.world.item.BlockItem> SIGNAL_CONTROLLER_ITEM = ITEMS.register(
         "signal_controller", () -> new net.minecraft.world.item.BlockItem(
             RealTrainModUnofficialBlocks.SIGNAL_CONTROLLER.get(), new net.minecraft.world.item.Item.Properties())
@@ -171,32 +160,28 @@ public class RealTrainModUnofficialItems {
         "pos_setting_tool_1", () -> new jp.masa.signalcontrollermod.ItemPosSettingTool(1)
     );
 
-    // ---- 本家 ItemInstalledObject のうち未移植だった設置物 ----
-    // 本家 installed_object meta 0: ガラスの蛍光灯 (BlockFluorescent)。置くだけで光源 15。
+    // ---- 本家 ItemInstalledObject のうち未移植だった設置物 ---- 本家…
     public static final DeferredItem<InstalledObjectItem> FLUORESCENT_ITEM = ITEMS.register(
         "fluorescent", () -> new InstalledObjectItem(InstalledObjectCategory.FLUORESCENT)
     );
-    // 本家 installed_object meta 6: 標識 (BlockRailroadSign)。モデルでなくテクスチャを選ぶ。
+    // 本家 installed_object meta 6: 標識 (BlockRailroadSign…
     public static final DeferredItem<InstalledObjectItem> RAILROAD_SIGN_ITEM = ITEMS.register(
         "railroad_sign", () -> new InstalledObjectItem(InstalledObjectCategory.RAILROAD_SIGN)
     );
-    // 本家 installed_object meta 13: 車止め (EntityBumpingPost)。レールに吸着し列車を止める。
+    // 本家 installed_object meta 13: 車止め (EntityBumpingPo…
     public static final DeferredItem<InstalledObjectItem> BUMPING_POST_ITEM = ITEMS.register(
         "bumping_post", () -> new InstalledObjectItem(InstalledObjectCategory.BUMPING_POST)
     );
-    // 本家 installed_object meta 16: 転轍機 (BlockPoint)。右クリックで切り替わるレッドストーン源。
+    // 本家 installed_object meta 16: 転轍機 (BlockPoint)。
     public static final DeferredItem<InstalledObjectItem> POINT_MACHINE_ITEM = ITEMS.register(
         "point_machine", () -> new InstalledObjectItem(InstalledObjectCategory.POINT)
     );
-    // 本家 installed_object meta 18: 券売機 (BlockTicketVendor)。切符/回数券を発券する。
+    // 本家 installed_object meta 18: 券売機 (BlockTicketVend…
     public static final DeferredItem<InstalledObjectItem> TICKET_VENDOR_ITEM = ITEMS.register(
         "ticket_vendor", () -> new InstalledObjectItem(InstalledObjectCategory.TICKET_VENDOR)
     );
 
-    /**
-     * カテゴリに対応する設置物アイテム。中ボタン(ピックブロック)で設置済みの照明/信号/碍子/架線柱などを
-     * コピーする用。WIRE 等 InstalledObjectItem を持たないカテゴリは null。
-     */
+    /** カテゴリに対応する設置物アイテム。中ボタン(ピックブロック)で設置済みの照明/信号/碍子/架線柱な… */
     public static net.minecraft.world.item.Item getInstalledObjectItem(InstalledObjectCategory category) {
         if (category == null) {
             return null;
@@ -228,7 +213,7 @@ public class RealTrainModUnofficialItems {
             default -> null;
         };
     }
-    // 本家 ItemCamera: 撮り鉄用カメラ (望遠 / 被写界深度 / 流し撮り / 列車追尾AF)
+    // 本家 ItemCamera: 撮り鉄用カメラ (望遠 / 被写界深度 / 流し撮り / 列車追尾A…
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.CameraItem> CAMERA_ITEM = ITEMS.register(
         "camera", com.portofino.realtrainmodunofficial.item.CameraItem::new
     );
@@ -240,9 +225,7 @@ public class RealTrainModUnofficialItems {
         "ticket_book", () -> new com.portofino.realtrainmodunofficial.item.TicketItem(11)
     );
 
-    // ───────────────────────────────────────────────────────────────
-    // 本家 RTM_道具 タブのアイテム (RTMItem.init と同じ並び)
-    // ───────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────…
 
     /** 本家 nvd: 暗視装置 (頭防具)。 */
     public static final DeferredItem<jp.ngt.rtm.item.ItemNVD> NVD_ITEM = ITEMS.register(
@@ -266,11 +249,7 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<jp.ngt.rtm.item.ItemGun> AMR_ITEM = ITEMS.register(
         "amr", () -> new jp.ngt.rtm.item.ItemGun(jp.ngt.rtm.item.ItemGun.GunType.amr)
     );
-    /**
-     * 本家 money: メタ 0〜8 の 9 種。
-     * ★1 アイテム + variant の overrides はアイコンの解決が壊れやすいので、
-     * material と同じく<b>アイテムを分ける</b> (アイコンは通常のモデル解決)。
-     */
+    /** 本家 money: メタ 0〜8 の 9 種。 */
     public static final java.util.Map<Integer, DeferredItem<jp.ngt.rtm.item.ItemMoney>> MONEY_ITEMS =
         new java.util.LinkedHashMap<>();
     static {
@@ -301,9 +280,7 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<jp.ngt.rtm.item.ItemAmmunition> BULLET_ITEM = ITEMS.register(
         "bullet", jp.ngt.rtm.item.ItemAmmunition::new
     );
-    // ───────────────────────────────────────────────────────────────
-    // 本家 RTM_工業 タブのアイテム (RTMItem.init と同じ並び)
-    // ───────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────…
 
     public static final DeferredItem<jp.ngt.rtm.item.ItemBucketLiquid> BUCKET_LIQUID_ITEM = ITEMS.register(
         "bucket_liquid", jp.ngt.rtm.item.ItemBucketLiquid::new
@@ -345,15 +322,9 @@ public class RealTrainModUnofficialItems {
         "steel_slab", () -> new net.minecraft.world.item.BlockItem(
             RealTrainModUnofficialBlocks.STEEL_SLAB.get(), new net.minecraft.world.item.Item.Properties())
     );
-    // ───────────────────────────────────────────────────────────────
-    // 本家 RTM_鉄道 タブの未移植分 (第1回)
-    // ───────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────…
 
-    /**
-     * 本家 material: メタ 0/1/2/3/4/8 の部品 6 種。
-     * ★<b>1 アイテム + variant にしてはいけない</b>。1.21 のレシピの材料は
-     * アイテムでしか一致を見ないので、鉄板を要求する所に車軸が入ってしまう。
-     */
+    /** 本家 material: メタ 0/1/2/3/4/8 の部品 6 種。 */
     public static final java.util.Map<Integer, DeferredItem<jp.ngt.rtm.item.ItemMaterial>> MATERIAL_ITEMS =
         new java.util.LinkedHashMap<>();
     static {
@@ -402,11 +373,11 @@ public class RealTrainModUnofficialItems {
     public static final DeferredItem<jp.ngt.rtm.item.ItemCargo> ITEM_CARGO = ITEMS.register(
         "item_cargo", jp.ngt.rtm.item.ItemCargo::new
     );
-    /** 本家 framework: 鉄骨 (IronFrame01 を置く。本家 tab=null・レシピで入手)。 */
+    /** 本家 framework: 鉄骨 (IronFrame01 を置く。 */
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.FrameworkItem> FRAMEWORK_ITEM = ITEMS.register(
         "framework", com.portofino.realtrainmodunofficial.item.FrameworkItem::new
     );
-    /** 本家 item_decoration: 装飾ブロック (registerItemModel は "decoration")。 */
+    /** 本家 item_decoration: 装飾ブロック (registerItemModel は "… */
     public static final DeferredItem<jp.ngt.rtm.item.ItemDecoration> ITEM_DECORATION = ITEMS.register(
         "item_decoration", jp.ngt.rtm.item.ItemDecoration::new
     );
@@ -426,7 +397,7 @@ public class RealTrainModUnofficialItems {
         "brick_slab", () -> new net.minecraft.world.item.BlockItem(
             RealTrainModUnofficialBlocks.BRICK_SLAB.get(), new net.minecraft.world.item.Item.Properties())
     );
-    /** 本家 item_motorman メタ 1: モデル付き NPC (運転士はメタ 0 = MOTORMAN_ITEM)。 */
+    /** 本家 item_motorman メタ 1: モデル付き NPC (運転士はメタ 0 = MOTO… */
     public static final DeferredItem<com.portofino.realtrainmodunofficial.item.NpcItem> NPC_ITEM = ITEMS.register(
         "npc", com.portofino.realtrainmodunofficial.item.NpcItem::new
     );

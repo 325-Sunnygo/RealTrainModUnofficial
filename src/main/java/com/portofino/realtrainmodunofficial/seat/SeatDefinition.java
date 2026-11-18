@@ -74,7 +74,7 @@ public class SeatDefinition {
         return inside;
     }
     
-    /** Check if a point is within the seat bounds (including height) */
+    /** Check if a point is within the seat bounds (inclu… */
     public boolean isPointInSeat(Vec3 point) {
         if (!isPointInPolygon(point)) {
             return false;

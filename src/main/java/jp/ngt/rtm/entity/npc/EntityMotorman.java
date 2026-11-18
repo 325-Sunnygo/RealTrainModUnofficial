@@ -24,20 +24,16 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 
-/**
- * 本家 jp.ngt.rtm.entity.npc.EntityMotorman の移植 (運転士)。
- * 運転士アイテムで列車を右クリックすると運転台に乗り、自動運転する:
- */
+/** 本家 jp.ngt.rtm.entity.npc.EntityMotorman の移植 (運転士)。 */
 public class EntityMotorman extends PathfinderMob {
 
     private static final EntityDataAccessor<ItemStack> DIAGRAM =
             SynchedEntityData.defineId(EntityMotorman.class, EntityDataSerializers.ITEM_STACK);
-    /** スキン名 ("" = 既定/季節、"santa"/"shishi" = 同梱、その他 = npc_skins/ のファイル名)。 */
+    /** スキン名 ("" = 既定/季節、"santa"/"shishi" = 同梱、その他 = npc_… */
     private static final EntityDataAccessor<String> SKIN =
             SynchedEntityData.defineId(EntityMotorman.class, EntityDataSerializers.STRING);
 
-    // ★registerGoals はスーパーコンストラクタから呼ばれるため、ここで生成する
-    // (コンストラクタのフィールド初期化より前。final にして ctor で入れると null で登録され NPE)。
+    // ★registerGoals はスーパーコンストラクタから呼ばれるため、ここで生成する (コンスト…
     private DriveWithMacroGoal macroGoal;
 
     public EntityMotorman(EntityType<? extends EntityMotorman> type, Level level) {
@@ -45,7 +41,7 @@ public class EntityMotorman extends PathfinderMob {
         this.setPersistenceRequired();
     }
 
-    /** 本家 applyEntityAttributes: HP40 / 速度0.45 / 追跡64 / 攻撃1 */
+    /** 本家 applyEntityAttributes: HP40 / 速度0.45 / 追跡64 /… */
     public static AttributeSupplier.Builder createAttributes() {
         return PathfinderMob.createMobAttributes()
                 .add(Attributes.MAX_HEALTH, 40.0D)
@@ -56,8 +52,7 @@ public class EntityMotorman extends PathfinderMob {
 
     @Override
     protected void registerGoals() {
-        // 本家の task 順: 泳ぐ > マクロ > ダイヤ > 信号 > うろつき > プレイヤー注視 > 見回し
-        // (このメソッドはスーパーコンストラクタから呼ばれるので macroGoal はここで生成する)
+        // 本家の task 順: 泳ぐ > マクロ > ダイヤ > 信号 > うろつき > プレイヤー注視…
         this.macroGoal = new DriveWithMacroGoal(this);
         this.goalSelector.addGoal(1, new FloatGoal(this));
         this.goalSelector.addGoal(2, this.macroGoal);
@@ -68,14 +63,7 @@ public class EntityMotorman extends PathfinderMob {
         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
     }
 
-    /**
-     * 別 mod (RTMU-AutoDrive) が運転を握っているか。
-     *
-     * <p>true の間は<b>本家の運転 AI (マクロ/ダイヤ/信号) を全部止める</b>。
-     * 止めないと、信号を置いていない線区では EntityAIDrivingWithSignal が
-     * 「現示 0 = 停止」と読んで毎回 brake_4 を入れてしまい、
-     * 外から力行ノッチを入れても打ち消されて<b>列車が一切動かない</b>。
-     */
+    /** 別 mod (RTMU-AutoDrive) が運転を握っているか。 */
     private boolean externalDrive;
 
     public boolean isExternallyDriven() {
@@ -93,7 +81,7 @@ public class EntityMotorman extends PathfinderMob {
         builder.define(SKIN, "");
     }
 
-    // ------------------------------------------------------------ スキン
+    // -------------------------------------------------…
 
     /** スキン名 ("" = 既定/季節)。レンダラが参照する。 */
     public String getSkin() {
@@ -104,7 +92,7 @@ public class EntityMotorman extends PathfinderMob {
         this.entityData.set(SKIN, skin == null ? "" : skin);
     }
 
-    // ------------------------------------------------------------ ダイヤ (本と羽根ペン)
+    // -------------------------------------------------…
 
     public boolean hasDiagram() {
         ItemStack stack = this.getDiagram();
@@ -126,7 +114,7 @@ public class EntityMotorman extends PathfinderMob {
         }
     }
 
-    // ------------------------------------------------------------ NBT
+    // -------------------------------------------------…
 
     @Override
     public void addAdditionalSaveData(CompoundTag nbt) {
@@ -154,7 +142,7 @@ public class EntityMotorman extends PathfinderMob {
         this.externalDrive = nbt.getBoolean("ExternalDriveRTM");
     }
 
-    // ------------------------------------------------------------ インタラクト
+    // -------------------------------------------------…
 
     @Override
     protected InteractionResult mobInteract(Player player, InteractionHand hand) {
@@ -177,7 +165,7 @@ public class EntityMotorman extends PathfinderMob {
         return super.mobInteract(player, hand);
     }
 
-    // ------------------------------------------------------------ ダメージ/ドロップ
+    // -------------------------------------------------…
 
     @Override
     public boolean hurt(DamageSource source, float amount) {
@@ -209,11 +197,11 @@ public class EntityMotorman extends PathfinderMob {
         return new ItemStack(com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.MOTORMAN_ITEM.get());
     }
 
-    // ------------------------------------------------------------ その他
+    // -------------------------------------------------…
 
     @Override
     public boolean removeWhenFarAway(double distance) {
-        return false; //本家 canDespawn=false
+        return false; // 本家 canDespawn=false
     }
 
     @Override
@@ -221,7 +209,7 @@ public class EntityMotorman extends PathfinderMob {
         return false;
     }
 
-    // 経験値は落とさない (本家 getExperiencePoints=0。Mob の既定 xpReward も 0)
+    // 経験値は落とさない (本家 getExperiencePoints=0。
 
     /** 本家 isMotorman: 運転士 NPC か。 */
     public boolean isMotorman() {

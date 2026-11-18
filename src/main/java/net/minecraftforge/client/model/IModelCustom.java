@@ -1,9 +1,6 @@
 package net.minecraftforge.client.model;
 
-/**
- * 1.7.10 Forge の net.minecraftforge.client.model.IModelCustom スタブ。
- * Forge の OBJ/TCN カスタムモデル用インターフェース。
- */
+/** 1.7.10 Forge の net.minecraftforge.client.model.IM… */
 public interface IModelCustom {
     String getType();
 

@@ -1,5 +1,5 @@
 package jp.ngt.ngtlib.math;
-/** KaizPatchX's translation-invariant cubic evaluation. */
+/** KaizPatchX's translation-invariant cubic evaluati… */
 public final class CubicBezier2D {
     record Vector(double x,double y) {
         double length() {return Math.hypot(x,y);}

@@ -6,12 +6,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * 紙幣・硬貨。本家 {@code new ItemMultiIcon(RTMItem.MoneyType.values())} の移植。
- *
- * <p>本家はメタ 0〜8 で ￥1〜￥10000 を出す。1.21 にメタが無いので
- * {@link RealTrainModUnofficialComponents#ITEM_VARIANT} に本家と同じ id を持たせている。
- */
+/** 紙幣・硬貨。本家 new ItemMultiIcon(RTMItem.MoneyType.valu… */
 public class ItemMoney extends Item {
 
     /** 本家のメタ (MoneyType.id)。 */
@@ -27,7 +22,7 @@ public class ItemMoney extends Item {
         return Component.translatable("item." + RealTrainModUnofficial.MODID + ".money." + this.variant);
     }
 
-    /** 本家 {@code RTMItem.MoneyType}。 */
+    /** 本家 RTMItem.MoneyType。 */
     public enum MoneyType {
         Y1(0, 1),
         Y5(1, 5),

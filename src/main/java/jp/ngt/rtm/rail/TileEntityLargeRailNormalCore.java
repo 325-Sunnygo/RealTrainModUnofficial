@@ -4,7 +4,7 @@ import jp.ngt.rtm.rail.util.RailMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** 本家 jp.ngt.rtm.rail.TileEntityLargeRailNormalCore の忠実移植。 */
+/** 本家 jp.ngt.rtm.rail.TileEntityLargeRailNormalCore… */
 public class TileEntityLargeRailNormalCore extends TileEntityLargeRailCore {
 
     public TileEntityLargeRailNormalCore(BlockPos pos, BlockState state) {
@@ -102,8 +102,6 @@ public class TileEntityLargeRailNormalCore extends TileEntityLargeRailCore {
         RailMap map = this.getRailMap(null);
         if (map == null || map.getStartRP() == null || map.getEndRP() == null) {
             // ★レールを置いた直後は RailMap がまだ無い。
-            // WAILA 系 MOD は見ているブロックへ毎tick getCloneItemStack を呼ぶので、
-            // ここで落ちるとレール設置の瞬間にクライアントごと落ちる (実測)。
             return "Type:Normal";
         }
         if(isRailSection()) {

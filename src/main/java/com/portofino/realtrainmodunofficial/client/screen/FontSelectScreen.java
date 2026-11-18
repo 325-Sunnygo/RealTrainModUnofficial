@@ -13,12 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 
-/**
- * 看板の文字に使う OS フォントを選ぶ画面。
- * 本家 GuiSignboard は Swing の JFrame + JComboBox を出していたが、Minecraft は
- * java.awt.headless=true で起動されることがあり (特に macOS)、その状態では
- * ウィンドウを開けない。
- */
+/** 看板の文字に使う OS フォントを選ぶ画面。 */
 public class FontSelectScreen extends Screen {
     private static final int ROW_H = 14;
     private static final int LIST_TOP = 50;
@@ -138,8 +133,7 @@ public class FontSelectScreen extends Screen {
             graphics.drawString(this.font,
                     (scroll + 1) + " / " + (maxScroll() + 1), right - 40, this.height - 24, 0xAAAAAA, false);
         }
-        //★super.render は renderBackground をもう一度呼び、描いた内容の上に暗幕が乗る。
-        //  ウィジェットだけを描く (ぼかし根絶と同時に入れた描画順の修正)。
+        // ★super.render は renderBackground をもう一度呼び、描いた内容の上に…
         for (net.minecraft.client.gui.components.Renderable renderable : this.renderables) {
             renderable.render(graphics, mouseX, mouseY, partialTick);
         }

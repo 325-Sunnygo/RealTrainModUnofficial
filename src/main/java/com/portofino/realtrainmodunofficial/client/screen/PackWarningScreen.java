@@ -10,11 +10,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.List;
 
-/**
- * 前提パックが足りないことを知らせる画面。
- * 読み込み自体は通してあるので遊べるが、スクリプトが解決できなかった車両やレールは
- * 本来の見た目にならない (前面ガラスやドアが崩れる)。
- */
+/** 前提パックが足りないことを知らせる画面。 読み込み自体は通してあるので遊べるが、スクリプトが解決で… */
 @OnlyIn(Dist.CLIENT)
 public class PackWarningScreen extends Screen {
     private final Screen parent;

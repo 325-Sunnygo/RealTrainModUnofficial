@@ -9,10 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.model.ModelLoader のスクリプト互換移植。
- * パック内 .mqo/.mqoz を PolygonModel (グループ/面/頂点グラフ) として読む。
- */
+/** 本家 jp.ngt.ngtlib.renderer.model.ModelLoader のスクリプ… */
 public final class ModelLoader {
     private static final com.portofino.realtrainmodunofficial.util.ConfiguredModelCache<PolygonModel> CACHE =
         new com.portofino.realtrainmodunofficial.util.ConfiguredModelCache<>(ModelLoader::estimateMemoryBytes,model -> {});
@@ -32,7 +29,7 @@ public final class ModelLoader {
         return loadModel(resource, accuracy, new Object[0]);
     }
 
-    /** スクリプト形: ModelLoader.loadModel(resource, VecAccuracy.LOW, []) */
+    /** スクリプト形: ModelLoader.loadModel(resource, VecAccura… */
     public static PolygonModel loadModel(Object resource, VecAccuracy accuracy, Object... options) {
         VecAccuracy precision=accuracy==null?VecAccuracy.MEDIUM:accuracy;
         int mode=drawMode(options);
@@ -61,7 +58,7 @@ public final class ModelLoader {
         });
     }
 
-    /** Original InputStream[] overload; streams are owned and closed by the loader. */
+    /** Original InputStream[] overload; */
     public static PolygonModel loadModel(java.io.InputStream[] streams,String name,VecAccuracy accuracy,Object... options) {
         try {
             if(streams==null || streams.length==0 || streams[0]==null)throw new java.io.FileNotFoundException(name);
@@ -72,7 +69,7 @@ public final class ModelLoader {
         finally {if(streams!=null)for(var stream:streams)if(stream!=null)try {stream.close();}catch(IOException ignored) {}}
     }
 
-    /** MQO テキストから直接 (VehicleScriptRenderers が車体モデルグラフ生成に使用)。 */
+    /** MQO テキストから直接 (VehicleScriptRenderers が車体モデルグラフ生成に… */
     public static PolygonModel parse(byte[] bytes, String name) throws IOException {
         return parse(bytes,name,VecAccuracy.MEDIUM,4);
     }
@@ -98,8 +95,7 @@ public final class ModelLoader {
         if (text == null)throw new ModelFormatException("Unreadable model archive: "+name);
         if(!text.contains("Metasequoia Document") || !text.contains("Eof"))throw new ModelFormatException("Invalid MQO document: "+name);
         MqoValidation.validate(text,name);
-        // ★書式の解釈は MqoReader だけが持つ ([[MqoReader]])。ここは「スクリプトが見る
-        // グラフ」への組み立てに徹する: 座標は 0.01 倍、面の頂点は逆順格納。
+        // ★書式の解釈は MqoReader だけが持つ ([[MqoReader]])。
         MqoReader.read(text, new MqoReader.Handler() {
             private GroupObject current;
             private int mirrorAxis = -1;
@@ -157,19 +153,14 @@ public final class ModelLoader {
                 }
             }
         });
-        // 本家 PolygonModel のコンストラクタは init の直後に calcVertexNormals を回す。
-        // ★これが無いと face.vertexNormals が null のままで、スクリプト描画経路
-        // (drawModelGroup) が面法線だけで描く = 常にフラット陰影になる。
+        // 本家 PolygonModel のコンストラクタは init の直後に calcVertexNor…
         for (GroupObject group : model.groupObjects) {
             group.calcVertexNormals(model.accuracy);
         }
         return model;
     }
 
-    /**
-     * 本家 MqoModel.parseFaceQuads は addVertex(3 - i, ...) で頂点/UV を逆順格納する。
-     * 法線 (= CustomAnimator の左右判定 / CustomMonitor の向き) がこれに依存するため必ず一致させる。
-     */
+    /** 本家 MqoModel.parseFaceQuads は addVertex(3 - i, ...… */
     private static void addFace(GroupObject group,List<Vertex> verts,int count,int materialId,
                                 int[] vertexIndices,float[] uvs,VecAccuracy accuracy,int drawMode) {
         int[] order;

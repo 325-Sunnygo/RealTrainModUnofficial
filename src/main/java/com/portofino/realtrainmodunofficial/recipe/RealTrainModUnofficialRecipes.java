@@ -16,8 +16,7 @@ public final class RealTrainModUnofficialRecipes {
         DeferredRegister.create(Registries.RECIPE_SERIALIZER, RealTrainModUnofficial.MODID);
 
     public static final DeferredHolder<RecipeType<?>, RecipeType<WorkBenchRecipe>> WORK_BENCH_TYPE =
-        //★RecipeType.simple(...) は NeoForge 追加で Fabric に無い。
-        //  中身は toString だけ返す無名クラスなので、そのまま書く。
+        // ★RecipeType.simple(...) は NeoForge 追加で Fabric に無い。
         RECIPE_TYPES.register("work_bench", () -> new RecipeType<WorkBenchRecipe>() {
             @Override
             public String toString() {

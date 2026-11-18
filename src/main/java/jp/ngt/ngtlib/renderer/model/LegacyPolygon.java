@@ -1,6 +1,6 @@
 package jp.ngt.ngtlib.renderer.model;
 
-/** MQO triangulation and logical-face normals used by the original RTM triangle loader. */
+/** MQO triangulation and logical-face normals used b… */
 public final class LegacyPolygon {
     private LegacyPolygon() {}
 
@@ -14,7 +14,7 @@ public final class LegacyPolygon {
         return indices;
     }
 
-    /** Each source polygon contributes once, irrespective of triangle area or subdivision. */
+    /** Each source polygon contributes once, irrespectiv… */
     public static float[] faceNormal(float[] triangles) {
         double x = 0, y = 0, z = 0;
         for (int i = 0; i + 8 < triangles.length; i += 9) {

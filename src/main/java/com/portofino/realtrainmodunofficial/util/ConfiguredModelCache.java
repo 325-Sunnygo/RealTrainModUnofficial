@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.util;
 
 import java.util.function.*;
 
-/** One configured budget shared by native meshes and script model graphs. */
+/** One configured budget shared by native meshes and… */
 public final class ConfiguredModelCache<V> {
     private record Key(Object owner,String name) {}
     private record Value(Object model,long bytes,Runnable release) {}
@@ -19,6 +19,6 @@ public final class ConfiguredModelCache<V> {
         var value=SHARED.computeIfAbsent(new Key(owner,name),key->{V model=factory.apply(name);return model==null?null:new Value(model,weight.applyAsLong(model),()->release.accept(model));});
         return value==null?null:(V)value.model;
     }
-    /** Resource reload invalidates both representations of each source model together. */
+    /** Resource reload invalidates both representations… */
     public void clear(){SHARED.clear();}
 }

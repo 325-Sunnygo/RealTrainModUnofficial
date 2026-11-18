@@ -2,10 +2,7 @@ package jp.ngt.mccompat;
 
 import net.minecraft.util.Mth;
 
-/**
- * パックスクリプト互換: 1.7.10/1.12 の net.minecraft.util.MathHelper。
- * プリリュードで `var MathHelper = Java.type(...)` としてバインドされる。
- */
+/** パックスクリプト互換: 1.7.10/1.12 の net.minecraft.util.Math… */
 @SuppressWarnings("unused")
 public final class MathHelper {
     private MathHelper() {
@@ -76,10 +73,7 @@ public final class MathHelper {
         return Mth.clamp(value, min, max);
     }
 
-    // ---- 1.7.10 難読化名エイリアス ----
-    // 一部のパックスクリプト (SL の Render_DT580.js 等) は逆コンパイル名ではなく MCP 難読化名
-    // (func_*) で MathHelper を呼ぶ。これらが無いと render が例外→素モデル全描画にフォール
-    // バックし、スクリプトが隠すはずの部品まで出て「動くと二重に見える」不具合になっていた。
+    // ---- 1.7.10 難読化名エイリアス ---- 一部のパックスクリプト (SL の Rend…
     public static float func_76134_b(float rad) { return cos(rad); }           // cos
     public static float func_76126_a(float rad) { return sin(rad); }           // sin
     public static float func_76129_c(float value) { return sqrt_float(value); } // sqrt_float

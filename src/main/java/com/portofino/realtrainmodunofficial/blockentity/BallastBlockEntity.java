@@ -8,10 +8,7 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 道床(バラスト)ブロックのブロックエンティティ。
- * 対応するレールコア(LargeRailCore)の位置を保持し、道床を壊すとレールも撤去できるようにする。
- */
+/** 道床(バラスト)ブロックのブロックエンティティ。 */
 public class BallastBlockEntity extends BlockEntity {
     private BlockPos corePos;
 
@@ -24,12 +21,7 @@ public class BallastBlockEntity extends BlockEntity {
         setChanged();
     }
 
-    /**
-     * チャンクを組み立てるときに、道床の形 (4 隅の高さと貼るブロック) を渡す。
-     *
-     * <p>これがチャンクのメッシュへ焼かれるので、描いたあとは毎フレームの負担が無い。
-     * レールを敷き直したときは {@code requestModelDataUpdate} で作り直させる。
-     */
+    /** チャンクを組み立てるときに、道床の形 (4 隅の高さと貼るブロック) を渡す。 */
     @Override
     public net.neoforged.neoforge.client.model.data.ModelData getModelData() {
         if (this.level == null) {

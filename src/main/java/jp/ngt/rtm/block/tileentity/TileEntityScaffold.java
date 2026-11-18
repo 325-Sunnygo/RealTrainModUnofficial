@@ -4,7 +4,7 @@ import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEnti
 import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
 import org.openjdk.nashorn.api.scripting.AbstractJSObject;
 
-/** Legacy type predicate for scaffold tiles sharing RTMU's installed-object implementation. */
+/** Legacy type predicate for scaffold tiles sharing… */
 public final class TileEntityScaffold extends AbstractJSObject {
     public static final TileEntityScaffold TYPE = new TileEntityScaffold();
 

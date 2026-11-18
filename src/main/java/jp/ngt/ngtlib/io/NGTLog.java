@@ -10,10 +10,7 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-/**
- * 本家 NGTLib jp.ngt.ngtlib.io.NGTLog の移植。
- * ログ API (debug) はスクリプトからも呼ばれるためシグネチャを本家のまま維持。
- */
+/** 本家 NGTLib jp.ngt.ngtlib.io.NGTLog の移植。 */
 public final class NGTLog {
     private static final Logger logger = LogManager.getLogger("NGT");
 

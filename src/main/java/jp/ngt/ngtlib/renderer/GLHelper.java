@@ -1,10 +1,6 @@
 package jp.ngt.ngtlib.renderer;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.GLHelper のスクリプト互換ファサード。
- * 発光系 (setLightmapMaxBrightness/setBrightness) は GLRecorder に BRIGHTNESS として記録し、
- * 再生側が packedLight として使用する (1.7.10 の輝度パック形式は 1.21 と同一レイアウト)。
- */
+/** 本家 jp.ngt.ngtlib.renderer.GLHelper のスクリプト互換ファサード。 */
 @SuppressWarnings("unused")
 public final class GLHelper {
     private GLHelper() {
@@ -42,10 +38,7 @@ public final class GLHelper {
     public static double getPickedObjDepth(int index) { return LegacySelection.hit(index).depth(); }
     public static int getPickedObjId(int index) { return LegacySelection.hit(index).id(); }
 
-    // ---- ディスプレイリスト (NGTO Builder のミニチュアプレビューが使用) ----
-    // 本家の GL ディスプレイリストを GLRecorder のサブ記録として実装する:
-    // generateGLList → 非 0 ハンドル (0 を返すと JS 側の `!glList` 判定が毎フレーム真になり
-    // callList 分岐が永久に実行されず、プレビューが表示されない)。
+    // ---- ディスプレイリスト (NGTO Builder のミニチュアプレビューが使用) ----…
     private static final java.util.Map<Integer, GLRecorder> GL_LISTS =
         new java.util.concurrent.ConcurrentHashMap<>();
     private static final java.util.Set<DisplayList> LIST_HANDLES=java.util.concurrent.ConcurrentHashMap.newKeySet();
@@ -108,8 +101,7 @@ public final class GLHelper {
         }
     }
 
-    // ---- テクスチャ UV スクロール (方向幕/回転計器) ----
-    // テクスチャ行列の平行移動をコマンド状態と専用シェーダーへ保存する。
+    // ---- テクスチャ UV スクロール (方向幕/回転計器) ---- テクスチャ行列の平行移動を…
     public static void preMoveTexUV(float u, float v) {
         LegacyRenderState.current().pushTexture(u,v);
     }
@@ -118,7 +110,7 @@ public final class GLHelper {
         LegacyRenderState.current().popTexture();
     }
 
-    /** 本家setColor: 0xRRGGBB + alpha(0-255) を現在色に設定 (GLRecorder経由)。 */
+    /** 本家setColor: 0xRRGGBB + alpha(0-255) を現在色に設定 (GLRe… */
     public static void setColor(int rgb, int alpha) {
         float r = (rgb >> 16 & 0xFF) / 255.0F;
         float g = (rgb >> 8 & 0xFF) / 255.0F;
@@ -150,7 +142,7 @@ public final class GLHelper {
         return par1 instanceof DisplayList list ? list.value>0 : par1 instanceof Number number && number.intValue()>0;
     }
 
-    /** Compile, link and validate source strings in the active render context. */
+    /** Compile, link and validate source strings in the… */
     public static int getShaderProgram(String vsh, String fsh) {
         return LegacyShaderProgram.create(vsh,fsh);
     }

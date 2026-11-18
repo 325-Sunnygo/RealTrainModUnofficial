@@ -3,10 +3,7 @@ package jp.ngt.ngtlib.renderer;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.NGTTessellator (Tessellator ラッパ) のスクリプト互換。
- * 頂点列を蓄積し、draw で GLRecorder に DRAW_TESS として記録する。
- */
+/** 本家 jp.ngt.ngtlib.renderer.NGTTessellator (Tessell… */
 @SuppressWarnings("unused")
 public final class NGTTessellator implements IRenderer {
     public static final NGTTessellator instance = new NGTTessellator();
@@ -68,10 +65,7 @@ public final class NGTTessellator implements IRenderer {
         this.setColorRGBA_F(red, green, blue, 1.0F);
     }
 
-    /**
-     * 本家 Tessellator.setColorOpaque_I: パック済み RGB を不透明色として設定する。
-     * これが未実装だったため、本家の電線スクリプトが動いていなかった。
-     */
+    /** 本家 Tessellator.setColorOpaque_I: パック済み RGB を不透明色と… */
     public void setColorOpaque_I(int color) {
         this.setColorRGBA((color >>> 16) & 0xFF, (color >>> 8) & 0xFF, color & 0xFF, 255);
     }
@@ -86,10 +80,7 @@ public final class NGTTessellator implements IRenderer {
         this.colorDisabled = true;
     }
 
-    /**
-     * 本家 setTextureUV: 次の addVertex が使う UV を先に指定する。
-     * addVertexWithUV を使わず「UV を置いてから座標を置く」書き方のスクリプト用。
-     */
+    /** 本家 setTextureUV: 次の addVertex が使う UV を先に指定する。 */
     public void setTextureUV(double u, double v) {
         this.hasTexture = true;
         this.textureU = (float) u;
@@ -121,7 +112,7 @@ public final class NGTTessellator implements IRenderer {
         }
     }
 
-    /** Java callers may pass doubles; scripts use the original fixed float signature. */
+    /** Java callers may pass doubles; */
     public void addVertexWithUV(double... values) {
         if(values.length!=5)throw new IllegalArgumentException("Expected x,y,z,u,v");
         addVertexWithUV((float)values[0],(float)values[1],(float)values[2],(float)values[3],(float)values[4]);
@@ -140,11 +131,7 @@ public final class NGTTessellator implements IRenderer {
                 cr, cg, cb, ca, this.normalX, this.normalY, this.normalZ});
     }
 
-    /**
-     * 本家 getVertexState 相当の頂点スナップショット。
-     * 本家は半透明面の奥行きソート用に使うが、1.21 では BufferBuilder 側が
-     * ソートするため、ここは「積んだ頂点をそのまま保持して復元できる」ことだけ保証する。
-     */
+    /** 本家 getVertexState 相当の頂点スナップショット。 */
     public static final class TesselatorVertexState {
         private final List<float[]> verts;
         private final int mode;

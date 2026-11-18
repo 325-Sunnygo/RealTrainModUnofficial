@@ -9,12 +9,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * パックスクリプト互換: 1.7.10 の net.minecraft.client.renderer.texture.TextureUtil。
- * func_110996_a (glGenTextures) は疑似ハンドルを払い出し、
- * func_110987_a (uploadTextureImageAllocate) は BufferedImage を DynamicTexture として
- * TextureManager に登録する。GL11Facade.glBindTexture がハンドル→ResourceLocation を解決する。
- */
+/** パックスクリプト互換: 1.7.10 の net.minecraft.client.rendere… */
 public final class TextureUtil {
     private static final AtomicInteger NEXT_ID = new AtomicInteger(1);
     private static final Map<Integer, net.minecraft.resources.ResourceLocation> HANDLE_TO_RL = new ConcurrentHashMap<>();

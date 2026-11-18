@@ -9,9 +9,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 
-/**
- * オンライン連携のクライアントフック (タイトル画面のアップデート通知のみ)。
- */
+/** オンライン連携のクライアントフック (タイトル画面のアップデート通知のみ)。 */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class OnlineClientHooks {
 

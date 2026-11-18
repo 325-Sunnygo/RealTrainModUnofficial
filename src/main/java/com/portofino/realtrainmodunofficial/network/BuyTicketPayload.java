@@ -14,10 +14,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 本家 GuiTicketVendor / VendorScreenSelectTicket の「切符」「回数券」ボタン。
- * 本家は PacketNotice("vendor:ticket" / "vendor:ticketbook") を投げていた。
- */
+/** 本家 GuiTicketVendor / VendorScreenSelectTicket の「切… */
 public record BuyTicketPayload(BlockPos pos, boolean book) implements CustomPacketPayload {
 
     public static final Type<BuyTicketPayload> TYPE = new Type<>(

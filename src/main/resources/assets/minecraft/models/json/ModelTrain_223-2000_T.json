@@ -19,9 +19,9 @@
 		"空き", "空き", "団体", "臨時", "試運転", "回送"
 	],
 
-	"sound_Horn": "rtm:sounds/train/rtm_223mh.ogg",
-	"sound_BrakeRelease": "rtm:sounds/train/rtm_223_release.ogg",
-	"sound_BrakeRelease2": "rtm:sounds/train/brakeR_w.ogg",
+	"sound_Horn": "sounds/train/rtm_223mh.ogg",
+	"sound_BrakeRelease": "sounds/train/rtm_223_release.ogg",
+	"sound_BrakeRelease2": "sounds/train/brakeR_w.ogg",
 	"soundScriptPath": "scripts/sound_223.js",
 	
 	"interiorLights": [

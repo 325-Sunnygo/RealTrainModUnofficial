@@ -71,7 +71,6 @@ public class TrainControlScreen extends Screen {
                 addArrowButton(left + 152, top + 76, ">", "next_destination");
             }
             // アナウンスも方向幕と同じ回し方にする (最後まで行ったら最初に戻る)。
-            // アナウンスを持たないパックでは null と出して、押せなくする。
             if (announcementCount() == 0) {
                 addArrowButton(left + 4, top + 100, "<", "noop");
                 addButton(left + 28, top + 100, 120, "アナウンス null", "noop", 0);
@@ -210,20 +209,13 @@ public class TrainControlScreen extends Screen {
         return train.isPantographUp() ? "パンタ 上" : "パンタ 下";
     }
 
-    /**
-     * このパックが持つアナウンスの数。0 ならアナウンス機能なし。
-     * 表示名 (sound_Announcement の 1 列目) は省略されることがあるので、数は音声の数で
-     * 数える。名前だけで数えると、名前が無いアナウンスを取りこぼす。
-     */
+    /** このパックが持つアナウンスの数。0 ならアナウンス機能なし。 */
     private int announcementCount() {
         VehicleDefinition definition = VehicleRegistry.getById(train.getVehicleId());
         return definition == null ? 0 : definition.getAnnouncementSounds().size();
     }
 
-    /**
-     * 本家 sound_Announcement は [[表示名, 音声パス], ...] なので、指定された表示名を出す。
-     * 名前が未指定 / パック未登録のときだけ従来の「アナウンス N」にフォールバックする。
-     */
+    /** 本家 sound_Announcement は [[表示名, 音声パス], ...] なので、指定… */
     private String announcementLabel() {
         int count = announcementCount();
         if (count == 0) {
@@ -252,7 +244,7 @@ public class TrainControlScreen extends Screen {
             var state = train == null ? null : train.getResourceState();
             var set = state == null ? null : state.getResourceSet();
             var config = set == null ? null : set.getConfig();
-            return config == null ? null : config.rollsignNames;
+            return config instanceof jp.ngt.rtm.modelpack.cfg.TrainConfig tc ? tc.rollsignNames : null;
         } catch (Throwable ignored) {
             return null;
         }
@@ -263,7 +255,7 @@ public class TrainControlScreen extends Screen {
         if (count == 0) {
             return "方向幕 null";
         }
-        String[] names = train.getResourceState().getResourceSet().getConfig().rollsignNames;
+        String[] names = ((jp.ngt.rtm.modelpack.cfg.TrainConfig) train.getResourceState().getResourceSet().getConfig()).rollsignNames;
         return "方向幕 " + names[Math.floorMod(train.getDestinationIndex(), count)];
     }
 

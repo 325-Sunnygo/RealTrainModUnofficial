@@ -17,10 +17,7 @@ import org.jetbrains.annotations.NotNull;
 
 import static com.portofino.realtrainmodunofficial.RealTrainModUnofficial.MODID;
 
-/**
- * 自動車の描画。
- * エンティティの vehicleId が指す車両定義のモデル/テクスチャ/レンダースクリプトを描画する。
- */
+/** 自動車の描画。 エンティティの vehicleId が指す車両定義のモデル/テクスチャ/レンダース… */
 @OnlyIn(Dist.CLIENT)
 public final class CarRenderer extends EntityRenderer<CarEntity> {
     private static final ResourceLocation FALLBACK_TEXTURE =
@@ -39,10 +36,9 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
     @Override
     public void render(@NotNull CarEntity entity, float entityYaw, float partialTick, PoseStack poseStack,
                        @NotNull MultiBufferSource bufferSource, int packedLight) {
-        // SRB のマーカー描画基準(MCWrapper.getPosX → renderPosX)が PoseStack 原点と同じ
-        // partialTick で entity 補間位置を出せるよう、現在の partialTick を共有する。
+        // SRB のマーカー描画基準(MCWrapper.getPosX → renderPosX)が Po…
         com.portofino.realtrainmodunofficial.client.ScriptClientCompat.currentRenderPartialTick = partialTick;
-        // スクリプトが読む Minecraft/Player ラッパー (field_71462_r 等) を毎フレーム更新
+        // スクリプトが読む Minecraft/Player ラッパー (field_71462_r 等)…
         jp.ngt.mccompat.Minecraft.refresh();
         VehicleDefinition def = VehicleRegistry.getById(entity.getVehicleId());
         if (def == null) {
@@ -50,8 +46,7 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
             return;
         }
 
-        // 本家式: rendererPath スクリプトを Nashorn (VehicleScriptRenderers) で実行。
-        // SRB3/NGTO Builder の GUI・マーカー・入力処理はこの render 内で動く。
+        // 本家式: rendererPath スクリプトを Nashorn (VehicleScriptRe…
         var scripted = com.portofino.realtrainmodunofficial.client.render.VehicleScriptRenderers.get(def);
         if (scripted != null) {
             poseStack.pushPose();
@@ -67,14 +62,12 @@ public final class CarRenderer extends EntityRenderer<CarEntity> {
             }
         }
         // ★スクリプトを持つ車両は、それが何も描かなくても素モデルへ逃がさない (本家に代替描画は無い)。
-        //   スクリプトを持たない車両だけがこの経路。
         if (scripted == null) {
             MqoModelLoader.MqoModel model = MqoModelLoader.loadModelForVehicle(def);
             if (model != null) {
                 poseStack.pushPose();
                 try {
                     // 本家 RenderVehicleBase と同じ姿勢: ヨー、ピッチ、ロールの順。
-                    // 符号は RTMU の本家車レンダラ (NgtoVehicleRenderer) に合わせる。
                     poseStack.mulPose(Axis.YP.rotationDegrees(-entityYaw));
                     poseStack.mulPose(Axis.XP.rotationDegrees(
                         Mth.lerp(partialTick, entity.xRotO, entity.getXRot())));

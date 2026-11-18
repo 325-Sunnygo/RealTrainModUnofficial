@@ -8,10 +8,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
 
-/**
- * 本家 jp.ngt.rtm.rail.BlockLargeRailSwitchBase の忠実移植。
- * (本家の onNeighborBlockChange はコメントアウト済 = 分岐のRS判定は Point.onUpdate のポーリング)
- */
+/** 本家 jp.ngt.rtm.rail.BlockLargeRailSwitchBase の忠実移植。 */
 public class BlockLargeRailSwitchBase extends BlockLargeRailBase {
     public static final MapCodec<BlockLargeRailSwitchBase> CODEC = simpleCodec(props -> new BlockLargeRailSwitchBase(2, props));
 

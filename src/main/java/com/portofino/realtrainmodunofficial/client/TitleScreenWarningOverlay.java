@@ -22,15 +22,7 @@ public final class TitleScreenWarningOverlay {
     // 前提パック不足の警告をこのセッションで一度出したか。
     private static boolean warningOpened;
 
-    /**
-     * タイトル画面が開いたときの順番:
-     * <ol>
-     * README 未同意のパックがあれば、まず同意画面を出す
-     * 同意が全部片付いたら、前提パックが足りないものを警告画面 (OK) で知らせる
-     * </ol>
-     * 同意画面は閉じるとタイトルへ戻るので、そこでこのイベントがもう一度走り、
-     * 未決が無くなった時点で警告へ進む。同意画面が無い環境では最初の 1 回で警告が出る。
-     */
+    /** タイトル画面が開いたときの順番: <ol> README 未同意のパックがあれば、まず同意画面を出… */
     @SubscribeEvent
     public static void onScreenInit(ScreenEvent.Init.Post event) {
         if (!(event.getScreen() instanceof TitleScreen)) {

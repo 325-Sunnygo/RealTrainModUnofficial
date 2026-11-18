@@ -21,15 +21,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 移動装置。本家 {@code jp.ngt.rtm.block.tileentity.TileEntityMovingMachine} の移植。
- *
- * <p>2 つ設置してバールで繋ぐと、その 2 点を結ぶ向きへ、指定した大きさのブロックの塊を運ぶ。
- * 運んでいる間はブロックを消して {@link EntityMMBoundingBox} を置き、着いたら戻す。
- * どちらの端にレッドストーン入力が来ているかで進む向きが決まる。
- *
- * <p>★本家の「乗り物生成器」(メタ 1 / {@code generateVehicle}) は未移植。
- */
+/** 移動装置。本家 jp.ngt.rtm.block.tileentity.TileEntityMov… */
 public class TileEntityMovingMachine extends BlockEntity {
 
     public boolean guideVisibility = true;
@@ -185,7 +177,7 @@ public class TileEntityMovingMachine extends BlockEntity {
         double mX = this.posX - this.prevPosX;
         double mY = this.posY - this.prevPosY;
         double mZ = this.posZ - this.prevPosZ;
-        //本家: 先に全部の箱を動かしてから、当たり判定を回す
+        // 本家: 先に全部の箱を動かしてから、当たり判定を回す
         for (EntityMMBoundingBox entity : this.bbList) {
             entity.setPos(entity.getX() + mX, entity.getY() + mY, entity.getZ() + mZ);
         }
@@ -241,9 +233,7 @@ public class TileEntityMovingMachine extends BlockEntity {
         this.sync();
     }
 
-    /**
-     * @param mode 0 = ブロックを消して箱を置く / 1 = ブロックを戻す
-     */
+    
     private void editBlock(int mode) {
         if (this.level == null || (mode == 1 && this.blocksObject == null)) {
             return;
@@ -254,7 +244,7 @@ public class TileEntityMovingMachine extends BlockEntity {
 
         if (mode == 0) {
             List<BlockSet> list = new ArrayList<>();
-            //本家と同じ 2 パス: 先に全部読んでから消す (途中で崩れないように)
+            // 本家と同じ 2 パス: 先に全部読んでから消す (途中で崩れないように)
             for (int j = 0; j < this.height; ++j) {
                 for (int i = 0; i < this.width; ++i) {
                     for (int k = 0; k < this.depth; ++k) {
@@ -400,7 +390,7 @@ public class TileEntityMovingMachine extends BlockEntity {
                 pair.reset(false);
             }
         }
-        //運んでいる途中なら戻してから解除する
+        // 運んでいる途中なら戻してから解除する
         if (this.blocksObject != null) {
             this.editBlock(1);
         }
@@ -423,9 +413,7 @@ public class TileEntityMovingMachine extends BlockEntity {
     /** 乗り物生成器: 作る乗り物の種類 (0=車 / 1=船 / 2=飛行機)。 */
     public int vehicleType;
 
-    /**
-     * 本家 generateVehicle: 範囲のブロックを NGTO に写して消し、その姿の乗り物を湧かせる。
-     */
+    /** 本家 generateVehicle: 範囲のブロックを NGTO に写して消し、その姿の乗り物を… */
     public void generateVehicle(net.minecraft.world.entity.player.Player player) {
         if (this.level == null || this.level.isClientSide()) {
             return;
@@ -463,7 +451,7 @@ public class TileEntityMovingMachine extends BlockEntity {
             this.getBlockPos().getY() + 0.5D, this.getBlockPos().getZ() + 0.5D);
         jp.ngt.rtm.entity.vehicle.VehicleNGTO obj =
             new jp.ngt.rtm.entity.vehicle.VehicleNGTO(ngto, 0.5F, 0.5F, 0.5F, 1.0F);
-        //乗る位置は塊の上に置く (本家は GUI で調整するが、まず実用値)
+        // 乗る位置は塊の上に置く (本家は GUI で調整するが、まず実用値)
         obj.riderPosY = this.height + 0.5F;
         vehicle.setNGTO(obj);
         this.level.addFreshEntity(vehicle);

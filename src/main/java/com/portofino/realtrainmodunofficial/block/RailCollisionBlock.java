@@ -25,14 +25,10 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * レールの「薄い当たり判定」専用ブロック。
- * 見た目は描かず、破壊されたら対応するレールコアも削除する。
- */
+/** レールの「薄い当たり判定」専用ブロック。 見た目は描かず、破壊されたら対応するレールコアも削除する。 */
 public class RailCollisionBlock extends BaseEntityBlock {
     public static final MapCodec<RailCollisionBlock> CODEC = simpleCodec(RailCollisionBlock::new);
-    // 本家RTM準拠: ブロック底からレール面の高さまでのスラブ box(0,0,0,16,railTop,16)。
-    // 平坦レールは surfaceY=0 → 1px の薄いスラブ(=カーペット)。
+    // 本家RTM準拠: ブロック底からレール面の高さまでのスラブ box(0,0,0,16,railTo…
     private static VoxelShape railShape(BlockGetter level, BlockPos pos) {
         float s = 0.0f;
         if (level.getBlockEntity(pos) instanceof RailCollisionBlockEntity rbe) {
@@ -63,8 +59,6 @@ public class RailCollisionBlock extends BaseEntityBlock {
     @Override
     public RenderShape getRenderShape(BlockState state) {
         // ★道床 (レール脇の砂利) はこのブロックが描く。
-        // 本家 1.7.10 も、レール本体を幅ぶん敷き詰めて砂利のテクスチャで描いていた。
-        // BallastBlock は登録だけされていて実際には置かれない。
         return RenderShape.MODEL;
     }
 
@@ -85,8 +79,7 @@ public class RailCollisionBlock extends BaseEntityBlock {
 
     @Override
     public ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state) {
-        // 中ボタン(ピックブロック): レール当たり判定からコアを辿り、種類+形状(長さ)を
-        // まるごとコピーした RailItem を返す。地面を右クリックすれば同じレールを再配置できる。
+        // 中ボタン(ピックブロック): レール当たり判定からコアを辿り、種類+形状(長さ)を まるごとコピー…
         BlockEntity be = level.getBlockEntity(pos);
         if (be instanceof RailCollisionBlockEntity rbe) {
             BlockPos corePos = rbe.getCorePos();

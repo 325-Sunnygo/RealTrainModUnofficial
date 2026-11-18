@@ -12,15 +12,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
-/**
- * 弾の描画。本家 {@code jp.ngt.rtm.entity.RenderBullet} の pass 0 の移植。
- *
- * <p>本家と同じモデル ({@code cannonball.obj} / {@code 200mm_rocket.mqo}) を
- * mod の jar から読んで使う。ライフル弾で「まだブロックを壊せる = 飛翔中」のものは
- * 本家と同じく<b>発光した細長い形</b>で描く (曳光弾)。
- *
- * <p>★本家 pass 1 のロケットの炎と、撃った人に出るマズルフラッシュ / レーザーの光条は未移植。
- */
+/** 弾の描画。本家 jp.ngt.rtm.entity.RenderBullet の pass 0 の… */
 public class BulletRenderer extends EntityRenderer<EntityBullet> {
 
     private static final String MODEL_CANNON = "models/entity/cannonball.obj";
@@ -47,7 +39,7 @@ public class BulletRenderer extends EntityRenderer<EntityBullet> {
             || type == BulletType.rifle_12_7mm) && entity.getCanBreakBlock();
 
         if (brightBullet) {
-            //本家: テクスチャを切って発光させ、縦に伸ばした形を黄色 (1.0,1.0,0.25) で描く
+            // 本家: テクスチャを切って発光させ、縦に伸ばした形を黄色 (1.0,1.0,0.25) で描く
             if (type == BulletType.rifle_12_7mm) {
                 poseStack.scale(0.1F, 1.5F, 0.1F);
             } else {

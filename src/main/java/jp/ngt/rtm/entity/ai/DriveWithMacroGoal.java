@@ -7,10 +7,7 @@ import net.minecraft.world.entity.ai.goal.Goal;
 
 import java.util.EnumSet;
 
-/**
- * 本家 jp.ngt.rtm.entity.ai.EntityAIDriveWithMacro の移植。
- * GUI で選んだマクロ (.txt) を相対時刻どおりに実行して運転する。
- */
+/** 本家 jp.ngt.rtm.entity.ai.EntityAIDriveWithMacro の移… */
 public class DriveWithMacroGoal extends Goal {
 
     private final EntityMotorman motorman;
@@ -18,7 +15,7 @@ public class DriveWithMacroGoal extends Goal {
 
     public DriveWithMacroGoal(EntityMotorman motorman) {
         this.motorman = motorman;
-        this.setFlags(EnumSet.of(Flag.MOVE)); //本家 setMutexBits(1)
+        this.setFlags(EnumSet.of(Flag.MOVE)); // 本家 setMutexBits(1)
     }
 
     public void setMacro(String[] args) {
@@ -27,7 +24,7 @@ public class DriveWithMacroGoal extends Goal {
 
     @Override
     public boolean canUse() {
-        //別 mod が運転を握っている間は本家 AI を止める (打ち消し合って動かなくなる)
+        // 別 mod が運転を握っている間は本家 AI を止める (打ち消し合って動かなくなる)
         if (this.motorman.isExternallyDriven()) {
             return false;
         }
@@ -53,7 +50,7 @@ public class DriveWithMacroGoal extends Goal {
 
     @Override
     public boolean requiresUpdateEveryTick() {
-        return true; //マクロは相対時刻きっかりに実行する
+        return true; // マクロは相対時刻きっかりに実行する
     }
 
     @Override

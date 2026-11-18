@@ -13,11 +13,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.function.Supplier;
 
-/**
- * 前提パックの不足チェック。
- * 分割配布のパックは、車両やレールの定義だけを持ち、実体のスクリプトは前提パック側に置く
- * ことがある (例: 車両パックが定義、描画スクリプトはベースの共通パック)。
- */
+/** 前提パックの不足チェック。 分割配布のパックは、車両やレールの定義だけを持ち、実体のスクリプトは前… */
 public final class PackPrerequisiteCheck {
 
     /** 警告画面に並べる最大件数 (同じ前提パック不足で何百件も出るため)。 */
@@ -39,17 +35,10 @@ public final class PackPrerequisiteCheck {
         return Collections.unmodifiableList(new ArrayList<>(MISSING));
     }
 
-    /**
-     * 全パックのロード後に呼ぶ。解決できない前提を集めておく (ここでは止めない)。
-     * スクリプトの解決は全パック横断の索引まで見た上での判定なので、
-     * ここで見つからなければ本当にファイルがどこにも無い。
-     */
+    /** 全パックのロード後に呼ぶ。解決できない前提を集めておく (ここでは止めない)。 */
     public static void verify() {
         List<String> missing = new ArrayList<>();
         // ★同じ (パック, スクリプト) を二度調べない。
-        // readScriptContent はパック zip を先頭から展開して走査するので、
-        // 車両 1 両ごとに呼ぶと数百 MB のパックを何百回も舐めることになり、
-        // 起動が固まったように見える。1 パック 1 スクリプトにつき 1 回で済ませる。
         Map<String, Boolean> resolved = new HashMap<>();
 
         for (VehicleDefinition def : VehicleRegistry.getAll()) {
@@ -93,10 +82,7 @@ public final class PackPrerequisiteCheck {
             "[RTMU] {}", buildMessage(missing));
     }
 
-    /**
-     * スクリプトが解決できるか。
-     * まず全パック横断の索引で引く (索引は 1 回作れば以降は O(1))。
-     */
+    /** スクリプトが解決できるか。 まず全パック横断の索引で引く (索引は 1 回作れば以降は O(1))。 */
     private static boolean resolvable(String scriptPath, Supplier<String> fullRead) {
         try {
             if (jp.ngt.ngtlib.io.NGTFileLoader.findAsset(scriptPath) != null) {

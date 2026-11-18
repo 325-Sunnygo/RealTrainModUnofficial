@@ -6,10 +6,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/**
- * jp.ngt.rtm.rail の BlockEntityType 登録 (1.21)。
- * メインクラスから REGISTER.register(modBus) される。
- */
+/** jp.ngt.rtm.rail の BlockEntityType 登録 (1.21)。 */
 public final class RTMRailBlockEntities {
     public static final DeferredRegister<BlockEntityType<?>> REGISTER =
             DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, RealTrainModUnofficial.MODID);
@@ -45,8 +42,7 @@ public final class RTMRailBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TileEntityMarker>> MARKER =
             REGISTER.register("marker", () -> BlockEntityType.Builder.of(TileEntityMarker::new,
                     RTMRailBlocks.MARKER.get(), RTMRailBlocks.MARKER_SWITCH.get(),
-                    // ★marker_straight を追加した際にここへ入れ忘れると、
-                    //   設置時に「Invalid block entity ... got marker_straight」でクラッシュする。
+                    // ★marker_straight を追加した際にここへ入れ忘れると、 設置時に「Invalid b…
                     RTMRailBlocks.MARKER_STRAIGHT.get(),
                     // legacy_* は本家 BlockMarker にエイリアス (同じ BE = 同じ処理)
                     com.portofino.realtrainmodunofficial.RealTrainModUnofficialBlocks.MARKER.get(),

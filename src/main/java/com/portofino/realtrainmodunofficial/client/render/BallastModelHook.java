@@ -9,12 +9,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ModelEvent;
 
-/**
- * 道床のベイクドモデルを {@link BallastModel} へ差し替える。
- *
- * <p>{@code ballast.json} が焼かれた結果 (1/16 の平らな板) を「形が出せないときの控え」として
- * 抱えたまま包む。これでレールコアがまだ読めていない一瞬でも、道床が消えたりしない。
- */
+/** 道床のベイクドモデルを BallastModel へ差し替える。 */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT,
     bus = EventBusSubscriber.Bus.MOD)
 public final class BallastModelHook {
@@ -22,17 +17,7 @@ public final class BallastModelHook {
     private BallastModelHook() {
     }
 
-    /**
-     * 道床を描くブロック。
-     *
-     * <p>★敷設で実際に置かれるのは {@code jp.ngt.rtm.rail} 側のレールブロック。
-     * {@code RailMap.setRail} が LARGE_RAIL_BASE を敷き詰め、コアだけ別ブロックになる。
-     * 本家でも {@code BlockLargeRailBase.getRenderType()} = renderIdBlockRail で、
-     * コア (BlockLargeRailCore extends BlockLargeRailBase) も同じ道床を描く。
-     *
-     * <p>坂レール (LARGE_RAIL_SLOPE_BASE) だけは高さをブロックステートに持つ別系統で、
-     * 静的モデル (large_rail_slope_h0〜h15) がそのまま道床になっているので触らない。
-     */
+    /** 道床を描くブロック。 ★敷設で実際に置かれるのは jp.ngt.rtm.rail 側のレールブロッ… */
     private static java.util.List<net.minecraft.world.level.block.Block> targets() {
         return java.util.List.of(
             jp.ngt.rtm.rail.RTMRailBlocks.LARGE_RAIL_BASE.get(),

@@ -13,10 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * 既存の描画コードが「実際に吐いた頂点」をそのまま捕まえて、1 つのメッシュ (VBO) に統合する。
- * 本家 RTM 1.7.10 はレール 1 本をディスプレイリストに 1 回焼いて GPU に置きっぱなしにしていた。
- */
+/** 既存の描画コードが「実際に吐いた頂点」をそのまま捕まえて、1 つのメッシュ (VBO) に統合する。 */
 public final class MeshCapture {
 
     private MeshCapture() {
@@ -49,8 +46,6 @@ public final class MeshCapture {
                     continue;
                 }
                 // RenderType 自身の format/mode で BufferBuilder を作る。
-                // シェーダー MOD (Iris) は RenderType の頂点フォーマットを拡張し、
-                // BufferBuilder 経由で接線などを補完するため、この経路なら追従できる。
                 BufferBuilder builder = Tesselator.getInstance().begin(type.mode(), type.format());
                 for (int i = 0; i < sink.count; i++) {
                     int f = i * 8;
@@ -88,11 +83,7 @@ public final class MeshCapture {
         }
     }
 
-    /**
-     * VertexConsumer として呼ばれた内容をそのまま配列に貯める。
-     * 呼び出し側は addVertex(...).setColor(...).setUv(...).setOverlay(...).setLight(...).setNormal(...)
-     * の順で使う (バニラの標準的な並び)。setOverlay/setLight は既定実装で setUv1/setUv2 に落ちる。
-     */
+    /** VertexConsumer として呼ばれた内容をそのまま配列に貯める。 */
     private static final class Sink implements VertexConsumer {
         // x,y,z,u,v,nx,ny,nz
         private float[] data = new float[8 * 4096];

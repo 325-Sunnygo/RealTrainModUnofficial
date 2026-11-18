@@ -5,11 +5,7 @@ import net.minecraft.core.particles.ParticleTypes;
 
 import java.util.Map;
 
-/**
- * 1.7.10 net.minecraft.util.EnumParticleTypes の互換。
- * SL パック (RTM Taiwan SL Pack 等) の描画スクリプトは蒸気/煙の演出で
- * entity.field_70170_p.func_175688_a(EnumParticleTypes.EXPLOSION_NORMAL, ...) を呼ぶ。
- */
+/** 1.7.10 net.minecraft.util.EnumParticleTypes の互換。 */
 public enum EnumParticleTypes {
     EXPLOSION_NORMAL(ParticleTypes.POOF, "explode"),
     EXPLOSION_LARGE(ParticleTypes.EXPLOSION, "largeexplode"),
@@ -46,10 +42,7 @@ public enum EnumParticleTypes {
         BY_LEGACY = java.util.Collections.unmodifiableMap(m);
     }
 
-    /**
-     * 1.7.10 の粒子名 ("explode" 等) から ParticleOptions を引く。
-     * 未知の名前は煙 (SMOKE) にフォールバック (エラーで描画を止めないため)。
-     */
+    /** 1.7.10 の粒子名 ("explode" 等) から ParticleOptions を引く。 */
     public static ParticleOptions particleByLegacyName(String name) {
         if (name != null) {
             EnumParticleTypes t = BY_LEGACY.get(name.toLowerCase(java.util.Locale.ROOT));

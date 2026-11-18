@@ -5,12 +5,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
-/**
- * 本家 {@code jp.ngt.rtm.entity.EntityATC} の 1.21 移植。
- *
- * <p>ATC 地上子。配線 (コネクタ) で給電された値を真下のレールの signal に書き込む。
- * 壊したらレール信号を 0 に戻し、ATC アイテムをドロップする。
- */
+/** 本家 jp.ngt.rtm.entity.EntityATC の 1.21 移植。 ATC 地上子。 */
 public class EntityATC extends EntityElectricalWiring {
     private int signalLevel;
 
@@ -53,12 +48,12 @@ public class EntityATC extends EntityElectricalWiring {
     }
 
     @Override
-    public void remove(RemovalReason reason) {
-        // 本家 attackEntityFrom: 撤去時にレール信号を 0 に戻す。
+    public boolean hurt(net.minecraft.world.damagesource.DamageSource source, float amount) {
+        // 本家 EntityATC.attackEntityFrom: ダメージを受けた時点でレール信号を…
         if (!this.level().isClientSide()) {
             this.setSignalToRail(0);
         }
-        super.remove(reason);
+        return super.hurt(source, amount);
     }
 
     @Override
@@ -68,7 +63,17 @@ public class EntityATC extends EntityElectricalWiring {
     }
 
     @Override
+    public String getSubType() {
+        return "Antenna_Send";
+    }
+
+    @Override
     protected String getDefaultName() {
         return "ATC_01";
+    }
+
+    @Override
+    protected ItemStack getItem() {
+        return new ItemStack(com.portofino.realtrainmodunofficial.RealTrainModUnofficialItems.ATC_ITEM.get());
     }
 }

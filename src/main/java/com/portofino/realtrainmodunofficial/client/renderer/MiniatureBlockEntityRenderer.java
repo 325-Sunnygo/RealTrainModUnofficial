@@ -14,12 +14,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.world.phys.AABB;
 import com.mojang.math.Axis;
 
-/**
- * 設置済みミニチュアの描画 (neo mcte)。本家 MCTE RenderMiniature 相当。
- * 中身の BlockSet をバニラのブロック描画でそのまま描き、
- * 行列側で縮尺・回転・オフセットを掛ける。
- * ★負荷対策: ミニチュアは中身が数千ブロックになり得るので、
- */
+/** 設置済みミニチュアの描画 (neo mcte)。 */
 public class MiniatureBlockEntityRenderer implements BlockEntityRenderer<MiniatureBlockEntity> {
 
     /** これより遠い模型は描かない (ブロック)。 */
@@ -76,7 +71,6 @@ public class MiniatureBlockEntityRenderer implements BlockEntityRenderer<Miniatu
                 dispatcher.renderSingleBlock(set.state, poseStack, buffer, light, OverlayTexture.NO_OVERLAY);
             } catch (Throwable ignored) {
                 // 描けないブロック (専用レンダラ前提の MOD ブロック等) は飛ばす。
-                // 1 個の失敗で模型ごと消さない。
             }
             poseStack.popPose();
         }

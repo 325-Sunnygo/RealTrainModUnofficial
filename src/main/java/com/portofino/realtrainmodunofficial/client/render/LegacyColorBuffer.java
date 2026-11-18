@@ -3,7 +3,7 @@ package com.portofino.realtrainmodunofficial.client.render;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
 
-/** Bake the legacy current color into vertices before deferred batches are submitted. */
+/** Bake the legacy current color into vertices befor… */
 public final class LegacyColorBuffer {
     private LegacyColorBuffer() {}
     public static MultiBufferSource tint(MultiBufferSource source,float red,float green,float blue,float alpha) {

@@ -3,20 +3,13 @@ package jp.ngt.ngtlib.util;
 import jp.ngt.ngtlib.renderer.GLRecorder;
 import net.minecraft.client.Minecraft;
 
-/**
- * 本家 jp.ngt.ngtlib.util.NGTUtilClient のスクリプト互換ファサード。
- * bindTexture は GLRecorder に BIND_TEXTURE として記録され、
- * 以降の描画 (parts.render / tessellator / model.renderPart) にテクスチャ差し替えとして効く。
- */
+/** 本家 jp.ngt.ngtlib.util.NGTUtilClient のスクリプト互換ファサード。 */
 @SuppressWarnings("unused")
 public final class NGTUtilClient {
     private NGTUtilClient() {
     }
 
-    /**
-     * スクリプト互換の Minecraft ラッパーを返す (field_71462_r/field_71439_g 等の
-     * SRG フィールドを SRB3/NGTO Builder が直接読むため)。最新値へ refresh してから返す。
-     */
+    /** スクリプト互換の Minecraft ラッパーを返す (field_71462_r/field_7… */
     public static jp.ngt.mccompat.Minecraft getMinecraft() {
         jp.ngt.mccompat.Minecraft.refresh();
         return jp.ngt.mccompat.Minecraft.func_71410_x();
@@ -26,12 +19,7 @@ public final class NGTUtilClient {
         return Minecraft.getInstance();
     }
 
-    /**
-     * クライアントプレイヤー。NGTUtil#getClientPlayer からリフレクションで呼ばれる。
-     * NGTUtil 側に置くと、戻り値の型と Minecraft.player (LocalPlayer) の
-     * 代入互換性を JVM の検証器が確かめるために LocalPlayer を読み込み、専用サーバーで
-     * NGTUtil ごとロードできなくなる。クライアント専用のこちらに置くこと。
-     */
+    /** クライアントプレイヤー。NGTUtil#getClientPlayer からリフレクションで呼ばれ… */
     public static net.minecraft.world.entity.player.Player getClientPlayer() {
         return Minecraft.getInstance().player;
     }
@@ -42,10 +30,7 @@ public final class NGTUtilClient {
         return level != null ? new jp.ngt.mccompat.WorldCompat(level) : null;
     }
 
-    /**
-     * スクリプトが渡すテクスチャ指定を記録する。null でデフォルトテクスチャへ復帰。
-     * 解決できない型でも黙って捨ててはいけない。
-     */
+    /** スクリプトが渡すテクスチャ指定を記録する。null でデフォルトテクスチャへ復帰。 */
     public static void bindTexture(Object texture) {
         GLRecorder r = GLRecorder.active();
         if (r == null) {
@@ -60,8 +45,7 @@ public final class NGTUtilClient {
             jp.ngt.ngtlib.io.NGTLog.debug("[RTM] bindTexture: unresolved texture object "
                     + texture.getClass().getName() + " (" + texture + ")");
         }
-        // 元パスも記録する。再生側は「モデルの素テクスチャへ戻す bind」を検出して
-        // 上書きを解除する (残すと以降のパーツが全部そのテクスチャで描かれる)。
+        // 元パスも記録する。再生側は「モデルの素テクスチャへ戻す bind」を検出して 上書きを解除する (…
         r.bindTexture(rl, rawPathOf(texture));
     }
 
@@ -83,7 +67,7 @@ public final class NGTUtilClient {
         return path.replace('\\', '/').replaceFirst("^/+", "").toLowerCase(java.util.Locale.ROOT);
     }
 
-    /** スクリプトが渡す各種テクスチャ表現を実 ResourceLocation へ寄せる。解決不能なら null。 */
+    /** スクリプトが渡す各種テクスチャ表現を実 ResourceLocation へ寄せる。 */
     private static net.minecraft.resources.ResourceLocation toResourceLocation(Object texture) {
         if (texture instanceof net.minecraft.resources.ResourceLocation rl) {
             return rl;
@@ -94,8 +78,7 @@ public final class NGTUtilClient {
         if (texture instanceof CharSequence cs) {
             return fromPath(null, cs.toString());
         }
-        // ScriptTexture 等、SRG アクセサ (func_110624_b=namespace / func_110623_a=path) を
-        // 持つラッパー。ModelPack 由来のテクスチャはこの形で渡ってくることがある。
+        // ScriptTexture 等、SRG アクセサ (func_110624_b=namespace…
         String path = invokeString(texture, "func_110623_a");
         if (path != null) {
             return fromPath(invokeString(texture, "func_110624_b"), path);
@@ -112,11 +95,7 @@ public final class NGTUtilClient {
         }
     }
 
-    /**
-     * パック内アセットとして解決を試み、駄目なら実 RL を組む。
-     * RTM パックのテクスチャ名は大文字を含むことが多く、1.21 の ResourceLocation は
-     * 小文字しか許さないため、実 RL の生成は失敗しうる。例外で描画ごと落とさないこと。
-     */
+    /** パック内アセットとして解決を試み、駄目なら実 RL を組む。 */
     private static net.minecraft.resources.ResourceLocation fromPath(String namespace, String path) {
         net.minecraft.resources.ResourceLocation packTex =
                 jp.ngt.ngtlib.io.NGTFileLoader.resolvePackTexture(path);
@@ -138,10 +117,7 @@ public final class NGTUtilClient {
         }
     }
 
-    /**
-     * スクリプトが作る RL はパック内アセットを指すことが多い。
-     * パックアセットとして解決済みならその動的テクスチャ、そうでなければ実 RL をそのまま返す。
-     */
+    /** スクリプトが作る RL はパック内アセットを指すことが多い。 */
     private static net.minecraft.resources.ResourceLocation resolve(jp.ngt.mccompat.ResourceLocation compat) {
         net.minecraft.resources.ResourceLocation packTex =
                 jp.ngt.ngtlib.io.NGTFileLoader.resolvePackTexture(compat.func_110623_a());
@@ -176,10 +152,7 @@ public final class NGTUtilClient {
         }
     }
 
-    /**
-     * 本家 {@code NGTUtilClient.playSound(ISound)}: SoundHandler に登録する。
-     * パックのムービングサウンド ({@link jp.ngt.ngtlib.sound.MovingSoundBase}) を渡す。
-     */
+    /** 本家 NGTUtilClient.playSound(ISound): SoundHandler… */
     public static void playSound(jp.ngt.ngtlib.sound.MovingSoundBase sound) {
         if (sound == null) {
             return;

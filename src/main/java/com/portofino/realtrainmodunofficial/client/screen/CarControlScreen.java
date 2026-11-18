@@ -10,18 +10,7 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
-/**
- * 自動車 (ModelVehicle) のカスタムボタン (customButtons) 操作画面。
- *
- * <p>本家 {@code GuiVehicleControl} 相当。RTMU は操作画面が<b>列車専用</b>で、
- * ModelVehicle の車両 (シールドマシン 等) は {@code Button0} を立てられず、
- * サーバースクリプトが動かなかった (ShieldMachine.js は
- * {@code Button0 != 0 && speed > 0} が条件)。
- *
- * <p>ボタンを押すと {@code dataMap.setInt("Button<i>", value, 1)} = 同期フラグ付きで書き、
- * 既存のクライアント→サーバー同期 (CarScriptDataPayload) でサーバーの
- * {@code onUpdate(entity, scriptExecuter)} へ届く。
- */
+/** 自動車 (ModelVehicle) のカスタムボタン (customButtons) 操作画面。 */
 public class CarControlScreen extends Screen {
     private final CarEntity car;
 

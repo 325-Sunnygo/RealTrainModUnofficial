@@ -3,40 +3,24 @@ package jp.ngt.rtm.modelpack.cfg;
 public class VehicleConfig extends VehicleBaseConfig implements IConfigWithType {
     public static final String TYPE = "ModelVehicle";
 
-    /**
-     * 名前(重複不可)
-     */
+    /** 名前(重複不可) */
     private String name;
-    /**
-     * モデル
-     */
+    /** モデル */
     public ModelSource model;
-    /**
-     * Car, Plane, Ship
-     */
+    /** Car, Plane, Ship */
     public String vehicleType;
 
-    //以下浮動小数の配列{OnGround, InAir}
-    /**
-     * 滑りやすさ
-     */
+    // 以下浮動小数の配列{OnGround, InAir}
+    /** 滑りやすさ */
     private float[] friction;
-    /**
-     * 加速度
-     */
+    /** 加速度 */
     private float[] acceleration;
-    /**
-     * 最大速度
-     */
+    /** 最大速度 */
     private float[] maxSpeed;
-    /**
-     * 最大Y軸回転
-     */
+    /** 最大Y軸回転 */
     private float[] maxYaw;
-    /**
-     * 係数
-     */
-    //private float[] speedCoefficient;
+    /** 係数 */
+    // private float[] speedCoefficient;
     private float[] yawCoefficient;
     private float[] pitchCoefficient;
     private float[] rollCoefficient;
@@ -84,11 +68,7 @@ public class VehicleConfig extends VehicleBaseConfig implements IConfigWithType 
         return this.maxYaw[onGround ? 0 : 1];
     }
 
-	/*public float getSpeedCoefficient(boolean onGround)
-	{
-		if(this.speedCoefficient == null){return 5.0F;}
-		return this.speedCoefficient[onGround ? 0 : 1];
-	}*/
+	/* public float getSpeedCoefficient(boolean onGround… */
 
     public float getYawCoefficient(boolean onGround) {
         if (this.yawCoefficient == null) {

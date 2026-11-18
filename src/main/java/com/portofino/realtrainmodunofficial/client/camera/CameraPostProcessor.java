@@ -18,7 +18,7 @@ import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
-/** Original eight depth bands and ten-frame sensitivity snapshot, on core-profile FBOs. */
+/** Original eight depth bands and ten-frame sensitiv… */
 public final class CameraPostProcessor {
     private static final org.slf4j.Logger LOGGER=org.slf4j.LoggerFactory.getLogger(CameraPostProcessor.class);
     private static ShaderInstance dofShader,accumShader,blitShader;
@@ -131,8 +131,7 @@ public final class CameraPostProcessor {
         buffer.addVertex(-1.0F, 1.0F, 0.0F).setUv(0.0F, 1.0F);
         MeshData mesh = buffer.build();
         if (mesh != null) {
-            // These shaders consume clip-space positions and explicit uniforms. Avoid
-            // the world renderer's window-dependent default uniform setup.
+            // These shaders consume clip-space positions and ex…
             var shader = RenderSystem.getShader();
             if (shader.MODEL_VIEW_MATRIX != null) shader.MODEL_VIEW_MATRIX.set(new org.joml.Matrix4f());
             if (shader.PROJECTION_MATRIX != null) shader.PROJECTION_MATRIX.set(new org.joml.Matrix4f());

@@ -2,7 +2,7 @@ package jp.ngt.ngtlib.renderer;
 
 import java.util.*;
 
-/** Script-local fixed-function state. Snapshots travel with geometry, never with GPU globals. */
+/** Script-local fixed-function state. */
 public final class LegacyRenderState {
     public static final int CURRENT_BIT=1, POINT_BIT=2, LINE_BIT=4, POLYGON_BIT=8, LIGHTING_BIT=64,
             DEPTH_BUFFER_BIT=256, ENABLE_BIT=8192, COLOR_BUFFER_BIT=16384, TEXTURE_BIT=262144;

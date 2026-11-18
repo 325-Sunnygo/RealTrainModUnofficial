@@ -4,10 +4,7 @@ import jp.ngt.ngtlib.sound.MovingSoundBase;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundSource;
 
-/**
- * 本家 {@code jp.ngt.rtm.sound.MovingSoundCustom<T>} の移植。
- * 音量/ピッチは次 tick に反映される (本家 prevVolume / prevPitch と同じ挙動)。
- */
+/** 本家 jp.ngt.rtm.sound.MovingSoundCustom<T> の移植。 */
 public abstract class MovingSoundCustom<T> extends MovingSoundBase {
 
     protected final T entity;

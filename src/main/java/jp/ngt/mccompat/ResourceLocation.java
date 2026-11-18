@@ -1,10 +1,6 @@
 package jp.ngt.mccompat;
 
-/**
- * パックスクリプト互換: 1.7.10 の net.minecraft.util.ResourceLocation。
- * スクリプトの `new Packages.net.minecraft.util.ResourceLocation(...)` は
- * ローダの FQN リマップでこのクラスに差し替えられる。
- */
+/** パックスクリプト互換: 1.7.10 の net.minecraft.util.ResourceL… */
 public class ResourceLocation {
     private final String domain;
     private final String path;

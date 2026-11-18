@@ -9,15 +9,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/**
- * 本家 {@code jp.ngt.rtm.CommonProxy}/{@code ClientProxy} のスクリプト互換
- * ({@code RTMCore.proxy})。
- *
- * <p>本家の {@code playSound} は「サーバーでは周囲のクライアントへ
- * {@code PacketPlaySound} を送り、クライアントで鳴らす」実装。ここでも同じく
- * サーバーは範囲内プレイヤーへ {@link SpeakerPlayPayload} を送り、
- * クライアントはその場で鳴らす。
- */
+/** 本家 RTMCore.proxy のスクリプト互換。 */
 public class RTMProxy {
 
     public void playSound(Object target, Object sound, float volume, float pitch) {
@@ -29,17 +21,16 @@ public class RTMProxy {
             return;
         }
         String soundId = toSoundId(sound);
-        Level level;
+        int entityId = -1;
         double x;
         double y;
         double z;
         if (target instanceof Entity entity) {
-            level = entity.level();
+            entityId = entity.getId();
             x = entity.getX();
             y = entity.getY();
             z = entity.getZ();
-        } else if (target instanceof BlockEntity blockEntity) {
-            level = blockEntity.getLevel();
+        } else if (target instanceof BlockEntity blockEntity && blockEntity.getLevel() != null) {
             var pos = blockEntity.getBlockPos();
             x = pos.getX() + 0.5D;
             y = pos.getY() + 0.5D;
@@ -47,25 +38,25 @@ public class RTMProxy {
         } else {
             return;
         }
+        float r = range > 0.0F ? range : 16.0F;
+        Level level = target instanceof Entity entity ? entity.level() : ((BlockEntity) target).getLevel();
         if (level == null) {
             return;
         }
-        float r = range > 0.0F ? range : 16.0F;
         if (level instanceof ServerLevel serverLevel) {
-            // 本家 CommonProxy: 周囲へ送ってクライアントで鳴らす
+            // 本家 PacketPlaySound: 256 ブロック以内の全プレイヤーへ送る。
             for (ServerPlayer player : serverLevel.players()) {
-                if (player.distanceToSqr(x, y, z) <= (double) r * (double) r) {
+                if (player.distanceToSqr(x, y, z) <= 256.0D * 256.0D) {
                     PacketDistributor.sendToPlayer(player,
-                        new SpeakerPlayPayload(x, y, z, soundId, volume, pitch));
+                        new SpeakerPlayPayload(entityId, x, y, z, soundId, volume, pitch, r));
                 }
             }
         } else {
-            // クライアント側で直接鳴らす
-            LegacyScriptSoundManager.playAt(x, y, z, soundId, volume, pitch);
+            LegacyScriptSoundManager.playOriginal(entityId, x, y, z, soundId, volume, pitch, r);
         }
     }
 
-    /** mccompat / 実 ResourceLocation / 文字列のいずれも "ns:path" へ正規化する。 */
+    /** mccompat / 実 ResourceLocation / 文字列のいずれも "ns:path… */
     private static String toSoundId(Object sound) {
         if (sound instanceof net.minecraft.resources.ResourceLocation rl) {
             return rl.toString();

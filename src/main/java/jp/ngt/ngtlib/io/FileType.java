@@ -36,9 +36,7 @@ public class FileType {
         return fileName.endsWith(this.extension);
     }
 
-    /**
-     * "."含まない
-     */
+    /** "."含まない */
     public String getExtension() {
         return this.extension;
     }

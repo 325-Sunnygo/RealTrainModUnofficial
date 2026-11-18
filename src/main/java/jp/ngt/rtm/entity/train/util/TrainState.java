@@ -46,11 +46,8 @@ public enum TrainState {
     public enum TrainStateType {
         State_TrainDir(0, "train_dir", 0, 1),
         State_Notch(1, "notch", -8, 5),
-        State_Signal(2, "signal", -1, 127),//6
-        /**
-         * RTMU 追加: ドアカット。この車両を 1 にすると、開扉指令 (State_Door) が来ても
-         * ドアを開けない (物理: doorState を 0 扱い)。id 3 は 16 バイト状態配列の空きスロット。
-         */
+        State_Signal(2, "signal", -1, 127),// 6
+        /** RTMU 追加: ドアカット。この車両を 1 にすると、開扉指令 (State_Door) が来て… */
         State_DoorCut(3, "door_cut", 0, 1),
         State_Door(4, "door", 0, 3),
         State_Light(5, "light", 0, 2),
@@ -61,10 +58,7 @@ public enum TrainState {
         /** 編成内の位置(前,中,後) */
         State_Direction(10, "direction", 0, 2),
         State_InteriorLight(11, "interior_light", 0, 2),
-        /**
-         * RTMU 追加: 種別幕。方向幕 (State_Destination) とは別に「種別」を選ぶための状態。
-         * id 12 は 16 バイトの状態配列 (0..15) の空き。0..127 で種別インデックスを持つ。
-         */
+        /** RTMU 追加: 種別幕。方向幕 (State_Destination) とは別に「種別」を選ぶた… */
         State_Type(12, "type", 0, 127);
 
         public final int id;
@@ -79,9 +73,7 @@ public enum TrainState {
             this.max = (byte) par4;
         }
 
-        // ---- 本家スクリプト互換のエイリアス ----
-        // 本家のレンダースクリプトは TrainState.TrainStateType.Door のように「本家の定数名」で書く。
-        // ★注意: 本家 Direction は id 0 (編成の進行方向)、本家 Role は id 10 (編成内の位置)。
+        // ---- 本家スクリプト互換のエイリアス ---- 本家のレンダースクリプトは TrainStat…
         public static final TrainStateType Direction = State_TrainDir;
         public static final TrainStateType Notch = State_Notch;
         public static final TrainStateType Signal = State_Signal;

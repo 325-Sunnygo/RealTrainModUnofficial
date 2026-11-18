@@ -12,10 +12,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.UUID;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.parts.EntityVehiclePart (KaizPatchX) の忠実移植。
- * 車両に追従するパーツ (フロア/座席等) の基底。
- */
+/** 本家 jp.ngt.rtm.entity.train.parts.EntityVehiclePar… */
 public abstract class EntityVehiclePart extends Entity {
     private static final EntityDataAccessor<Integer> DATA_VEHICLE =
             SynchedEntityData.defineId(EntityVehiclePart.class, EntityDataSerializers.INT);
@@ -37,7 +34,7 @@ public abstract class EntityVehiclePart extends Entity {
     public EntityVehiclePart(EntityType<?> type, Level level) {
         super(type, level);
         this.noPhysics = true;
-        this.lastFollowTick = level.getGameTime();//spawn 直後を孤児扱いしないための猶予
+        this.lastFollowTick = level.getGameTime();// spawn 直後を孤児扱いしないための猶予
     }
 
     @Override
@@ -95,11 +92,7 @@ public abstract class EntityVehiclePart extends Entity {
         return !this.isRemoved() && !this.isOrphan();
     }
 
-    /**
-     * 親を失ったパーツはクリック対象にしない。
-     * 掃除役が回収するまでの数 tick でも、取り残された当たり判定が本物の座席の
-     * 手前に居るとクリックを吸ってしまうため、両サイドで即座に無効化する。
-     */
+    /** 親を失ったパーツはクリック対象にしない。 掃除役が回収するまでの数 tick でも、取り残された当… */
     @Override
     public boolean isPickable() {
         return !this.isRemoved() && !this.isOrphan();
@@ -120,27 +113,19 @@ public abstract class EntityVehiclePart extends Entity {
             if (vehicle != null) {
                 this.updatePartPos(vehicle);
             } else if (!this.level().isClientSide && this.isOrphan()) {
-                // 親車両が居ないパーツは即座に消す。
-                // 座れない当たり判定だけが残る」状態になる (ユーザー報告)。
+                // 親車両が居ないパーツは即座に消す。 座れない当たり判定だけが残る」状態になる (ユーザー報告)。
                 this.discard();
             }
         }
     }
 
-    /**
-     * 座席/床パーツはワールドに保存しない。
-     * これらは車体の設定 (slotPos) から毎回作り直される派生データで、保存する意味が無い。
-     */
+    /** 座席/床パーツはワールドに保存しない。 これらは車体の設定 (slotPos) から毎回作り直され… */
     @Override
     public boolean shouldBeSaved() {
         return false;
     }
 
-    /**
-     * 位置を更新 (両サイド: クライアントは補間済みの車体位置に追従)。
-     * 回転は設定しない — 乗員の視点が車両の向きに固定されないように
-     * (視点は完全に自由、本家の座席と同じ感覚)。
-     */
+    /** 位置を更新 (両サイド: クライアントは補間済みの車体位置に追従)。 */
     public void updatePartPos(EntityVehicleBase<?> vehicle) {
         this.lastFollowTick = this.level().getGameTime();
         Vec3 v3 = this.getPartVec();
@@ -155,12 +140,7 @@ public abstract class EntityVehiclePart extends Entity {
     public void onPassengerTurned(net.minecraft.world.entity.Entity rider) {
     }
 
-    /**
-     * 本家 setPositionAndRotation2 相当。ただしトラッカー座標をそのまま使わない。
-     * クライアントの車体は「最後に受けたサーバー位置へ数 tick かけて寄せる」補間なので、
-     * サーバーの座席座標をそのまま入れると車体より数 tick 先に飛んでガタつく。
-     * ★これは追従の 3 本目の経路でもある。
-     */
+    /** 本家 setPositionAndRotation2 相当。ただしトラッカー座標をそのまま使わない。 */
     @Override
     public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps) {
         EntityVehicleBase<?> vehicle = this.getVehicle();
@@ -168,14 +148,9 @@ public abstract class EntityVehiclePart extends Entity {
             this.updatePartPos(vehicle);
         }
         // ★親が引けないときはトラッカー座標を使わない。
-        // 純粋な計算結果で、ネットワーク越しの座標は必ず数 tick 古い。
     }
 
-    /**
-     * ワールドに追加された時点で車体の一覧へ登録する。
-     * tick 内で登録していると、座席が何らかの理由で tick しないとき車体側からも
-     * 押し出せず、取り残されたまま復帰できない。
-     */
+    /** ワールドに追加された時点で車体の一覧へ登録する。 */
     @Override
     public void onAddedToLevel() {
         super.onAddedToLevel();
@@ -195,11 +170,7 @@ public abstract class EntityVehiclePart extends Entity {
         this.parent = vehicle;
     }
 
-    /**
-     * 親車体。居なくなっていたら必ず null を返す。
-     * ★以前はここで引き直しに失敗しても parent に削除済みの車体が
-     * 残ったままで、それをそのまま返していた。
-     */
+    /** 親車体。居なくなっていたら必ず null を返す。 */
     public EntityVehicleBase<?> getVehicle() {
         if (this.parent == null || this.parent.isRemoved()) {
             this.parent = null;
@@ -216,22 +187,18 @@ public abstract class EntityVehiclePart extends Entity {
         return this.entityData.get(DATA_VEHICLE);
     }
 
-    /**
-     * 親を失っていて、もうワールドに居てはいけない状態か。
-     * 掃除役 (SeatCleanup) と当たり判定の有効/無効の両方がこれを見る。
-     */
+    /** 親を失っていて、もうワールドに居てはいけない状態か。 */
     public boolean isOrphan() {
         if (this.isIndependent) {
-            return false;//設置型パーツは単独で存在してよい
+            return false;// 設置型パーツは単独で存在してよい
         }
         if (this.unloadedParent != null) {
-            return false;//セーブから復帰中。親を引き直すまで待つ
+            return false;// セーブから復帰中。親を引き直すまで待つ
         }
         if (this.getVehicle() != null) {
             return false;
         }
         // ★自分では親を引けなくても、車体が位置を押してくれているなら生きている。
-        // 車体側の一覧に載っていれば追従は成立していて、当たり判定も正しい場所にある。
         return this.level().getGameTime() - this.lastFollowTick > 40L;
     }
 

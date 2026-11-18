@@ -13,10 +13,7 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 金ノコ。本家 {@code jp.ngt.rtm.item.ItemHacksaw} の移植。
- * 冷えた鋼材 (steel_slab の温度 0) を切って鋼インゴットにする。
- */
+/** 金ノコ。本家 jp.ngt.rtm.item.ItemHacksaw の移植。 */
 public class ItemHacksaw extends Item {
     public ItemHacksaw() {
         super(new Properties().stacksTo(1).durability(Tiers.IRON.getUses()));

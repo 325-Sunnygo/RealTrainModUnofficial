@@ -1,11 +1,6 @@
 package jp.ngt.rtm;
 
-/**
- * 本家 jp.ngt.rtm.RTMResource のスクリプト互換 (リソース種別の static 定数)。
- * 本家は ResourceType<Config, ModelSet> の static 群で、スクリプトは
- * ModelPackManager.INSTANCE.getResourceSet(RTMResource.CONNECTOR_RELAY, name) 等の
- * 種別引数に使う。
- */
+/** 本家 jp.ngt.rtm.RTMResource のスクリプト互換 (リソース種別の stati… */
 @SuppressWarnings("unused")
 public final class RTMResource {
     private RTMResource() {

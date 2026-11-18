@@ -1,8 +1,5 @@
 package jp.ngt.ngtlib.block;
 
-/**
- * 本家 jp.ngt.ngtlib.block.TileEntityCustom のプレースホルダ。
- * スクリプトの importPackage 解決用 (instanceof 判定は常に false でよい)。
- */
+/** 本家 jp.ngt.ngtlib.block.TileEntityCustom のプレースホルダ。 */
 public class TileEntityCustom {
 }

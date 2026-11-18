@@ -2,7 +2,7 @@ package jp.ngt.mccompat.nbt;
 
 import net.minecraft.nbt.CompoundTag;
 
-/** 1.7.10/1.12 NBTTagCompound のスクリプト互換ラッパー (SRG メソッド名)。 */
+/** 1.7.10/1.12 NBTTagCompound のスクリプト互換ラッパー (SRG メソッド… */
 public final class NBTTagCompound {
     public final CompoundTag tag;
     private final java.util.List<Runnable> observers=new java.util.ArrayList<>();
@@ -27,7 +27,7 @@ public final class NBTTagCompound {
         return null;
     }
 
-    /** func_74737_b = copy。NGTO Builder が編集前の NBT を退避するのに使う。 */
+    /** func_74737_b = copy。NGTO Builder が編集前の NBT を退避するの… */
     public NBTTagCompound func_74737_b() {
         return new NBTTagCompound(this.tag.copy());
     }

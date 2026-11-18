@@ -1,7 +1,7 @@
 package jp.ngt.ngtlib.network;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.nbt.CompoundTag;
-/** Legacy server-to-client tile snapshot, copied when constructed. */
+/** Legacy server-to-client tile snapshot, copied whe… */
 public final class PacketNBT {
     public final BlockEntity tile;
     public final CompoundTag data;

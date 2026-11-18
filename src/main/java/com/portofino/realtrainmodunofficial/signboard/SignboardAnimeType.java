@@ -1,9 +1,6 @@
 package com.portofino.realtrainmodunofficial.signboard;
 
-/**
- * 本家 jp.ngt.rtm.block.tt.SignboardText.AnimeType の移植。
- * NBT には ordinal をそのまま保存するため、並び順は本家から変更しないこと。
- */
+/** 本家 jp.ngt.rtm.block.tt.SignboardText.AnimeType の移… */
 public enum SignboardAnimeType {
     /** アニメなし。テキストをそのまま表示する。 */
     NONE,

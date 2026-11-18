@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Deferred, batching-safe GPU realization of fixed-function states captured by a script. */
+/** Deferred, batching-safe GPU realization of fixed-… */
 public final class LegacyRenderTypes extends RenderType {
     private LegacyRenderTypes() { super("legacy_unused",DefaultVertexFormat.NEW_ENTITY,VertexFormat.Mode.QUADS,256,false,false,()->{},()->{}); }
     private static ShaderInstance shader;
@@ -48,13 +48,12 @@ public final class LegacyRenderTypes extends RenderType {
     public static RenderType vehicle(RenderType inherited,ResourceLocation texture,boolean blend,boolean cull,boolean depthWrite,VertexFormat.Mode mode,float vertexAlpha) {
         var state=LegacyRenderState.playback();
         if(state==null) state=new LegacyRenderState().snapshot();
-        // Forge 1.7.10 calls entity pass 1 before restoring glDepthMask(true).
-        // RenderVehicleBase inherits that disabled mask, unless a script overrides it.
+        // Forge 1.7.10 calls entity pass 1 before restoring…
         state=state.withDefaultAlpha(blend?513:514,1.0F);
         return types().computeIfAbsent(new Key(texture,state,blend,cull,depthWrite && !blend,mode,770,771,false,vertexAlpha),LegacyRenderTypes::createState);
     }
 
-    /** Native model light passes share the body's vertex program and depth positions. */
+    /** Native model light passes share the body's vertex… */
     public static RenderType modelLight(ResourceLocation texture,boolean lightOn,boolean cull) {
         return modelLight(texture, lightOn, cull, com.portofino.realtrainmodunofficial.client.ShaderCompat.active() ? VertexFormat.Mode.QUADS : VertexFormat.Mode.TRIANGLES);
     }
@@ -89,11 +88,7 @@ public final class LegacyRenderTypes extends RenderType {
                 ()->{ RenderSystem.disableBlend(); RenderSystem.defaultBlendFunc(); org.lwjgl.opengl.GL11.glCullFace(1029); });
         boolean shaderPack=com.portofino.realtrainmodunofficial.client.ShaderCompat.active();
         ResourceLocation texture=shaderPack?IrisTexturePasses.select(state.enabled(0x0DE1,true)?key.texture:IrisTexturePasses.white(),state,key.vertexAlpha):key.texture;
-        // Vanilla suppliers are intercepted by Iris, including its gbuffer/shadow framebuffer routing.
-        // GL_LIGHTING=false means that fixed-function directional lighting is disabled;
-        // it does not mean that the texture is an entity eye/glow material. Iris maps
-        // the emissive supplier to ENTITIES_EYES_TRANS, which makes entire interiors
-        // bloom. Keep their recorded lightmap and use the ordinary entity pipeline.
+        // Vanilla suppliers are intercepted by Iris, includ…
         ShaderStateShard program=shaderPack
                 ? shaderPackProgram(blend,write,state.enabled(0x0B50,true))
                 : new ShaderStateShard(()->configuredShader(state));

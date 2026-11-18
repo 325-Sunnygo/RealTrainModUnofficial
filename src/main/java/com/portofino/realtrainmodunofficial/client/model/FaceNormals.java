@@ -2,27 +2,20 @@ package com.portofino.realtrainmodunofficial.client.model;
 
 import org.joml.Vector3f;
 
-/**
- * 面法線の正規化。モデルの大きさに依存しないことだけを目的にした小物。
- * なぜ要るか (2026-07-25 に丸一日溶かした所)
- * 外積 n = e1 × e2 の大きさは三角形の面積に比例する = 辺の長さの2乗で効く。
- */
+/** 面法線の正規化。モデルの大きさに依存しないことだけを目的にした小物。 */
 public final class FaceNormals {
 
     private FaceNormals() {
     }
 
-    /**
-     * 外積ベクトルを正規化する。面積 0 の時だけ (0, 1, 0) を入れる。
-     * @return 正規化できたら true、潰れた面なら false
-     */
+    /** 外積ベクトルを正規化する。面積 0 の時だけ (0, 1, 0) を入れる。 */
     public static boolean normalize(Vector3f n) {
         float max = Math.max(Math.abs(n.x), Math.max(Math.abs(n.y), Math.abs(n.z)));
         if (!(max > 0.0F) || !Float.isFinite(max)) {
             n.set(0.0F, 1.0F, 0.0F);
             return false;
         }
-        // 先に最大成分で割って桁を 1 付近へ戻す。こうしないと |n|² が float の下限で 0 に落ちる。
+        // 先に最大成分で割って桁を 1 付近へ戻す。
         float x = n.x / max;
         float y = n.y / max;
         float z = n.z / max;

@@ -3,24 +3,18 @@ package jp.ngt.ngtlib.renderer;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * スクリプトの GL11 呼び出しを記録し、PoseStack へ再生するためのオペコードバッファ。
- * (1.21 にイミディエイトモード GL が無いための本家 GL 呼び出し互換層)
- */
+/** スクリプトの GL11 呼び出しを記録し、PoseStack へ再生するためのオペコードバッファ。 */
 public final class GLRecorder {
 
     public enum Op {
         PUSH, POP, TRANSLATE, ROTATE, SCALE, MULT_MATRIX, LOAD_MATRIX, PROJECTION, COLOR_MASK, DRAW_TEXT, COLOR, BRIGHTNESS, RENDER_PARTS, RENDER_GROUPS,
-        /** テクスチャ差し替え (payload: ResourceLocation, null=デフォルトに戻す) */
+        /** テクスチャ差し替え (payload: ResourceLocation, null=デフォルトに… */
         BIND_TEXTURE,
         /** NGTTessellator の即時描画 (payload: TessDraw) */
         DRAW_TESS,
-        /** ModelLoader で読んだ PolygonModel のグループ描画 (payload: Object[]{PolygonModel, groupName}) */
+        /** ModelLoader で読んだ PolygonModel のグループ描画 (payload: O… */
         DRAW_MODEL_GROUP,
-        /**
-         * バニラ BlockState のゴースト描画 (payload: BlockState、a/b/c=相対座標)。
-         * NGTO Builder のミニチュアプレビュー (NGTRenderer.renderNGTObject) 用。
-         */
+        /** バニラ BlockState のゴースト描画 (payload: BlockState、a/b/c… */
         RENDER_BLOCK, RENDER_ITEM, RENDER_GUI_ITEM, LOAD_NAME
     }
 
@@ -43,21 +37,14 @@ public final class GLRecorder {
         addCmd(Op.RENDER_ITEM,0,0,0,0,null,new ItemDraw(stack.copy(),seed));
     }
 
-    /** NGTTessellator.draw の記録データ。verts は {x,y,z,u,v,r,g,b,a} × n。 */
+    /** NGTTessellator.draw の記録データ。 */
     public static final class TessDraw {
         public final int mode;
         public final float[] verts;
-        /**
-         * 加算合成 (GL_SRC_ALPHA, GL_ONE) で描くか。
-         * 本家 renderLightEffect の前照灯/回転灯は加算合成なので、それだけ true。
-         * 既定 false = 半透明 (entityTranslucent)。
-         */
+        /** 加算合成 (GL_SRC_ALPHA, GL_ONE) で描くか。 */
         public final boolean additive;
         public final float[] normals;
-        /**
-         * 前面カリング (本家 ActionParts の輪郭線 glCullFace(GL_FRONT)) で描くか。
-         * 描画側は RenderSystem.cullFace(FRONT) を設定して即時 flush する。
-         */
+        /** 前面カリング (本家 ActionParts の輪郭線 glCullFace(GL_FRONT))… */
         public final boolean cullFront;
         public final boolean useCurrentColor;
 
@@ -86,22 +73,13 @@ public final class GLRecorder {
         }
     }
 
-    /**
-     * 1 コマンド。
-     * ★フィールドは使い回しのため final ではない。
-     */
+    /** 1 コマンド。 ★フィールドは使い回しのため final ではない。 */
     public static final class Cmd {
         public Op op;
         public float a, b, c, d;
         public String name;
         public Object payload;
-        /**
-         * RENDER_PARTS / RENDER_GROUPS を出した {@code jp.ngt.rtm.render.Parts} インスタンス。
-         * 色ピッキング (ActionParts) で<b>同名パーツを区別</b>するために運ぶ。
-         * 名前一致だけだと、同じグループ名を複数箇所に描くスクリプト
-         * (RenderTorii.js の数字キー 10 個 = 全て "key") で別パーツを区別できない。
-         * ★contentKey には混ぜない (同一名なら幾何は同じなので焼き込みキーを変えない)。
-         */
+        /** RENDER_PARTS / RENDER_GROUPS を出した jp.ngt.rtm.rend… */
         public Object partsRef;
         public LegacyRenderState.Snapshot state;
 
@@ -145,31 +123,20 @@ public final class GLRecorder {
         ACTIVE.remove();
     }
 
-    /**
-     * 記録と同時に集計しておく値。
-     * 以前は contentKey / hasGeometry / hasTess が呼ばれるたびに
-     * コマンド列を頭から走査していた。
-     */
+    /** 記録と同時に集計しておく値。 以前は contentKey / hasGeometry / has… */
     private int contentHash = 1;
     private boolean geometry;
     private boolean tess;
-    /**
-     * 記録中に「視点依存の光エフェクト (renderLightEffect に normal を渡した)」があったか。
-     * これがある内容はカメラを動かすだけで形が変わるため、焼き込みキーに混ぜてはいけない
-     * (混ぜると回転灯/ミラーボールの焼き込みが毎フレーム無効になる)。
-     */
+    /** 記録中に「視点依存の光エフェクト (renderLightEffect に normal を渡した… */
     private boolean viewDependent;
 
     /** 生きているコマンド数 (cmds.size ではない。使い回しのため配列は縮めない)。 */
     private int size;
 
-    /** 次に積む RENDER_PARTS/RENDER_GROUPS へ添える Parts インスタンス (1 コマンド限り)。 */
+    /** 次に積む RENDER_PARTS/RENDER_GROUPS へ添える Parts インスタンス… */
     private Object pendingPartsRef;
 
-    /**
-     * 直後に積む RENDER_PARTS/RENDER_GROUPS へ Parts インスタンスを添える。
-     * 色ピッキングで同名パーツを区別するために使う (描画そのものには影響しない)。
-     */
+    /** 直後に積む RENDER_PARTS/RENDER_GROUPS へ Parts インスタンスを添… */
     public void partsRef(Object parts) {
         this.pendingPartsRef = parts;
     }
@@ -188,10 +155,7 @@ public final class GLRecorder {
         addCmd(op, a, b, c, d, name, null);
     }
 
-    /**
-     * コマンドを積む唯一の入口。集計もここでまとめる。
-     * 既存インスタンスがあれば上書きして使う (毎フレームの Cmd 生成を無くすため)。
-     */
+    /** コマンドを積む唯一の入口。集計もここでまとめる。 */
     private void addCmd(Op op, float a, float b, float c, float d, String name, Object payload) {
         boolean geometry = op == Op.RENDER_PARTS || op == Op.RENDER_GROUPS || op == Op.DRAW_MODEL_GROUP
                 || op == Op.DRAW_TEXT || op == Op.DRAW_TESS || op == Op.RENDER_BLOCK || op == Op.RENDER_ITEM || op == Op.RENDER_GUI_ITEM;
@@ -247,19 +211,12 @@ public final class GLRecorder {
         return this.size == 0;
     }
 
-    /**
-     * 実際にジオメトリを 1 つでも描いたか。
-     * 行列操作 (PUSH/TRANSLATE/…) だけの記録は「何も描いていない」。
-     */
+    /** 実際にジオメトリを 1 つでも描いたか。 行列操作 (PUSH/TRANSLATE/…) だけの記… */
     public boolean hasGeometry() {
         return this.geometry;
     }
 
-    /**
-     * NGTTessellator の即時描画 (DRAW_TESS) を 1 つでも含むか。
-     * マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ等) を持つ
-     * マテリアルを発見するために使う (VehicleScriptRenderers)。
-     */
+    /** NGTTessellator の即時描画 (DRAW_TESS) を 1 つでも含むか。 */
     public boolean hasTess() {
         return this.tess;
     }
@@ -272,10 +229,7 @@ public final class GLRecorder {
         this.addCmd(Op.POP, 0, 0, 0, 0, null);
     }
 
-    /**
-     * NaN/Inf を弾く。スクリプトが未実装フィールドを読むと undefined→NaN が入り、
-     * そのまま行列に載るとモデルが丸ごと消える。壊れた値は 0 に潰して描画を守る。
-     */
+    /** NaN/Inf を弾く。スクリプトが未実装フィールドを読むと undefined→NaN が入り、… */
     private static float finite(float v) {
         return Float.isFinite(v) ? v : 0.0F;
     }
@@ -299,10 +253,7 @@ public final class GLRecorder {
         this.addCmd(Op.ROTATE, deg, x, y, z, null, quat);
     }
 
-    /**
-     * glMultMatrix 相当。列優先 16 要素をそのまま payload で運び、再生側で掛ける。
-     * NGTO Builder 2 が任意姿勢のプレビューに使う。
-     */
+    /** glMultMatrix 相当。列優先 16 要素をそのまま payload で運び、再生側で掛け… */
     public void multMatrix(float[] matrix) {
         if (matrix == null || matrix.length < 16) {
             return;
@@ -328,10 +279,7 @@ public final class GLRecorder {
         this.addCmd(Op.COLOR, r, g, b, a, null);
     }
 
-    /**
-     * 記録に含まれる明るさの指紋。
-     * 明るさは頂点に焼き込まれるので、ワールドの光が変われば記録ごと作り直す必要がある。
-     */
+    /** 記録に含まれる明るさの指紋。 明るさは頂点に焼き込まれるので、ワールドの光が変われば記録ごと作り直… */
     private long lightSignature;
 
     public long getLightSignature() {
@@ -344,8 +292,7 @@ public final class GLRecorder {
     }
 
     public void renderParts(String objName) {
-        // 再生毎の Set 生成を避け、renderNamedGroups の IdentityHashMap キャッシュに
-        // 同一インスタンスでヒットさせるため、正規化 Set を記録時に確定させる (payload)
+        // 再生毎の Set 生成を避け、renderNamedGroups の IdentityHashMa…
         java.util.Set<String> names = java.util.Set.of(
                 objName.trim().toLowerCase(java.util.Locale.ROOT));
         this.addCmd(Op.RENDER_PARTS, 0, 0, 0, 0, objName, names);
@@ -377,7 +324,7 @@ public final class GLRecorder {
         this.addCmd(Op.RENDER_BLOCK, x, y, z, 0, null, blockState);
     }
 
-    /** 別レコーダーの記録を末尾に追記する (GLHelper のディスプレイリスト callList 用)。 */
+    /** 別レコーダーの記録を末尾に追記する (GLHelper のディスプレイリスト callList 用… */
     public void appendFrom(GLRecorder other) {
         if (other != null && other != this) {
             for (Cmd cmd : other.getCommands()) {
@@ -390,20 +337,12 @@ public final class GLRecorder {
         this.drawModelGroup(model, groupName, false);
     }
 
-    /**
-     * 再生側 (VehicleScriptRenderers) が頂点法線を使うか面法線かの判断に使う。
-     * a スロットに 1/0 で載せる。
-     * @param smoothing 本家 renderPart(smoothing, ...) の平滑指定。
-     */
+    /** 再生側 (VehicleScriptRenderers) が頂点法線を使うか面法線かの判断に使う。 */
     public void drawModelGroup(Object model, String groupName, boolean smoothing) {
         this.addCmd(Op.DRAW_MODEL_GROUP, smoothing ? 1.0F : 0.0F, 0, 0, 0, groupName, model);
     }
 
-    /**
-     * 記録の内容から作る焼き直し判定キー。
-     * にあたるもの。
-     * ★payload の Set は中身でハッシュする。
-     */
+    /** 記録の内容から作る焼き直し判定キー。 にあたるもの。 */
     public int contentKey() {
         return this.contentHash;
     }
@@ -417,10 +356,7 @@ public final class GLRecorder {
         return this.viewDependent;
     }
 
-    /**
-     * 値を撹拌する (雪崩関数)。
-     * 焼き込みキーを組み立てるときは、足し合わせる前に必ずこれを通すこと。
-     */
+    /** 値を撹拌する (雪崩関数)。 焼き込みキーを組み立てるときは、足し合わせる前に必ずこれを通すこと。 */
     public static int mixKey(int value) {
         int e = value;
         e *= 0x9E3779B1;
@@ -430,10 +366,7 @@ public final class GLRecorder {
         return e;
     }
 
-    /**
-     * Set の内容キー。順序非依存 (総和) は保ったまま、要素ごとに撹拌して線形性を壊す。
-     * Set.hashCode をそのまま使ってはいけない (#mixKey 参照)。
-     */
+    /** Set の内容キー。順序非依存 (総和) は保ったまま、要素ごとに撹拌して線形性を壊す。 */
     public static int setKey(java.util.Set<?> set) {
         if (set == null) {
             return 0;
@@ -465,7 +398,6 @@ public final class GLRecorder {
         if (payload instanceof Number number) return number.hashCode();
         if (payload instanceof java.util.Set<?> set) {
             // ★Set.hashCode をそのまま使ってはいけない。
-            // あれは要素ハッシュの単純な総和なので、差が打ち消し合うと別物が同じ値になる。
             return setKey(set);
         }
         if (payload instanceof float[] fa) {
@@ -489,8 +421,7 @@ public final class GLRecorder {
                 || payload instanceof net.minecraft.world.level.block.state.BlockState) {
             return payload.hashCode();
         }
-        // モデルグラフ (DRAW_MODEL_GROUP の payload) は読み込み後は不変で、
-        // 同じモデルには同じインスタンスが渡る。中身を歩くと重いので同一性で足りる。
+        // モデルグラフ (DRAW_MODEL_GROUP の payload) は読み込み後は不変で、 同…
         return System.identityHashCode(payload);
     }
 }

@@ -6,7 +6,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.items.IItemHandler;
 
-/** Inventory and item rendering bridge used by cargo and installed-object scripts. */
+/** Inventory and item rendering bridge used by cargo… */
 public final class LegacyItemRenderer {
     public static final LegacyItemRenderer INSTANCE=new LegacyItemRenderer();
     public float zLevel;

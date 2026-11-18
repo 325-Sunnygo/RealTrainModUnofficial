@@ -13,10 +13,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.parts.EntityFloor (KaizPatchX) の忠実移植。
- * config の slotPos ごとにスポーンし、右クリックで着席する。
- */
+/** 本家 jp.ngt.rtm.entity.train.parts.EntityFloor (Kai… */
 public class EntityFloor extends EntityVehiclePart {
     private static final EntityDataAccessor<Byte> DATA_SEAT_TYPE =
             SynchedEntityData.defineId(EntityFloor.class, EntityDataSerializers.BYTE);
@@ -74,7 +71,6 @@ public class EntityFloor extends EntityVehiclePart {
     public void tick() {
         super.tick();
         // 車体側の一覧へ自分を登録しておく (車体が移動後に位置を押し出すため)。
-        // 本命は onAddedToLevel での登録。
         this.registerToVehicle();
         if (!this.level().isClientSide) {
             // スニークで降車 (バニラ経路が効かない場合の保険)
@@ -86,22 +82,10 @@ public class EntityFloor extends EntityVehiclePart {
         }
     }
 
-    /**
-     * 当たり判定ボックスの持ち上げ量。
-     * 同じ高さになるため、そのままだと台車をクリックしても座席が先に当たってしまう。
-     */
+    /** 当たり判定ボックスの持ち上げ量。 同じ高さになるため、そのままだと台車をクリックしても座席が先に当… */
     private static final double HITBOX_LIFT = 0.55D;
 
-    /**
-     * 座席はプレイヤーを<b>素通しにする</b>。
-     *
-     * <p>立ち乗りで車内を歩くとき、座席の当たり判定が壁になって通れなかった。
-     * クリック判定 ({@code isPickable}) は残るので、右クリックで座るのは今までどおり。
-     *
-     * <p>ぶつかる判定 ({@code canBeCollidedWith}) とクリック判定 ({@code isPickable}) は
-     * 別物なので、片方だけ落とせる。台車など他のパーツは {@link EntityVehiclePart} の
-     * 既定のままで、当たり判定を持ち続ける (座席だけの話)。
-     */
+    /** 座席はプレイヤーを素通しにする。 立ち乗りで車内を歩くとき、座席の当たり判定が壁になって通れなかっ… */
     @Override
     public boolean canBeCollidedWith() {
         return false;
@@ -121,13 +105,12 @@ public class EntityFloor extends EntityVehiclePart {
         if (this.getSeatType() == 0 || player.isShiftKeyDown()) {
             return InteractionResult.PASS;
         }
-        // バール所持中は着席しない。台車を狙ったクリックが手前の座席に吸われて
-        // 連結モードに入れなくなるため、最寄りの台車へ転送する (本家の連結操作)。
+        // バール所持中は着席しない。台車を狙ったクリックが手前の座席に吸われて 連結モードに入れなくなるため…
         if (player.getMainHandItem().getItem() instanceof com.portofino.realtrainmodunofficial.item.CrowbarItem) {
             EntityVehicleBase<?> parentVehicle = this.getVehicle();
             if (parentVehicle instanceof jp.ngt.rtm.entity.train.EntityTrainBase train) {
                 jp.ngt.rtm.entity.train.EntityBogie nearest = null;
-                double best = 16.0D; //4 ブロック以内
+                double best = 16.0D; // 4 ブロック以内
                 for (int i = 0; i < 2; i++) {
                     jp.ngt.rtm.entity.train.EntityBogie bogie = train.getBogie(i);
                     if (bogie != null) {
@@ -144,8 +127,7 @@ public class EntityFloor extends EntityVehiclePart {
             }
             return InteractionResult.PASS;
         }
-        // 作り直し: EntityFloor に乗せる旧方式は視点固定バグの温床だったため、
-        // 列車本体へ座席オフセット付きで直接乗せる (運転席と同じ経路 = 視点フリー)。
+        // 作り直し: EntityFloor に乗せる旧方式は視点固定バグの温床だったため、 列車本体へ座席…
         EntityVehicleBase<?> vehicle = this.getVehicle();
         if (vehicle instanceof jp.ngt.rtm.entity.train.EntityTrainBase train) {
             jp.ngt.ngtlib.math.Vec3 pv = this.getPartVec();

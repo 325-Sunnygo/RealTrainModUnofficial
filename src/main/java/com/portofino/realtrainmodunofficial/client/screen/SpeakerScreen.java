@@ -17,10 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * スピーカー設定GUI（本家 RTM GuiSpeaker 風のスロット選択方式）。
- * 左: レッドストーン信号強度 1〜15 のスロット一覧（縦スクロール可）。各行に「select」ボタン。
- */
+/** スピーカー設定GUI（本家 RTM GuiSpeaker 風のスロット選択方式）。 */
 public class SpeakerScreen extends Screen {
     private static final int SLOT_COUNT = 15;
     private static final int SLOT_ROW_H = 16;

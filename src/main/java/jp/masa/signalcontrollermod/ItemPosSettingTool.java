@@ -15,12 +15,7 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
-/**
- * SignalControllerMod (作者: masa300, https://github.com/masa300/SignalControllerMod)
- * の ItemPosSettingTool 1.21.1 移植。
- * 使い方 (原作同様): 信号機を右クリック → 位置を記録、
- * SignalController を右クリック → 記録した位置を NextSignal / DisplayPos として追加。
- */
+/** SignalControllerMod (作者: masa300, https://github.… */
 public class ItemPosSettingTool extends Item {
     private final int mode;
 

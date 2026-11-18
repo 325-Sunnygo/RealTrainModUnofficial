@@ -14,12 +14,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.MapColor;
 
-/**
- * 溶けた金属 (銑鉄/鋼鉄) の液体ブロック。本家 {@code BlockMeltedMetal} の移植。
- *
- * <p>鋼鉄は満たされて静止すると鋼材 (steel_slab, temperature 15) に固まる。
- * 水に触れると爆発する。触れた物は燃える。
- */
+/** 溶けた金属 (銑鉄/鋼鉄) の液体ブロック。本家 BlockMeltedMetal の移植。 */
 public class BlockMeltedMetal extends BlockLiquidBase {
 
     /** true = 鋼鉄 (steel_l)。false = 銑鉄 (pig_iron_l)。 */
@@ -39,7 +34,7 @@ public class BlockMeltedMetal extends BlockLiquidBase {
     @Override
     protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
         super.tick(state, level, pos, random);
-        //本家: 鋼鉄はメタ 0 (残り 1 単位) で、露出していて流動が終わっていれば 1/5x1/5 で固まる
+        // 本家: 鋼鉄はメタ 0 (残り 1 単位) で、露出していて流動が終わっていれば 1/5x1/5…
         BlockState now = level.getBlockState(pos);
         if (this.steel && now.is(this) && now.getValue(AMOUNT) == 0 && random.nextInt(5) == 0) {
             boolean exposed = false;

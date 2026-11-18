@@ -10,10 +10,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/**
- * 本家 GuiTicketVendor + VendorScreenSelectTicket の移植。
- * 券売機を素手で右クリックすると開き、「切符」と「回数券」の2つのボタンだけがある。
- */
+/** 本家 GuiTicketVendor + VendorScreenSelectTicket の移植。 */
 @OnlyIn(Dist.CLIENT)
 public class TicketVendorScreen extends Screen {
 

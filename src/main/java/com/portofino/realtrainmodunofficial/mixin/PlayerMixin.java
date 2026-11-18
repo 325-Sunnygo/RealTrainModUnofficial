@@ -7,11 +7,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * フリーカメラ中はスニーク (シフト) で列車から降りないようにする。
- * バニラは LocalPlayer.rideTick で wantsToStopRiding が true なら
- * 降車する。
- */
+/** フリーカメラ中はスニーク (シフト) で列車から降りないようにする。 */
 @Mixin(Player.class)
 public abstract class PlayerMixin {
 

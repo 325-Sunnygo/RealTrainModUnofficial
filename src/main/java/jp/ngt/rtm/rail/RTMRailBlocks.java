@@ -6,10 +6,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/**
- * 本家 jp.ngt.rtm.RTMRail のブロック登録 (1.21 DeferredRegister 版)。
- * メインクラスから REGISTER.register(modBus) される。
- */
+/** 本家 jp.ngt.rtm.RTMRail のブロック登録 (1.21 DeferredRegis… */
 public final class RTMRailBlocks {
     public static final DeferredRegister.Blocks REGISTER = DeferredRegister.createBlocks(RealTrainModUnofficial.MODID);
 
@@ -41,7 +38,7 @@ public final class RTMRailBlocks {
     // 本家: RTMBlock.markerSwitch (markerType=1)
     public static final DeferredHolder<Block, BlockMarker> MARKER_SWITCH =
             REGISTER.register("marker_switch", () -> new BlockMarker(1, BlockBehaviour.Properties.of()));
-    // 本家: RTMBlock.markerStraight (markerType=10)。レンチ mode 2 が置く「直線マーカー」。
+    // 本家: RTMBlock.markerStraight (markerType=10)。
     public static final DeferredHolder<Block, BlockMarker> MARKER_STRAIGHT =
             REGISTER.register("marker_straight", () -> new BlockMarker(10, BlockBehaviour.Properties.of()));
 

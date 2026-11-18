@@ -17,10 +17,7 @@ import net.minecraft.world.phys.AABB;
 
 import java.util.Locale;
 
-/**
- * jp.ngt.rtm.entity.train.EntityTrain 用レンダラ (Phase 2)。
- * 本家 RenderVehicleBase の変換順を踏襲: translate → yaw(Y) → -pitch(X) → roll(Z) → config offset。
- */
+/** jp.ngt.rtm.entity.train.EntityTrain 用レンダラ (Phase… */
 public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
 
     public RtmTrainRenderer(EntityRendererProvider.Context context) {
@@ -45,8 +42,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
     @Override
     public void render(EntityTrain entity, float entityYaw, float partialTicks, PoseStack poseStack,
                        MultiBufferSource buffer, int packedLight) {
-        // 計測: 設置される列車は EntityTrain なのに、Profiler の Train カテゴリは旧実装の
-        // TrainEntityRenderer にしか入っておらず常に 0 だった (= 本命のコストが計測外)。
+        // 計測: 設置される列車は EntityTrain なのに、Profiler の Train カテゴ…
         long profilerStart =
             com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.begin();
         com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.beginTrainGeometry();
@@ -80,8 +76,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             return;
         }
         reportInitialPose(entity,def,model);
-        // 本家 preRenderBody: 室内灯 ON かつ周囲が暗いなら車体の通常描画をフルブライトで描く。
-        // ★本家は preRenderBody/postRenderBody で車体パスだけを挟む。
+        // 本家 preRenderBody: 室内灯 ON かつ周囲が暗いなら車体の通常描画をフルブライトで…
         final int interiorLightState = entity.getTrainStateData(
             jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_InteriorLight.id);
         final int bodyLight = TrainEntityRenderer.applyInteriorLighting(entity.level(),
@@ -90,9 +85,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
 
         ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_LOOKUP, tSec);
 
-        // 乗員を車体より先に描画する。車体は半透明バッチ (AlphaBlend) が深度を書くため、
-        // 列車→乗員の順に描かれると乗員がガラス/車体越しに遮蔽されて透明に見える
-        // (本家 1.7.10 は不透明ピクセル先行の 2 パスだったため発生しなかった問題)。
+        // 乗員を車体より先に描画する。車体は半透明バッチ (AlphaBlend) が深度を書くため、 列車…
         tSec = ClientRenderProfiler.sec();
         this.renderRidersFirst(entity, partialTicks, poseStack, buffer, packedLight);
         ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_RIDERS, tSec);
@@ -109,13 +102,9 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
 
             poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
 
-            // ★前照灯・尾灯の光 (本家 RenderVehicleBase.renderLightEffect)。
-            //   本家はモデルオフセットまで掛けた状態で描き、<b>モデルの拡大率は掛けない</b>ので
-            //   下の poseStack.scale より前に置く。
+            // ★前照灯・尾灯の光 (本家 RenderVehicleBase.renderLightEffect…
             renderLightEffect(entity, def, poseStack, buffer);
-            // ★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。本家は
-            // NGTOParts.render の中だけで glScalef(scale) するので、スクリプトが台車/ドアを
-            // 置く glTranslatef はブロック単位のまま。ここで掛けると全部が中央に寄る。
+            // ★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。
             if (!model.isVoxelModel()) {
                 poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
             }
@@ -131,15 +120,11 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             ClientRenderProfiler.secEnd(ClientRenderProfiler.SEC_SCRIPTED, tSec);
 
             // ★スクリプトを持つ車両は、それが何も描かなくても素モデルへ逃がさない。
-            //   本家 PartsRenderer.execScriptFunc は例外を投げ直すだけで代替描画を持たない。
-            //   スクリプトを持たない車両だけがこの経路 (本家の useScript=false 相当)。
             if (scripted == null) {
                 MqoModelLoader.GroupPredicate filter =
                         groupName -> shouldRenderGroup(groupName);
 
-                // ★ ドアの開閉。
-                // 車両 JSON の door_left / door_right (「このグループを開くとき何処へ動かすか」) による
-                // 開閉は旧 TrainEntity のレンダラーにしか実装されていなかった。
+                // ★ ドアの開閉。 車両 JSON の door_left / door_right (「このグルー…
                 java.util.Map<String, java.util.List<TrainEntityRenderer.PartsStep>> leftChains =
                         TrainEntityRenderer.partsChains(def.getLeftDoors());
                 java.util.Map<String, java.util.List<TrainEntityRenderer.PartsStep>> rightChains =
@@ -168,15 +153,10 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                     }
                 };
                 tSec = ClientRenderProfiler.sec();
-                // この経路も entity を渡せない (renderModel の 6 引数版) ため、カリング判定
-                // (shouldCullModelFaces) が車両の doCulling を引けず両面描画に落ちる。
-                // スクリプト経路と同じフォールバックに載せる。
+                // この経路も entity を渡せない (renderModel の 6 引数版) ため、カリング判…
                 com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(entity);
                 try {
-                    // entity を渡す版を使う。
-                    // 発光パスの点灯判定 (前照灯/尾灯/室内灯) も引けない。
-                    // ★本家 preRenderBody は室内灯の GL 点光源を
-                    // 「室内灯が点いていて、かつ周囲が暗い (getLightValue < 7)」ときだけ有効にする。
+                    // entity を渡す版を使う。 発光パスの点灯判定 (前照灯/尾灯/室内灯) も引けない。
                     boolean interiorLightingActive =
                         !def.getInteriorLights().isEmpty()
                         && bodyLight == net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
@@ -184,9 +164,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
                         interiorLightingActive ? def.getInteriorLights() : null,
                         interiorLightState == 2, entity.level().getGameTime() * 50L);
                     try {
-                        // One complete normal pass, then one complete alpha pass, as in
-                        // RenderVehicleBase. Splitting static/moving groups here submitted
-                        // shadow/glass before the opaque faces of moving doors.
+                        // One complete normal pass, then one complete alpha…
                         final int lightForBody = bodyLight;
                         com.portofino.realtrainmodunofficial.client.render.LocalSpaceBatch.run(
                             poseStack, buffer, (localPose, localBuffer) -> {
@@ -204,7 +182,6 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             }
 
             // ★ 方向幕 (JSON の rollsigns)。
-            // 本家 RenderVehicleBase はスクリプト描画とは別に方向幕を描く。
             tSec = ClientRenderProfiler.sec();
             TrainEntityRenderer.renderConfiguredRollsigns(
                     entity.getTrainStateData(
@@ -222,13 +199,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         }
     }
 
-    /**
-     * 前照灯・尾灯の光。本家 {@code RenderVehicleBase.renderLightEffect} の引数集め。
-     *
-     * <p>本家は {@code getConnectedTrain(dir)} で「その向きに連結相手が居るか」を見て、
-     * 先頭車だけ前照灯・最後尾だけ尾灯を点ける。単行 (isSingleTrain かつ両端とも非連結) は
-     * 進行方向側が前照灯・反対側が尾灯になる。
-     */
+    /** 前照灯・尾灯の光。本家 RenderVehicleBase.renderLightEffect の… */
     private static void renderLightEffect(EntityTrain entity, VehicleDefinition def,
                                           PoseStack poseStack, MultiBufferSource buffer) {
         int mode = entity.getTrainStateData(
@@ -248,10 +219,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
             ambient, poseStack, buffer);
     }
 
-    /**
-     * 乗員 (運転士等) を車体より先に描画する。
-     * 通常の描画ループでも描かれるが、同一変換の二重描画は視覚上問題にならない。
-     */
+    /** 乗員 (運転士等) を車体より先に描画する。 */
     private void renderRidersFirst(EntityTrain entity, float partialTicks, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight) {
         var mc = net.minecraft.client.Minecraft.getInstance();
@@ -277,14 +245,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         }
     }
 
-    /**
-     * 焼き込みフォールバック時のグループ選別。
-     *
-     * <p>スクリプトがまだ非同期コンパイル中/読込失敗のとき、全ての authored グループを
-     * 描くと連結曲げ用の代替メッシュ (body-90 / body-180 等) まで重なって描かれ、
-     * 車体が反転・散乱して見える。本家でも実際に使う Parts だけを登録するため、
-     * フォールバックでは従来どおり代替メッシュ/影/ガイドを除外する。
-     */
+    /** 焼き込みフォールバック時のグループ選別。 スクリプトがまだ非同期コンパイル中/読込失敗のとき、全て… */
     private static boolean shouldRenderGroup(String groupName) {
         if (groupName == null || groupName.isBlank()) {
             return true;
@@ -300,7 +261,7 @@ public class RtmTrainRenderer extends EntityRenderer<EntityTrain> {
         if (n.endsWith("_guide") || n.endsWith("[obj]") || n.endsWith("_atari") || n.endsWith(" atari")) {
             return false;
         }
-        // 連結曲げ用の角度バリアント (body-90 / body-180(mx) / bogie1-90 等)
+        // 連結曲げ用の角度バリアント (body-90 / body-180(mx) / bogie1-90…
         return !isAngleBendVariant(n);
     }
 

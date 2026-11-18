@@ -7,16 +7,13 @@ import jp.ngt.ngtlib.renderer.model.TextureCoordinate;
 import java.nio.FloatBuffer;
 import java.util.List;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.NGTRenderHelper のスクリプト互換。
- * renderCustomModel 系はグループ名を GLRecorder に記録し、再生側が本体モデルから描く。
- */
+/** 本家 jp.ngt.ngtlib.renderer.NGTRenderHelper のスクリプト互… */
 @SuppressWarnings("unused")
 public final class NGTRenderHelper {
     private NGTRenderHelper() {
     }
 
-    /** Legacy world-item entry point records the real native stack. */
+    /** Legacy world-item entry point records the real na… */
     public static LegacyItemRenderer getItemRenderer() {
         return LegacyItemRenderer.INSTANCE;
     }
@@ -52,10 +49,7 @@ public final class NGTRenderHelper {
         addFaceWithMatrix(face, tessellator, null, -1, smoothing);
     }
 
-    /**
-     * 本家 addFaceWithMatrix: matrix 指定時は index 番目の 4x4 行列を掛けてから積む。
-     * matrix が null なら素の座標。
-     */
+    /** 本家 addFaceWithMatrix: matrix 指定時は index 番目の 4x4 行… */
     public static void addFaceWithMatrix(Face face, Object tessellator, FloatBuffer matrix, int index, boolean smoothing) {
         if (face == null || !(tessellator instanceof IRenderer tess)) {
             return;
@@ -144,7 +138,7 @@ public final class NGTRenderHelper {
                 {moveX, moveY, moveZ, 1.0F}});
     }
 
-    /** 本家 rotate: 変換行列に回転を掛ける。angle はラジアン、coordinate は 'X'/'Y'/'Z'。 */
+    /** 本家 rotate: 変換行列に回転を掛ける。 */
     public static FloatBuffer rotate(FloatBuffer buffer, float angle, char coordinate) {
         float sin = (float) Math.sin(angle);
         float cos = (float) Math.cos(angle);

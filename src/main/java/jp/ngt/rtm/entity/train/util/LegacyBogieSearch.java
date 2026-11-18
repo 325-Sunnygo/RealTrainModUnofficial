@@ -2,7 +2,7 @@ package jp.ngt.rtm.entity.train.util;
 
 import jp.ngt.rtm.rail.util.RailMap;
 
-/** Original inclusive trailing-bogie search, including the final rail endpoint. */
+/** Original inclusive trailing-bogie search, includi… */
 public final class LegacyBogieSearch {
     private LegacyBogieSearch() {}
     public static int trailingIndex(RailMap map,int split,int min,int max,double y,double[] front,double length) {

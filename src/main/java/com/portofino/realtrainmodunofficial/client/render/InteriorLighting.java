@@ -4,10 +4,7 @@ import java.util.List;
 
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
 
-/**
- * 本家 RenderVehicleBase.preRenderBody → RenderUtil.enableCustomLighting の移植。
- * 本家は室内灯の座標ごとに GL の点光源を有効化して車体を照らす。
- */
+/** 本家 RenderVehicleBase.preRenderBody → RenderUtil.e… */
 public final class InteriorLighting {
 
     /** 本家 glLight の GL_DIFFUSE。 */
@@ -35,10 +32,7 @@ public final class InteriorLighting {
         return positions != null;
     }
 
-    /**
-     * @param lights   室内灯 (モデル座標)
-     * @param rainbow  本家の r < 0.0F 相当 (InteriorLight_Rainbow)。時間で色が回る
-     */
+    
     public static void begin(List<VehicleDefinition.LightDefinition> lights, boolean rainbow, long timeMillis) {
         if (lights == null || lights.isEmpty()) {
             positions = null;
@@ -53,7 +47,7 @@ public final class InteriorLighting {
         }
         positions = pos;
         if (rainbow) {
-            // 本家: hue = (int)(millis / 50 % 24000 * 15) % 360 / 360
+            // 本家: hue = (int)(millis / 50 % 24000 * 15) % 360 /…
             float hue = (float) ((int) ((timeMillis / 50L % 24000L) * 15L) % 360) / 360.0F;
             float[] rgb = hueToRgb(hue);
             colorR = rgb[0];
@@ -85,11 +79,7 @@ public final class InteriorLighting {
         return colorB;
     }
 
-    /**
-     * 頂点 1 個分の明るさ係数。本家の GL ライティングと同じく
-     * ambient + diffuse * max(0, dot(N, L)) を光源ごとに足す (距離減衰なし)。
-     * @return 1.0 以上になり得る (本家も複数光源で飽和する)。呼び出し側で clamp すること
-     */
+    /** 頂点 1 個分の明るさ係数。本家の GL ライティングと同じく ambient + diffuse… */
     public static float factor(float x, float y, float z, float nx, float ny, float nz) {
         float[] pos = positions;
         if (pos == null) {

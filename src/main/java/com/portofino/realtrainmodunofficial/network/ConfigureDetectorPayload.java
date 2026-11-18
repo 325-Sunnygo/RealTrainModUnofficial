@@ -11,20 +11,11 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 列車検知器の設定 (出力先の座標 + 検知時に置くか消すか)。
- * @param pos           検知器の位置
- * @param hasTarget     出力先を設定しているか (false なら出力しない)
- * @param target        出力先の座標
- * @param placeOnDetect true = 検知したら置く / false = 検知したら消す
- */
+/** 列車検知器の設定 (出力先の座標 + 検知時に置くか消すか)。 */
 public record ConfigureDetectorPayload(BlockPos pos, boolean hasTarget, BlockPos target, boolean placeOnDetect)
         implements CustomPacketPayload {
 
-    /**
-     * 検知器から出力先までの上限(ブロック)。壊れたパケットで遠隔地のチャンクを
-     * 巻き込まないための歯止め。
-     */
+    /** 検知器から出力先までの上限(ブロック)。壊れたパケットで遠隔地のチャンクを 巻き込まないための歯止… */
     private static final int MAX_TARGET_DISTANCE = 256;
     private static final double MAX_REACH_SQ = 64.0D * 64.0D;
 

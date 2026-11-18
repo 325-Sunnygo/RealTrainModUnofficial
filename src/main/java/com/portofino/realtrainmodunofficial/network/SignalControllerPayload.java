@@ -14,11 +14,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * SignalControllerMod (masa300) 移植: 設定 GUI → サーバー反映
- * (原作 PacketSignalController 相当)。設定値と nextSignal/displayPos の
- * 全リストを一括で送る。
- */
+/** SignalControllerMod (masa300) 移植: 設定 GUI → サーバー反映… */
 public record SignalControllerPayload(BlockPos pos, String signalType,
                                       boolean above, boolean last, boolean repeat, boolean reducedSpeed,
                                       List<BlockPos> nextSignal, List<BlockPos> displayPos)

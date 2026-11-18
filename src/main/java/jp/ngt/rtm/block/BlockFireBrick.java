@@ -13,14 +13,7 @@ import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.level.material.MapColor;
 
-/**
- * 耐火レンガ / 熱風炉レンガ。本家 {@code jp.ngt.rtm.block.BlockFireBrick} の移植。
- *
- * <p>熱風炉 ({@code randomTick = true}) は隣の溶岩から熱を溜める。
- * ★<b>本家はさらに、溜めた熱を炉の火 ({@code RTMFluid.furnaceFire}) として
- * 隣の空気へ吐き出し、排ガス ({@code exhaustGas}) からも熱を受け取る。
- * この 2 つの流体ブロックは RTMU に未移植なので、そこだけ動かない。</b>
- */
+/** 耐火レンガ / 熱風炉レンガ。本家 jp.ngt.rtm.block.BlockFireBrick… */
 public class BlockFireBrick extends Block {
     public static final MapCodec<BlockFireBrick> CODEC = simpleCodec(p -> new BlockFireBrick(true));
     /** 本家のメタ (溜まった熱)。 */
@@ -61,9 +54,7 @@ public class BlockFireBrick extends Block {
         if (!this.changeColor) {
             return;
         }
-        //本家 BlockFireBrick.updateTick (hotStoveBrick):
-        //  隣の空気へ 溜めた熱を炉の火 (meta 15) として吐き出す (確率は熱が高いほど上がる)
-        //  隣の排ガスから熱を 1 吸う / 隣の溶岩から熱を 1 吸う
+        // 本家 BlockFireBrick.updateTick (hotStoveBrick): 隣の空…
         int heat = state.getValue(HEAT);
         int n = 16 - heat;
         for (Direction face : Direction.values()) {

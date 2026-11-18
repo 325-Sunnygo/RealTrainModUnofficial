@@ -7,7 +7,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** RTM.cfg is the authoritative file; NeoForge's native screen mirrors its values. */
+/** RTM.cfg is the authoritative file; */
 public final class RTMUConfig {
     private static final Map<RTMConfigOptions.Option, ModConfigSpec.ConfigValue<?>> VALUES = new LinkedHashMap<>();
     public static final ModConfigSpec SPEC;
@@ -21,8 +21,7 @@ public final class RTMUConfig {
             builder.push(category);
             for (var option : RTMConfigOptions.ALL) if (option.category().equals(category)) {
                 Object value = imported.getOrDefault(option,option.defaultValue());
-                // NeoForge comment correction treats dots as paths, even for list-defined keys.
-                // RTM.cfg retains the original name; this key is only the native screen mirror.
+                // NeoForge comment correction treats dots as paths,…
                 String nativeKey = option.key().replace('.', '_');
                 builder.comment("RTM setting: " + option.field() + ".");
                 ModConfigSpec.ConfigValue<?> property;
@@ -41,8 +40,7 @@ public final class RTMUConfig {
         if (!(event instanceof ModConfigEvent.Loading) && !(event instanceof ModConfigEvent.Reloading)) return;
         var file = FMLPaths.CONFIGDIR.get().resolve("RTM.cfg");
         try {
-            // File edits take priority on every startup, including when the native
-            // screen's TOML cache already exists. Reloading comes from that screen.
+            // File edits take priority on every startup, includ…
             boolean readFile = event instanceof ModConfigEvent.Loading && java.nio.file.Files.isRegularFile(file);
             Map<RTMConfigOptions.Option,Object> fileValues = readFile ? RTMConfigOptions.readLegacy(file) : Map.of();
             Map<RTMConfigOptions.Option,Object> current = new LinkedHashMap<>();

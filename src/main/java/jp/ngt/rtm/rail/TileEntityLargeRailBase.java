@@ -14,10 +14,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 本家 jp.ngt.rtm.rail.TileEntityLargeRailBase (KaizPatchX) の忠実移植。
- * 道床(レールベース)ブロック1個ごとの BlockEntity。startPoint でコアを参照する。
- */
+/** 本家 jp.ngt.rtm.rail.TileEntityLargeRailBase (KaizP… */
 public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
     private static final int SPLIT = 128;
     protected int[] startPoint = new int[3];
@@ -25,23 +22,14 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
     /** ブロックの当たり判定が設定されている */
     private boolean finishSetupBlockBounds;
 
-    /**
-     * {xNzP, xPzP, xPzN, xNzN}
-     * 描画と当たり判定の計算に使用
-     */
+    /** {xNzP, xPzP, xPzN, xNzN} 描画と当たり判定の計算に使用 */
     private float[] blockHeights;
 
-    /**
-     * 当たり判定の形状キャッシュ。
-     * 毎回マスごとの箱を union すると重い。
-     */
+    /** 当たり判定の形状キャッシュ。 毎回マスごとの箱を union すると重い。 */
     private net.minecraft.world.phys.shapes.VoxelShape cachedShape;
     private int cachedShapeVersion = -1;
 
-    /**
-     * 1.7.10 TileEntity の座標 SRG フィールド (xCoord / yCoord / zCoord)。
-     * スクリプトが位置を読むのにこの名前を使う:
-     */
+    /** 1.7.10 TileEntity の座標 SRG フィールド (xCoord / yCoord… */
     public final int field_145851_c;
     public final int field_145848_d;
     public final int field_145849_e;
@@ -83,25 +71,14 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         this.refreshBallastModel();
     }
 
-    /**
-     * 道床の形を作り直させる。
-     *
-     * <p>NeoForge はチャンクを焼く直前に {@code getModelData()} を呼ぶが、
-     * 呼ぶ相手は「作り直しを申請した BlockEntity」だけ。申請しないと
-     * コアが後から届いても古い (空の) 形のまま焼かれ、道床が出ない。
-     */
+    /** 道床の形を作り直させる。 NeoForge はチャンクを焼く直前に getModelData()… */
     public void refreshBallastModel() {
         if (this.level != null && this.level.isClientSide()) {
             this.requestModelDataUpdate();
         }
     }
 
-    /**
-     * 道床 (レール下の砂利) の形をチャンクビルダへ渡す。
-     *
-     * <p>本家 1.7.10 は {@code RenderBlockLargeRail} (ISimpleBlockRenderingHandler) で
-     * チャンクメッシュへ焼いていた。1.21 でも同じく焼く側に載せるので、毎フレームの負担は無い。
-     */
+    /** 道床 (レール下の砂利) の形をチャンクビルダへ渡す。 */
     @Override
     public net.neoforged.neoforge.client.model.data.ModelData getModelData() {
         if (this.level == null) {
@@ -155,10 +132,7 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         return false;
     }
 
-    /**
-     * スクリプト互換 SRG: func_70296_d = markDirty (setChanged)。
-     * SRB3 のサーバースクリプトがレール生成後に呼ぶ。
-     */
+    /** スクリプト互換 SRG: func_70296_d = markDirty (setChanged… */
     public void func_70296_d() {
         this.setChanged();
     }
@@ -183,11 +157,7 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         return null;
     }
 
-    /**
-     * スクリプト互換オーバーロード: Baru's Pole (xx_s/xx_w) 等は world に
-     * tileEntity.func_145831_w = jp.ngt.mccompat.WorldCompat を渡す。
-     * Level 版へアンラップして委譲する (Object で受けないと Nashorn のオーバーロード解決が失敗する)。
-     */
+    /** スクリプト互換オーバーロード: Baru's Pole (xx_s/xx_w) 等は world… */
     public static TileEntityLargeRailBase getRailFromCoordinates(Object world, double px, double py, double pz) {
         Level level = null;
         if (world instanceof Level l) {
@@ -217,10 +187,7 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         return null;
     }
 
-    /**
-     * 指定した座標の下にあるレールのRailMapを返す
-     * @param entity 列車、車止め、など
-     */
+    /** 指定した座標の下にあるレールのRailMapを返す */
     /** スクリプト互換: WorldCompat / PlayerCompat をそのまま渡せる版。 */
     public static RailMap getRailMapFromCoordinates(Object world, Object entity, double px, double py, double pz) {
         Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
@@ -236,11 +203,7 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         return null;
     }
 
-    /**
-     * 坂に沿った当たり判定。
-     * 本家は「1ブロック = 4隅の平均高さの平らな箱」1つなので、坂だとブロックごとの段差になる。
-     * @param thickness 最低の厚み (本家 BlockLargeRailBase.THICKNESS = 1/16)
-     */
+    /** 坂に沿った当たり判定。 本家は「1ブロック = 4隅の平均高さの平らな箱」1つなので、坂だとブロッ… */
     public net.minecraft.world.phys.shapes.VoxelShape getRailCollisionShape(int x, int y, int z, float thickness) {
         TileEntityLargeRailCore core = this.getRailCore();
         if (core == null) {
@@ -304,7 +267,7 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
                 return fa;
             }
         } else {
-            // 初回: コアが解決できれば計算を有効化 (本家 updateEntity の finishSetupBlockBounds 相当)
+            // 初回: コアが解決できれば計算を有効化 (本家 updateEntity の finishSetu…
             if (this.getRailCore() != null) {
                 this.finishSetupBlockBounds = true;
                 float[] fa = this.getBlockHeights(x, y, z, defaultHeight);
@@ -326,14 +289,7 @@ public class TileEntityLargeRailBase extends BlockEntity implements ILargeRail {
         return blockHeightsOf(core == null ? null : core.getAllRailMaps(), x, y, z, defaultHeight);
     }
 
-    /**
-     * レールコアの線形から、そのブロックの 4 隅の高さを出す。
-     *
-     * <p>道床 (BallastBlock) からも同じ計算が要るので static に切り出してある。
-     * レール本体と道床で別々の式にすると、隣り合うブロックの継ぎ目がずれる。
-     *
-     * @return {xNzP, xPzP, xPzN, xNzN}。出せなければ null
-     */
+    /** レールコアの線形から、そのブロックの 4 隅の高さを出す。 */
     public static float[] blockHeightsOf(RailMap[] rms, int x, int y, int z, float defaultHeight) {
         if (rms == null) {
             return null;

@@ -4,7 +4,7 @@ import jp.ngt.ngtlib.renderer.*;
 import jp.ngt.ngtlib.renderer.model.*;
 import jp.ngt.rtm.render.Parts;
 
-/** Behavioral cases based on the supplied 1.7.10 reference implementation. */
+/** Behavioral cases based on the supplied 1.7.10 ref… */
 public final class LegacyRenderApiRegression {
     private static int checks;
     private static void check(boolean value,String message) { checks++; if(!value) throw new AssertionError(message); }

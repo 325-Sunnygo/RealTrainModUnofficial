@@ -4,10 +4,7 @@ import jp.ngt.ngtlib.io.ScriptUtil;
 import jp.ngt.rtm.rail.TileEntityLargeRailCore;
 import jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore;
 
-/**
- * 本家 jp.ngt.rtm.render.RailPartsRenderer の移植。
- * レールスクリプトの renderRailStatic/renderRailDynamic/shouldRenderObject を仲介する。
- */
+/** 本家 jp.ngt.rtm.render.RailPartsRenderer の移植。 */
 public class RailPartsRenderer extends PartsRenderer {
     public RailPartsRenderer() { this(new String[0]); }
     public RailPartsRenderer(String... args) {
@@ -37,10 +34,7 @@ public class RailPartsRenderer extends PartsRenderer {
                 tile.getBlockPos().getZ() + rp.posZ - rp.blockZ};
     }
 
-    /** One Nashorn-visible signature: mixed (Level,int...) and (Object,double...)
-     * overloads are ambiguous for JavaScript coordinates. Keep the reference rail
-     * renderer's integer-coordinate conversion and brightness sampling.
-     */
+    /** One Nashorn-visible signature: mixed (Level,int..… */
     @Override
     public int getBrightness(Object world, double x, double y, double z) {
         return world instanceof net.minecraft.world.level.Level level
@@ -55,14 +49,10 @@ public class RailPartsRenderer extends PartsRenderer {
         return getRailBrightness(level, new net.minecraft.core.BlockPos(x, y, z), positions);
     }
 
-    /** 現在描画中のレール index (0=メイン, 1..=subRails)。スクリプトがリフレクション参照。 */
+    /** 現在描画中のレール index (0=メイン, 1..=subRails)。 */
     public int currentRailIndex;
 
-    /**
-     * 分岐コア用: renderStaticParts が描画する RailMap の差し替え。
-     * getRailMap(null) は分岐で先頭マップしか返さないため、呼び出し側
-     * (RailScriptRenderers) が getAllRailMaps の各マップを設定してマップごとに回す。
-     */
+    /** 分岐コア用: renderStaticParts が描画する RailMap の差し替え。 */
     public jp.ngt.rtm.rail.util.RailMap renderMapOverride;
 
     /** 本家: モデルの全グループ名 (renderKey 計算やスクリプトが使う)。 */
@@ -76,10 +66,7 @@ public class RailPartsRenderer extends PartsRenderer {
                 .toArray(String[]::new);
     }
 
-    /**
-     * 本家: レール描画原点 (先頭 RailPosition のブロック端数)。
-     * 表示リストの平行移動や、スクリプトが原点補正するときに使う。
-     */
+    /** 本家: レール描画原点 (先頭 RailPosition のブロック端数)。 */
     public double[] getRailRenderOrigin(Object tileObj) {
         if (!(tileObj instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore core)) {
             return new double[]{0.0D, 0.0D, 0.0D};
@@ -124,20 +111,11 @@ public class RailPartsRenderer extends PartsRenderer {
         return true;
     }
 
-    /**
-     * 描画対象モデルのオブジェクト名一覧 (renderStaticParts 用)。
-     * クライアント側 (RailScriptRenderers) が呼出前に設定する。
-     */
+    /** 描画対象モデルのオブジェクト名一覧 (renderStaticParts 用)。 */
     public java.util.Set<String> modelGroupNames = java.util.Set.of();
 
-    /**
-     * 本家のデフォルトレール描画。
-     * renderer.renderStaticParts(tileEntity, x, y, z) として呼ばれる。
-     */
-    /**
-     * 本家 renderRailMapStatic の忠実移植 (GLRecorder 記録)。
-     * BRE 系スクリプトが分岐の非可動側レールを描くのに使う:
-     */
+    /** 本家のデフォルトレール描画。 renderer.renderStaticParts(tileEnt… */
+    /** 本家 renderRailMapStatic の忠実移植 (GLRecorder 記録)。 */
     public void renderRailMapStatic(Object tileObj, Object railMapObj, int max, int startIndex, int endIndex, Parts... pArray) {
         if (!(tileObj instanceof jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore tileEntity)
                 || !(railMapObj instanceof jp.ngt.rtm.rail.util.RailMap rm)) {
@@ -176,11 +154,7 @@ public class RailPartsRenderer extends PartsRenderer {
         }
     }
 
-    /**
-     * レール 1 区間の明るさ。レール面のすぐ上で拾う。
-     * そこが完全に真っ暗 (= ブロックの中でサンプリングしてしまった) の時だけ 1〜2 段上へ
-     * 逃がす。
-     */
+    /** レール 1 区間の明るさ。レール面のすぐ上で拾う。 */
     private static int sampleBrightness(TileEntityLargeRailCore tile, double wx, double wy, double wz) {
         net.minecraft.world.level.Level level = tile.getLevel();
         if (level == null) {
@@ -197,10 +171,7 @@ public class RailPartsRenderer extends PartsRenderer {
         return light;
     }
 
-    /**
-     * 本家 RailPartsRendererBase.createRailPos の忠実移植。
-     * 全 RailMap の 0.5m 刻み各点を {x, y, z, yaw, -pitch, cant} で返す。
-     */
+    /** 本家 RailPartsRendererBase.createRailPos の忠実移植。 */
     public static float[][] createRailPos(TileEntityLargeRailCore tile) {
         jp.ngt.rtm.rail.util.RailMap[] rms = tile.getAllRailMaps();
         if (rms == null || rms.length == 0) {
@@ -233,10 +204,7 @@ public class RailPartsRenderer extends PartsRenderer {
         return list.isEmpty() ? null : list.toArray(new float[0][]);
     }
 
-    /**
-     * 本家 getRailBrightness の忠実移植。各点の位置で明るさを拾う。
-     * ★コアブロック 1 点で代表させてはいけない。
-     */
+    /** 本家 getRailBrightness の忠実移植。各点の位置で明るさを拾う。 */
     public static int[] getRailBrightness(net.minecraft.world.level.Level level,
                                           net.minecraft.core.BlockPos origin, float[][] rp) {
         int[] out = new int[rp.length];
@@ -262,10 +230,7 @@ public class RailPartsRenderer extends PartsRenderer {
         return b;
     }
 
-    /**
-     * 本家 KaizPatchX createStaticRenderKey の忠実移植。
-     * レール形状・各点の明るさ・モデル (オブジェクト名/テクスチャ) をまとめた 1 個の int。
-     */
+    /** 本家 KaizPatchX createStaticRenderKey の忠実移植。 */
     public static int createStaticRenderKey(float[][] fa, int[] brightness, int modelKey) {
         int key = 31 * java.util.Arrays.deepHashCode(fa) + java.util.Arrays.hashCode(brightness);
         return 31 * key + modelKey;
@@ -280,8 +245,6 @@ public class RailPartsRenderer extends PartsRenderer {
             return;
         }
         // ★本家 createRailPos と同じく全 RailMap を 1 回の呼び出しで回す。
-        // 分岐は RailMap を複数持つので、1 本しか見ないと分岐側のルートに土台 (道床/枕木) が
-        // 付かない。
         jp.ngt.rtm.rail.util.RailMap[] maps;
         if (this.renderMapOverride != null) {
             maps = new jp.ngt.rtm.rail.util.RailMap[]{this.renderMapOverride};
@@ -331,7 +294,6 @@ public class RailPartsRenderer extends PartsRenderer {
             float relZ = (float) (z + p1[0] - origin.getZ());
 
             // 本家 renderRailMapStatic と同じく、明るさは区間ごとにサンプリングする。
-            // ★コアブロック 1 点で全長を代表させてはいけない。
             rec.brightness(sampleBrightness(tile, origin.getX() + relX, origin.getY() + relY, origin.getZ() + relZ));
             rec.push();
             rec.translate(relX, relY, relZ);

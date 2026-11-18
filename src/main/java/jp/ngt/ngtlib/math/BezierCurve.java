@@ -6,12 +6,7 @@ public final class BezierCurve implements ILine {
     /** レンダラの max と同一にし、max > split による重複サンプル（スパイク）を防ぐ。 */
     public static final int MAX_CURVE_RENDER_SPLIT = 384;
 
-    /**
-     * 等間隔化テーブルの分割数。描画用の上限を掛けてはいけない。
-     * 台車はレール上の位置を「レール長 × 360」の解像度で数えるが、実際に座標へ直すのは
-     * このテーブル (normalizedParameters) で、テーブルの粗さがそのまま
-     * 台車が止まれる位置の粗さになる。
-     */
+    /** 等間隔化テーブルの分割数。描画用の上限を掛けてはいけない。 */
     public static int tableSplitForLength(double arcLength) {
         if (arcLength < 1.0e-4) {
             return 64;
@@ -19,10 +14,7 @@ public final class BezierCurve implements ILine {
         return Mth.clamp((int) (arcLength * 128.0), 64, 32768);
     }
 
-    /**
-     * 描画用の分割数。レンダラの max と揃えて重複サンプルを防ぐ。
-     * 位置計算には使わないこと (#tableSplitForLength 参照)。
-     */
+    /** 描画用の分割数。レンダラの max と揃えて重複サンプルを防ぐ。 */
     public static int splitForLength(double arcLength) {
         if (arcLength < 1.0e-4) {
             return 32;
@@ -34,25 +26,14 @@ public final class BezierCurve implements ILine {
 
 
 
-    public final double[] sp;//StartPoint
-    public final double[] cpS;//ControlPoint
-    public final double[] cpE;//ControlPoint
-    public final double[] ep;//EndPoint
+    public final double[] sp;// StartPoint
+    public final double[] cpS;// ControlPoint
+    public final double[] cpE;// ControlPoint
+    public final double[] ep;// EndPoint
     private final CubicBezier2D curve;
     private final BezierArcLength arcLength;
 
-    /**
-     * ベジェ曲線
-     *
-     * @param p1 開始点のX値
-     * @param p2 開始点のY値
-     * @param p3 制御点1のX値
-     * @param p4 制御点1のY値
-     * @param p5 制御点2のX値
-     * @param p6 制御点2のY値
-     * @param p7 終止点のX値
-     * @param p8 終止点のY値
-     */
+    /** ベジェ曲線 */
     public BezierCurve(double p1, double p2, double p3, double p4, double p5, double p6, double p7, double p8) {
         this.sp = new double[]{p1, p2};
         this.cpS = new double[]{p3, p4};

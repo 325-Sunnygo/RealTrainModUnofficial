@@ -12,10 +12,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * EntityVehicleBase (本家系列車/車両) の DataMap 同期 (server → client)。
- * flag=1 で書かれたエントリを EntityTrainBase が定期配信する。
- */
+/** EntityVehicleBase (本家系列車/車両) の DataMap 同期 (server… */
 public record DataMapSyncPayload(int entityId, Map<String, String> data) implements CustomPacketPayload {
 
     public static final Type<DataMapSyncPayload> TYPE = new Type<>(

@@ -11,10 +11,7 @@ import net.minecraft.world.item.component.CustomData;
 
 import java.util.List;
 
-/**
- * 本家 jp.ngt.rtm.item.ItemTicket の移植。
- * 改札 (TICKET_GATE) が消費する。
- */
+/** 本家 jp.ngt.rtm.item.ItemTicket の移植。 */
 public class TicketItem extends Item {
 
     private static final String KEY_RIDES = "Rides";
@@ -35,10 +32,7 @@ public class TicketItem extends Item {
         return stack;
     }
 
-    /**
-     * 改札を通ったときの処理。
-     * @return 手に残るスタック (使い切ったら ItemStack#EMPTY)
-     */
+    /** 改札を通ったときの処理。 */
     public ItemStack consume(ItemStack stack) {
         CompoundTag tag = read(stack);
         int rides = tag.contains(KEY_RIDES) ? tag.getInt(KEY_RIDES) : defaultRides;

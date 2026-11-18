@@ -2,26 +2,13 @@ package jp.ngt.mccompat.nbt;
 
 import net.minecraft.nbt.CompoundTag;
 
-/**
- * {@link NBTTagCompound} と同じ SRG メソッドの静的版。レシーバを引数で受ける。
- *
- * <p>スクリプトが触る NBT は、いつもシムとは限らない。
- * 例えば {@code jp.ngt.ngtlib.block.BlockSet.nbt} は Java 側の都合で実バニラの
- * {@link CompoundTag} で、これには 1.7.10 の SRG 名が無い。
- * 実バニラ型は継承もラップもできないので、
- * {@code PackScriptSource} が {@code <式>.func_74737_b(...)} を
- * {@code NBTCompat.func_74737_b(<式>, ...)} へ書き換えて、ここへ流す。
- *
- * <p>これが無いと NGTO Builder2 の setTileEntityData が
- * 「nbt.func_74737_b is not a function」で落ち、
- * パック側が例外を捨てるため、ポールだけ置かれて架線のモデルも接続先も書かれなかった。
- */
+/** NBTTagCompound と同じ SRG メソッドの静的版。レシーバを引数で受ける。 */
 public final class NBTCompat {
 
     private NBTCompat() {
     }
 
-    /** シムでも実バニラでも受ける。null は空タグ扱い (スクリプト側の null 判定は呼ぶ前に済んでいる)。 */
+    /** シムでも実バニラでも受ける。null は空タグ扱い (スクリプト側の null 判定は呼ぶ前に済ん… */
     private static NBTTagCompound of(Object nbt) {
         if (nbt instanceof NBTTagCompound c) {
             return c;

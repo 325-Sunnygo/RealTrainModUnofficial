@@ -19,7 +19,7 @@ public final class LegacyInventoryRegression {
         public com.mojang.blaze3d.vertex.VertexConsumer setNormal(float x,float y,float z) { return this; }
     }
     public static void main(String[] args) throws Exception {
-        // Standalone registry tests have no discovered mods; feature flags still require the loader list.
+        // Standalone registry tests have no discovered mods;
         net.neoforged.fml.loading.LoadingModList.of(java.util.List.of(),java.util.List.of(),java.util.List.of(),java.util.List.of(),java.util.Map.of());
         net.minecraft.SharedConstants.tryDetectVersion();
         net.minecraft.server.Bootstrap.bootStrap();

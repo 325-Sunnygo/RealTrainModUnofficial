@@ -3,10 +3,7 @@ package jp.ngt.rtm.render;
 import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
-/**
- * 本家 jp.ngt.rtm.render.SignalPartsRenderer の移植。
- * 信号機のスクリプト (RenderClock.js 等) が renderClass に指定する。
- */
+/** 本家 jp.ngt.rtm.render.SignalPartsRenderer の移植。 */
 public class SignalPartsRenderer extends TileEntityPartsRenderer {
 
     public SignalPartsRenderer(String... par1) {
@@ -18,10 +15,7 @@ public class SignalPartsRenderer extends TileEntityPartsRenderer {
         return tile instanceof InstalledObjectBlockEntity be ? be.getSignal() : 0;
     }
 
-    /**
-     * 本家: TileEntitySignal.getBlockDirection / getRotation
-     * BER 側でブロックの向きを適用済みのため 0 (InstalledObjectBlockEntity も 0 を返す)
-     */
+    /** 本家: TileEntitySignal.getBlockDirection / getRotat… */
     public float getBlockDirection(Object tile) {
         return tile instanceof InstalledObjectBlockEntity be ? be.getBlockDirection() : 0.0F;
     }
@@ -40,7 +34,7 @@ public class SignalPartsRenderer extends TileEntityPartsRenderer {
         return tile instanceof InstalledObjectBlockEntity be ? be.getMountRoll() : 0.0F;
     }
 
-    /** 本家: TileEntitySignal.getRenderBlock (isOpaqueCube 等が使う)。 */
+    /** 本家: TileEntitySignal.getRenderBlock (isOpaqueCube… */
     public net.minecraft.world.level.block.Block getBlock(Object tile) {
         if (tile instanceof BlockEntity be && be.getLevel() != null) {
             return be.getLevel().getBlockState(be.getBlockPos()).getBlock();

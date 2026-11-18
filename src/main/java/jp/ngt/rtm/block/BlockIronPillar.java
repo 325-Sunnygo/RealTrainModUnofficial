@@ -9,10 +9,7 @@ import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.MapColor;
 
-/**
- * 鉄柱。本家 {@code jp.ngt.rtm.block.BlockIronPillar} の移植。
- * 登れる (はしご扱い)。同じブロックが隣にあるとその面を描かない。
- */
+/** 鉄柱。本家 jp.ngt.rtm.block.BlockIronPillar の移植。 */
 public class BlockIronPillar extends Block {
     public static final MapCodec<BlockIronPillar> CODEC = simpleCodec(p -> new BlockIronPillar());
 

@@ -1,9 +1,6 @@
 package jp.ngt.ngtlib.renderer.model;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.model.Material の最小移植 (スクリプト可視フィールドのみ)。
- * スクリプトは material.texture を bindTexture に渡す。
- */
+/** 本家 jp.ngt.ngtlib.renderer.model.Material の最小移植 (ス… */
 public class Material {
     public final byte id;
     public Object texture;

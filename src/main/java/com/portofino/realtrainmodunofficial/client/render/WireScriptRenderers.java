@@ -24,12 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 本家式の架線・架線柱スクリプト描画。
- * ModelWire_*.json の rendererPath (render_baru_pole_bx_f.js 等) を Nashorn で実行し、
- * renderClass (WirePartsRenderer) の renderWireStatic / renderWireDynamic を
- * 本家 RenderElectricalWiring と同じ座標系 (接続元の取付点が原点) で呼ぶ。
- */
+/** 本家式の架線・架線柱スクリプト描画。 ModelWire_*.json の rendererPat… */
 public final class WireScriptRenderers {
 
     private static final Map<String, Scripted> CACHE = new ConcurrentHashMap<>();
@@ -38,14 +33,7 @@ public final class WireScriptRenderers {
     private WireScriptRenderers() {
     }
 
-    /**
-     * 架線の描画器を返す。
-     *
-     * <p>★スクリプトを持たない架線でも返す。本家はスクリプトの有無にかかわらず
-     * {@link WirePartsRenderer#renderWire} を通し、スクリプトが無いときは
-     * {@code renderWireDynamic} の中で直線/たるみを描く。
-     * レンダラ側に別経路を持たせない。
-     */
+    /** 架線の描画器を返す。 ★スクリプトを持たない架線でも返す。 */
     public static Scripted get(InstalledObjectDefinition def) {
         if (def == null) {
             return null;
@@ -66,14 +54,13 @@ public final class WireScriptRenderers {
                             def.getId(), scriptPath);
                     return INVALID;
                 }
-                // Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-8 だと構文ごと壊れる)
+                // Shift_JIS のパックがあるため必ず PackTextDecoder を通す (生 UTF-…
                 String source = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
                 ScriptEngine se = ScriptUtil.doScript(
                         "var GL11 = Java.type('jp.ngt.ngtlib.renderer.GL11Facade');\n"
                         + "var GL12 = GL11;\n"
                         + "var MathHelper = Java.type('jp.ngt.mccompat.MathHelper');\n"
-                        // スクリプトは 1.12 の net.minecraft.util.math.BlockPos を import する。
-                        // 1.21 では core.BlockPos なので、あらかじめグローバルに束縛しておく。
+                        // スクリプトは 1.12 の net.minecraft.util.math.BlockPos を…
                         + "var BlockPos = Java.type('" + net.minecraft.core.BlockPos.class.getName() + "');\n"
                         + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, scriptPath));
                 Object rcName = se.get("renderClass");
@@ -94,7 +81,7 @@ public final class WireScriptRenderers {
                 }
                 renderer = wpr;
                 renderer.setScript(se);
-                //どのパックのスクリプトが落ちたか追えるように名前を持たせる
+                // どのパックのスクリプトが落ちたか追えるように名前を持たせる
                 renderer.scriptName = def.getId() + " (" + scriptPath + ")";
                 se.put("renderer", renderer);
             } else {
@@ -116,7 +103,12 @@ public final class WireScriptRenderers {
             mo.model = modelBytes != null ? ModelLoader.parse(modelBytes, def.getModelFile()) : new PolygonModel();
             mo.setTextures(jp.ngt.ngtlib.renderer.model.LegacyTextureLayout.create(mo.model, def.getTextureOverrides()));
 
-            renderer.init(null, mo);
+            // 本家 ModelObject: renderer.init(ModelSetBase, Model…
+            jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> modelSet =
+                    jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getScriptOnlyModelSet(
+                            "wire-script:" + def.getId(), def.getDisplayName(), "ModelWire",
+                            null, null, null, def.getButtonTexture());
+            renderer.init(modelSet, mo);
             return new Scripted(renderer, mo, resolveDefaultTexture(def));
         } catch (Throwable t) {
             RealTrainModUnofficial.LOGGER.warn("Failed to init wire script renderer for {}", def.getId(), t);
@@ -124,10 +116,7 @@ public final class WireScriptRenderers {
         }
     }
 
-    /**
-     * モデル定義の "default" テクスチャ (無ければ最初の 1 つ) をパックアセットとして解決する。
-     * 架線スクリプトが bindTexture を呼ばないため、tessellator 描画の既定テクスチャに使う。
-     */
+    /** モデル定義の "default" テクスチャ (無ければ最初の 1 つ) をパックアセットとして解… */
     private static net.minecraft.resources.ResourceLocation resolveDefaultTexture(InstalledObjectDefinition def) {
         Map<String, String> overrides = def.getTextureOverrides();
         if (overrides == null || overrides.isEmpty()) {
@@ -147,10 +136,7 @@ public final class WireScriptRenderers {
     public static final class Scripted {
         private final WirePartsRenderer renderer;
         private final ModelObject modelObject;
-        /**
-         * モデル定義の "default" テクスチャ。
-         * (本家は描画前に host 側がモデルの default テクスチャを bind してからスクリプトを呼ぶ)。
-         */
+        /** モデル定義の "default" テクスチャ。 */
         private final net.minecraft.resources.ResourceLocation defaultTexture;
 
         Scripted(WirePartsRenderer renderer, ModelObject modelObject,
@@ -160,29 +146,20 @@ public final class WireScriptRenderers {
             this.defaultTexture = defaultTexture;
         }
 
-        /**
-         * @param from 接続元の取付点 (ブロック隅からの相対座標)
-         * @param to   接続先の取付点 (同上)
-         * @return true = 何か描いた (代替描画は無いので呼び出し元は使わない)
-         */
-        public boolean render(InstalledObjectBlockEntity be, net.minecraft.world.phys.Vec3 from,
+        
+        public boolean render(Object be, net.minecraft.world.phys.Vec3 from,
                               net.minecraft.world.phys.Vec3 to, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel model) {
             // ★model == null を弾かないこと。
-            // "Model_none.mqo" (モデル無し) で、架線の見た目は全てスクリプトの tessellatorが
-            // 描く。
             if (this.renderer == null) {
                 return false;
             }
             this.renderer.modelGroupNames = model != null ? model.getOriginalGroupNames() : java.util.Set.of();
-            // 本家 RenderElectricalWiring: 原点は接続元の取付点、vec は相手までの相対ベクトル
+            // 本家 RenderElectricalWiring: 原点は接続元の取付点、vec は相手までの相…
             Vec3 vec = new Vec3(to.x - from.x, to.y - from.y, to.z - from.z);
 
-            // 本家 RenderElectricalWiring.renderWire のパス構成をそのまま再現する。
-            //   pass0 → NORMAL
-            //   pass1 → light を持つなら LIGHT (満照度)、alphaBlend を持つなら TRANSPARENT
-            // 1.21 の BlockEntityRenderer は 1 回しか呼ばれないので、ここで順に流す。
+            // 本家 RenderElectricalWiring.renderWire のパス構成をそのまま再現…
             boolean drawn = renderPass(jp.ngt.rtm.render.RenderPass.NORMAL, be, from, vec, partialTick,
                 poseStack, buffer, packedLight, packedOverlay, model);
             if (this.modelObject != null && this.modelObject.light) {
@@ -198,7 +175,7 @@ public final class WireScriptRenderers {
         }
 
         /** 1 パス分を記録して再生する。本家の pass ごとの renderWire 呼び出しに対応。 */
-        private boolean renderPass(jp.ngt.rtm.render.RenderPass pass, InstalledObjectBlockEntity be,
+        private boolean renderPass(jp.ngt.rtm.render.RenderPass pass, Object be,
                                    net.minecraft.world.phys.Vec3 from, Vec3 vec, float partialTick,
                                    PoseStack poseStack, MultiBufferSource buffer,
                                    int packedLight, int packedOverlay, MqoModelLoader.MqoModel model) {

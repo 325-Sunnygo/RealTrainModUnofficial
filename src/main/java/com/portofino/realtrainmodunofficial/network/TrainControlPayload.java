@@ -42,7 +42,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             if (!(context.player() instanceof ServerPlayer player)) {
                 return;
             }
-            // Phase 2: 本家忠実列車 (jp.ngt) — 乗車中の車両を TrainState 系で直接操作
+            // Phase 2: 本家忠実列車 (jp.ngt) — 乗車中の車両を TrainState 系で直…
             if (player.getVehicle() instanceof jp.ngt.rtm.entity.train.EntityTrainBase rtmTrain) {
                 handleRtmTrain(rtmTrain, player, payload.action(), payload.value());
                 return;
@@ -115,7 +115,23 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     if (!driverPassenger) {
                         return;
                     }
-                    controlTrain.setNotch(0);
+                    if (controlTrain.setNotch(0)) {
+                        controlTrain.playNotchSound();
+                    }
+                }
+                // 本家 KEY_ATS: signal=1 を確認 (-1)、EB 中なら復帰 (0)
+                case "ats" -> {
+                    int signal = controlTrain.getSignal();
+                    if (signal == 1) {
+                        controlTrain.setSignal2(-1);
+                    } else if (signal == -1 && controlTrain.getNotch() == -controlTrain.getMaxBrakeNotch()) {
+                        controlTrain.setSignal2(0);
+                    }
+                }
+                // 本家 KEY_EB: 非常ブレーキ + 警笛
+                case "eb" -> {
+                    controlTrain.setNotchForFormation(-controlTrain.getMaxBrakeNotch());
+                    playHorn(sourceTrain, controlTrain);
                 }
                 case "dismount" -> {
                     player.stopRiding();
@@ -129,11 +145,19 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 case "toggle_door_left" -> controlTrain.toggleDoorSideForFormation(true);
                 case "toggle_door_right" -> controlTrain.toggleDoorSideForFormation(false);
                 case "toggle_pantograph" -> controlTrain.setPantographUpForFormation(!controlTrain.isPantographUp());
-                case "toggle_reverse" -> controlTrain.setReverse(!controlTrain.isReverse());
-                case "set_reverser" -> controlTrain.setReverser(payload.value());
+                case "toggle_reverse" -> {
+                    if (controlTrain.getReverser() != (controlTrain.isReverse() ? 1 : -1)) {
+                        controlTrain.setReverse(!controlTrain.isReverse());
+                        controlTrain.playReversalSound();
+                    }
+                }
+                case "set_reverser" -> {
+                    if (controlTrain.getReverser() != payload.value()) {
+                        controlTrain.setReverser(payload.value());
+                        controlTrain.playReversalSound();
+                    }
+                }
                 // ↑↓ キーのレバーサ操作。↑=前(+1)/↓=後(-1) に 1 段ずつ。中立(0)を挟む 3 段。
-                // ★動かせるのは<b>マスコンが非常ブレーキ位置のとき</b> (ユーザー要望)。
-                // 連結すると必ず非常位置になるので、ニュートラル条件だと連結後に切り替えられなかった。
                 case "reverser_up", "reverser_down" -> {
                     if (!driverPassenger) {
                         return;
@@ -143,16 +167,16 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                         int next = Math.max(-1, Math.min(1, controlTrain.getReverser() + delta));
                         if (next != controlTrain.getReverser()) {
                             controlTrain.setReverser(next);
-                            TrainSoundPayload.broadcast(controlTrain, "rtm:sounds/train/lever.ogg", 1.0F, 1.0F);
+                            controlTrain.playReversalSound();
                         }
                     }
                 }
                 case "next_destination" -> {
-                    int count = Math.max(1, controlTrain.getResourceState().getResourceSet().getConfig().rollsignNames.length);
+                    int count = Math.max(1, ((jp.ngt.rtm.modelpack.cfg.TrainConfig) controlTrain.getResourceState().getResourceSet().getConfig()).rollsignNames.length);
                     controlTrain.setDestinationIndexForFormation((controlTrain.getDestinationIndex() + 1) % count);
                 }
                 case "prev_destination" -> {
-                    int count = Math.max(1, controlTrain.getResourceState().getResourceSet().getConfig().rollsignNames.length);
+                    int count = Math.max(1, ((jp.ngt.rtm.modelpack.cfg.TrainConfig) controlTrain.getResourceState().getResourceSet().getConfig()).rollsignNames.length);
                     controlTrain.setDestinationIndexForFormation(Math.floorMod(controlTrain.getDestinationIndex() - 1, count));
                 }
                 case "next_sound" -> controlTrain.setSoundIndex(resolveNextSoundIndex(controlTrain, 1));
@@ -181,10 +205,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
         });
     }
 
-    /**
-     * jp.ngt.rtm.entity.train.EntityTrainBase 用の操作処理 (Phase 2 先行版)。
-     * 本家の TrainState 系 API で処理する。
-     */
+    /** jp.ngt.rtm.entity.train.EntityTrainBase 用の操作処理 (P… */
     private static void handleRtmTrain(jp.ngt.rtm.entity.train.EntityTrainBase train,
                                        ServerPlayer player, String action, int value) {
         var doorType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Door;
@@ -197,18 +218,17 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
             // ノッチ 0 に戻すのもマスコン操作なので、本家 addNotch と同じレバー音を鳴らす
             case "mascon_neutral" -> {
                 if (train.setNotch(0)) {
-                    TrainSoundPayload.broadcast(train, "rtm:sounds/train/lever.ogg", 1.0F, 1.0F);
+                    train.playNotchSound();
                 }
             }
             case "dismount" -> player.stopRiding();
             case "toggle_reverse" -> {
                 if (train.getNotch() == 0) {
                     train.setTrainDirection(1 - train.getTrainDirection());
+                    train.playReversalSound();
                 }
             }
-            // ↑↓ キーのレバーサ操作。
-            // ★動かせるのは<b>マスコンが非常ブレーキ位置のとき</b> (ユーザー要望)。
-            // 連結すると必ず非常位置になるので、ニュートラル条件だと連結後に切り替えられなかった。
+            // ↑↓ キーのレバーサ操作。 ★動かせるのはマスコンが非常ブレーキ位置のとき (ユーザー要望)。
             case "reverser_up", "reverser_down" -> {
                 if (train.getNotch() == train.getEmergencyBrakeNotch()) {
                     var dirType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction;
@@ -222,7 +242,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     byte target = action.equals("reverser_up") ? front : back;
                     if (train.getTrainStateData(dirType.id) != target) {
                         train.setTrainStateData(dirType.id, target);
-                        TrainSoundPayload.broadcast(train, "rtm:sounds/train/lever.ogg", 1.0F, 1.0F);
+                        train.playReversalSound();
                     }
                 }
             }
@@ -233,9 +253,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                 jp.ngt.rtm.entity.npc.macro.MacroRecorder.recDoor(player,
                         jp.ngt.rtm.entity.train.util.TrainState.getState(doorType.id, next));
             }
-            // ドアボタンの左右→ドアビット変換。
-            // なので、運転士から見た左右は運転台の向き (cabDirection) だけで決まる
-            // (編成内でその車両が逆向きに繋がれていても、運転士から見える左右は変わらない)。
+            // ドアボタンの左右→ドアビット変換。 なので、運転士から見た左右は運転台の向き (cabDirect…
             case "toggle_door_left" -> {
                 byte data = train.getTrainStateData(doorType.id);
                 boolean dir = (train.getCabDirection() & 1) == 0;
@@ -253,9 +271,6 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                         jp.ngt.rtm.entity.train.util.TrainState.getState(doorType.id, next));
             }
             // 運転席GUI (ドアタブ) の速度設定。JSON から読まなくなったぶんをここで決める。
-            // value = 最高速度 (km/h)。0 で既定へ戻す。
-            // value = 加速度 (km/h/s ×100)。0 で既定へ戻す。
-            // ドアカット: この運転車両の開扉をカットする (物理でドアを開けない)。
             case "toggle_door_cut" -> {
                 var cutType = jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_DoorCut;
                 byte data = train.getTrainStateData(cutType.id);
@@ -290,8 +305,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Direction.id, (byte) value);
             case "set_destination" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Destination.id, (byte) value);
-            // 方向幕の送り/戻し。
-            // (=設置される列車) 側ハンドラに case が無く、行先が一切変わらなかった (方向幕が空白のまま)。
+            // 方向幕の送り/戻し。 (=設置される列車) 側ハンドラに case が無く、行先が一切変わらなかっ…
             case "next_destination", "prev_destination" -> {
                 VehicleDefinition destDef = VehicleRegistry.getById(train.getModelName());
                 int count = destDef != null ? Math.max(1, destDef.getRollsignNames().size()) : 1;
@@ -306,8 +320,38 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Type.id, (byte) value);
             case "set_announcement" -> train.setTrainStateData(
                     jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Announcement.id, (byte) value);
-            // 車内放送: 選択中のアナウンス (TrainState の Announcement が本家のインデックス) を鳴らす。
-            // 本家 GuiVehicleControlPanel のボタン 129 と同じ。
+            // 本家 KEY_ATS / KEY_EB (RTMKeyHandlerServer.setATS / setTrainNotch 相当)
+            case "ats" -> {
+                int signal = train.getSignal();
+                if (signal == 1) {
+                    train.setSignal2(-1);
+                } else if (signal == -1 && train.getNotch() == -8) {
+                    train.setSignal2(0);
+                }
+            }
+            case "eb" -> {
+                jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = train.getConfig();
+                int ebNotch = cfg != null && cfg.deccelerations != null ? -(cfg.deccelerations.length - 1) : -8;
+                train.syncTrainStateData(jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Notch.id, (byte) ebNotch);
+                String horn = cfg != null ? cfg.sound_Horn : null;
+                if (horn != null && !horn.isBlank()) {
+                    com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(
+                            train, horn, 1.0F, 1.0F);
+                }
+            }
+            case "next_sound", "prev_sound" -> {
+                jp.ngt.rtm.entity.train.util.TrainState.TrainStateType announceType =
+                        jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Announcement;
+                jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = train.getConfig();
+                int count = cfg != null && cfg.sound_Announcement != null ? cfg.sound_Announcement.length : 0;
+                if (count <= 0) {
+                    return;
+                }
+                int cur = train.getTrainStateData(announceType.id);
+                int step = "next_sound".equals(action) ? 1 : -1;
+                train.syncTrainStateData(announceType.id, (byte) Math.floorMod(cur + step, count));
+            }
+            // 車内放送: 選択中のアナウンス (TrainState の Announcement が本家のイン…
             case "play_selected_announcement" -> {
                 VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
                 List<String> sounds = def != null ? def.getAnnouncementSounds() : List.of();
@@ -346,11 +390,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
         }
     }
 
-    /**
-     * 本家 RTMKeyHandlerClient の KEY_CHIME_NEXT/PREV と同じ。
-     * i0 = state + delta;
-     * i0 = i0 < type.min ? type.max : (i0 > type.max ? 0 : i0);
-     */
+    /** 本家 RTMKeyHandlerClient の KEY_CHIME_NEXT/PREV と同じ。 */
     private static int resolveNextSoundIndex(TrainEntity controlTrain, int delta) {
         jp.ngt.rtm.entity.train.util.TrainState.TrainStateType type =
             jp.ngt.rtm.entity.train.util.TrainState.TrainStateType.State_Announcement;
@@ -358,10 +398,7 @@ public record TrainControlPayload(int trainEntityId, String action, int value) i
         return i0 < type.min ? type.max : (i0 > type.max ? 0 : i0);
     }
 
-    /**
-     * 本家 RTMKeyHandlerClient.playSound(player, 3) と同じ。
-     * if (sa0 != null && index < sa0.length) で、件数を超えた番号では何も鳴らさない。
-     */
+    /** 本家 RTMKeyHandlerClient.playSound(player, 3) と同じ。 */
     private static void playSelectedAnnouncement(TrainEntity sourceTrain, TrainEntity controlTrain) {
         VehicleDefinition definition = VehicleRegistry.getById(controlTrain.getVehicleId());
         if (definition == null) {

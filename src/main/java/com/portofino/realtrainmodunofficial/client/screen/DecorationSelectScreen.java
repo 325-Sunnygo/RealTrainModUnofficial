@@ -14,14 +14,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 装飾ブロック用の選択画面。本家 {@code GuiSelectIcon} の移植。
- *
- * <p>TEXTURE: 全ブロックテクスチャ + RTM の deco テクスチャの格子 (本家 getAllIcon)。
- * 本家はブロックアトラスを列挙するが 1.21 は使った分しか繋がないので、
- * リソースの {@code textures/block/} と {@code textures/decoration/} の png を列挙する。
- * MODEL: 登録済み DecorationModel の格子 (回転プレビュー)。
- */
+/** 装飾ブロック用の選択画面。本家 GuiSelectIcon の移植。 */
 public class DecorationSelectScreen extends Screen {
 
     public enum Mode {
@@ -54,7 +47,7 @@ public class DecorationSelectScreen extends Screen {
     @Override
     protected void init() {
         if (this.mode == Mode.TEXTURE && this.textures.isEmpty()) {
-            //本家 DecorationStore.getAllIcon 相当
+            // 本家 DecorationStore.getAllIcon 相当
             var manager = this.minecraft.getResourceManager();
             for (String dir : new String[]{"textures/block", "textures/decoration"}) {
                 manager.listResources(dir, loc -> loc.getPath().endsWith(".png")).keySet().forEach(loc -> {
@@ -133,7 +126,7 @@ public class DecorationSelectScreen extends Screen {
             }
         }
 
-        //テクスチャセルの中身 (直バインド描画)
+        // テクスチャセルの中身 (直バインド描画)
         if (this.mode == Mode.TEXTURE) {
             MultiBufferSource.BufferSource buffer = this.minecraft.renderBuffers().bufferSource();
             var pose = graphics.pose().last();
@@ -154,7 +147,7 @@ public class DecorationSelectScreen extends Screen {
             }
             buffer.endBatch();
         } else {
-            //モデルの回転プレビュー (本家 IconElementModel: 20/45 度傾け + 常時回転)
+            // モデルの回転プレビュー (本家 IconElementModel: 20/45 度傾け + 常時回…
             float rotation = (Util.getMillis() % 4000L) / 4000.0F * 360.0F;
             for (int i = 0; i < this.models.size(); ++i) {
                 int x = 10 + (i % cols) * cell;
@@ -166,7 +159,7 @@ public class DecorationSelectScreen extends Screen {
                 DecorationEditScreen.drawModelPreview(graphics, this.models.get(i),
                     x + this.mode.cellSize / 2, y + this.mode.cellSize / 2, s,
                     20.0F, 45.0F + rotation);
-                //モデル名
+                // モデル名
                 graphics.drawString(this.font, this.models.get(i).name, x, y + this.mode.cellSize - 8, 0xFFFFFF);
             }
         }

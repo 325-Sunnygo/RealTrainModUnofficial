@@ -1,14 +1,9 @@
 package com.portofino.realtrainmodunofficial.client;
 
-/**
- * フリーカメラの有効フラグだけを持つ軽量ホルダー。
- * FreeCameraController はクライアント専用クラス (Minecraft 等を import) なので、
- * 共通クラス Player へ当てる mixin から直接参照すると専用サーバーで
- * クラスロードに失敗する。
- */
+/** フリーカメラの有効フラグだけを持つ軽量ホルダー。 */
 public final class FreeCameraState {
 
-    /** フリーカメラ中は true。クライアントの FreeCameraController だけが書き換える。 */
+    /** フリーカメラ中は true。クライアントの FreeCameraController だけが書き換… */
     public static volatile boolean active;
 
     private FreeCameraState() {

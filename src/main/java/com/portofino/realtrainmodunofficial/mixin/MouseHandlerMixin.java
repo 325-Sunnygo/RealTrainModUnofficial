@@ -7,12 +7,7 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
-/**
- * フリーカメラ (FreeCameraController) 中はマウスの視点移動をプレイヤーではなく
- * カメラへ振り向ける。MouseHandler.turnPlayer 末尾の
- * player.turn(dyaw, dpitch) を横取りし、フリーカメラが有効なら体を回さずに
- * カメラ独自の向きだけを動かす (体は列車内で固定・視点追従オフ)。
- */
+/** フリーカメラ (FreeCameraController) 中はマウスの視点移動をプレイヤーではな… */
 @Mixin(MouseHandler.class)
 public abstract class MouseHandlerMixin {
 

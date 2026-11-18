@@ -10,7 +10,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 
-/** Standalone regression checks; no Minecraft bootstrap or graphics context required. */
+/** Standalone regression checks; */
 public final class LegacyScriptRegression {
     private static int checks;
 
@@ -43,30 +43,35 @@ public final class LegacyScriptRegression {
                 equal(true, active.isEmpty());
             }
         }
-        // Different case is significant for assets in ZIP files.
+        // Different case is significant for assets in ZIP f…
         equal("ab", LegacyScriptIncludes.expand("//include <A.js>\n//include <a.js>", new HashSet<>(), p -> p.equals("A.js") ? "a" : "b").replace("\n", ""));
-        String[][] names = {
-                {"Packages.old.Class", "Packages.java.lang.String"},
-                {"Packages.old.ClassMP", "Packages.java.lang.Integer"}
-        };
-        equal("Packages.java.lang.String.valueOf(1)", LegacyClassReferences.remap("Packages.old.Class.valueOf(1)", names));
-        equal("Packages.java.lang.Integer", LegacyClassReferences.remap("Packages.old.ClassMP", names));
-        equal("Packages.old.ClassOther", LegacyClassReferences.remap("Packages.old.ClassOther", names));
-        equal("java.lang.String", LegacyClassReferences.remap("old.Class", names));
-        equal("Java.type('java.lang.String')", LegacyClassReferences.remap("Java.type('old.Class')", names));
-        equal("Java . type ( \"java.lang.String\" )", LegacyClassReferences.remap("Java . type ( \"old.Class\" )", names));
-        equal("'Packages.old.Class'", LegacyClassReferences.remap("'Packages.old.Class'", names));
-        equal("// Packages.old.Class\n/* old.Class */", LegacyClassReferences.remap("// Packages.old.Class\n/* old.Class */", names));
-        equal("`Packages.old.Class`", LegacyClassReferences.remap("`Packages.old.Class`", names));
-        equal("x.old.Class", LegacyClassReferences.remap("x.old.Class", names));
-        equal("42", engine.eval(LegacyClassReferences.remap("Java.type('old.Class').valueOf(42)", names)));
-        engine.eval("load('nashorn:mozilla_compat.js');");
-        equal("42", engine.eval(LegacyClassReferences.remap("Packages.old.Class.valueOf(42)", names)));
-        String[][] valueTypes = {{"Packages.old.Tile", "Packages.java.lang.Integer.TYPE"}};
-        equal("Java.type('java.lang.Integer').TYPE", LegacyClassReferences.remap("Java.type('old.Tile')", valueTypes));
-        equal("Packages.java.lang.Integer.TYPE", LegacyClassReferences.remap("Packages.old.Tile", valueTypes));
-        equal("Packages.java.lang.Integer.TYPE", LegacyClassReferences.remap("Packages.java.lang.Integer.TYPE", valueTypes));
-        equal(Integer.TYPE, engine.eval(LegacyClassReferences.remap("Java.type('old.Tile')", valueTypes)));
+        // KaizPatchX と同じ: スクリプト本文は書き換えず、//include だけ展開する。
+        String rawScript = "var s='x.seatRotation'; // x.seatRotation";
+        equal(rawScript, PackScriptSource.prepare(rawScript, "raw.js", path -> null));
+        String included = PackScriptSource.prepare("var x=1;\n//include <inc.js>\n", "main.js", path -> "var y=2;".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        equal("var x=1;\nvar y=2;\n", included);
+        ScriptEngine importEngine = jp.ngt.ngtlib.io.ScriptUtil.doScript(
+                PackScriptSource.PRELUDE
+                        + "importPackage(Packages.jp.ngt.rtm.block);"
+                        + "importPackage(Packages.org.lwjgl.opengl);"
+                        + "importClass(Packages.jp.ngt.rtm.render.Parts);"
+                        + "var blockClass = BlockScaffoldStairs;"
+                        + "var glClass = GL11;"
+                        + "var partsClass = Parts;",
+                "package-import.js");
+        equal("jp.ngt.rtm.block.BlockScaffoldStairs", String.valueOf(importEngine.get("blockClass")).replaceAll("^StaticClass\\[|\\]$", ""));
+        equal("jp.ngt.ngtlib.renderer.GL11Facade", String.valueOf(importEngine.get("glClass")).replaceAll("^StaticClass\\[|\\]$", ""));
+        equal("jp.ngt.rtm.render.Parts", String.valueOf(importEngine.get("partsClass")).replaceAll("^StaticClass\\[|\\]$", ""));
+
+        // ModelSetBase が本家と同じく serverSE を構築時に読み込むこと。
+        jp.ngt.rtm.modelpack.cfg.TrainConfig serverCfg = new jp.ngt.rtm.modelpack.cfg.TrainConfig();
+        serverCfg.trainName = "script-load-test";
+        serverCfg.serverScriptPath = "scripts/server/223.js";
+        serverCfg.init();
+        jp.ngt.rtm.modelpack.modelset.ModelSetTrain serverSet = new jp.ngt.rtm.modelpack.modelset.ModelSetTrain(serverCfg);
+        equal(true, serverSet.serverSE != null);
+        equal(true, jp.ngt.ngtlib.io.ScriptUtil.hasFunction(serverSet.serverSE, "onUpdate"));
+
         ChunkCoordinates coordinates = new ChunkCoordinates(-2, 64, 3);
         engine.put("coordinates", coordinates);
         equal(-2, ((Number) engine.eval("coordinates.field_71574_a")).intValue());
@@ -82,17 +87,6 @@ public final class LegacyScriptRegression {
         equal(0.0D, jp.ngt.ngtlib.math.PerlinNoise.perlin(0, 0, 0));
         equal(jp.ngt.ngtlib.math.PerlinNoise.perlin(0.25, 0.5, 0.75),
                 jp.ngt.ngtlib.math.PerlinNoise.perlin(256.25, 256.5, 256.75));
-        String opaque = "var s='x.seatRotation'; /* x.seatRotation */ var r=/x.seatRotation/; x.seatRotation;";
-        equal("var s='x.seatRotation'; /* x.seatRotation */ var r=/x.seatRotation/; x.getSeatRotationRaw();",
-                LegacySourceMask.transform(opaque, text -> text.replace(".seatRotation", ".getSeatRotationRaw()")));
-        equal("x / y.getSeatRotationRaw()", LegacySourceMask.transform("x / y.seatRotation", text -> text.replace(".seatRotation", ".getSeatRotationRaw()")));
-        equal("return /[\\/].seatRotation/", LegacySourceMask.transform("return /[\\/].seatRotation/", text -> text.replace(".seatRotation", ".getSeatRotationRaw()")));
-        String large = "var label='ordinary literal';\n".repeat(30000);
-        equal(large, LegacyClassReferences.remap(large, names));
-        equal(large, LegacySourceMask.transform(large, text -> text));
-        equal("NotJava.type('old.Class')", LegacyClassReferences.remap("NotJava.type('old.Class')", names));
-        engine.eval(PackScriptSource.prepare("var gui=new Packages.net.minecraft.client.gui.Gui();", "srbx-gui.js", path -> null));
-        equal(true, engine.get("gui") instanceof jp.ngt.mccompat.Gui);
         String japanese = "var name='①髙﨑';";
         equal(japanese, PackTextDecoder.decodeText(japanese.getBytes(Charset.forName("MS932"))));
         equal("var x=1;", PackTextDecoder.decodeText("\ufeffvar x=1;".getBytes(java.nio.charset.StandardCharsets.UTF_8)));

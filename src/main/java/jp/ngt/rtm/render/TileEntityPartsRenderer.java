@@ -10,14 +10,10 @@ public abstract class TileEntityPartsRenderer extends PartsRenderer {
         super(par1);
     }
 
-    /**
-     * 本家 render: スクリプトの render(tileEntity, pass, partialTick) を実行
-     * (踏切/改札の MachinePartsRenderer と信号の SignalPartsRenderer で共通)
-     */
+    /** 本家 render: スクリプトの render(tileEntity, pass, partia… */
     public void render(Object t, int pass, float partialTick) {
         this.currentPass = pass;
         // スクリプトが落ちたらフラグを立てる (呼び出し側が素のモデル描画へ戻せるように)。
-        // PartsRenderer.execRenderScript 参照。
         this.execRenderScript(t, pass, partialTick);
     }
 

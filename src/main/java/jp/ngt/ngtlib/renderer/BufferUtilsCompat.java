@@ -4,11 +4,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 
-/**
- * LWJGL2 の org.lwjgl.BufferUtils 互換。
- * スクリプトが BufferUtils.createFloatBuffer(16) で行列バッファを作り
- * GL11.glMultMatrix(buf) へ渡す (NGTO Builder 2)。
- */
+/** LWJGL2 の org.lwjgl.BufferUtils 互換。 */
 public final class BufferUtilsCompat {
 
     private BufferUtilsCompat() {

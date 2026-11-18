@@ -1,6 +1,6 @@
 package jp.ngt.ngtlib.renderer.model;
 
-/** 本家 jp.ngt.ngtlib.renderer.model.TextureSet の移植 (スクリプト可視フィールド)。 */
+/** 本家 jp.ngt.ngtlib.renderer.model.TextureSet の移植 (ス… */
 public class TextureSet {
     public Material material;
     /** 発光テクスチャ (***_light0/1/2.png)。無ければ null。 */
@@ -13,10 +13,7 @@ public class TextureSet {
         this.material = material;
     }
 
-    /**
-     * 本家 TextureSet(material, subTexturesSize, alpha, args...)。
-     * subTextures は args があればそれ、無ければ元テクスチャ名に "_light{i}" を挿した名前。
-     */
+    /** 本家 TextureSet(material, subTexturesSize, alpha, a… */
     public TextureSet(Material material, int subTexturesSize, boolean doAlphaBlend, String... args) {
         this.material = material;
         this.doAlphaBlend = doAlphaBlend;

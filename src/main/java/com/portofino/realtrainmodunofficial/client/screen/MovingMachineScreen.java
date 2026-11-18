@@ -12,7 +12,7 @@ import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** 移動装置の設定。本家 {@code GuiMovingMachine} 相当 (大きさ・ずらし・速さ)。 */
+/** 移動装置の設定。本家 GuiMovingMachine 相当 (大きさ・ずらし・速さ)。 */
 public class MovingMachineScreen extends Screen {
     private final BlockPos pos;
     private final int[] init = new int[6];

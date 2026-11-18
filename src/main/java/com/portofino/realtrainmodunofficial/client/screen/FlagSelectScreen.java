@@ -10,14 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.List;
 import java.util.function.Consumer;
 
-/**
- * 旗を選ぶ画面。本家 {@code jp.ngt.rtm.gui.GuiSelectTexture} の移植。
- *
- * <p>本家は「モデル選択」ではなく<b>テクスチャ選択</b>で、
- * {@code TextureConfig.getUCountInGui()/getVCountInGui()} = <b>横 4 × 縦 2</b> の升目に
- * 旗のテクスチャそのものを<b>縦横比を保って</b>並べる。ホイールで 1 行ずつスクロール。
- * 標識も本家では同じ画面 (RTMU は既に本家式の {@link SignSelectGridScreen} を持っている)。
- */
+/** 旗を選ぶ画面。本家 jp.ngt.rtm.gui.GuiSelectTexture の移植。 */
 public class FlagSelectScreen extends Screen {
 
     /** 本家 TextureConfig.getUCountInGui。 */
@@ -64,7 +57,7 @@ public class FlagSelectScreen extends Screen {
         if (ph <= 0.0F) {
             ph = 1.0F;
         }
-        //本家: 横長なら幅で、縦長なら高さで合わせる
+        // 本家: 横長なら幅で、縦長なら高さで合わせる
         float f0 = pw > ph ? cw / pw : ch / ph;
         int w = (int) (pw * f0);
         int h = (int) (ph * f0);
@@ -75,7 +68,7 @@ public class FlagSelectScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double dx, double dy) {
-        //本家: ホイールで 1 行ずつ。最終行より下へは送らない
+        // 本家: ホイールで 1 行ずつ。最終行より下へは送らない
         int rows = Math.max(1, (this.flags.size() + U_COUNT - 1) / U_COUNT);
         this.currentScroll = Math.max(0, Math.min(this.currentScroll - (int) Math.signum(dy), rows - 1));
         return true;
@@ -98,9 +91,7 @@ public class FlagSelectScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        //背景 (renderBlurredBackground を殺してあるので、バニラの暗いグラデーション =
-        //本家 drawDefaultBackground と同じ 0xC0101010→0xD0101010 だけが敷かれる)。
-        //★セルより先に描くこと。後に回すと旗の上に暗幕が乗る。
+        // 背景 (renderBlurredBackground を殺してあるので、バニラの暗いグラデーショ…
         super.render(graphics, mouseX, mouseY, partialTick);
 
         for (int i = 0; i < this.flags.size(); ++i) {
@@ -112,11 +103,10 @@ public class FlagSelectScreen extends Screen {
             InstalledObjectDefinition.FlagParams params = def.getFlagParams();
             ResourceLocation tex = TextureFlagRenderer.resolveTexture(
                 def.getPackName(), params != null ? params.texture() : def.getButtonTexture());
-            //本家 GuiButtonSelectTexture.draw: テクスチャ全面 (UV 0〜1) を升目いっぱいに貼る
+            // 本家 GuiButtonSelectTexture.draw: テクスチャ全面 (UV 0〜1)…
             graphics.blit(tex, r[0], r[1], r[2], r[3], 0.0F, 0.0F, 16, 16, 16, 16);
 
-            //選択中と、カーソルが乗っている物に枠を出す (本家は枠を出さないが、
-            //本家は押した瞬間に閉じるので、どれを選ぶか分かるようにする)
+            // 選択中と、カーソルが乗っている物に枠を出す (本家は枠を出さないが、 本家は押した瞬間に閉じるので…
             boolean hovered = mouseX >= r[0] && mouseX < r[0] + r[2]
                 && mouseY >= r[1] && mouseY < r[1] + r[3];
             if (def.getId().equals(this.currentId)) {

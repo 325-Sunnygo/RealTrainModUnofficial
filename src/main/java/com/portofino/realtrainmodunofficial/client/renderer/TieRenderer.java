@@ -12,21 +12,16 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
 
-/**
- * 貨物用枕木の描画。本家 {@code RenderTie} の移植。
- *
- * <p>本家は ModelBase の箱 (40x2x40 / テクスチャ 256x64) を
- * {@code textures/train/tie.png} で描く。バニラの箱 UV 配置をそのまま再現する。
- */
+/** 貨物用枕木の描画。本家 RenderTie の移植。 */
 public class TieRenderer extends EntityRenderer<EntityTie> {
 
     private static final ResourceLocation TEXTURE =
-        //★assets/rtm/textures/train/** はビルドで除外されるので自前名前空間に置く
+        // ★assets/rtm/textures/train/** はビルドで除外されるので自前名前空間に…
         ResourceLocation.fromNamespaceAndPath("realtrainmodunofficial", "textures/train/tie.png");
 
-    //本家 ModelTie: addBox(-20,-2,-20, 40,2,40)。単位は 1/16 ブロック
-    private static final float HALF = 40.0F / 16.0F / 2.0F;   //2.5 / 2
-    private static final float HEIGHT = 2.0F / 16.0F;         //0.125
+    // 本家 ModelTie: addBox(-20,-2,-20, 40,2,40)。
+    private static final float HALF = 40.0F / 16.0F / 2.0F;   // 2.5 / 2
+    private static final float HEIGHT = 2.0F / 16.0F;         // 0.125
     private static final float TEX_W = 256.0F;
     private static final float TEX_H = 64.0F;
 
@@ -43,24 +38,24 @@ public class TieRenderer extends EntityRenderer<EntityTie> {
 
         VertexConsumer consumer = buffer.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));
         Matrix4f mat = poseStack.last().pose();
-        //バニラの箱 UV 配置 (w=40, h=2, d=40, offset 0,0)
+        // バニラの箱 UV 配置 (w=40, h=2, d=40, offset 0,0)
         float w = 40.0F, h = 2.0F, d = 40.0F;
-        //上面
+        // 上面
         quad(consumer, mat, packedLight,
             -HALF, HEIGHT, -HALF, HALF, HEIGHT, HALF, d, 0, d + w, d, 0, 1, 0);
-        //底面
+        // 底面
         quad(consumer, mat, packedLight,
             -HALF, 0, -HALF, HALF, 0, HALF, d + w, 0, d + 2 * w, d, 0, -1, 0);
-        //北 (z-)
+        // 北 (z-)
         quadZ(consumer, mat, packedLight,
             -HALF, 0, -HALF, HALF, HEIGHT, d, d, d + w, d + h, 0, 0, -1);
-        //南 (z+)
+        // 南 (z+)
         quadZ(consumer, mat, packedLight,
             -HALF, 0, HALF, HALF, HEIGHT, d + w + d, d, d + w + d + w, d + h, 0, 0, 1);
-        //西 (x-)
+        // 西 (x-)
         quadX(consumer, mat, packedLight,
             -HALF, 0, -HALF, HALF, HEIGHT, 0, d, d, d + h, -1, 0, 0);
-        //東 (x+)
+        // 東 (x+)
         quadX(consumer, mat, packedLight,
             HALF, 0, -HALF, HALF, HEIGHT, d + w, d, d + w + d, d + h, 1, 0, 0);
 

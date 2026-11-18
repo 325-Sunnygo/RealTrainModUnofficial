@@ -12,12 +12,7 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
-/**
- * コンテナ / 火砲の描画。本家 {@code RenderContainer} / {@code RenderArtillery} 相当。
- *
- * <p>パックのモデルをそのまま描く。火砲は砲塔 (Y 回転) と砲身 (X 回転) を持つが、
- * ★<b>パーツ分けの描画は未移植</b>で、いまは車体ごと砲塔の向きへ回している。
- */
+/** コンテナ / 火砲の描画。本家 RenderContainer / RenderArtillery… */
 public class CargoRenderer<T extends EntityCargoWithModel> extends EntityRenderer<T> {
 
     public CargoRenderer(EntityRendererProvider.Context context) {

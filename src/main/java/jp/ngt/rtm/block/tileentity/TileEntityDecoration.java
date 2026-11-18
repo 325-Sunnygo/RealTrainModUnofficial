@@ -9,9 +9,7 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 装飾ブロックの BE。本家 {@code TileEntityDecoration} の移植。モデル名だけ持つ。
- */
+/** 装飾ブロックの BE。本家 TileEntityDecoration の移植。モデル名だけ持つ。 */
 public class TileEntityDecoration extends BlockEntity {
 
     private String modelName = DecorationModel.DEFAULT_MODEL.name;

@@ -3,11 +3,7 @@ package jp.ngt.rtm.entity.train.util;
 import jp.ngt.rtm.entity.train.EntityTrainBase;
 import jp.ngt.rtm.modelpack.cfg.TrainConfig;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.util.TrainSpeedManager の忠実移植。
- * useVariableAcceleration/Deceleration のときはサーバースクリプトの
- * getAcceleration/getDeceleration(train, prevSpeed) を呼ぶ (KaizPatchX と同一)。
- */
+/** 本家 jp.ngt.rtm.entity.train.util.TrainSpeedManager… */
 public final class TrainSpeedManager {
     private static final float[] BRAKE = {-0.0005F, -0.001F, -0.0015F, -0.002F, -0.0025F, -0.003F, -0.0035F, -0.01F};
 
@@ -24,7 +20,7 @@ public final class TrainSpeedManager {
             } else {
                 if (cfg.useVariableAcceleration) {
                     Object obj = jp.ngt.ngtlib.io.ScriptUtil.doScriptIgnoreError(
-                            train.getServerScriptEngine(),
+                            train.getModelSet().serverSE,
                             "getAcceleration",
                             train,
                             prevSpeed);
@@ -36,7 +32,7 @@ public final class TrainSpeedManager {
             float deceleration;
             if (cfg.useVariableDeceleration) {
                 Object obj = jp.ngt.ngtlib.io.ScriptUtil.doScriptIgnoreError(
-                        train.getServerScriptEngine(),
+                        train.getModelSet().serverSE,
                         "getDeceleration",
                         train,
                         prevSpeed);

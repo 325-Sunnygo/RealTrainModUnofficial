@@ -7,7 +7,7 @@ import jp.ngt.ngtlib.renderer.LegacyPointVertices;
 import net.minecraft.client.renderer.RenderType;
 import org.lwjgl.system.MemoryUtil;
 
-/** Uses a normal queued RenderType, then submits one native point for each buffered center. */
+/** Uses a normal queued RenderType, then submits one… */
 final class LegacyPointRenderType extends RenderType {
     private final float pointSize;
     private static PointBuffer pointBuffer;
@@ -34,7 +34,7 @@ final class LegacyPointRenderType extends RenderType {
                 LegacyPointVertices.compact(mesh.vertexBuffer(),MemoryUtil.memByteBuffer(storage.reserve(bytes),bytes),original.format().getVertexSize(),points);
                 MeshData.DrawState drawState=new MeshData.DrawState(original.format(),points,points,
                         VertexFormat.Mode.DEBUG_LINE_STRIP,VertexFormat.IndexType.least(points));
-                // Keep Minecraft's shader defaults, textures and vertex layout; only the final primitive differs.
+                // Keep Minecraft's shader defaults, textures and ve…
                 BufferUploader.reset();
                 if(pointBuffer==null) pointBuffer=new PointBuffer();
                 setupRenderState();

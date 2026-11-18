@@ -1,9 +1,6 @@
 package jp.ngt.ngtlib.block;
 
-/**
- * 本家 jp.ngt.ngtlib.block.TileEntityPlaceable 相当。
- * NGTO Builder は設置の最後にこれで向きを与える:
- */
+/** 本家 jp.ngt.ngtlib.block.TileEntityPlaceable 相当。 */
 public interface TileEntityPlaceable {
 
     /** 現在の向き (度)。 */

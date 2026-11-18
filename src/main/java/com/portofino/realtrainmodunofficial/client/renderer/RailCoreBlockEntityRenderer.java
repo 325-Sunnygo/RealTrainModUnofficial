@@ -24,25 +24,13 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
     private record RailSample(double x, double y, double z, float yaw, float pitch, float roll) {}
     private record RailCacheKey(BlockPos corePos, int mapId, int sampleMax) {}
     private static final Map<RailCacheKey, RailSample[]> SAMPLE_CACHE = new ConcurrentHashMap<>();
-    /**
-     * RTM本家の RailPartsRendererBase#createRailPos と同じ length*2 を基準にする。
-     * Baru系は pos 番号で枕木・バラスト周期を決めるため、ここを増やすと部品間隔が詰まって壊れる。
-     */
+    /** RTM本家の RailPartsRendererBase#createRailPos と同じ le… */
     private static int computeRailSampleMax(RailMap map, double length, RailDefinition definition) {
-        // RTM本家 RailPartsRendererBase#createRailPos と同じ length*2 固定。
-        // 枕木・バラスト・レールの間隔は視点距離で変えない (ユーザー要望「視界でレールの間隔が
-        // 変わる、変えないで」)。
-        // ★本家は切り捨て: int split = (int)(rm.getLength * 2.0F);
-        // (rtm_src RailPartsRendererBase.java:305 / :123)
-        // RTMU は Math.ceil にしていたため、長さ 10.7 なら本家 21 に対して 22 となり、
-        // 枕木が 1 本多く入って間隔が本家とずれていた。切り捨てに揃える。
+        // RTM本家 RailPartsRendererBase#createRailPos と同じ len…
         return Math.max(1,jp.ngt.rtm.render.LegacyRailSampling.split(length,0));
     }
 
-/**
- * 直線のみ: Baru 等は全サンプルでレールを描くため Z-fighting しやすい。極小の Y オフセットで深度を分散。
- * 曲線ではベジェと整合したサンプル間隔のためオフセットしない。
- */
+/** 直線のみ: Baru 等は全サンプルでレールを描くため Z-fighting しやすい。 */
     private static float depthJitter(int pos) {
         return 0.0F;
     }
@@ -74,13 +62,10 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         try {
             if (!be.isLoaded()) return;
             // ディスパッチャの packedLight はコア BE のブロック位置でサンプリングされる。
-            // コアは道床/地面の中にあることが多く光量 0 になるので、ほぼ真っ暗な時だけ
-            // レール上面 (1〜2 ブロック上) で取り直す。
-            // ★ここはあくまで「基準値」。
             if (be.getLevel() != null) {
                 int blockL = packedLight & 0xFFFF;
                 int skyL = (packedLight >> 16) & 0xFFFF;
-                if (blockL <= 16 && skyL <= 16) { //座標圧縮前で 1 段以下 = 埋没サンプリングとみなす
+                if (blockL <= 16 && skyL <= 16) { // 座標圧縮前で 1 段以下 = 埋没サンプリングとみなす
                     net.minecraft.core.BlockPos bp = be.getBlockPos();
                     int above1 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above());
                     int above2 = net.minecraft.client.renderer.LevelRenderer.getLightColor(be.getLevel(), bp.above(2));
@@ -96,15 +81,11 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             if (maps == null || maps.length == 0) return;
 
             // 重ねレール (サブレール): 同じ RailMap 上に各サブレール定義のモデルを描く。
-            // 先に描く (どちらも不透明なので順序は問題にならない)。
             if (be.subRails != null && !be.subRails.isEmpty()) {
                 renderSubRails(be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay);
             }
 
             // 本家式レール描画 (作り直し後の標準パス)。
-            // スクリプト付き: renderRailStatic をスクリプトが実行し、デフォルト配置は
-            // スクリプトが renderer.renderStaticParts を呼んだ時のみ (位置毎 shouldRenderObject
-            // = 端トリミング/枕木循環)。スクリプト無し: renderStaticParts 相当のみ。
             com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.Scripted scripted =
                 com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.get(def);
             if (scripted != null) {
@@ -117,15 +98,9 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 return;
             }
             // ここから下は旧パイプライン。トング (可動レール) を持つ分岐コアだけがここに来る。
-            // かつてはここで毎フレーム「0.5m 刻みの位置ごとにモデルを描画呼び出し」していて、
-            // 実測 12.4ms/本。視界に 1 本あるだけでレール描画時間のほぼ全部を食っていた。
             long legacyStart = ClientRenderProfiler.begin();
             try {
                 // ★ 焼き直しのキーは「トングの位置」で決める。
-                // 以前は開通方向 (activeIndex) をキーにしていたが、トングの位置は
-                // renderSwitchPoint が Point.getMovement から読んでいるため、
-                // 開通方向だけ見ても転てつを検知できず、焼いたメッシュが固まったままだった。
-                // ★焼き込みキーは本家 KaizPatchX の createStaticRenderKey のみ。
                 long variant = staticRenderKey(be, model);
                 RailDefinition bakedDef = def;
                 // packedLight はこのメソッド内で再代入しているのでラムダに直接は渡せない
@@ -151,10 +126,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         }
     }
 
-    /**
-     * 重ねレール (サブレール) をすべて描く。
-     * サブレール定義自身のモデル+スクリプトで描かれる (RailScriptRenderers.renderSubRail)。
-     */
+    /** 重ねレール (サブレール) をすべて描く。 */
     private void renderSubRails(TileEntityLargeRailCore be, RailMap[] maps, float partialTick,
                                 PoseStack poseStack, MultiBufferSource buffer, int packedLight, int packedOverlay) {
         java.util.List<jp.ngt.rtm.rail.util.RailProperty> subs = be.subRails;
@@ -171,21 +143,14 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             if (subModel == null) {
                 continue;
             }
-            // 本家 RenderLargeRail と同じくサブレール i を railIndex = i+1 で描く。
+            // 本家 RenderLargeRail と同じくサブレール i を railIndex = i+1…
             com.portofino.realtrainmodunofficial.client.render.RailScriptRenderers.renderSubRail(
                     be, maps, partialTick, poseStack, buffer, packedLight, packedOverlay, subDef, subModel, i + 1);
         }
     }
 
-    /**
-     * 焼いたメッシュの「見た目の要因」。トングの位置が変われば別物として焼き直す。
-     * Point.getMovement は moveCount / MAX_COUNT で、レッドストーン入力に
-     * 応じて 0 〜 1 を毎 tick 1 段ずつ動く。ここを見ないと転てつしてもメッシュが更新されない。
-     */
-    /**
-     * 本家 KaizPatchX createStaticRenderKey 相当。レール形状 + 各点の明るさ + モデル。
-     * 失敗しても焼き込み自体は続けたいので 0 を返す (= 従来どおり variant だけで判定)。
-     */
+    /** 焼いたメッシュの「見た目の要因」。トングの位置が変われば別物として焼き直す。 */
+    /** 本家 KaizPatchX createStaticRenderKey 相当。 */
     private static int staticRenderKey(TileEntityLargeRailCore be,
                                        com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model) {
         try {
@@ -208,8 +173,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         if (points != null) {
             for (jp.ngt.rtm.rail.util.Point p : points) {
                 // getMovement を 8 段階に量子化して混ぜる。
-                // (1 段 = 1/80 = 0.0125) ので、RS 入力の揺れで moveCount が ±1 微振動しても
-                // 量子化値は変わらない。
                 int q = p == null ? 0 : Math.round(p.getMovement() * 8.0F);
                 key = key * 31L + q;
             }
@@ -221,10 +184,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
     }
 
 
-    /**
-     * 旧パイプライン本体 (トング付き分岐)。統合メッシュへの焼き込みからも、逐次描画からも
-     * 同じコードが呼ばれる。渡された poseStack がレール原点基準であることが前提。
-     */
+    /** 旧パイプライン本体 (トング付き分岐)。統合メッシュへの焼き込みからも、逐次描画からも 同じコード… */
     private void renderLegacy(TileEntityLargeRailCore be, RailDefinition def,
                               MqoModelLoader.MqoModel model, RailMap[] maps, float partialTick,
                               PoseStack poseStack, MultiBufferSource buffer,
@@ -241,14 +201,10 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 int activeIndex = Mth.clamp(be.getActiveSegmentIndex(), 0, maps.length - 1);
                 int previousIndex = Mth.clamp(be.getPreviousSegmentIndex(), 0, maps.length - 1);
                 float switchProgress = be.getSwitchProgress(partialTick);
-                // 本家RTM準拠の分岐描画(LibRenderRail.js)。Point があるレールは:
-                // ・base/ballast/sleeper は全 RailMap に沿って描画(地面なので重なりOK)
-                // ・レール本体(railL/railR)とトング(L0/L1/R0/R1)は Point 単位で半分ずつ + トング分離アニメ
-                // これでレール本体が二重に重ならず、転てつ時にトングが動く(本家と同じ)。
+                // 本家RTM準拠の分岐描画(LibRenderRail.js)。
                 jp.ngt.rtm.rail.util.Point[] points = be.getSwitchPoints();
                 if (points != null && points.length > 0 && railModelHasSwitchParts(model)) {
-                    // base/ballast/sleeper は本家同様 全 RailMap に沿って描画。マップ毎に微小Yオフセットを
-                    // 与え、平行/収束区間で土台が同位置に重なって起きる z-fight(チカチカ)を防ぐ。
+                    // base/ballast/sleeper は本家同様 全 RailMap に沿って描画。
                     for (int mi = 0; mi < maps.length; mi++) {
                         if (maps[mi] != null) {
                             renderMapGroups(be, maps[mi], poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model,
@@ -263,8 +219,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                     }
                     return;
                 }
-                // フォールバック(Point 情報やパーツが無い): 本家 createRailPos 同様、全 RailMap を全描画。
-                // Sample the authored endpoints unchanged; the reference selects end faces separately.
+                // フォールバック(Point 情報やパーツが無い): 本家 createRailPos 同様、全 R…
                 for (int mapIndex = 0; mapIndex < maps.length; mapIndex++) {
                     RailMap map = maps[mapIndex];
                     if (map != null) {
@@ -339,8 +294,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         RailSample[] samples = getOrCreateSamples(map, new BlockPos((int) ox, (int) oy, (int) oz), max);
         int stride = 1;
         int[] clip = computeSwitchClip(map, mapIndex, layout, activeIndex, previousIndex, switchProgress, max);
-        // 重なり除去: 基準ルート(primarySamples)と重なっている根元(先頭サンプル)は描かない。
-        // ルート0と十分離れた(分岐した)位置から描くことで、トランクのレール二重描画を防ぐ。
+        // 重なり除去: 基準ルート(primarySamples)と重なっている根元(先頭サンプル)は描かな…
         int divergenceStart = primarySamples == null ? 0 : computeDivergenceStart(samples, primarySamples, 0.15);
         int startIndex = Math.min(Math.max(0, Math.max(clip[0], divergenceStart)), samples.length - 1);
         int endIndex = Math.max(startIndex, samples.length - 1 - Math.max(0, clip[1]));
@@ -394,10 +348,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         }
     }
 
-    /**
-     * trimEnds 時、端 (先頭/末尾) のサンプルを半ピース (0.25m) 内側へ寄せた座標を返す。
-     * ピース中心が端点に来るとモデルが半分レール外へ飛び出すため、端では面一にする。
-     */
+    /** trimEnds 時、端 (先頭/末尾) のサンプルを半ピース (0.25m) 内側へ寄せた座標を… */
     private static double[] trimmedSamplePos(RailSample[] samples, int index, boolean trimEnds) {
         RailSample sample = samples[index];
         double sx = sample.x;
@@ -419,7 +370,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         return new double[]{sx, sy, sz};
     }
 
-    // ===== 本家RTM準拠の分岐レンダリング (LibRenderRail.js / RenderRailStandardHP.js 移植) =====
+    // ===== 本家RTM準拠の分岐レンダリング (LibRenderRail.js / Render…
     private static final float TONG_MOVE = 0.35F;
     private static final float TONG_POS = 1.0F / 10.0F;
     private static final float HALF_GAUGE = 0.5647F;
@@ -428,7 +379,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
     /** どのレールパーツ群を描画するか。 */
     private enum RailGroup { BASE, NON_BRANCH, LEFT, RIGHT, TONG_FL, TONG_BL, TONG_FR, TONG_BR }
 
-    /** レールモデルが本家分岐パーツ(トング L0/L1/R0/R1 とレール railL/railR)を持つか。 */
+    /** レールモデルが本家分岐パーツ(トング L0/L1/R0/R1 とレール railL/railR)を… */
     private static boolean railModelHasSwitchParts(MqoModelLoader.MqoModel model) {
         java.util.Set<String> groups = model.getAllNormalizedGroupNames();
         if (groups == null) return false;
@@ -506,7 +457,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         }
     }
 
-    /** 本家 LibRenderRail.renderPoint 移植。Point ごとにレール本体+トングを描く。 */
+    /** 本家 LibRenderRail.renderPoint 移植。 */
     private void renderSwitchPoint(TileEntityLargeRailCore be, jp.ngt.rtm.rail.util.Point point,
                                    float partialTick,
                                    PoseStack poseStack, MultiBufferSource buffer, int packedLight,
@@ -518,11 +469,11 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
                 point.mainDirIsPositive, 0.0F, 0, poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, 0.0F);
             return;
         }
-        // partialTick 補間版を使い、トングの動きを frame 間で滑らかにする (素の getMovement は 20Hz でカクつく)。
+        // partialTick 補間版を使い、トングの動きを frame 間で滑らかにする (素の get…
         float movement = point.getMovement(partialTick);
         int tongIndex = (int) Math.floor(point.rmMain.getLength() * 2.0 * TONG_POS);
         float move = movement * TONG_MOVE;
-        // rmMain は基準(bias 0)、rmBranch は分岐点付近で同位置に重なるため微小に持ち上げて z-fight 回避。
+        // rmMain は基準(bias 0)、rmBranch は分岐点付近で同位置に重なるため微小に持ち…
         renderRailMapDynamic(be, point.rmMain, point.branchDir, point.mainDirIsPositive, move, tongIndex,
             poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, 0.0F);
         move = (1.0F - movement) * TONG_MOVE;
@@ -530,7 +481,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             poseStack, buffer, packedLight, ox, oy, oz, mo, scale, model, def, 0.012F);
     }
 
-    /** 本家 LibRenderRail.renderRailMapDynamic 移植。半分の区間+トング分離アニメ。 */
+    /** 本家 LibRenderRail.renderRailMapDynamic 移植。 */
     private void renderRailMapDynamic(TileEntityLargeRailCore be, RailMap rms,
                                       jp.ngt.rtm.rail.util.RailDir dir, boolean par3, float move, int tongIndex,
                                       PoseStack poseStack, MultiBufferSource buffer, int packedLight,
@@ -542,7 +493,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         double railLength = rms.getLength();
         int max = computeRailSampleMax(rms, railLength, def);
         int halfMax = max / 2;
-        // 中間点(halfMax)を隣の Point と二重描画して z-fight しないよう、後半側は halfMax+1 から開始。
+        // 中間点(halfMax)を隣の Point と二重描画して z-fight しないよう、後半側は…
         int startIndex = par3 ? 0 : halfMax + 1;
         int endIndex = par3 ? halfMax : max;
         RailSample[] samples = getOrCreateSamples(rms, new BlockPos((int) ox, (int) oy, (int) oz), max);
@@ -551,8 +502,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         for (int i = startIndex; i <= endIndex && i < samples.length; i++) {
             RailSample s = samples[i];
             poseStack.pushPose();
-            // 本家 LibRenderRail と同じく yaw/pitch のみ(roll/カントは適用しない)。depthBias で
-            // rmMain/rmBranch を微小に上下させ、分岐点付近の同位置 z-fight(チカチカ)を防ぐ。
+            // 本家 LibRenderRail と同じく yaw/pitch のみ(roll/カントは適用しない…
             poseStack.translate(s.x - ox, s.y - oy - 0.0625 + depthJitter(i) + depthBias, s.z - oz);
             poseStack.mulPose(Axis.YP.rotationDegrees(s.yaw));
             poseStack.mulPose(Axis.XP.rotationDegrees(-s.pitch));
@@ -593,11 +543,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         }
     }
 
-    /**
-     * RTM 互換: 分岐の非アクティブ方向をレールの「分岐点側」から徐々に切り詰めて
-     * 「割れている」見た目を作る。
-     * activeIndex / previousIndex / switchProgress で smoothstep 補間する。
-     */
+    /** RTM 互換: 分岐の非アクティブ方向をレールの「分岐点側」から徐々に切り詰めて 「割れている」見… */
     private static int[] computeSwitchClip(RailMap map, int mapIndex, RenderSwitchLayout layout,
                                            int activeIndex, int previousIndex, float switchProgress, int sampleMax) {
         if (layout == RenderSwitchLayout.NONE || sampleMax <= 0) {
@@ -633,10 +579,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         return new int[]{clipStart, 0};
     }
 
-    /**
-     * samples の先頭から、primary(基準ルート)と重なっている区間の長さ(クリップ数)を返す。
-     * samples[i] が primary のどのサンプルからも threshold より離れたら、そこが分岐開始点。
-     */
+    /** samples の先頭から、primary(基準ルート)と重なっている区間の長さ(クリップ数)を返… */
     private static int computeDivergenceStart(RailSample[] samples, RailSample[] primary, double threshold) {
         if (samples == null || primary == null || samples.length == 0 || primary.length == 0) {
             return 0;
@@ -671,8 +614,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         }
         if (layout == RenderSwitchLayout.SCISSORS) {
             // 信号 ON でストレート区間が有効、OFF で対角区間が有効。
-            // referenceIndex は TileEntityLargeRailCore で計算された active 番号なので
-            // そのままピンポイント比較する。
             return mapIndex == referenceIndex;
         }
         return mapIndex == referenceIndex;
@@ -810,8 +751,6 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         MqoModelLoader.MqoModel model
     ) {
         // 本家 1.7.10 の TESR と同じく「レールのその区間の位置」の明るさで描く。
-        // コア 1 点の明るさ (常に埋没 → 上ブロック=空の明るさで救済) を全長に使うと、
-        // 日陰・夜間・トンネル外でレールだけ明るく浮く。
         if (blockEntity.getLevel() != null) {
             net.minecraft.core.BlockPos sp = net.minecraft.core.BlockPos.containing(wx, wy + 0.25D, wz);
             int segLight = net.minecraft.client.renderer.LevelRenderer.getLightColor(blockEntity.getLevel(), sp);
@@ -838,8 +777,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
             groupName -> shouldRenderObject(blockEntity, groupName, max, pos),
             null
         );
-        // ★半透明パスは距離で切らない。
-        // 無条件 true で、距離やグループ名でレールを間引く仕組みそのものが無い。
+        // ★半透明パスは距離で切らない。 無条件 true で、距離やグループ名でレールを間引く仕組みそのも…
         if (model.hasTranslucentBatches()) {
             MqoModelLoader.renderModelWithoutScript(
                 model,
@@ -855,12 +793,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
         poseStack.popPose();
     }
 
-    /**
-     * この位置でこのグループを描くか。
-     * 本家 RailPartsRenderer.shouldRenderObject(tile, objName, len, pos) に丸投げする。
-     * ★以前はここで RTMU が独自に出し分けていた (ballast を pos % 16 で回す、
-     * sleeper_point を常に隠す、end/cap は端だけ… など)。
-     */
+    /** この位置でこのグループを描くか。 本家 RailPartsRenderer.shouldRende… */
     private static boolean shouldRenderObject(TileEntityLargeRailCore be, String groupName, int max, int pos) {
         if (groupName == null || groupName.isBlank()) return true;
         if(!jp.ngt.rtm.render.LegacyRailSampling.crossSection(groupName,pos,max+1,be.shouldRenderRailStartCap(),be.shouldRenderRailEndCap())) return false;
@@ -889,9 +822,7 @@ public class RailCoreBlockEntityRenderer implements BlockEntityRenderer<TileEnti
 
     @Override
     public boolean shouldRenderOffScreen(TileEntityLargeRailCore blockEntity) {
-        // true 必須: false だとコアブロックのあるチャンクセクションが視界から外れた瞬間に
-        // レール全体が消える (BE はセクション単位でカリングされるため)。本家 1.7.10 も
-        // ignoreFrustumCheck 相当で常時描画 (「レールはその場にある」)。
+        // true 必須: false だとコアブロックのあるチャンクセクションが視界から外れた瞬間に レー…
         return true;
     }
 

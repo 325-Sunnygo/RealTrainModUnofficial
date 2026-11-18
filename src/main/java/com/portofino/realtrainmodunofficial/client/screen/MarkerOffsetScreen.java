@@ -10,11 +10,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/**
- * マーカーの位置調整 (レンチのモード「マーカー位置調整」でマーカーを右クリック)。
- * 本家のマーカーはブロック単位でしか置けず、レールの端は必ず
- * 「ブロック中心 + 向きごとの固定オフセット (RailPosition.REVISION)」に来る。
- */
+/** マーカーの位置調整 (レンチのモード「マーカー位置調整」でマーカーを右クリック)。 */
 public class MarkerOffsetScreen extends Screen {
 
     /** 動かせる範囲 (1/16 ブロック単位)。ブロック 1 個ぶんまで。 */

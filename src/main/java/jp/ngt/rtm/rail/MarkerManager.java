@@ -10,11 +10,7 @@ import java.util.WeakHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.Collectors;
 
-/**
- * ロード済みマーカー BE の追跡。
- * 本家は world.loadedTileEntityList を走査していたが、1.21 に相当 API がないため
- * onLoad/setRemoved で登録・解除する方式で代替。
- */
+/** ロード済みマーカー BE の追跡。 本家は world.loadedTileEntityList… */
 public final class MarkerManager {
     private static final Map<Level, Set<TileEntityMarker>> MARKERS = Collections.synchronizedMap(new WeakHashMap<>());
 

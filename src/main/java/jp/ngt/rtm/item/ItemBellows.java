@@ -12,12 +12,7 @@ import net.minecraft.world.phys.AABB;
 
 import java.util.List;
 
-/**
- * フイゴ。本家 {@code jp.ngt.rtm.item.ItemBellows} の移植。
- *
- * <p>スロットを右クリックすると、その奥のコークスに空気を送って温度を上げる。
- * 流体を直接右クリックすると<b>冷ます</b> ({@link EntityFluid#interact} 側)。本家と同じ。
- */
+/** フイゴ。本家 jp.ngt.rtm.item.ItemBellows の移植。 */
 public class ItemBellows extends Item {
     public ItemBellows() {
         super(new Properties().stacksTo(1));
@@ -29,7 +24,7 @@ public class ItemBellows extends Item {
         if (!level.isClientSide()) {
             BlockPos pos = context.getClickedPos();
             if (level.getBlockState(pos).is(RealTrainModUnofficialBlocks.SLOT.get())) {
-                //本家は clicked 面の反対側を見る
+                // 本家は clicked 面の反対側を見る
                 BlockPos target = pos.relative(context.getClickedFace().getOpposite());
                 this.blow(level, target);
             }

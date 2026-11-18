@@ -2,10 +2,7 @@ package jp.ngt.rtm.entity.train.util;
 
 import java.util.Arrays;
 
-/**
- * 本家 jp.ngt.rtm.entity.train.util.EnumNotch の忠実移植。
- * 運転士 (EntityMotorman) の自動運転 AI がノッチ選択に使う。
- */
+/** 本家 jp.ngt.rtm.entity.train.util.EnumNotch の忠実移植。 */
 public enum EnumNotch {
     accelerate_5(5, 1.80F, 0.002F),
     accelerate_4(4, 1.44F, 0.002F),
@@ -58,10 +55,7 @@ public enum EnumNotch {
         }
     }
 
-    /**
-     * @param par1 ノッチ
-     * @param par2 変更前の速度
-     */
+    
     public static float getAcceleration(int par1, float par2) {
         EnumNotch notch = getNotch(par1);
         if (par1 > 0 && par2 >= notch.max_speed) {
@@ -70,7 +64,7 @@ public enum EnumNotch {
         return notch.acceleration;
     }
 
-    /** @param par1 目標速度 */
+    
     public static EnumNotch getSuitableNotchFromSpeed(float par1) {
         if (par1 >= accelerate_5.max_speed) {
             return accelerate_5;
@@ -83,7 +77,7 @@ public enum EnumNotch {
         return inertia;
     }
 
-    /** @param par1 目標加速度 */
+    
     public static EnumNotch getSuitableNotchFromAcceleration(float par1) {
         if (par1 > 0.0F) {
             return accelerate_4;

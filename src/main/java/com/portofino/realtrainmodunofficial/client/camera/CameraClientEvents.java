@@ -9,7 +9,7 @@ import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.event.ViewportEvent;
 
-/** Original first-person/main-hand activation and four-line camera HUD. */
+/** Original first-person/main-hand activation and fo… */
 @EventBusSubscriber(modid=RealTrainModUnofficial.MODID,value=Dist.CLIENT)
 public final class CameraClientEvents {
     private CameraClientEvents() {}

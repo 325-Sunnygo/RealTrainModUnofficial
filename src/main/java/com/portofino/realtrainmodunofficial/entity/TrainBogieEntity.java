@@ -95,9 +95,7 @@ public final class TrainBogieEntity extends Entity {
     public void tick() {
         super.tick();
         TrainEntity train = resolveTrain();
-        // クライアント側で親エンティティがまだ届いていないだけのケースで
-        // 台車を discard すると、その後親列車が同期しても台車が永遠に消えたままになる。
-        // discard はサーバー側でのみ行い、クライアントは親が来るまで待機する。
+        // クライアント側で親エンティティがまだ届いていないだけのケースで 台車を discard すると、そ…
         if (train == null || !train.isAlive() || train.isRemoved()) {
             if (!level().isClientSide()) {
                 discard();
@@ -167,10 +165,7 @@ public final class TrainBogieEntity extends Entity {
         }
         Vec3 target = train.getBogieEntityWorldPosition(getBogieIndex());
         if (level().isClientSide()) {
-            // クライアント側: xo を train.xo/yRotO ベースで明示設定して
-            // train body の lerp(pt, train.xo, train.getX) と同期させる。
-            // tick順序の不定性により baseTick が設定する xo がずれると高速時に
-            // 台車が前後にずれて見えるため、毎tick明示的に揃える。
+            // クライアント側: xo を train.xo/yRotO ベースで明示設定して train bod…
             Vec3 prevTarget = train.getBogieEntityWorldPositionPrev(getBogieIndex());
             this.xo = prevTarget.x;
             this.yo = prevTarget.y;
@@ -179,7 +174,6 @@ public final class TrainBogieEntity extends Entity {
         this.setPos(target.x, target.y, target.z);
         if (!level().isClientSide()) {
             // サーバー側: railアンカーから毎tick yaw/pitch を計算して setRot。
-            // この値が ClientboundMoveEntityPacket.Rot 等でクライアントへ同期される。
             float targetYaw = train.getBogieWorldYaw(getBogieIndex());
             float targetPitch = train.getBogiePitch(getBogieIndex());
             this.setYRot(targetYaw);
@@ -189,8 +183,7 @@ public final class TrainBogieEntity extends Entity {
             this.setYHeadRot(targetYaw);
             this.setYBodyRot(targetYaw);
         }
-        // クライアント側では rotation はサーバーからの lerpTo で setYRot/setXRot され、
-        // yRotO/xRotO は lerpTo 内で前tick値として保持される。ここでは触らない。
+        // クライアント側では rotation はサーバーからの lerpTo で setYRot/setX…
     }
 
     public TrainEntity getTrain() {
@@ -211,8 +204,7 @@ public final class TrainBogieEntity extends Entity {
 
     @Override
     public void lerpTo(double x, double y, double z, float yRot, float xRot, int steps) {
-        // 位置は refreshFromTrain が毎tick設定するため server lerp パケットの位置は無視。
-        // 回転はサーバーが railアンカーから計算した値を反映する。
+        // 位置は refreshFromTrain が毎tick設定するため server lerp パケッ…
         this.yRotO = this.getYRot();
         this.xRotO = this.getXRot();
         this.setYRot(yRot);

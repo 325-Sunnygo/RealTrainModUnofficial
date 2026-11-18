@@ -10,7 +10,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 
-/** Actual Minecraft PNG decode/upload, independently checked against ImageIO and GPU readback. */
+/** Actual Minecraft PNG decode/upload, independently… */
 public final class LegacyTextureUploadRegression {
     public static void main(String[] args) throws Exception {
         net.neoforged.fml.loading.LoadingModList.of(java.util.List.of(),java.util.List.of(),java.util.List.of(),java.util.List.of(),java.util.Map.of());
@@ -93,8 +93,7 @@ public final class LegacyTextureUploadRegression {
         } catch(Throwable failure) {
             if(!System.getProperty("rtmu.e259Pack","").isBlank()){failure.printStackTrace();System.exit(1);}throw failure;
         } finally {
-            // ImageIO's GIF/AWT path starts AppKit; GLFW teardown then deadlocks on macOS.
-            // The isolated test JVM releases its native window on process termination.
+            // ImageIO's GIF/AWT path starts AppKit;
             if(!System.getProperty("rtmu.e259Pack","").isBlank())System.exit(0);
             for(var program:programs) program.close();if(window!=0) GLFW.glfwDestroyWindow(window); GLFW.glfwTerminate(); }
     }

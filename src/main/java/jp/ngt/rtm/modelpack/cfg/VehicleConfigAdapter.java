@@ -1,6 +1,6 @@
 package jp.ngt.rtm.modelpack.cfg;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
-/** Keeps ModelVehicle's two-element ground/air profiles separate from train notches. */
+/** Keeps ModelVehicle's two-element ground/air profi… */
 public final class VehicleConfigAdapter {
     private static final java.util.Map<VehicleDefinition,VehicleConfig> CACHE=java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     private VehicleConfigAdapter() {}

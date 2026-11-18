@@ -18,46 +18,26 @@ import org.joml.Vector3f;
 
 import java.util.List;
 
-/**
- * 前照灯・尾灯の<b>光の表現</b>。
- *
- * <p>本家 {@code jp.ngt.rtm.entity.vehicle.RenderVehicleBase.renderLightEffect} と
- * {@code jp.ngt.rtm.render.PartsRenderer.renderLightEffectS} をそのまま移植したもの。
- * 灯具そのもの (モデルの発光テクスチャ) は別で、これは<b>灯具から出る光</b>だけを描く。
- *
- * <p>本家の作りは 2 種類:
- * <ul>
- *   <li>{@code type 0} = <b>光り玉</b>。中心が灯色で縁が黒 α0 の円板。視線が光軸から
- *       45 度を超えると半径が縮んでいき、90 度でゼロになる (真横からは見えない)</li>
- *   <li>{@code type 1} = <b>ハイビーム</b>。前方 16m へ伸びる円錐と、その中の放射状の筋。
- *       視線が光軸に近いほど明るい。★<b>周囲が明るいと描かない</b> (本家 DAYLIGHT_LIMIT)</li>
- * </ul>
- */
+/** 前照灯・尾灯の光の表現。 本家 jp.ngt.rtm.entity.vehicle.RenderV… */
 public final class VehicleLightEffect extends RenderStateShard {
 
     private VehicleLightEffect(String name, Runnable setup, Runnable clear) {
         super(name, setup, clear);
     }
 
-    /** 本家 {@code RenderVehicleBase.DAYLIGHT_LIMIT}。これより明るいと type 1 を描かない。 */
+    /** 本家 RenderVehicleBase.DAYLIGHT_LIMIT。 */
     private static final int DAYLIGHT_LIMIT = 7;
-    /** 本家 {@code PartsRenderer.DIV_NUM}。 */
+    /** 本家 PartsRenderer.DIV_NUM。 */
     private static final int DIV_NUM = 32;
     private static final float ANGLE = 360.0F / DIV_NUM;
-    /** 本家 {@code PartsRenderer.BRIGHTNESS_RATE}。 */
+    /** 本家 PartsRenderer.BRIGHTNESS_RATE。 */
     private static final double BRIGHTNESS_RATE = 1.0D / 256.0D;
     /** 本家 RenderVehicleBase が renderLightEffectS へ渡す根元半径。 */
     private static final float ROOT_RADIUS = 0.0625F;
-    /** 本家 RenderVehicleBase が renderLightEffectS へ渡す光錐の長さ (m)。 */
+    /** 本家 RenderVehicleBase が renderLightEffectS へ渡す光錐の長… */
     private static final float CONE_LENGTH = 16.0F;
 
-    /**
-     * 本家の
-     * {@code glBlendFunc(GL_SRC_ALPHA, GL_ONE)} + {@code glDepthMask(false)}
-     * + {@code glDisable(GL_CULL_FACE)} + {@code glDisable(GL_TEXTURE_2D)}
-     * + {@code setLightmapMaxBrightness} と同じ状態。
-     * POSITION_COLOR なのでテクスチャも明度テクスチャも持たない (= 常に最大輝度)。
-     */
+    /** 本家の glBlendFunc(GL_SRC_ALPHA, GL_ONE) + glDepthMa… */
     private static final TransparencyStateShard ADDITIVE = new TransparencyStateShard(
         "rtmu_light_effect_additive",
         () -> {
@@ -81,17 +61,7 @@ public final class VehicleLightEffect extends RenderStateShard {
             .setWriteMaskState(RenderStateShard.COLOR_WRITE)
             .createCompositeState(false));
 
-    /**
-     * 本家 {@code RenderVehicleBase.renderLightEffect(vehicle, modelset)}。
-     *
-     * <p>呼ぶ位置は本家と同じく<b>車体の回転とモデルオフセットまで掛けた状態</b>。
-     * ★モデルの拡大率は掛けない (本家も灯具の座標には掛けていない)。
-     *
-     * @param mode      本家 {@code getVehicleState(TrainStateType.Light)} (0=消灯 / 1=前尾 / 2=両側)
-     * @param dir       進行方向 (本家 {@code getTrainDirection})。列車以外は 0
-     * @param frontFree 進行方向側に連結相手が居なければ true (本家 b0)
-     * @param rearFree  反対側に連結相手が居なければ true (本家 b1)
-     */
+    /** 本家 RenderVehicleBase.renderLightEffect(vehicle, m… */
     public static void render(VehicleDefinition def, int mode, int dir, boolean frontFree, boolean rearFree,
                               double worldX, double worldY, double worldZ, float yaw, float pitch,
                               int ambientLight, PoseStack poseStack, MultiBufferSource buffer) {
@@ -116,7 +86,7 @@ public final class VehicleLightEffect extends RenderStateShard {
             renderModeTail = ((mode == 1 && !frontFree && rearFree) || mode == 2) ? 0 : -1;
         }
 
-        // 光軸 (ワールド空間)。本家は (0,0,1) を rotateAroundY(yaw) → rotateAroundZ(pitch)。
+        // 光軸 (ワールド空間)。本家は (0,0,1) を rotateAroundY(yaw) → ro…
         Vector3f normal = rotate(0.0F, 0.0F, 1.0F, yaw, pitch);
 
         VertexConsumer consumer = buffer.getBuffer(LIGHT_EFFECT);
@@ -129,12 +99,7 @@ public final class VehicleLightEffect extends RenderStateShard {
                     worldX, worldY, worldZ, yaw, pitch);
             }
         }
-        // ★AppleExtended はここも <b>headLights</b> を回す (尾灯ループの写し間違い)。
-        //   結果として「前照灯・尾灯」を選ぶと前照灯が 2 回描かれて倍の明るさになり、
-        //   これがユーザーの言う<b>ハイビーム</b>そのもの。赤い尾灯は一度も描かれない。
-        //   ★RTM 1.12.2 / KaizPatchX は tailLights を回すので赤が出る。
-        //   移植元は AppleExtended なので<b>直さずそのまま</b>にしてある。
-        //   tailLights は上の「未定義なら描かない」判定にだけ使う。
+        // ★AppleExtended はここも headLights を回す (尾灯ループの写し間違い)。
         if (renderModeTail >= 0) {
             for (VehicleDefinition.LightDefinition light : headLights) {
                 if (light.type() == 1 && ambientLight > DAYLIGHT_LIMIT) {
@@ -146,7 +111,7 @@ public final class VehicleLightEffect extends RenderStateShard {
         }
     }
 
-    /** 本家 {@code RenderVehicleBase.renderLightEffect(vehicle, normal, light, mode)}。 */
+    /** 本家 RenderVehicleBase.renderLightEffect(vehicle, n… */
     private static void renderLight(VertexConsumer consumer, PoseStack poseStack, Vector3f normal,
                                     VehicleDefinition.LightDefinition light, int mode,
                                     double worldX, double worldY, double worldZ, float yaw, float pitch) {
@@ -177,7 +142,7 @@ public final class VehicleLightEffect extends RenderStateShard {
         poseStack.popPose();
     }
 
-    /** 本家 {@code PartsRenderer.renderLightEffectS}。 */
+    /** 本家 PartsRenderer.renderLightEffectS。 */
     private static void renderLightEffectS(VertexConsumer consumer, Matrix4f mat, Vector3f normal,
                                            double x, double y, double z, float rL, float rS, float length,
                                            int color, int type, boolean reverse) {
@@ -201,7 +166,7 @@ public final class VehicleLightEffect extends RenderStateShard {
                 lightStrength = (90.0F - viewerAngle) / 45.0F;
             }
             float r = rL * lightStrength;
-            // 本家は GL_TRIANGLE_FAN。QUADS なので中心を 2 回積んで三角形 1 枚ぶんにする
+            // 本家は GL_TRIANGLE_FAN。QUADS なので中心を 2 回積んで三角形 1 枚ぶんに…
             for (int i = 0; i < DIV_NUM; ++i) {
                 float rad0 = (float) Math.toRadians(i * ANGLE);
                 float rad1 = (float) Math.toRadians((i + 1) * ANGLE);
@@ -264,13 +229,13 @@ public final class VehicleLightEffect extends RenderStateShard {
         consumer.addVertex(mat, x, y, z).setColor(red, green, blue, alpha);
     }
 
-    /** 本家 {@code PartsRenderer.getViewerVec}: 視点から灯具へのベクトル。 */
+    /** 本家 PartsRenderer.getViewerVec: 視点から灯具へのベクトル。 */
     private static Vector3f viewerVec(double x, double y, double z) {
         Vec3 eye = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         return new Vector3f((float) (eye.x - x), (float) (eye.y - y), (float) (eye.z - z));
     }
 
-    /** 本家 {@code Vector3f.angle}: 2 ベクトルのなす角 (ラジアン)。 */
+    /** 本家 Vector3f.angle: 2 ベクトルのなす角 (ラジアン)。 */
     private static float angleBetween(Vector3f a, Vector3f b) {
         float d = a.x * b.x + a.y * b.y + a.z * b.z;
         float len = (float) (Math.sqrt(a.lengthSquared()) * Math.sqrt(b.lengthSquared()));
@@ -280,7 +245,7 @@ public final class VehicleLightEffect extends RenderStateShard {
         return (float) Math.acos(Mth.clamp(d / len, -1.0F, 1.0F));
     }
 
-    /** 本家 {@code Vec3.rotateAroundY(yaw)} → {@code rotateAroundZ(pitch)} (どちらも度)。 */
+    /** 本家 Vec3.rotateAroundY(yaw) → rotateAroundZ(pitch)… */
     private static Vector3f rotate(float x, float y, float z, float yaw, float pitch) {
         float ry = (float) Math.toRadians(yaw);
         float cy = Mth.cos(ry);

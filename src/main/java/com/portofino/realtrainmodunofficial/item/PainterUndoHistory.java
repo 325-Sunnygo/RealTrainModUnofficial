@@ -13,10 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 元に戻す (neo mcte)。本家 MCTE WorldSnapshot + Editor.history の移植。
- * 本家はエディタ 1 個につきスタックを持っていた。
- */
+/** 元に戻す (neo mcte)。本家 MCTE WorldSnapshot + Editor.hi… */
 public final class PainterUndoHistory {
 
     /** エディタ 1 個あたりの履歴数。 */

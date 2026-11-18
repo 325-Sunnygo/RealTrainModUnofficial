@@ -7,13 +7,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
-/**
- * 飛行機。本家 {@code jp.ngt.rtm.entity.vehicle.EntityPlane} の移植。
- *
- * <p>空中でも操作でき、速度に応じてピッチで昇降する。
- * ★本家は上昇/下降を専用キー (setUpDown) で行うが、RTMU にそのキーが無いので
- * <b>運転者の視線ピッチ</b>で機首を操作する (速度が出ているときだけ)。
- */
+/** 飛行機。本家 jp.ngt.rtm.entity.vehicle.EntityPlane の移植。 */
 public class EntityPlane extends EntityVehicle {
     public EntityPlane(EntityType<? extends EntityPlane> type, Level level) {
         super(type, level);
@@ -25,7 +19,7 @@ public class EntityPlane extends EntityVehicle {
 
     @Override
     protected boolean shouldUpdateMotion() {
-        return true;   //本家: 空中でも操作できる
+        return true;   // 本家: 空中でも操作できる
     }
 
     @Override
@@ -38,14 +32,14 @@ public class EntityPlane extends EntityVehicle {
 
         this.speed = Mth.clamp((float) this.speed, 0.0F, MAX_SPEED);
 
-        //★視線ピッチで機首を動かす (本家 setUpDown の代替)
+        // ★視線ピッチで機首を動かす (本家 setUpDown の代替)
         if (this.speed > 0.0D) {
             float target = entity.getXRot();
             float step = PITCH_COEFFICIENT * (float) (this.speed / MAX_SPEED);
             float dif = Mth.clamp(Mth.wrapDegrees(target - this.getXRot()), -step, step);
             this.setXRot(this.getXRot() + dif);
             if (this.onGround() && this.getXRot() > -1.0F) {
-                this.setXRot(0.0F);   //本家: 地上では機首上げのみ
+                this.setXRot(0.0F);   // 本家: 地上では機首上げのみ
             }
         }
 
@@ -61,7 +55,7 @@ public class EntityPlane extends EntityVehicle {
             this.setDeltaMovement(0.0D, this.getDeltaMovement().y, 0.0D);
         }
 
-        //本家: 旋回でロール
+        // 本家: 旋回でロール
         if (this.speed > 0.0D && !this.onGround()) {
             this.rotationRoll = -moveStrafe * (float) (this.speed / MAX_SPEED) * -ROLL_COEFFICIENT;
         } else {

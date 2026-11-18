@@ -19,10 +19,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.List;
 
-/**
- * jp.ngt 列車の運転台メニュー — 本家 GuiTrainCtrl 相当 (RTM 風テクスチャ付き)。
- * 旧 TrainControlScreen のレイアウト/テクスチャを EntityTrainBase (TrainState) 向けに移植。
- */
+/** jp.ngt 列車の運転台メニュー — 本家 GuiTrainCtrl 相当 (RTM 風テクスチ… */
 public class RtmTrainControlScreen extends Screen {
     private static final ResourceLocation TAB_INVENTORY_TEXTURE =
             ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "textures/gui/tab_inventory.png");
@@ -67,7 +64,6 @@ public class RtmTrainControlScreen extends Screen {
             addButton(left + 28, top + 52, 120, "チャンクロード" + (loaderOn ? " ON" : " OFF"), "toggle_chunk_loader", 0);
             addArrowButton(left + 152, top + 52, ">", "toggle_chunk_loader", 0);
             // 方向幕/種別/アナウンスの3行は、チャンクロードの下で行間を詰める (高さ18)。
-            // 行を1つ増やした (種別) ぶん下がホットバー/インベントリに被らないように上へ寄せる。
             final int rowH = 18;
             // 方向幕: 持っていないパックでは null と出して押せなくする
             int destCount = rollsignNames().length;
@@ -85,7 +81,7 @@ public class RtmTrainControlScreen extends Screen {
                 addArrowButton(left + 152, top + 73, rowH, ">", "set_destination",
                         Math.floorMod(dest + 1, destCount));
             }
-            // RTMU 追加: 種別幕。方向幕のすぐ下に同じ操作感で並べる。持たないパックは null で押せなくする。
+            // RTMU 追加: 種別幕。方向幕のすぐ下に同じ操作感で並べる。
             int typeCount = typeSignNames().length;
             if (typeCount == 0) {
                 addArrowButton(left + 4, top + 92, rowH, "<", "noop", 0);
@@ -101,8 +97,7 @@ public class RtmTrainControlScreen extends Screen {
                 addArrowButton(left + 152, top + 92, rowH, ">", "set_type",
                         Math.floorMod(type + 1, typeCount));
             }
-            // アナウンスも方向幕と同じ回し方にする。
-            // 以前は上限も循環も無く、パックのアナウンス数を超えて増え続けていた。
+            // アナウンスも方向幕と同じ回し方にする。 以前は上限も循環も無く、パックのアナウンス数を超えて増え続…
             int announceCount = announcementCount();
             if (announceCount == 0) {
                 // アナウンスを持たないパック: 空欄ではなく null と出して、押せなくする
@@ -129,8 +124,7 @@ public class RtmTrainControlScreen extends Screen {
                 int value = train.getResourceState() == null ? 0
                         : train.getResourceState().getDataMap().getInt("Button" + i);
                 List<String> optionList = options.get(i);
-                // スライダー型: customButtons のエントリを ["slider:名前"] と書くと
-                // 0-100% のスライダーになる (値は DataMap Button{i}、0=未設定は 100% 扱い)
+                // スライダー型: customButtons のエントリを ["slider:名前"] と書くと 0…
                 if (optionList.size() == 1 && optionList.get(0).startsWith("slider:")) {
                     String label = optionList.get(0).substring("slider:".length());
                     int shown = value <= 0 ? 100 : Math.min(100, value);
@@ -150,7 +144,6 @@ public class RtmTrainControlScreen extends Screen {
 
     private String[] rollsignNames() {
         // N2100 など rollsignNames を持たないパックでは null が返る。
-        // インベントリキーでこの画面を開いた瞬間に NPE で落ちないよう空配列へ落とす。
         jp.ngt.rtm.modelpack.cfg.TrainConfig config = null;
         try {
             config = train == null ? null : train.getConfig();
@@ -210,20 +203,13 @@ public class RtmTrainControlScreen extends Screen {
         return train.getTrainStateData(TrainStateType.State_Pantograph.id) != 0 ? "パンタ 上" : "パンタ 下";
     }
 
-    /**
-     * このパックが持つアナウンスの数。0 ならアナウンス機能なし。
-     * 表示名 (sound_Announcement の 1 列目) は省略されることがあるので、
-     * 数は音声の数で数える。名前だけで数えると、名前が無いアナウンスを取りこぼす。
-     */
+    /** このパックが持つアナウンスの数。0 ならアナウンス機能なし。 */
     private int announcementCount() {
         VehicleDefinition definition = VehicleRegistry.getById(train.getModelName());
         return definition == null ? 0 : definition.getAnnouncementSounds().size();
     }
 
-    /**
-     * 本家 sound_Announcement は [[表示名, 音声パス], ...] なので、指定された表示名を出す。
-     * 名前が未指定 / パック未登録のときだけ従来の「アナウンス N」にフォールバックする。
-     */
+    /** 本家 sound_Announcement は [[表示名, 音声パス], ...] なので、指定… */
     private String announcementLabel(int announce) {
         VehicleDefinition definition = VehicleRegistry.getById(train.getModelName());
         List<String> names = definition != null ? definition.getAnnouncementNames() : List.of();
@@ -245,7 +231,7 @@ public class RtmTrainControlScreen extends Screen {
         return "方向幕 " + names[dest];
     }
 
-    // RTMU 追加: 種別幕 (typeSignNames)。方向幕とは別の State_Type で選ぶ。
+    // RTMU 追加: 種別幕 (typeSignNames)。
     private String[] typeSignNames() {
         VehicleDefinition def = VehicleRegistry.getById(train.getModelName());
         return def == null ? new String[0] : def.getTypeSignNames().toArray(new String[0]);
@@ -282,14 +268,13 @@ public class RtmTrainControlScreen extends Screen {
             }
         }
         PacketDistributor.sendToServer(new TrainControlPayload(train.getId(), action, value));
-        // スライダーはドラッグ中に毎回 applyValue が呼ばれる — 再構築すると
-        // ウィジェットが差し替わってドラッグが切れ、値が動かなくなる
+        // スライダーはドラッグ中に毎回 applyValue が呼ばれる — 再構築すると ウィジェットが差…
         if (!"set_custom_button".equals(action)) {
             rebuildTabWidgets();
         }
     }
 
-    /** スライダー型カスタムボタン (0-100%)。ドラッグ確定ごとに DataMap Button{i} を送信。 */
+    /** スライダー型カスタムボタン (0-100%)。 */
     private class CustomSliderButton extends net.minecraft.client.gui.components.AbstractSliderButton {
         private final String label;
         private final int index;
@@ -384,8 +369,7 @@ public class RtmTrainControlScreen extends Screen {
         if (selectedTab != ControlTab.FORMATION) {
             return;
         }
-        // 本家 GuiVehicleControlPanel の編成タブ移植: 連結中の各車両を tab_formation.png の
-        // 車両スプライトで並べる。u=制御車で右へ+32、v=先頭(0)/中間(1)/最後尾(2)、5両で改行。
+        // 本家 GuiVehicleControlPanel の編成タブ移植: 連結中の各車両を tab_f…
         jp.ngt.rtm.entity.train.util.Formation formation = train.getFormation();
         int size = formation == null ? 0 : formation.size();
         if (size <= 0) {
@@ -493,14 +477,12 @@ public class RtmTrainControlScreen extends Screen {
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
-    // タブのアイコン (左から順に並ぶ)。
-    // 触らない (入れ替えるとインベントリ内の全アイテムの見た目が変わってしまう)。
+    // タブのアイコン (左から順に並ぶ)。 触らない (入れ替えるとインベントリ内の全アイテムの見た目が…
     private enum ControlTab {
         INVENTORY(TAB_INVENTORY_TEXTURE, new ItemStack(Blocks.CHEST)),
         SETTING(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.CROWBAR_ITEM.get())),
         FUNCTION(TAB_SETTING_TEXTURE, new ItemStack(RealTrainModUnofficialItems.WRENCH_ITEM.get())),
-        //★ドア(専用)タブは廃止。中身だった速度設定はパックの JSON
-        //  (KaizPatchX TrainConfig の maxSpeed / accelerateion) が決めるようになった。
+        // ★ドア(専用)タブは廃止。中身だった速度設定はパックの JSON (KaizPatchX Trai…
         FORMATION(TAB_FORMATION_TEXTURE, new ItemStack(RealTrainModUnofficialItems.TRAIN_ITEM.get()));
 
         final ResourceLocation background;
@@ -525,8 +507,7 @@ public class RtmTrainControlScreen extends Screen {
         @Override
         protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
             int doorState = train.getTrainStateData(TrainStateType.State_Door.id);
-            // 車両自身のドア byte は常に「その車両の物理左右」(Formation が entry.dir で
-            // 再配布済み)。運転士から見た左右は運転台向き (cabDir) だけで決まる。
+            // 車両自身のドア byte は常に「その車両の物理左右」(Formation が entry.dir…
             boolean dir = (train.getCabDirection() & 1) == 0;
             int bit = leftDoor ? (dir ? 1 : 2) : (dir ? 2 : 1);
             boolean opened = (doorState & bit) == bit;

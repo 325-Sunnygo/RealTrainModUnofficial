@@ -4,7 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import net.minecraft.client.renderer.*;
 import org.spongepowered.asm.mixin.*;
 
-/** Secondary views cannot clear the main view's Fabulous/outline buffers. */
+/** Secondary views cannot clear the main view's Fabu… */
 @Mixin(LevelRenderer.class)
 public abstract class MirrorLevelTargetsMixin implements com.portofino.realtrainmodunofficial.client.mirror.MirrorLevelTargets {
     @com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod(method="renderSky")

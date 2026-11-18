@@ -50,8 +50,7 @@ public class RailItem extends Item {
             return InteractionResult.PASS;
         }
 
-        // 敷設済みのレールを右クリック → そのレールのモデルを、今このアイテムで選んでいる
-        // モデルに差し替える。引き直さずに見た目だけ変えられるようにするため。
+        // 敷設済みのレールを右クリック → そのレールのモデルを、今このアイテムで選んでいる モデルに差し替…
         if (level.getBlockEntity(context.getClickedPos()) instanceof TileEntityLargeRailBase railBase) {
             TileEntityLargeRailCore core = railBase.getRailCore();
             if (core != null) {
@@ -62,18 +61,11 @@ public class RailItem extends Item {
             }
         }
 
-        //★「コピーしたレールを貼り付ける」独自機能は本家に無く、RTMU 独自マーカー
-        //  (MarkerBlock) に依存していたため削除した。本家 ItemRail はマーカーを
-        //  レンチ/レールアイテムで設置して敷設する方式。
+        // ★「コピーしたレールを貼り付ける」独自機能は本家に無く、RTMU 独自マーカー (MarkerBl…
         return InteractionResult.PASS;
     }
 
-    /**
-     * 敷設済みレールのモデル差し替え。
-     * 本家 ItemRail もレールを右クリックするとモデルをいじれる (シフトで差し替え、
-     * 素で重ねレールの追加) が、そちらは「コピーしたレール」アイテム側の話で、
-     * モデル選択式の通常レールアイテムからは何もできなかった。
-     */
+    /** 敷設済みレールのモデル差し替え。 本家 ItemRail もレールを右クリックするとモデルをいじれ… */
     private static void changeRailModel(TileEntityLargeRailCore core, ItemStack stack, Player player) {
         String selectedId = com.portofino.realtrainmodunofficial.compat.LegacyItemStackBridge
             .getSelectedModelId(stack);
@@ -85,7 +77,7 @@ public class RailItem extends Item {
         RailDefinition def = RailRegistry.getById(selectedId);
         String name = def != null ? def.getDisplayName() : selectedId;
 
-        // Original ItemRail applies the held item's complete property, including ballast.
+        // Original ItemRail applies the held item's complet…
         RailProperty next = jp.ngt.rtm.item.ItemRail.getProperty((Object)stack);
         if(next == null) return;
 
@@ -120,10 +112,7 @@ public class RailItem extends Item {
         }
     }
 
-    /**
-     * 本家 ItemRail.getItemStackDisplayName と同じ形。
-     * 「レール (1067mm_PC, 砂利)」のように、レールの種類と道床を出す。
-     */
+    /** 本家 ItemRail.getItemStackDisplayName と同じ形。 */
     @Override
     public net.minecraft.network.chat.Component getName(net.minecraft.world.item.ItemStack stack) {
         net.minecraft.network.chat.Component base = super.getName(stack);

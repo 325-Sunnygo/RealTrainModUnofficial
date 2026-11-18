@@ -5,7 +5,7 @@ import net.minecraft.world.phys.Vec3;
 import org.joml.*;
 import java.lang.Math;
 
-/** Off-axis frustum through the actual mirror corners, seen from the reflected eye. */
+/** Off-axis frustum through the actual mirror corner… */
 public final class MirrorGeometry {
     private MirrorGeometry(){}
     public record View(Vec3 eye,float yaw,float pitch,Matrix4f rotation,Matrix4f projection,float left,float right,float bottom,float top){}
@@ -25,7 +25,7 @@ public final class MirrorGeometry {
         Matrix4f projection=new Matrix4f().frustum(l,r,b,t,near,Math.max(far,near+16));
         return new View(reflected,yaw,pitch,rotation,projection,l,r,b,t);
     }
-    /** Sky vertices are camera-centered and must not use the mirror surface as their near plane. */
+    /** Sky vertices are camera-centered and must not use… */
     public static Matrix4f skyProjection(Matrix4f projection) {
         float near=.05F,far=projection.perspectiveFar();
         return new Matrix4f(projection).m22(-(far+near)/(far-near)).m32(-2*far*near/(far-near));

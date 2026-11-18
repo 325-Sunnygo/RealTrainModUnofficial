@@ -16,15 +16,10 @@ import net.minecraft.client.model.geom.builders.MeshDefinition;
 import net.minecraft.client.model.geom.builders.PartDefinition;
 import net.minecraft.util.Mth;
 
-/**
- * 本家 RTM が Java で持っている車両モデル (*.class) の移植。
- * 本家は jp.ngt.rtm.modelpack.model.RTMClassModels に
- * ModelBogie / ModelTrain_kiha600 / ModelTrain_Minecart を持ち、
- * モデルパックの "modelFile": "ModelBogie.class" からこれを引いている。
- */
+/** 本家 RTM が Java で持っている車両モデル (*.class) の移植。 */
 public final class ClassModelGeometry {
 
-    /** 1 頂点あたり x, y, z, nx, ny, nz, u, v。MqoModelLoader.Batch と同じ並び。 */
+    /** 1 頂点あたり x, y, z, nx, ny, nz, u, v。 */
     public static final int STRIDE = 8;
 
     private ClassModelGeometry() {
@@ -87,14 +82,10 @@ public final class ClassModelGeometry {
         };
     }
 
-    /**
-     * バニラに焼かせた ModelPart を描かせて頂点を掴む。
-     * @param extraScale 追加スケール (minecart の 3 倍など)
-     * @param rotateY90  車体側の glRotatef(90, 0, 1, 0) 相当を掛けるか
-     */
+    /** バニラに焼かせた ModelPart を描かせて頂点を掴む。 */
     private static float[] capture(ModelPart root, float extraScale, boolean rotateY90) {
         PoseStack pose = new PoseStack();
-        // 本家 MCModel.renderAll の glScalef(1, -1, -1)。X 軸 180° 回転と同じで裏表は反転しない。
+        // 本家 MCModel.renderAll の glScalef(1, -1, -1)。
         pose.scale(extraScale, -extraScale, -extraScale);
         if (rotateY90) {
             pose.mulPose(com.mojang.math.Axis.YP.rotationDegrees(90.0F));
@@ -188,10 +179,7 @@ public final class ClassModelGeometry {
         {0, 0, 0, -2, -7, 1, 4, 14, -9, 10, 18},
     };
 
-    /**
-     * ModelPart#render が投げてくる頂点を掴むだけの VertexConsumer。
-     * Cube#compile は 1 面 4 頂点を順に流すので、そのまま四角形として溜まる。
-     */
+    /** ModelPart#render が投げてくる頂点を掴むだけの VertexConsumer。 */
     private static final class Capture implements VertexConsumer {
         private final List<float[]> vertices = new ArrayList<>();
         private float[] current;

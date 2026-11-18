@@ -3,28 +3,18 @@ package jp.ngt.rtm.modelpack.cfg;
 import java.util.stream.IntStream;
 
 public abstract class VehicleBaseConfig extends ModelConfig {
-    /**
-     * {width, height}
-     */
+    /** {width, height} */
     protected float[] size;
 
-    /**
-     * 方向幕のテクスチャのパス
-     */
+    /** 方向幕のテクスチャのパス */
     public String rollsignTexture;
-    /**
-     * 方向幕の名前
-     */
+    /** 方向幕の名前 */
     public String[] rollsignNames;
     public Rollsign[] rollsigns;
 
-    /**
-     * [ボタン][ボタンの状態名]
-     */
+    /** [ボタン][ボタンの状態名] */
     public String[][] customButtons;
-    /**
-     * [各ボタンの説明]
-     */
+    /** [各ボタンの説明] */
     public String[] customButtonTips;
 
     public VehicleParts[] door_left;
@@ -32,86 +22,48 @@ public abstract class VehicleBaseConfig extends ModelConfig {
     public VehicleParts[] pantograph_front;
     public VehicleParts[] pantograph_back;
 
-    /**
-     * 停車時のサウンド
-     */
+    /** 停車時のサウンド */
     public String sound_Stop;
-    /**
-     * 停車-走行時のサウンド
-     */
+    /** 停車-走行時のサウンド */
     public String sound_S_A;
-    /**
-     * 走行時のサウンド
-     */
+    /** 走行時のサウンド */
     public String sound_Acceleration;
-    /**
-     * 走行時のサウンド
-     */
+    /** 走行時のサウンド */
     public String sound_Deceleration;
-    /**
-     * 走行-停車時のサウンド
-     */
+    /** 走行-停車時のサウンド */
     public String sound_D_S;
-    /**
-     * 警笛のサウンド
-     */
+    /** 警笛のサウンド */
     public String sound_Horn;
     public String sound_DoorOpen;
     public String sound_DoorClose;
 
-    /**
-     * ATSのサウンド
-     */
+    /** ATSのサウンド */
     public String sound_ATSChime;
     public String sound_ATSBell;
 
-    /**
-     * 車内放送 {name, sound}
-     */
+    /** 車内放送 {name, sound} */
     public String[][] sound_Announcement;
 
     public String soundScriptPath;
 
-    /**
-     * 煙を出す<br>
-     * {float x, float y, float z, String name, int min, int max, float speed}<br>
-     */
+    /** 煙を出す {float x, float y, float z, String name, int… */
     public Object[][] smoke;
 
-    /**
-     * 前照灯
-     */
+    /** 前照灯 */
     public Light[] headLights;
-    /**
-     * 尾灯
-     */
+    /** 尾灯 */
     public Light[] tailLights;
-    /**
-     * 車内灯
-     */
+    /** 車内灯 */
     public Light[] interiorLights;
 
-    /**
-     * 座席の位置 {x, y, z, type}<br>
-     * <br>
-     * typeには座席の種類を指定<br>
-     * 0:なし<br>
-     * 1:クロスシート（モデル表示あり）<br>
-     * 2:クロスシート・ロングシート（モデル表示なし、車両モデルに座席を用意しているのであればこちらを指定する）)<br>
-     * 3:寝台(未実装)<br>
-     * 4:立席（モデル表示なし 立ち姿）
-     */
+    /** 座席の位置 {x, y, z, type} typeには座席の種類を指定 0:なし 1:クロスシー… */
     protected float[][] slotPos;
     @Deprecated
     protected int[][] seatPos;
-    /**
-     * プレーヤーの座る位置{x, y, z}
-     */
+    /** プレーヤーの座る位置{x, y, z} */
     public float[][] playerPos;
 
-    /**
-     * 運転台を画面に表示しない
-     */
+    /** 運転台を画面に表示しない */
     public boolean notDisplayCab;
 
     public float wheelRotationSpeed;
@@ -171,32 +123,17 @@ public abstract class VehicleBaseConfig extends ModelConfig {
     }
 
 
-    /**
-     * 方向幕の位置とマッピングを定義するクラス
-     */
+    /** 方向幕の位置とマッピングを定義するクラス */
     public static class Rollsign {
-        /**
-         * 方向幕のマッピング<br>
-         * テクスチャ上で方向幕に使いたい部位(１つだけではなく、全て)を指定<br>
-         * {uMin, uMax, vMin, vMax}<br>
-         * uvは0.0~1.0の値<br>
-         */
+        /** 方向幕のマッピング テクスチャ上で方向幕に使いたい部位(１つだけではなく、全て)を指定 {uMin… */
         public float[] uv;
 
-        /**
-         * 方向幕の位置、複数可<br>
-         * テクスチャを貼る面をその頂点4つで指定<br>
-         * {{{点1(x,y,z)},{点2},{点3},{点4}}, ...}
-         */
+        /** 方向幕の位置、複数可 テクスチャを貼る面をその頂点4つで指定 {{{点1(x,y,z)},{点2}… */
         public float[][][] pos;
 
-        /**
-         * 方向幕を動かすかどうか
-         */
+        /** 方向幕を動かすかどうか */
         public boolean doAnimation;
-        /**
-         * 光らせない
-         */
+        /** 光らせない */
         public boolean disableLighting;
     }
 
@@ -205,18 +142,13 @@ public abstract class VehicleBaseConfig extends ModelConfig {
         public int color;
         public float[] pos;
         public float r;
-        /**
-         * 向き反転
-         */
+        /** 向き反転 */
         public boolean reverse;
     }
 
     public static class VehicleParts extends Parts {
         public VehicleParts[] childParts;
-        /**
-         * 移動:{x, y, z}<br>
-         * 回転:{angle, vecX, vecY, vecZ}
-         */
+        /** 移動:{x, y, z} 回転:{angle, vecX, vecY, vecZ} */
         public float[][] transform;
     }
 }

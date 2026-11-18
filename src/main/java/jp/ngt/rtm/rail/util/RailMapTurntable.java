@@ -4,12 +4,12 @@ import jp.ngt.ngtlib.math.PooledVec3;
 import jp.ngt.ngtlib.math.StraightLine;
 import jp.ngt.ngtlib.math.Vec3;
 
-/** 本家 jp.ngt.rtm.rail.util.RailMapTurntable (KaizPatchX) の忠実移植。 */
+/** 本家 jp.ngt.rtm.rail.util.RailMapTurntable (KaizPat… */
 public final class RailMapTurntable extends RailMapBasic {
     public final int centerX, centerY, centerZ, radius;
     private float rotation;
 
-    /** @deprecated use #RailMapTurntable(RailPosition, RailPosition, int, int, int, int, int) */
+    /** @deprecated use #RailMapTurntable(RailPosition, R… */
     @Deprecated
     public RailMapTurntable(RailPosition par1, RailPosition par2, int x, int y, int z, int r) {
         this(par1, par2, x, y, z, r, 0);

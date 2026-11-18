@@ -1,13 +1,11 @@
 package jp.ngt.mccompat;
 
-/**
- * パックスクリプト互換: 1.12 SRG の Minecraft.func_71410_x.func_110434_K 系。
- * (RTMCore.VERSION に "1.7.10" を含むため通常は旧パスが使われるが、保険として提供)
- */
+/** パックスクリプト互換: 1.12 SRG の Minecraft.func_71410_x.fun… */
 public final class Minecraft {
     private static final Minecraft INSTANCE = new Minecraft();
     private static final TextureManagerCompat TEXTURE_MANAGER = new TextureManagerCompat();
     private static final LanguageManagerCompat LANGUAGE_MANAGER = new LanguageManagerCompat();
+    private static final SoundHandlerCompat SOUND_HANDLER = new SoundHandlerCompat();
 
     /** currentScreen (SRG)。refresh で更新。null なら GUI 非表示。 */
     public int field_71443_c=854,field_71440_d=480;
@@ -29,15 +27,10 @@ public final class Minecraft {
     public PlayerCompat field_71439_g;
     /** theWorld (SRG)。refresh で更新。 */
     public WorldCompat field_71441_e;
-    /**
-     * entityRenderer (SRG)。
-     * func_78483_a(0.0) (disableLightmap) / func_78463_b(0.0) (enableLightmap) を呼ぶ。
-     */
+    /** entityRenderer (SRG)。 */
     public final EntityRendererCompat field_71460_t = new EntityRendererCompat();
 
-    /**
-     * ingameGUI (SRG field_71456_v)。スクリプトがチャット欄の開閉を見るのに使う。
-     */
+    /** ingameGUI (SRG field_71456_v)。 */
     public final GuiIngameCompat field_71456_v = new GuiIngameCompat();
 
     public static final class GuiIngameCompat {
@@ -50,10 +43,7 @@ public final class Minecraft {
     }
 
     public static final class GuiNewChatCompat {
-        /**
-         * getChatOpen: チャット入力欄が開いているか。
-         * ★クライアント専用クラスに触るので必ず握り潰す。サーバーで呼ばれても落とさない。
-         */
+        /** getChatOpen: チャット入力欄が開いているか。 */
         public boolean func_146241_e() {
             try {
                 net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
@@ -70,7 +60,7 @@ public final class Minecraft {
         public void func_78483_a(double partialTicks) {
         }
 
-        /** 1.7.10 enableLightmap → 環境光へ復帰 (brightness 負値 = 再生側が packedLight に戻す) */
+        /** 1.7.10 enableLightmap → 環境光へ復帰 (brightness 負値 = 再… */
         public void func_78463_b(double partialTicks) {
             jp.ngt.ngtlib.renderer.GLRecorder r = jp.ngt.ngtlib.renderer.GLRecorder.active();
             if (r != null) {
@@ -100,10 +90,7 @@ public final class Minecraft {
         return INSTANCE;
     }
 
-    /**
-     * クライアントの毎フレーム/毎tick 呼び出しで現在値を反映する
-     * (CarRenderer / クライアント tick イベントから)。
-     */
+    /** クライアントの毎フレーム/毎tick 呼び出しで現在値を反映する (CarRenderer / ク… */
     public static void refresh() {
         try {
             net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
@@ -111,7 +98,6 @@ public final class Minecraft {
             INSTANCE.field_71443_c=mc.getWindow().getWidth();INSTANCE.field_71440_d=mc.getWindow().getHeight();
             INSTANCE.field_71474_y.field_74335_Z=mc.options.guiScale().get();
             // field_71439_g (thePlayer) は絶対に null にしない。
-            // 空プレイヤー (PlayerCompat.EMPTY) を入れる。
             if (mc.player != null) {
                 INSTANCE.field_71439_g = PlayerCompat.of(mc.player);
                 INSTANCE.field_71439_g.refresh();
@@ -144,6 +130,34 @@ public final class Minecraft {
                 return net.minecraft.client.Minecraft.getInstance().getLanguageManager().getSelected();
             } catch (Throwable t) {
                 return "en_us";
+            }
+        }
+    }
+
+    /** getSoundHandler (E233 サウンドスクリプト用)。 */
+    public SoundHandlerCompat func_147118_V() {
+        return SOUND_HANDLER;
+    }
+
+    public static final class SoundHandlerCompat {
+        /** isSoundPlaying */
+        public boolean func_147692_c(Object sound) {
+            if (sound instanceof net.minecraft.client.resources.sounds.SoundInstance instance) {
+                try {
+                    return net.minecraft.client.Minecraft.getInstance().getSoundManager().isActive(instance);
+                } catch (Throwable ignored) {
+                }
+            }
+            return false;
+        }
+
+        /** playSound */
+        public void func_147682_a(Object sound) {
+            if (sound instanceof net.minecraft.client.resources.sounds.SoundInstance instance) {
+                try {
+                    net.minecraft.client.Minecraft.getInstance().getSoundManager().play(instance);
+                } catch (Throwable ignored) {
+                }
             }
         }
     }

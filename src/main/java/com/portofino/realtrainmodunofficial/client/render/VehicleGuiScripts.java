@@ -15,65 +15,32 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 本家 ModelConfig.guiScriptPath (KaizPatchX ModelSetBase.guiSE) の移植。
- * 車両パックの運転台 GUI をスクリプトで描く。毎フレーム scripts/gui/*.js の
- * renderGui(entity, gui) を呼ぶ。guiScriptPath が無い車両は既定の cab を描く。
- */
+/** 本家 ModelConfig.guiScriptPath (KaizPatchX ModelSet… */
 public final class VehicleGuiScripts {
-
-    private static final Map<String, ScriptEngine> CACHE = new ConcurrentHashMap<>();
-    private static final Set<String> FAILED = ConcurrentHashMap.newKeySet();
 
     private VehicleGuiScripts() {
     }
 
-    /** guiScriptPath の engine。未設定/失敗なら null (= 既定 cab を描く)。 */
+    /** guiScriptPath の engine。 */
     public static ScriptEngine get(VehicleDefinition def) {
         if (def == null || !def.hasGuiScript()) {
             return null;
         }
-        if (FAILED.contains(def.getId())) {
-            return null;
+        Object set = jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getTrainModelSet(def.getId());
+        if (set instanceof jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> base) {
+            return base.guiSE;
         }
-        return CACHE.computeIfAbsent(def.getId(), id -> create(def));
+        return null;
     }
 
-    private static ScriptEngine create(VehicleDefinition def) {
-        try {
-            String source = VehiclePackLoader.readScriptContent(def, def.getGuiScriptPath());
-            if (source == null || source.isBlank()) {
-                RealTrainModUnofficial.LOGGER.warn("Vehicle gui script not readable for {} ({})",
-                        def.getId(), def.getGuiScriptPath());
-                FAILED.add(def.getId());
-                return null;
-            }
-            source = PackScriptSource.prepare(source, def.getGuiScriptPath());
-            // 本家と同じく Nashorn。プリリュードは 1.7.10 クラス名ブリッジ用。
-            ScriptEngine se = ScriptUtil.doScript(PackScriptSource.PRELUDE + source);
-            RealTrainModUnofficial.LOGGER.info("[RTMU] vehicle gui script init: {} ({})",
-                    def.getId(), def.getGuiScriptPath());
-            return se;
-        } catch (Throwable t) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to init vehicle gui script for {}", def.getId(), t);
-            FAILED.add(def.getId());
-            return null;
-        }
-    }
-
-    /** 診断コマンド用: 読み込みキャッシュを捨てる。 */
+    /** 診断コマンド用: ModelSet を作り直す。 */
     public static void forget(String id) {
         if (id != null) {
-            CACHE.remove(id);
-            FAILED.remove(id);
+            jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.forgetModelSet(id);
         }
     }
 
-    /**
-     * スクリプトへ渡す gui オブジェクト。本家では GuiIngameCustom (GuiScreen) が
-     * そのまま渡されていたため、スクリプトが使う描画 API をここで提供する。
-     * 実描画は GuiGraphics 経由。
-     */
+    /** スクリプトへ渡す gui オブジェクト。本家では GuiIngameCustom (GuiScre… */
     public static final class Gui {
         private final GuiGraphics graphics;
         private final Font font;
@@ -112,10 +79,7 @@ public final class VehicleGuiScripts {
             }
         }
 
-        /**
-         * 本家 (1.12 系) GuiScreen.drawRectangle(x, y, u, v, w, h, pxl)。
-         * pxl = テクスチャ実寸 (通常 512)。現在 bind 中のテクスチャを切り出して描く。
-         */
+        /** 本家 (1.12 系) GuiScreen.drawRectangle(x, y, u, v, w… */
         public void drawRectangle(int x, int y, int u, int v, int w, int h, int pxl) {
             if (this.texture == null || w <= 0 || h <= 0) {
                 return;
@@ -176,7 +140,7 @@ public final class VehicleGuiScripts {
             this.graphics.blit(this.texture, x, y, u, v, w, h, (int) tw, (int) th);
         }
 
-        /** 本家 GuiScreen.drawTexturedModalRect(float,float,int,int,int,int)。 */
+        /** 本家 GuiScreen.drawTexturedModalRect(float,float,in… */
         public void drawTexturedModalRect(float x, float y, int u, int v, int w, int h) {
             this.drawTexturedModalRect((int) x, (int) y, u, v, w, h);
         }
@@ -199,40 +163,40 @@ public final class VehicleGuiScripts {
             }
         }
 
-        // ---- 1.7.10 GuiScreen/Gui の MCP 名を再現するブリッジ (面を揃える) ----
+        // ---- 1.7.10 GuiScreen/Gui の MCP 名を再現するブリッジ (面を揃える…
 
-        /** 本家 Gui.drawTexturedModalRect(int,int,int,int,int,int,float zLevel)。 */
+        /** 本家 Gui.drawTexturedModalRect(int,int,int,int,int,… */
         public void drawTexturedModalRect(int x, int y, int u, int v, int w, int h, float zLevel) {
             this.drawTexturedModalRect(x, y, u, v, w, h);
         }
 
-        /** 本家 Gui.drawTexturedModalRect(float,float,int,int,int,int,float)。 */
+        /** 本家 Gui.drawTexturedModalRect(float,float,int,int,… */
         public void drawTexturedModalRect(float x, float y, int u, int v, int w, int h, float zLevel) {
             this.drawTexturedModalRect((int) x, (int) y, u, v, w, h);
         }
 
-        /** 本家 Gui.drawModalRectWithCustomSizedTexture (float 版)。 */
+        /** 本家 Gui.drawModalRectWithCustomSizedTexture (float… */
         public void drawModalRectWithCustomSizedTexture(float x, float y, float u, float v,
                                                         float w, float h, float tw, float th) {
             this.drawModalRectWithCustomSizedTexture((int) x, (int) y, u, v, (int) w, (int) h, tw, th);
         }
 
-        /** 本家 GuiScreen.drawString(FontRenderer, String, int, int, int)。 */
+        /** 本家 GuiScreen.drawString(FontRenderer, String, int… */
         public void drawString(Object fontRenderer, String s, int x, int y, int color) {
             this.graphics.drawString(this.font, s == null ? "" : s, x, y, color, false);
         }
 
-        /** 本家 GuiScreen.drawString(FontRenderer, String, int, int, int, boolean shadow)。 */
+        /** 本家 GuiScreen.drawString(FontRenderer, String, int… */
         public void drawString(Object fontRenderer, String s, int x, int y, int color, boolean shadow) {
             this.graphics.drawString(this.font, s == null ? "" : s, x, y, color, shadow);
         }
 
-        /** 本家 Gui.drawCenteredString(FontRenderer, String, int, int, int)。 */
+        /** 本家 Gui.drawCenteredString(FontRenderer, String, i… */
         public void drawCenteredString(Object fontRenderer, String s, int x, int y, int color) {
             this.graphics.drawCenteredString(this.font, s == null ? "" : s, x, y, color);
         }
 
-        /** 本家 Gui.drawHorizontalLine(int x1, int x2, int y) (1.7.10 は色無し)。 */
+        /** 本家 Gui.drawHorizontalLine(int x1, int x2, int y)… */
         public void drawHorizontalLine(int x1, int x2, int y) {
             this.drawHorizontalLine(x1, x2, y, -16777216);
         }
@@ -268,7 +232,7 @@ public final class VehicleGuiScripts {
             }
 
             public void drawSplitString(String s, int x, int y, int wrapWidth, int color) {
-                // 1.21 の Font.split は FormattedText を要求する。改行を含む場合のみ分割して描く。
+                // 1.21 の Font.split は FormattedText を要求する。
                 String text = s == null ? "" : s;
                 if (text.indexOf('\n') < 0) {
                     this.graphics.drawString(this.font, text, x, y, color, false);

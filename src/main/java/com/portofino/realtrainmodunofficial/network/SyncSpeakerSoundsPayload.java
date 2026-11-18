@@ -11,10 +11,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.List;
 
-/**
- * サーバー → クライアント。 スピーカーの音源ID→音名マッピング全体を同期する。
- * 接続時 / 設定変更時に送られ、クライアントは GUI のプレビュー表示などに使う。
- */
+/** サーバー → クライアント。 スピーカーの音源ID→音名マッピング全体を同期する。 */
 public record SyncSpeakerSoundsPayload(List<String> sounds) implements CustomPacketPayload {
     public static final Type<SyncSpeakerSoundsPayload> TYPE = new Type<>(
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "sync_speaker_sounds")

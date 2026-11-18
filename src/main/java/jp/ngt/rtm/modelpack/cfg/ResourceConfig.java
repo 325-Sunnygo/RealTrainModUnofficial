@@ -4,37 +4,25 @@ import jp.ngt.rtm.modelpack.state.DataMap;
 
 import java.util.Arrays;
 
-/**
- * 全てのコンフィグの親, JSONからの読み込みに使用
- */
+/** 全てのコンフィグの親, JSONからの読み込みに使用 */
 public abstract class ResourceConfig {
-    /**
-     * name重複時の優先度決定用
-     */
+    /** name重複時の優先度決定用 */
     public short version;
 
     public boolean useCustomColor;
 
-    /**
-     * 検索用タグ
-     */
+    /** 検索用タグ */
     public String tags;
 
-    /**
-     * DataMapのデフォルト値
-     */
+    /** DataMapのデフォルト値 */
     public DMInitValue[] defaultValues;
     @Deprecated
     public String defaultData;
 
-    /**
-     * Resource名, 重複不可
-     */
+    /** Resource名, 重複不可 */
     public abstract String getName();
 
-    /**
-     * Configの初期化時に呼ばれる
-     */
+    /** Configの初期化時に呼ばれる */
     public void init() {
         if (this.defaultValues == null && this.defaultData != null) {
             String[][] array = DataMap.convertArg(this.defaultData);
@@ -52,7 +40,7 @@ public abstract class ResourceConfig {
         if (path == null || path.length() == 0) {
             return null;
         } else if (!path.contains(":")) {
-            return "rtm:" + path;//ドメイン未指定のファイルパスがminecraftドメインと解釈されないように
+            return "rtm:" + path;// ドメイン未指定のファイルパスがminecraftドメインと解釈されないように
         }
         return path;
     }
@@ -61,30 +49,18 @@ public abstract class ResourceConfig {
         public String type;
         public String key;
         public String value;
-        /**
-         * List要素の型
-         */
+        /** List要素の型 */
         public String elementType;
-        /**
-         * Listの初期値
-         */
+        /** Listの初期値 */
         public String[] values;
-        /**
-         * Listの最小・最大要素数
-         */
+        /** Listの最小・最大要素数 */
         public Integer minItems;
         public Integer maxItems;
-        /**
-         * 入力候補
-         */
+        /** 入力候補 */
         public String[] suggestions;
-        /**
-         * [min, max]
-         */
+        /** [min, max] */
         public double[] minmax;
-        /**
-         * [start, contains, end]
-         */
+        /** [start, contains, end] */
         public String[] pattern;
     }
 }

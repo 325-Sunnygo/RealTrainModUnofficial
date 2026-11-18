@@ -11,12 +11,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
-/**
- * 貨物の基底。本家 {@code jp.ngt.rtm.entity.train.parts.EntityCargo} の移植。
- *
- * <p>設置してある物 ({@code isIndependent}) と、貨車に載っている物の両方になる。
- * 中身はアイテム側にも書き戻す (壊すとその状態のまま落ちる)。
- */
+/** 貨物の基底。本家 jp.ngt.rtm.entity.train.parts.EntityCarg… */
 public abstract class EntityCargo extends EntityVehiclePart {
     private static final EntityDataAccessor<Byte> CARGO_ID =
         SynchedEntityData.defineId(EntityCargo.class, EntityDataSerializers.BYTE);
@@ -121,11 +116,7 @@ public abstract class EntityCargo extends EntityVehiclePart {
         return false;
     }
 
-    /**
-     * ★設置した貨物は<b>ワールドに保存する</b>。
-     * 親クラス {@link EntityVehiclePart} は座席/床が対象なので保存しない設定だが、
-     * それを継いだままだとリロードで置いた貨物が消える。
-     */
+    /** ★設置した貨物はワールドに保存する。 親クラス EntityVehiclePart は座席/床が対… */
     @Override
     public boolean shouldBeSaved() {
         return this.isIndependent || super.shouldBeSaved();

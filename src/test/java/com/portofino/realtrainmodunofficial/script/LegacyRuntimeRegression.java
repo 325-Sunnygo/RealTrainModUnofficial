@@ -8,7 +8,7 @@ import jp.ngt.rtm.modelpack.modelset.ModelSetBase;
 import javax.script.ScriptEngine;
 import java.util.Objects;
 
-/** Behavior checks using production ScriptUtil/ScriptExecuter, without launching a world. */
+/** Behavior checks using production ScriptUtil/Scrip… */
 public final class LegacyRuntimeRegression {
     private static int checks;
 
@@ -98,7 +98,7 @@ public final class LegacyRuntimeRegression {
         equal(false, engine.eval("null instanceof tileType"));
         String originalText = "var message='x.seatRotation x.func_74737_b()'; /* x.seatRotation */";
         equal(originalText, PackScriptSource.prepare(originalText, "regression.js", path -> null));
-        engine.eval(PackScriptSource.prepare("var RL=Java.type('net.minecraft.util.ResourceLocation'); var resource=new RL('test:sample');", "regression.js", path -> null));
+        engine.eval(PackScriptSource.PRELUDE + PackScriptSource.prepare("var RL=Java.type('net.minecraft.util.ResourceLocation'); var resource=new RL('test:sample');", "regression.js", path -> null));
         equal("test:sample", engine.get("resource").toString());
         System.out.println("Legacy runtime regressions: " + checks + " passed");
     }

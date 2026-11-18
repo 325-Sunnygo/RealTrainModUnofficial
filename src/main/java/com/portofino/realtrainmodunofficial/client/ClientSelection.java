@@ -2,19 +2,13 @@ package com.portofino.realtrainmodunofficial.client;
 
 import net.minecraft.core.BlockPos;
 
-/**
- * クライアントが持つ選択範囲 (neo mcte)。MCTEU MCTEUnoffficialClient.pos1/pos2 と同じ持ち方。
- * ★ワールドに実体を置かない。
- */
+/** クライアントが持つ選択範囲 (neo mcte)。 */
 public final class ClientSelection {
 
     private static BlockPos pos1;
     private static BlockPos pos2;
 
-    /**
-     * 直前までの選択 (neo mcte 追加)。
-     * 広い範囲を組み直したあとで「さっきの範囲に戻したい」ことが多い。
-     */
+    /** 直前までの選択 (neo mcte 追加)。 */
     private static final java.util.ArrayDeque<BlockPos[]> HISTORY = new java.util.ArrayDeque<>();
     private static final int MAX_HISTORY = 16;
 

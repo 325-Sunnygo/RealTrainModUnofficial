@@ -6,15 +6,11 @@ import java.util.Arrays;
 import java.util.Random;
 import java.util.stream.IntStream;
 
-/**
- * 本家 NGTLib (jp.ngt.ngtlib.math.NGTMath) の忠実移植。
- * KaizPatchX (1.7.10) 版をベースに、1.12.2 版で追加されたメソッド
- * (floor, getSinD/getCosD, getAtan2/getAtan2D, getAngleD) を統合。
- */
+/** 本家 NGTLib (jp.ngt.ngtlib.math.NGTMath) の忠実移植。 */
 public final class NGTMath {
     public static final Random RANDOM = new Random();
 
-    /** 本家 NGTMath.generateHash: 配列から 0..bound-1 の決定的な値を作る。 */
+    /** 本家 NGTMath.generateHash: 配列から 0..bound-1 の決定的な値を作… */
     public static int generateHash(int[] data, int bound) {
         return new Random(Arrays.hashCode(data)).nextInt(bound);
     }
@@ -68,7 +64,7 @@ public final class NGTMath {
         return d0;
     }
 
-    /** @param sd : 分散 */
+    
     public static double getGaussian(Random random, double sd) {
         double z = Math.sqrt(-2.0D * StrictMath.log(random.nextDouble())) * Math.sin(2.0D * Math.PI * random.nextDouble());
         return sd * z;
@@ -80,11 +76,7 @@ public final class NGTMath {
         return (int) ((float) RAND_TABLE[RAND_COUNT] * (float) n);
     }
 
-    /**
-     * @param par2 Min
-     * @param par3 Max
-     * @param par4 Default
-     */
+    
     public static int getIntFromString(String par1, int par2, int par3, int par4) {
         if (par1 == null) {
             return par4;
@@ -103,11 +95,7 @@ public final class NGTMath {
         }
     }
 
-    /**
-     * @param par2 Min
-     * @param par3 Max
-     * @param par4 Default
-     */
+    
     public static float getFloatFromString(String par1, float par2, float par3, float par4) {
         if (par1 == null) {
             return par4;
@@ -138,7 +126,7 @@ public final class NGTMath {
         return v1.getX() == v2.getX() && v1.getY() == v2.getY() && v1.getZ() == v2.getZ();
     }
 
-    /** @return radian */
+    
     public static double getAngle(Vec3 v1, Vec3 v2) {
         double d0 = (v1.getX() * v2.getX() + v1.getY() * v2.getY() + v1.getZ() * v2.getZ()) / (v1.length() * v2.length());
         return Math.acos(d0);
@@ -154,22 +142,16 @@ public final class NGTMath {
         return (float) toDegrees(getAngle(sX, sY, eX, eY));
     }
 
-    /**
-     * 小数をある程度の精度で誤差を無視して比較
-     * @param p3 小数点以下の桁数
-     */
+    /** 小数をある程度の精度で誤差を無視して比較 */
     public static boolean compare(double p1, double p2, int p3) {
         p1 *= pow(10.0D, p3);
         p2 *= pow(10.0D, p3);
-        long i0 = Math.round(p1);//四捨五入
+        long i0 = Math.round(p1);// 四捨五入
         long i1 = Math.round(p2);
         return i0 == i1;
     }
 
-    /**
-     * JavaScriptからの利用向け("sin"だとJava8では動かない)
-     * 単位:ラジアン
-     */
+    /** JavaScriptからの利用向け("sin"だとJava8では動かない) 単位:ラジアン */
     public static float getSin(float par1) {
         return Mth.sin(par1);
     }
@@ -179,10 +161,7 @@ public final class NGTMath {
         return Mth.sin(toRadians(par1));
     }
 
-    /**
-     * JavaScriptからの利用向け("cos"だとJava8では動かない)
-     * 単位:ラジアン
-     */
+    /** JavaScriptからの利用向け("cos"だとJava8では動かない) 単位:ラジアン */
     public static float getCos(float par1) {
         return Mth.cos(par1);
     }

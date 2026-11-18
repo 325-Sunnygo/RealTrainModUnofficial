@@ -11,10 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * NPC パックの索引と読み込み。
- * ★走査は {@code InstalledObjectPackLoader} に相乗りする (貨物と同じ理由)。
- */
+/** NPC パックの索引と読み込み。 ★走査は InstalledObjectPackLoader に… */
 public final class NpcRegistry {
 
     private static final Map<String, NpcDefinition> BY_ID = new LinkedHashMap<>();
@@ -32,7 +29,7 @@ public final class NpcRegistry {
         RealTrainModUnofficial.LOGGER.info("[RTMU] NPC パック: {} 件", BY_ID.size());
     }
 
-    /** {@code ModelNPC_*.json} なら読んで true。 */
+    /** ModelNPC_*.json なら読んで true。 */
     public static synchronized boolean tryParse(JsonObject obj, String lowerFile, String packName) {
         if (!lowerFile.startsWith("modelnpc_")) {
             return false;
@@ -59,7 +56,7 @@ public final class NpcRegistry {
         }
         NpcDefinition definition = new NpcDefinition(name, packName, str(obj, "buttonTexture"), str(obj, "role"),
             str(obj, "texture"), modelFile, tex);
-        // 本家 NPCConfig.serverScriptPath (ModelConfig 由来)。トップレベルを読む。
+        // 本家 NPCConfig.serverScriptPath (ModelConfig 由来)。
         String serverScriptPath = str(obj, "serverScriptPath");
         if (serverScriptPath.isBlank() && obj.has("model") && obj.get("model").isJsonObject()) {
             serverScriptPath = str(obj.getAsJsonObject("model"), "serverScriptPath");

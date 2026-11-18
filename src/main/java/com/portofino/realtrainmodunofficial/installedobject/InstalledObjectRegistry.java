@@ -49,9 +49,7 @@ public final class InstalledObjectRegistry {
         found = FALLBACK_BY_ID.get(id);
         if (found != null) return found;
         if (MISSING_IDS.contains(id)) return null;
-        // Legacy fallback: block entities from old saves may use a different packName
-        // (e.g. "RTM-Official-Assets.zip" vs the current mod JAR path).
-        // Try matching by category:name, ignoring the packName segment.
+        // Legacy fallback: block entities from old saves ma…
         int first = id.indexOf(':');
         int last = id.lastIndexOf(':');
         if (first >= 0 && last > first) {
@@ -77,10 +75,7 @@ public final class InstalledObjectRegistry {
         return List.copyOf(BY_CATEGORY.getOrDefault(category, List.of()));
     }
 
-    /**
-     * bare name (id "category:pack:name" の末尾。本家の定義名) で検索する。
-     * NGTO Builder のスクリプトは bare name しか持たない (setModelName / ModelPackManager.getModelSet)。
-     */
+    /** bare name (id "category:pack:name" の末尾。 */
     public static InstalledObjectDefinition getByBareName(String bareName, InstalledObjectCategory preferred) {
         if (bareName == null || bareName.isEmpty()) return null;
         if (preferred != null) {

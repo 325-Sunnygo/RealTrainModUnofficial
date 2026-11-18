@@ -118,8 +118,6 @@ public final class PackRequirementWarnings {
             }
             byte[] bytes = zipFile.getInputStream(entry).readAllBytes();
             // UTF-8 → MS932 → Shift_JIS を厳格に試す共通デコーダに一本化。
-            // 旧実装の new String(bytes, charset) は例外を投げないため、CP932 専用文字を含む
-            // Shift_JIS README を UTF-8 のまま文字化けさせ、前提パック名の抽出を取りこぼしていた。
             String text = com.portofino.realtrainmodunofficial.util.PackTextDecoder.decodeText(bytes);
             if (text.contains("前提パック")) {
                 return text;

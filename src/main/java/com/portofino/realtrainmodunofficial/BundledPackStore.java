@@ -11,20 +11,14 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Resolves pack archives bundled inside the mod jar and materializes them into a private cache
- * directory when file-based model loaders need a real path.
- */
+/** Resolves pack archives bundled inside the mod jar… */
 public final class BundledPackStore {
     private static final String ROOT = "bundled_packs";
 
     private BundledPackStore() {
     }
 
-    /**
-     * このパスが この MOD 自身の jar か。
-     * 各パックローダは mods/ や gameDir 直下の .zip/.jar を「モデルパック」として総なめする。
-     */
+    /** このパスが この MOD 自身の jar か。 */
     public static boolean isOwnModJar(Path path) {
         if (path == null) {
             return false;
@@ -73,10 +67,7 @@ public final class BundledPackStore {
         }
     }
 
-    /**
-     * 同梱パックに付属する zip 以外のファイル (パック作者の Readme 等)。
-     * 展開先フォルダ (rtm_default_assets) に zip と並べて置くために使う。
-     */
+    /** 同梱パックに付属する zip 以外のファイル (パック作者の Readme 等)。 */
     public static List<Path> listBundledExtras(String category) {
         List<Path> result = new ArrayList<>();
         try {

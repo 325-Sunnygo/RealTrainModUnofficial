@@ -25,10 +25,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * 本家 jp.ngt.rtm.rail.util.RailMap (KaizPatchX) の忠実移植。
- * 道床(レールベース)ブロックの生成/破壊を担う抽象基底。
- */
+/** 本家 jp.ngt.rtm.rail.util.RailMap (KaizPatchX) の忠実移… */
 public abstract class RailMap {
     protected final List<int[]> rails = new ArrayList<>();
 
@@ -74,11 +71,7 @@ public abstract class RailMap {
         return getRailRoll(split, index);
     }
 
-    /**
-     * RailMapの端同士が繋げられるかどうか(=連続した曲線になるか)
-     * 同一RailMapの場合はtrue
-     * @param railMap null可
-     */
+    /** RailMapの端同士が繋げられるかどうか(=連続した曲線になるか) 同一RailMapの場合はt… */
     public boolean canConnect(RailMap railMap) {
         if (railMap == null) {
             return false;
@@ -114,12 +107,9 @@ public abstract class RailMap {
     /** 接続とみなす端点間距離。緩めると近接する別レールへ列車が飛ぶ。 */
     private static final double CONNECT_TOLERANCE = 0.001D;
 
-    /**
-     * 道床ブロックのリストを作成
-     * レールの生成時と破壊時に呼ばれる
-     */
+    /** 道床ブロックのリストを作成 レールの生成時と破壊時に呼ばれる */
     protected void createRailList(RailProperty prop) {
-        int width = prop.getBallastWidth() >> 1;//本家: prop.getModelSet().getConfig().ballastWidth
+        int width = prop.getBallastWidth() >> 1;// 本家: prop.getModelSet().getConfig().ballastWidth
 
         this.rails.clear();
         int split = (int) (this.getLength() * 4.0D);
@@ -131,11 +121,6 @@ public abstract class RailMap {
             double slope = Math.toRadians(this.getRailYaw(split, j));
             double height = this.getRailHeight(split, j);
             // 本家 RailMap.createRailList と同じく「レール面のあるブロック」に置く。
-            // 以前は -1 して1ブロック下に埋めていたが、当たり判定の高さは
-            // BlockLargeRailBase.getRailShape → TileEntityLargeRailBase.getBlockHeights
-            // = (レール面Y − ブロックY)
-            // で決まるため、ブロックを1つ下げるとその分だけ箱が丸ごと1ブロック高くなる。
-            // ★ (int) キャストは使わない。0 方向への切り捨てなので、負の Y で 1 つ上を指す。
             int y = Mth.floor(height);
             int x0 = Mth.floor(x);
             int z0 = Mth.floor(z);
@@ -171,11 +156,11 @@ public abstract class RailMap {
         }
         int[] pos = new int[]{x, y, z};
         if (!Arrays.equals(pos, this.getStartRP().getNeighborPos()) && !Arrays.equals(pos, this.getEndRP().getNeighborPos())) {
-            this.rails.add(new int[]{x, y, z});//始点と終点に接する位置にはブロック生成しないように
+            this.rails.add(new int[]{x, y, z});// 始点と終点に接する位置にはブロック生成しないように
         }
     }
 
-    /** スクリプト互換: WorldCompat (entity.field_70170_p) を渡す SRB3 等の呼び出しを受ける。 */
+    /** スクリプト互換: WorldCompat (entity.field_70170_p) を渡す S… */
     public void setRail(Object world, Object block, int x0, int y0, int z0, RailProperty prop) {
         Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
         if (level != null && block instanceof Block b) {
@@ -197,11 +182,7 @@ public abstract class RailMap {
         }
     }
 
-    /**
-     * スクリプト互換オーバーロード。
-     * スクリプトの world は entity.field_70170_p =
-     * jp.ngt.mccompat.WorldCompat であり実 Level ではない。
-     */
+    /** スクリプト互換オーバーロード。 スクリプトの world は entity.field_70170… */
     public void setRail(Object world, Block block, int x0, int y0, int z0, RailProperty prop) {
         Level level = jp.ngt.ngtlib.block.BlockUtil.toLevel(world);
         if (level != null) {
@@ -222,7 +203,7 @@ public abstract class RailMap {
             int z = rail[2];
             BlockPos pos = new BlockPos(x, y, z);
             Block block2 = world.getBlockState(pos).getBlock();
-            if (!(block2 instanceof BlockLargeRailBase) || block2 == block)//異なる種類のレールを上書きしない
+            if (!(block2 instanceof BlockLargeRailBase) || block2 == block)// 異なる種類のレールを上書きしない
             {
                 world.setBlock(pos, block.defaultBlockState(), 2);
                 BlockEntity be = world.getBlockEntity(pos);
@@ -293,8 +274,7 @@ public abstract class RailMap {
                         continue;
                     }
 
-                    // 重なっている他レールを破壊しないように
-                    // coreが既に破壊さている場合は続行
+                    // 重なっている他レールを破壊しないように coreが既に破壊さている場合は続行
                     TileEntityLargeRailCore core2 = ((TileEntityLargeRailBase) rail).getRailCore();
                     if (core2 == null || core2 == core) {
                         posSet.add(pos);
@@ -303,12 +283,7 @@ public abstract class RailMap {
             }
         });
 
-        // ★道床が残る対策:
-        //   道床幅の広いモデルのレールを先に置き、その上に幅の狭いレールを重ねて壊すと、
-        //   このレールの rails 一覧 (自分幅ぶん) からはみ出した「どのコアにも属さない
-        //   道床ブロック」(core == null) が取り残される。
-        //   自分の範囲を少し広げて走査し、持ち主のいない道床だけ撤去する。
-        //   (他のレールが生きていれば core != null なので消さない)
+        // ★道床が残る対策: 道床幅の広いモデルのレールを先に置き、その上に幅の狭いレールを重ねて壊すと、…
         if (!this.rails.isEmpty()) {
             final int margin = 8;
             int minX = Integer.MAX_VALUE;
@@ -357,7 +332,6 @@ public abstract class RailMap {
         boolean flag = true;
         for (int[] rail : this.rails) {
             // 本家 canPlaceRail と同じく、レールブロックを置く位置そのもので障害物を見る。
-            // (以前はレールブロックを1つ下に埋めていたので +1 してレール面を見ていた。
             BlockPos pos = new BlockPos(rail[0], rail[1], rail[2]);
             BlockState state = world.getBlockState(pos);
             Block block = state.getBlock();
@@ -385,9 +359,7 @@ public abstract class RailMap {
         NGTLog.sendChatMessageToAll(String.format("EA L%5.1f Y%5.1f", (this.getEndRP()).anchorLengthHorizontal, (this.getEndRP()).anchorYaw));
     }
 
-    // ==================================================================================
-    // 以下は Remaster 旧システム (RailCollisionBlock 方式) 向けの暫定互換 API。
-    // Phase 1 flip 完了時に削除する。
+    // =================================================…
 
     /** @deprecated Remaster 独自。 */
     @Deprecated
@@ -514,9 +486,6 @@ public abstract class RailMap {
             BlockState existingState = level.getBlockState(pos);
             Block existing = existingState.getBlock();
             // ★本家 setRail は「別のレールでなければ置き換える」。
-            // 空気系しか置き換えないと、草原など地面のある所では道床ブロックが 1 つも置かれず、
-            // 道床が出ない・当たり判定も付かない (実測)。
-            // レールのコアと、壊せないブロックだけは避ける。
             boolean replaceable = !(existing instanceof LargeRailCoreBlock)
                     && existingState.getDestroySpeed(level, pos) >= 0.0F;
             if (replaceable) {
@@ -549,7 +518,7 @@ public abstract class RailMap {
             double[] point = this.getRailPos(split, j);
             int x = NGTMath.floor(point[1]);
             int z = NGTMath.floor(point[0]);
-            int y = NGTMath.floor(this.getRailHeight(split, j));//(int) は負の Y で 1 つ上を指すため不可
+            int y = NGTMath.floor(this.getRailHeight(split, j));// (int) は負の Y で 1 つ上を指すため不可
             BlockPos pos = new BlockPos(x, y, z);
             if (pos.equals(startNeighbor) || pos.equals(endNeighbor)) {
                 continue;
@@ -590,7 +559,7 @@ public abstract class RailMap {
             double[] point = this.getRailPos(split, j);
             int x = NGTMath.floor(point[1]);
             int z = NGTMath.floor(point[0]);
-            int y = NGTMath.floor(this.getRailHeight(split, j));//(int) は負の Y で 1 つ上を指すため不可
+            int y = NGTMath.floor(this.getRailHeight(split, j));// (int) は負の Y で 1 つ上を指すため不可
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     for (int dy = -1; dy <= 0; dy++) {

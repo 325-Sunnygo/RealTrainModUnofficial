@@ -15,14 +15,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * legacy/legacylib inspired JSON loader with enhanced parsing capabilities
- * Handles complex vehicle configurations with proper scaling and validation
- */
+/** legacy/legacylib inspired JSON loader with enhanc… */
 public class VehicleJsonLoader {
     private static final String[] ENCODINGS = {"UTF-8", "SJIS"};
     
-    /** Parse vehicle configuration from JSON with legacy-style validation */
+    /** Parse vehicle configuration from JSON with legacy… */
     public static VehicleConfig parseVehicleConfig(Path jsonPath) throws IOException {
         String jsonContent = readFileWithEncoding(jsonPath);
         JsonElement root = JsonParser.parseString(jsonContent);
@@ -76,7 +73,7 @@ public class VehicleJsonLoader {
         return config;
     }
     
-    /** Read file with multiple encoding attempts (legacy-style) */
+    /** Read file with multiple encoding attempts (legacy… */
     private static String readFileWithEncoding(Path path) throws IOException {
         for (String encoding : ENCODINGS) {
             try {
@@ -88,7 +85,7 @@ public class VehicleJsonLoader {
         throw new IOException("Failed to read file with any supported encoding: " + path);
     }
     
-    /** Parse seat positions with legacy-style naming conventions */
+    /** Parse seat positions with legacy-style naming con… */
     private static List<Vec3> parseSeatPositions(JsonObject obj) {
         List<Vec3> seats = new ArrayList<>();
         
@@ -146,7 +143,7 @@ public class VehicleJsonLoader {
         return bogieModels;
     }
     
-    /** Parse texture overrides with legacy-style array format */
+    /** Parse texture overrides with legacy-style array f… */
     private static Map<String, String> parseTextures(JsonObject modelObj) {
         Map<String, String> textures = new HashMap<>();
         
@@ -237,7 +234,7 @@ public class VehicleJsonLoader {
         }
     }
     
-    /** Enhanced vehicle configuration class based on legacy's structure */
+    /** Enhanced vehicle configuration class based on leg… */
     public static class VehicleConfig {
         public String id;
         public String displayName;

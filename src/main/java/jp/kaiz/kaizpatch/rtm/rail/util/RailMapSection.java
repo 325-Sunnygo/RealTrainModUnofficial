@@ -1,6 +1,6 @@
 package jp.kaiz.kaizpatch.rtm.rail.util;
 import jp.ngt.rtm.rail.util.*;
-/** Restricts the original curve's parameter domain without rebuilding its control points. */
+/** Restricts the original curve's parameter domain w… */
 public final class RailMapSection extends RailMap {
     public final RailMapBasic source;
     public final double startRatio,endRatio;

@@ -5,7 +5,7 @@ public class RailMapSwitch extends RailMapBasic {
     public final RailDir startDir, endDir;
     private boolean isOpen;
 
-    /** @deprecated use #RailMapSwitch(RailPosition, RailPosition, RailDir, RailDir, int) */
+    /** @deprecated use #RailMapSwitch(RailPosition, Rail… */
     @Deprecated
     public RailMapSwitch(RailPosition par1, RailPosition par2, RailDir sDir, RailDir eDir) {
         this(par1, par2, sDir, eDir, 0);

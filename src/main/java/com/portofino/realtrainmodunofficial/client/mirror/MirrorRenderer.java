@@ -19,7 +19,7 @@ import java.lang.Math;
 import java.util.*;
 import jp.ngt.rtm.RTMConfig;
 
-/** Coplanar mirrors share an off-axis reflection framebuffer and configured refresh interval. */
+/** Coplanar mirrors share an off-axis reflection fra… */
 @EventBusSubscriber(modid="realtrainmodunofficial",value=Dist.CLIENT)
 public final class MirrorRenderer {
     private record Plane(Direction direction,double coordinate){}

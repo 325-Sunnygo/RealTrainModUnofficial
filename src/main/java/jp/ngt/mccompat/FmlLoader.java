@@ -1,10 +1,6 @@
 package jp.ngt.mccompat;
 
-/**
- * 1.7.10 Forge {@code cpw.mods.fml.common.Loader} のスクリプト互換。
- * NGTO Builder2 の {@code RTMApiCompat.isModLoaded} が
- * {@code Packages.cpw.mods.fml.common.Loader.isModLoaded(modid)} を呼ぶ。
- */
+/** 1.7.10 Forge cpw.mods.fml.common.Loader のスクリプト互換。 */
 public final class FmlLoader {
     private FmlLoader() {
     }

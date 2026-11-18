@@ -11,11 +11,7 @@ import net.minecraft.util.FormattedCharSequence;
 
 import java.util.List;
 
-/**
- * パック README の初回同意画面 (タイトル画面上に表示)。
- * PackConsent が集めた「README あり・未決定」のパックを 1 つずつ表示し、README を表示して
- * 「同意する / 同意しない」を選ばせる。
- */
+/** パック README の初回同意画面 (タイトル画面上に表示)。 */
 public final class PackConsentScreen extends Screen {
 
     private final Screen parent;
@@ -103,14 +99,12 @@ public final class PackConsentScreen extends Screen {
     }
 
     private void finish() {
-        // 同意したパックがあれば pack を reload して即反映する (タイトル画面=ワールド未ロードなので安全)。
+        // 同意したパックがあれば pack を reload して即反映する (タイトル画面=ワールド未ロー…
         if (anyAgreed) {
             try {
                 com.portofino.realtrainmodunofficial.vehicle.VehiclePackLoader.reload();
                 com.portofino.realtrainmodunofficial.rail.RailPackLoader.reload();
                 // ★車両/レールだけでなくサウンドも作り直す。
-                // いなかったため、README 同意が必要な SL パック等では「車両は出るのに走行音だけ
-                // 鳴らない」状態になっていた。
                 com.portofino.realtrainmodunofficial.client.sound.ExternalSoundPackBridge.rebuild();
                 this.minecraft.setScreen(this.parent);
                 this.minecraft.reloadResourcePacks();
@@ -122,11 +116,7 @@ public final class PackConsentScreen extends Screen {
         this.minecraft.setScreen(this.parent);
     }
 
-    /**
-     * ブラー無効化。既定の Screen.renderBackground はブラー(ぼかし)ポストエフェクトを適用し、
-     * その時点までに描いた文字までぼやけさせる (super.render が内部で自動的に呼ぶため、
-     * render 内で先に描いた README が全てぼやけていた)。不透明の暗色塗りだけに置き換える。
-     */
+    /** ブラー無効化。既定の Screen.renderBackground はブラー(ぼかし)ポストエフ… */
     @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
         g.fill(0, 0, this.width, this.height, 0xFF0A0A0A);
@@ -134,7 +124,7 @@ public final class PackConsentScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        // super.render = renderBackground(上のオーバーライド=ブラー無し) + ウィジェット(見出し/ボタン)。
+        // super.render = renderBackground(上のオーバーライド=ブラー無し)…
         super.render(g, mouseX, mouseY, partialTick);
 
         // README はウィジェットの後に描く。枠内に完全に収まる行だけ描くのでボタンとは重ならない。
@@ -171,10 +161,10 @@ public final class PackConsentScreen extends Screen {
         // 矢印キー/PageUp/PageDown でもスクロールできるようにする。
         if (isScrollable()) {
             switch (keyCode) {
-                case 264 -> { scrollLine = Math.min(maxScrollLine(), scrollLine + 3); return true; }          //DOWN
-                case 265 -> { scrollLine = Math.max(0, scrollLine - 3); return true; }                        //UP
-                case 267 -> { scrollLine = Math.min(maxScrollLine(), scrollLine + visibleLineCount()); return true; } //PageDown
-                case 266 -> { scrollLine = Math.max(0, scrollLine - visibleLineCount()); return true; }       //PageUp
+                case 264 -> { scrollLine = Math.min(maxScrollLine(), scrollLine + 3); return true; }          // DOWN
+                case 265 -> { scrollLine = Math.max(0, scrollLine - 3); return true; }                        // UP
+                case 267 -> { scrollLine = Math.min(maxScrollLine(), scrollLine + visibleLineCount()); return true; } // PageDown
+                case 266 -> { scrollLine = Math.max(0, scrollLine - visibleLineCount()); return true; }       // PageUp
             }
         }
         return super.keyPressed(keyCode, scanCode, modifiers);

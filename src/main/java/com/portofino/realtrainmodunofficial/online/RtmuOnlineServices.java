@@ -11,11 +11,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-/**
- * RTMU のオンライン連携 (クライアント専用・起動時に1回、バックグラウンドで実行)。
- * アップデート通知: GitHub の最新リリースと現在のバージョンを比較し、
- * 古ければタイトル画面にお知らせを出す (OnlineClientHooks)。
- */
+/** RTMU のオンライン連携 (クライアント専用・起動時に1回、バックグラウンドで実行)。 */
 public final class RtmuOnlineServices {
 
     private RtmuOnlineServices() {
@@ -26,7 +22,7 @@ public final class RtmuOnlineServices {
             "https://api.github.com/repos/325-Sunnygo/RealTrainModUnofficial/releases/latest";
 
     // --- 結果 (バックグラウンドスレッドが書き、描画/イベントスレッドが読む) ---
-    private static volatile String updateLatestVersion; //新しいバージョンがある時のみ非null
+    private static volatile String updateLatestVersion; // 新しいバージョンがある時のみ非null
     private static volatile String updateUrl = "https://github.com/325-Sunnygo/RealTrainModUnofficial/releases";
     private static volatile boolean started;
 
@@ -51,7 +47,7 @@ public final class RtmuOnlineServices {
         return updateUrl;
     }
 
-    // ------------------------------------------------------------------
+    // -------------------------------------------------…
     private static HttpClient newClient() {
         return HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(8))
@@ -95,7 +91,7 @@ public final class RtmuOnlineServices {
         }
     }
 
-    /** 先頭の v や空白を除き、数字とドット以外で打ち切る ("v1.0.7-beta" → "1.0.7")。 */
+    /** 先頭の v や空白を除き、数字とドット以外で打ち切る ("v1.0.7-beta" → "1.0.… */
     private static String normalizeVersion(String v) {
         if (v == null) {
             return "";

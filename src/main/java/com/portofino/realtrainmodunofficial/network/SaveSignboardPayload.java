@@ -18,10 +18,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 看板エディタ (SignboardScreen) の保存。
- * 本家 PacketSelectResource (ResourceStateSignboard の同期) に相当する。
- */
+/** 看板エディタ (SignboardScreen) の保存。 */
 public record SaveSignboardPayload(BlockPos pos, String definitionId, String ttSetting, List<SignboardText> texts)
         implements CustomPacketPayload {
 

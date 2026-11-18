@@ -5,7 +5,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Expands legacy include directives at their original position, as KaizPatchX does. */
+/** Expands legacy include directives at their origin… */
 public final class LegacyScriptIncludes {
     private static final Pattern INCLUDE = Pattern.compile("(?m)^[\\t ]*//include[\\t ]*<([^>\\r\\n]+)>");
 

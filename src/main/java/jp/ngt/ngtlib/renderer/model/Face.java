@@ -1,9 +1,6 @@
 package jp.ngt.ngtlib.renderer.model;
 
-/**
- * 本家 jp.ngt.ngtlib.renderer.model.Face のスクリプト互換移植。
- * vertices は面の頂点 (四角形は4点)。uvs は頂点順の {u,v}。
- */
+/** 本家 jp.ngt.ngtlib.renderer.model.Face のスクリプト互換移植。 */
 public class Face {
     /** ミラー軸ごとの符号反転パターン (本家 MIRROR_PATTERN)。 */
     private static final float[][] MIRROR_PATTERN = {
@@ -32,10 +29,7 @@ public class Face {
         this(new Vertex[size], new float[size * 2], material);
     }
 
-    /**
-     * 本家 textureCoordinates。
-     * スクリプトが face.textureCoordinates[i].getU と書けるようビューを返す。
-     */
+    /** 本家 textureCoordinates。 */
     public TextureCoordinate[] getTextureCoordinates() {
         if (this.texCoordView == null) {
             int n = this.vertices.length;
@@ -65,10 +59,7 @@ public class Face {
         this.texCoordView[index]=coord;
     }
 
-    /**
-     * 本家 calcVertexNormals: 隣接面の法線をスムージング角以内なら足し込んで頂点法線を作る。
-     * map は「頂点 → その頂点を共有する面」。
-     */
+    /** 本家 calcVertexNormals: 隣接面の法線をスムージング角以内なら足し込んで頂点法線… */
     public void calcVertexNormals(java.util.Map<Vertex, java.util.List<Face>> map, float angleCos, VecAccuracy accuracy) {
         if (this.faceNormal == null) {
             this.calculateFaceNormal(accuracy);
@@ -108,10 +99,7 @@ public class Face {
         jp.ngt.ngtlib.renderer.NGTRenderHelper.addFace(this, tessellator, smoothing);
     }
 
-    /**
-     * 本家 getMirror: 指定軸で反転した面を返す。type は 0=X, 1=Y, 2=Z。
-     * 反転で頂点の巻き順が裏返るので、index も反転させる。
-     */
+    /** 本家 getMirror: 指定軸で反転した面を返す。type は 0=X, 1=Y, 2=Z。 */
     public Face getMirror(int type, java.util.Map<Vertex, Vertex> mirrorVertex, VecAccuracy accuracy) {
         if (type < 0 || type > 2) {
             return this.copy();

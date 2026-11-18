@@ -1,6 +1,6 @@
 package jp.ngt.rtm.render;
 
-/** Shared reference rules: float length*2, logical sample count, and end cross sections. */
+/** Shared reference rules: float length*2, logical s… */
 public final class LegacyRailSampling {
     private LegacyRailSampling() {}
     public static int split(double length,int minimum) { return Math.max(Math.max(0,(int)((float)length*2.0F)),minimum); }

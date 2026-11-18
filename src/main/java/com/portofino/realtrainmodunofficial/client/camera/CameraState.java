@@ -2,7 +2,7 @@ package com.portofino.realtrainmodunofficial.client.camera;
 
 import java.util.Locale;
 
-/** Original Camera/CameraKeySet units and steps; no photographic-unit substitutions. */
+/** Original Camera/CameraKeySet units and steps; */
 public final class CameraState {
     private float scale=1, sensitivity=1, focus=0.5F;
     private int focusMode;
@@ -28,7 +28,7 @@ public final class CameraState {
         String text=focusMode==0?"NONE":focusMode==1?String.format(Locale.ROOT,"AUTO(%.3f)",focus):String.format(Locale.ROOT,"%.3f",focus);
         return String.format(Locale.ROOT,"x%.1f S:%d%% F:%s",scale,(int)(sensitivity*100),text);
     }
-    /** Original Camera.fixDepth, followed by the 8-bit grayscale conversion. */
+    /** Original Camera.fixDepth, followed by the 8-bit g… */
     public static int depthLevel(float depth) {
         if(depth<0.75F) return 0;
         double d=(depth-0.75F)/0.25F;

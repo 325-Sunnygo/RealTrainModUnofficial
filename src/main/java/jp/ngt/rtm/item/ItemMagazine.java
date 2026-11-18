@@ -9,10 +9,7 @@ import net.minecraft.world.item.TooltipFlag;
 
 import java.util.List;
 
-/**
- * 弾倉。本家 {@code jp.ngt.rtm.item.ItemMagazine} の移植。
- * 残弾は<b>耐久値</b>で持つ (damage 0 = 満タン)。本家と同じ。
- */
+/** 弾倉。本家 jp.ngt.rtm.item.ItemMagazine の移植。 */
 public class ItemMagazine extends Item {
     public final GunType magazineType;
 

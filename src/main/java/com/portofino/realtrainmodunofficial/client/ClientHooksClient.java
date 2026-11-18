@@ -133,7 +133,7 @@ public final class ClientHooksClient {
         com.portofino.realtrainmodunofficial.client.camera.RtmCamera.INSTANCE.toggle();
     }
 
-    /** カメラ: ブロック右クリックで本家 GuiCamera 相当の画面を開く (本家 ItemCamera.onItemUse)。 */
+    /** カメラ: ブロック右クリックで本家 GuiCamera 相当の画面を開く (本家 ItemCame… */
     public static void openCameraScreen() {
         Minecraft.getInstance().setScreen(
             new com.portofino.realtrainmodunofficial.client.screen.CameraScreen());
@@ -214,17 +214,7 @@ public final class ClientHooksClient {
         minecraft.player.displayClientMessage(Component.literal("[RTMU Script] " + message), false);
     }
 
-    /**
-     * 指定範囲のレールベースに道床を焼き直させる。
-     *
-     * <p>2 つ要る:
-     * <ol>
-     *   <li>{@code requestModelDataUpdate} — これを申請した BlockEntity だけが
-     *       次のチャンク焼きで {@code getModelData()} を呼び直される</li>
-     *   <li>{@code setBlocksDirty} — チャンクを焼き直させる</li>
-     * </ol>
-     * 片方だけだと、焼き直しても中身が古いまま / 中身は新しいのに焼かれないまま になる。
-     */
+    /** 指定範囲のレールベースに道床を焼き直させる。 */
     /** レール 1 本ぶんの焼き込みメッシュを捨てる (線形が変わった時)。 */
     public static void invalidateRailMesh(Level level, int x, int y, int z) {
         if (level == null || !level.isClientSide()) {

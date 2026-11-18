@@ -12,7 +12,7 @@ public final class Point {
     public final boolean mainDirIsPositive;
     public final boolean branchDirIsPositive;
     private int moveCount;
-    /** 直前 tick の moveCount。描画で partialTick 補間してトング移動を滑らかにするため保持。 */
+    /** 直前 tick の moveCount。描画で partialTick 補間してトング移動を滑らか… */
     private int prevMoveCount;
 
     public Point(RailPosition railPos, RailMapSwitch rms1, RailMapSwitch rms2) {
@@ -60,10 +60,7 @@ public final class Point {
         return (float) this.moveCount / (float) MAX_COUNT;
     }
 
-    /**
-     * partialTick 補間したトング移動量 (0.0〜1.0)。
-     * 変わらないため、素の #getMovement を描画に使うと 20Hz でカクつく。
-     */
+    /** partialTick 補間したトング移動量 (0.0〜1.0)。 */
     public float getMovement(float partialTick) {
         float t = partialTick < 0.0F ? 0.0F : (partialTick > 1.0F ? 1.0F : partialTick);
         float interp = this.prevMoveCount + (this.moveCount - this.prevMoveCount) * t;
@@ -77,13 +74,7 @@ public final class Point {
         return this.rpRoot.checkRSInput(level) ? this.rmBranch : this.rmMain;
     }
 
-    /**
-     * スクリプト互換オーバーロード。
-     * SRB3 の描画スクリプトは
-     * nearestPoint.getActiveRailMap(world)  // render_SuperRailBuilder3.js:2210
-     * と呼ぶが、この world は entity.field_70170_p = jp.ngt.mccompat.WorldCompat
-     * であり実 Level ではない。
-     */
+    /** スクリプト互換オーバーロード。 SRB3 の描画スクリプトは nearestPoint.getAc… */
     public RailMap getActiveRailMap(Object levelLike) {
         return getActiveRailMap(jp.ngt.ngtlib.block.BlockUtil.toLevel(levelLike));
     }

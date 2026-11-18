@@ -19,10 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * legacy-inspired ModelPackManager with advanced JSON processing and caching
- * Handles vehicle packs, textures, models, and configuration files
- */
+/** legacy-inspired ModelPackManager with advanced JS… */
 public class VehicleModelPackManager implements ResourceManagerReloadListener {
     public static final VehicleModelPackManager INSTANCE = new VehicleModelPackManager();
     
@@ -68,7 +65,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         }
     }
     
-    /** Scan for vehicle configuration files (legacy-style) */
+    /** Scan for vehicle configuration files (legacy-styl… */
     private void scanVehicleConfigs(ResourceManager resourceManager) {
         try {
             Map<ResourceLocation, Resource> resources = resourceManager.listResources(
@@ -121,7 +118,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return path.substring(lastSlash + 1, lastDot);
     }
     
-    /** Parse resource configuration with legacy-style validation */
+    /** Parse resource configuration with legacy-style va… */
     private ResourceConfig parseResourceConfig(JsonObject configObj, String packId) {
         ResourceConfig config = new ResourceConfig();
         config.packId = packId;
@@ -205,11 +202,11 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         return vehicles;
     }
     
-    /** Parse legacy-style seat positions with multiple field support */
+    /** Parse legacy-style seat positions with multiple f… */
     private List<net.minecraft.world.phys.Vec3> parselegacySeatPositions(JsonObject obj) {
         List<net.minecraft.world.phys.Vec3> seats = new ArrayList<>();
 
-        // legacy style: seatPos is often 1/16 units, seatPosF is in block units.
+        // legacy style: seatPos is often 1/16 units, seatPo…
         appendVec3Array(obj, "seatPos", seats, 1.0 / 16.0);
         appendVec3Array(obj, "seatPosF", seats, 1.0);
         appendVec3Array(obj, "seatPositions", seats, 1.0);
@@ -228,7 +225,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
     private List<net.minecraft.world.phys.Vec3> parselegacyBogiePositions(JsonObject obj) {
         List<net.minecraft.world.phys.Vec3> bogies = new ArrayList<>();
 
-        // These fields are expected to be in block units in legacy packs.
+        // These fields are expected to be in block units in…
         appendVec3Array(obj, "bogiePos", bogies, 1.0);
         appendVec3Array(obj, "bogiePositions", bogies, 1.0);
         appendVec3Array(obj, "truckPos", bogies, 1.0);
@@ -424,7 +421,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
                 }
             }
         } catch (IOException ignored) {
-            // If listResources fails for the current path, use direct resource lookup as fallback
+            // If listResources fails for the current path, use…
         }
 
         throw new IOException("Script not found: " + fileName);
@@ -440,7 +437,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         loadedPacks.clear();
         activePacks.clear();
 
-        // Reinitialization guard must be reset, otherwise initialize returns early.
+        // Reinitialization guard must be reset, otherwise i…
         initialized = false;
 
         // Reinitialize
@@ -566,7 +563,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         public void registerVehicles() {
             for (VehicleConfig vehicle : config.vehicles) {
                 try {
-                    // Convert legacy VehicleConfig to RealTrainModUnofficial VehicleDefinition
+                    // Convert legacy VehicleConfig to RealTrainModUnoff…
                     VehicleDefinition def = convertToVehicleDefinition(vehicle);
                     // Add to registry using existing method
                     synchronized (VehicleRegistry.class) {
@@ -581,7 +578,7 @@ public class VehicleModelPackManager implements ResourceManagerReloadListener {
         }
         
         private VehicleDefinition convertToVehicleDefinition(VehicleConfig vehicle) {
-            // Convert legacy config to RealTrainModUnofficial format
+            // Convert legacy config to RealTrainModUnofficial f…
             List<VehicleDefinition.BogieDefinition> bogieDefs = new ArrayList<>();
             
             // Add bogie models

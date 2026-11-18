@@ -1,8 +1,8 @@
 package jp.ngt.rtm.rail.util;
 
-/** Simplified ResourceStateRail stand-in: ballast width from rail pack (legacy RailConfig#ballastWidth). */
+/** Simplified ResourceStateRail stand-in: ballast wi… */
 public class RailProperties {
-    /** Same semantics as legacy: full width is2*halfWidth + center; 0 = center column only. */
+    /** Same semantics as legacy: full width is2*halfWidt… */
     public int ballastWidth;
     public float blockHeight;
 

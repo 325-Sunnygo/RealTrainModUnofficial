@@ -4,19 +4,15 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/**
- * 本家 jp.ngt.rtm.render.Parts の移植。
- * スクリプト用法:
- */
+/** 本家 jp.ngt.rtm.render.Parts の移植。 スクリプト用法: */
 public class Parts {
     public final String[] objNames;
     private final String[] names;
     private final Set<String> nameSet;
-    // 正規化済み (小文字) 名前 Set。GLRecorder 再生側の IdentityHashMap キャッシュに
-    // 毎フレーム同一インスタンスでヒットさせるため、生成時に確定して使い回す。
+    // 正規化済み (小文字) 名前 Set。GLRecorder 再生側の IdentityHashMa…
     private final Set<String> normalizedNames;
     private jp.ngt.ngtlib.renderer.model.GroupObject[] objs;
-    /** 本家 ActionParts.id: registerParts で 1 始まりで振られるピッキング ID。 */
+    /** 本家 ActionParts.id: registerParts で 1 始まりで振られるピッキン… */
     public int id;
 
     /** 操作パーツ (ActionParts) か。本家は instanceof で判定する。 */
@@ -49,7 +45,7 @@ public class Parts {
     public void init(PartsRenderer renderer) {
     }
 
-    /** 本家 getObjects(IModelNGT) 互換 — PolygonModel からグループ取得 (CustomAnimator 等)。 */
+    /** 本家 getObjects(IModelNGT) 互換 — PolygonModel からグループ… */
     public jp.ngt.ngtlib.renderer.model.GroupObject[] getObjects(Object model) {
         if (this.objs == null) {
             if (model instanceof jp.ngt.ngtlib.renderer.model.PolygonModel pm) {
@@ -69,10 +65,7 @@ public class Parts {
     }
 
     public void render(PartsRenderer renderer) {
-        // 名前ごとの記録ではなく正規化済み Set を 1 コマンドで記録する
-        // (再生側キャッシュに同一インスタンスでヒットさせる + コマンド数削減)
-        // ★Parts インスタンスも一緒に記録する: 色ピッキングで同名パーツ
-        //   (RenderTorii.js の数字キー 10 個 = 全て "key") を区別するため。
+        // 名前ごとの記録ではなく正規化済み Set を 1 コマンドで記録する (再生側キャッシュに同一イン…
         renderer.recordRenderPartsSet(this.normalizedNames, this);
     }
 

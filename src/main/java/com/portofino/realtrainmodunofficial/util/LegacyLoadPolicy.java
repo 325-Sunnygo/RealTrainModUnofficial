@@ -4,7 +4,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import jp.ngt.rtm.RTMConfig;
 
-/** Original ModelPackLoadThread concurrency: one / CPU thirds / all processors. */
+/** Original ModelPackLoadThread concurrency: one / C… */
 public final class LegacyLoadPolicy {
     private LegacyLoadPolicy() {}
     public static int workers(int speed,int processors) {

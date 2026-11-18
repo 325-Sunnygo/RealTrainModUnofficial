@@ -2,10 +2,7 @@ package jp.ngt.rtm.render;
 
 import jp.ngt.ngtlib.math.NGTMath;
 
-/**
- * 本家 jp.ngt.rtm.render.NPCPartsRenderer の移植。
- * 人型 NPC (運転士・乗客) のモデルスクリプトが、各関節の角度を読んでパーツを回す。
- */
+/** 本家 jp.ngt.rtm.render.NPCPartsRenderer の移植。 */
 @SuppressWarnings("unused")
 public class NPCPartsRenderer extends EntityPartsRenderer {
     public float headAngleX, headAngleY, headAngleZ;
@@ -19,11 +16,7 @@ public class NPCPartsRenderer extends EntityPartsRenderer {
         super(args);
     }
 
-    /**
-     * 本家 setRotationAngles: 歩行モーションから各関節角を求める。
-     * 本家の getRendererArg1/2 は「歩行距離」と「歩幅」なので、1.21 では
-     * walkAnimation から同じ値が取れる。
-     */
+    /** 本家 setRotationAngles: 歩行モーションから各関節角を求める。 */
     public void setRotationAngles(Object entity, float partialTicks) {
         if (entity == null)
             return;

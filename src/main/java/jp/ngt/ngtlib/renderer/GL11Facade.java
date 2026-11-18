@@ -1,10 +1,6 @@
 package jp.ngt.ngtlib.renderer;
 
-/**
- * パックスクリプト向け GL11 互換ファサード。
- * ScriptUtil のプリリュードで `var GL11 = Java.type("jp.ngt.ngtlib.renderer.GL11Facade")`
- * とバインドされ、mozilla_compat の importPackage(org.lwjgl.opengl) より優先される。
- */
+/** パックスクリプト向け GL11 互換ファサード。 */
 @SuppressWarnings("unused")
 public final class GL11Facade {
     // よく使われる定数 (値は本物の GL11 と同一)
@@ -31,7 +27,7 @@ public final class GL11Facade {
             GL_QUAD_STRIP=8, GL_POLYGON=9, GL_FOG=0x0B60;
 
     public static final int GL_NO_ERROR=0,GL_INVALID_ENUM=0x0500,GL_INVALID_VALUE=0x0501,GL_INVALID_OPERATION=0x0502;
-    /** Recorded commands have not reached the driver yet; query native errors only outside recording. */
+    /** Recorded commands have not reached the driver yet; */
     public static int glGetError() {
         if(GLRecorder.active()!=null)return GL_NO_ERROR;
         try {if(com.mojang.blaze3d.systems.RenderSystem.isOnRenderThread() && org.lwjgl.opengl.GL.getCapabilities()!=null)return org.lwjgl.opengl.GL11.glGetError();}
@@ -117,14 +113,7 @@ public final class GL11Facade {
         return GLRecorder.active();
     }
 
-    /**
-     * 記録 (GLRecorder) を通さずに描く経路のための、実際の行列スタック。
-     *
-     * <p>★これが無いと、記録に何も出さないスクリプト (焼き込みモデルが本体で、
-     * スクリプトは向きだけ変えるもの) の {@code glRotatef} 等が<b>黙って捨てられる</b>。
-     * ミラーボール・赤色灯が通電しても回らなかったのはこれ。
-     * 型は Object で持つ (専用サーバーで client 型を触らないため)。
-     */
+    /** 記録 (GLRecorder) を通さずに描く経路のための、実際の行列スタック。 */
     private static final ThreadLocal<Object> FALLBACK_POSE = new ThreadLocal<>();
     /** フォールバック側で積んだ push の数。スクリプトが pop し忘れても戻せるように数える。 */
     private static final ThreadLocal<int[]> FALLBACK_DEPTH = ThreadLocal.withInitial(() -> new int[1]);
@@ -154,9 +143,7 @@ public final class GL11Facade {
         return o instanceof com.mojang.blaze3d.vertex.PoseStack ps ? ps : null;
     }
 
-    /**
-     * glPushAttrib / glPopAttrib はスクリプトの描画状態を属性マスクごとに保存・復帰する。
-     */
+    /** glPushAttrib / glPopAttrib はスクリプトの描画状態を属性マスクごとに保存… */
     public static void glPushAttrib(int mask) {
         LegacyRenderState.current().push(mask);
     }

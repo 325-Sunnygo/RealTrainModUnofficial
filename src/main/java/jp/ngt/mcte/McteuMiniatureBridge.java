@@ -15,11 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * MCTEUnofficial (com.mattya.mcteunofficial) のミニチュアを NGTO Builder から使えるようにする
- * ソフト連携ブリッジ。
- * 無害に no-op で、RTMU 自前ミニチュアにフォールバックする)。
- */
+/** MCTEUnofficial (com.mattya.mcteunofficial) のミニチュア… */
 public final class McteuMiniatureBridge {
     /** MCTEU のミニチュアアイテムの登録 ID。 */
     private static final String MINIATURE_ITEM_ID = "mcteunofficial:miniature";
@@ -27,20 +23,19 @@ public final class McteuMiniatureBridge {
     private McteuMiniatureBridge() {
     }
 
-    // --- リフレクションハンドル (MCTEU 導入時のみ解決。ensureInit で 1 度だけ試行) ---
+    // --- リフレクションハンドル (MCTEU 導入時のみ解決。
     private static boolean initialized;
     private static boolean available;
     private static Method mGetMiniatureId;   // MiniatureItem.getMiniatureId(ItemStack) -> String
-    private static Method mLoadItemData;      // PlacedMiniatureManager.loadItemData(String) -> MiniatureData
+    private static Method mLoadItemData;      // PlacedMiniatureManager.loadItemData(String) -> Mi…
     private static Field fBlocks;             // MiniatureData.blocks : List<BlockEntry>
     private static Field feX, feY, feZ;       // BlockEntry.x / y / z : int
     private static Method mToBlockState;      // BlockEntry.toBlockState() -> BlockState
 
-    // 変換済み NGTObject NBT を miniatureId でキャッシュ (毎tick の変換を避ける)。
-    // MiniatureData のインスタンスが差し替わった (編集/再同期) ときは作り直す = 陳腐化しない。
+    // 変換済み NGTObject NBT を miniatureId でキャッシュ (毎tick の変…
     private static final Map<String, Object[]> CACHE = new ConcurrentHashMap<>();
 
-    /** この ItemStack が MCTEU のミニチュアアイテムか (登録 ID で判定、MCTEU 未導入でも安全)。 */
+    /** この ItemStack が MCTEU のミニチュアアイテムか (登録 ID で判定、MCTEU… */
     public static boolean isMiniature(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return false;
@@ -49,12 +44,7 @@ public final class McteuMiniatureBridge {
         return id != null && MINIATURE_ITEM_ID.equals(id.toString());
     }
 
-    /**
-     * MCTEU ミニチュアの中身を、NGTO Builder が読める NGTObject 形式の CompoundTag
-     * ({ObjId,SizeX,SizeY,SizeZ,OrigX/Y/Z,BlocksData:[...]}) に変換して返す。
-     * MCTEU 未導入 / データ未解決 (マルチで未同期等) / 変換失敗なら null
-     * (呼び出し側は通常の NBT にフォールバックする)。
-     */
+    /** MCTEU ミニチュアの中身を、NGTO Builder が読める NGTObject 形式の C… */
     public static CompoundTag getBlocksDataTag(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return null;
@@ -86,7 +76,7 @@ public final class McteuMiniatureBridge {
         }
     }
 
-    /** MCTEU の MiniatureData を RTMU の NGTObject NBT へ変換する。 */
+    /** MCTEU の MiniatureData を RTMU の NGTObject NBT へ変換す… */
     private static CompoundTag convert(Object miniatureData) throws Exception {
         List<?> blocks = (List<?>) fBlocks.get(miniatureData);
         if (blocks == null || blocks.isEmpty()) {
@@ -122,7 +112,7 @@ public final class McteuMiniatureBridge {
         return obj.writeToNBT();
     }
 
-    /** MCTEU のクラス/メンバをリフレクションで解決する (1 度だけ)。未導入なら available=false。 */
+    /** MCTEU のクラス/メンバをリフレクションで解決する (1 度だけ)。 */
     private static synchronized boolean ensureInit() {
         if (initialized) {
             return available;
@@ -147,7 +137,7 @@ public final class McteuMiniatureBridge {
 
             available = true;
         } catch (Throwable t) {
-            // MCTEU 未導入 or API 変更。NGTO Builder は RTMU 自前ミニチュアで動作する。
+            // MCTEU 未導入 or API 変更。NGTO Builder は RTMU 自前ミニチュアで動…
             available = false;
         }
         return available;

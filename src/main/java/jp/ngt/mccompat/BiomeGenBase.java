@@ -4,15 +4,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.biome.Biomes;
 
-/**
- * 1.7.10 {@code net.minecraft.world.biome.BiomeGenBase} のスクリプト互換。
- * NGTO Builder2 の Snowfall ブラシが
- * {@code BiomeGenBase.field_76774_n.field_76756_M} (= icePlains.biomeID) と
- * {@code BiomeGenBase.field_76772_c.field_76756_M} (= plains.biomeID) を読む。
- *
- * <p>1.21 のバイオームは int ID を持たないため、1.7.10 の固定 ID
- * (plains=1, icePlains=12) を返す。ChunkCompat のバイオーム配列もこの ID を使う。
- */
+/** 1.7.10 net.minecraft.world.biome.BiomeGenBase のスク… */
 public final class BiomeGenBase {
     private BiomeGenBase() {
     }
@@ -22,7 +14,7 @@ public final class BiomeGenBase {
     /** icePlains (1.7.10 biomeID=12) */
     public static final LegacyBiome field_76774_n = new LegacyBiome(12);
 
-    /** 1.7.10 BiomeGenBase のスクリプト互換 (field_76756_M = biomeID)。 */
+    /** 1.7.10 BiomeGenBase のスクリプト互換 (field_76756_M = bio… */
     public static final class LegacyBiome {
         /** biomeID */
         public final int field_76756_M;

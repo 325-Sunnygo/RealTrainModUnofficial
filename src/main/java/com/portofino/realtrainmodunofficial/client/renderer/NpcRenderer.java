@@ -15,11 +15,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
-/**
- * NPC の描画。本家 {@code RenderNPC} 相当。
- *
- * <p>パック定義が MQO を持つならそれを描き、{@code texture} だけならバニラの人型に貼る。
- */
+/** NPC の描画。本家 RenderNPC 相当。 */
 public class NpcRenderer extends EntityRenderer<EntityNPC> {
 
     private final PlayerModel<net.minecraft.world.entity.LivingEntity> playerModel;
@@ -33,7 +29,7 @@ public class NpcRenderer extends EntityRenderer<EntityNPC> {
     public void render(EntityNPC entity, float entityYaw, float partialTicks, PoseStack poseStack,
                        MultiBufferSource buffer, int packedLight) {
         NpcDefinition def = entity.getDefinition();
-        //生き物になったので胴体の向き (yBodyRot) を使う
+        // 生き物になったので胴体の向き (yBodyRot) を使う
         float bodyYaw = Mth.rotLerp(partialTicks, entity.yBodyRotO, entity.yBodyRot);
 
         poseStack.pushPose();
@@ -43,9 +39,7 @@ public class NpcRenderer extends EntityRenderer<EntityNPC> {
                 def.getPackName(), def.getModelFile(), def.getTextureOverrides(), null, true);
             MqoModelLoader.renderModel(model, poseStack, buffer, packedLight);
         } else {
-            //バニラの人型に絵を貼る (本家の texture だけの NPC)。歩行と頭の向きも動かす。
-            //★変換の順番はバニラ LivingEntityRenderer と同じ「回す → 反転 → 下げる」。
-            //  反転を先にすると Y 回転の向きが逆になり、NPC が反対を向く。
+            // バニラの人型に絵を貼る (本家の texture だけの NPC)。歩行と頭の向きも動かす。
             poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - bodyYaw));
             poseStack.scale(-1.0F, -1.0F, 1.0F);
             poseStack.translate(0.0F, -1.501F, 0.0F);
@@ -53,9 +47,7 @@ public class NpcRenderer extends EntityRenderer<EntityNPC> {
             float limbSwingAmount = Math.min(entity.walkAnimation.speed(partialTicks), 1.0F);
             float headYaw = Mth.rotLerp(partialTicks, entity.yHeadRotO, entity.yHeadRot) - bodyYaw;
             float headPitch = Mth.lerp(partialTicks, entity.xRotO, entity.getXRot());
-            //★EntityModel.young の既定は true。バニラは LivingEntityRenderer が毎フレーム
-            //  isBaby() を入れているが、この描画器は EntityRenderer 直下なので自分で入れる。
-            //  入れ忘れると HumanoidModel が子供比率 (頭 0.75 / 体 0.5) で描き、NPC が小さくなる。
+            // ★EntityModel.young の既定は true。
             this.playerModel.young = entity.isBaby();
             this.playerModel.riding = entity.isPassenger();
             this.playerModel.attackTime = entity.getAttackAnim(partialTicks);
@@ -70,12 +62,7 @@ public class NpcRenderer extends EntityRenderer<EntityNPC> {
         super.render(entity, entityYaw, partialTicks, poseStack, buffer, packedLight);
     }
 
-    /**
-     * 既定スキン。
-     * ★本家 (1.7.10/1.12) の {@code textures/entity/steve.png} は 1.13 で
-     * {@code textures/entity/player/wide/steve.png} へ移動していて、<b>1.21 に存在しない</b>。
-     * 本家パックの定義 (ModelNPC_MannequinSteve など) はこの旧パスを書いているので、読み替える。
-     */
+    /** 既定スキン。 ★本家 (1.7.10/1.12) の textures/entity/steve.… */
     private static final ResourceLocation DEFAULT_SKIN =
         ResourceLocation.withDefaultNamespace("textures/entity/player/wide/steve.png");
 
@@ -94,19 +81,17 @@ public class NpcRenderer extends EntityRenderer<EntityNPC> {
                 base = loc;
             }
         } catch (Exception ignored) {
-            //綴りが 1.21 の規則 (小文字のみ) に合わない → パック内探索へ
+            // 綴りが 1.21 の規則 (小文字のみ) に合わない → パック内探索へ
         }
         if (base == DEFAULT_SKIN) {
-            //同梱アセットに無い = 外部パックのテクスチャ。zip/フォルダから読んで動的登録する。
+            // 同梱アセットに無い = 外部パックのテクスチャ。zip/フォルダから読んで動的登録する。
             var info = com.portofino.realtrainmodunofficial.client.PackButtonTextureCache
                 .get(def.getPackName(), path);
             if (info != null && info.location() != null) {
                 base = info.location();
             }
         }
-        //★本家パックのスキンは 64x32 の並び (左右の腕・脚が同じ領域)。
-        //  1.21 の人型は 1.8 以降の並びなので、そのまま貼ると左腕と左脚が消える。
-        //  バニラと同じ旧スキン変換を通す。
+        // ★本家パックのスキンは 64x32 の並び (左右の腕・脚が同じ領域)。
         return NpcSkinLoader.getOrConvert(def.getPackName(), path, base);
     }
 

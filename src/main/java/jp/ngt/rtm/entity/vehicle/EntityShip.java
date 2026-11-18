@@ -8,10 +8,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraft.world.phys.AABB;
 
-/**
- * 船。本家 {@code jp.ngt.rtm.entity.vehicle.EntityShip} の移植。
- * 水上でだけ操作でき、水に浸かると浮き上がる。旋回で傾く。
- */
+/** 船。本家 jp.ngt.rtm.entity.vehicle.EntityShip の移植。 */
 public class EntityShip extends EntityVehicle {
     public EntityShip(EntityType<? extends EntityShip> type, Level level) {
         super(type, level);
@@ -29,7 +26,7 @@ public class EntityShip extends EntityVehicle {
     @Override
     protected void updateMotion(LivingEntity entity, float moveStrafe, float moveForward) {
         super.updateMotion(entity, moveStrafe, moveForward);
-        //本家: 旋回でロールする
+        // 本家: 旋回でロールする
         if (this.speed > 0.0D && this.isInWater()) {
             this.rotationRoll = -moveStrafe * (float) (this.speed / MAX_SPEED) * -5.0F;
         }

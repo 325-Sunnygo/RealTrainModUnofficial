@@ -23,10 +23,7 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
-/**
- * 本家 KaizPatchX の customIconTexture — アイテムの絵をモデル定義の画像に差し替える。
- * 本家 RenderItemWithModel の移植。
- */
+/** 本家 KaizPatchX の customIconTexture — アイテムの絵をモデル定義の… */
 public class CustomIconItemRenderer extends BlockEntityWithoutLevelRenderer {
 
     public CustomIconItemRenderer() {
@@ -98,20 +95,13 @@ public class CustomIconItemRenderer extends BlockEntityWithoutLevelRenderer {
         return "";
     }
 
-    // ------------------------------------------------------------------
-    // テクスチャの読み込み (パス → 登録済み ResourceLocation)
-    // ------------------------------------------------------------------
+    // -------------------------------------------------…
 
     private static final Map<String, ResourceLocation> CACHE = new HashMap<>();
     private static final ResourceLocation NONE =
         ResourceLocation.fromNamespaceAndPath(RealTrainModUnofficial.MODID, "dynamic/icon/none");
 
-    /**
-     * "rtm:textures/items/itemLinePole_1.png" のような指定を実テクスチャへ。
-     * 本家は名前空間つきなら ResourceLocation をそのまま使うが、RTMU はパックの中身を
-     * バニラのリソースパックには載せていないので、assets/<名前空間>/<パス> として
-     * NGTFileLoader で探す。名前空間なしならそのままのパスで探す。
-     */
+    /** "rtm:textures/items/itemLinePole_1.png" のような指定を実テ… */
     private static synchronized ResourceLocation resolve(String path) {
         if (path == null || path.isBlank()) {
             return null;

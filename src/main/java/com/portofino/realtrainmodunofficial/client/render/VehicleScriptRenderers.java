@@ -40,12 +40,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * 本家式の車両スクリプト描画 (Phase 3 車両編)。
- * パックの rendererPath スクリプトを Nashorn (本家と同一エンジン) で実行し、
- * renderClass (jp.ngt.rtm.render.VehiclePartsRenderer 等) をリフレクション生成、
- * 毎フレーム render(entity, pass, partialTick) を GLRecorder に記録して PoseStack に再生する。
- */
+/** 本家式の車両スクリプト描画 (Phase 3 車両編)。 */
 public final class VehicleScriptRenderers {
 
     private static final String PRELUDE = com.portofino.realtrainmodunofficial.script.PackScriptSource.PRELUDE;
@@ -61,33 +56,36 @@ public final class VehicleScriptRenderers {
         if (def == null || !def.hasScript()) {
             return null;
         }
-        Scripted cached=CACHE.get(def.getId());
-        if(cached!=null)return cached==INVALID?null:cached;
-        String key="vehicle-render|"+def.getId();
-        var compilation=com.portofino.realtrainmodunofficial.script.AsyncScriptCompiler.requestPrepared(key,def.getScriptPath(),() -> {
-            RealTrainModUnofficial.LOGGER.info("[RTMU] preparing vehicle script: {} ({})",def.getId(),def.getScriptPath());
-            String source=VehiclePackLoader.readScriptContent(def);
-            if(source==null || source.isBlank())throw new IllegalArgumentException("Vehicle script not readable: "+def.getScriptPath());
-            return com.portofino.realtrainmodunofficial.script.LegacyExecutionIncludes.prepare(source,def.getScriptPath(),jp.ngt.ngtlib.io.NGTFileLoader::findAsset,PRELUDE);
-        });
-        if(!compilation.isDone())return null;
+        Scripted cached = CACHE.get(def.getId());
+        if (cached != null) {
+            return cached == INVALID ? null : cached;
+        }
         Scripted result;
-        try {result=CACHE.computeIfAbsent(def.getId(),id -> create(def,compilation.join()));}
-        catch(java.util.concurrent.CompletionException failure) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to compile vehicle script {} ({})",def.getId(),def.getScriptPath(),failure);
-            CACHE.put(def.getId(),INVALID);result=INVALID;
-        } finally {com.portofino.realtrainmodunofficial.script.AsyncScriptCompiler.release(key);}
-        return result==INVALID?null:result;
-    }
-
-    public static boolean isLoading(VehicleDefinition def) {
-        return def!=null && !CACHE.containsKey(def.getId()) && com.portofino.realtrainmodunofficial.script.AsyncScriptCompiler.isPending("vehicle-render|"+def.getId());
-    }
-
-    private static Scripted create(VehicleDefinition def,javax.script.CompiledScript compiled) {
         try {
-            // Run top-level code and renderer.init on the render thread, after compilation finishes.
-            ScriptEngine se=compiled.getEngine();compiled.eval();
+            result = CACHE.computeIfAbsent(def.getId(), id -> create(def));
+        } catch (Throwable t) {
+            RealTrainModUnofficial.LOGGER.warn("Failed to compile vehicle script {} ({})",
+                    def.getId(), def.getScriptPath(), t);
+            CACHE.put(def.getId(), INVALID);
+            result = INVALID;
+        }
+        return result == INVALID ? null : result;
+    }
+
+    /** 本家と同じく同期読み込み。非同期コンパイルは行わない。 */
+    public static boolean isLoading(VehicleDefinition def) {
+        return false;
+    }
+
+    private static Scripted create(VehicleDefinition def) {
+        try {
+            String source = VehiclePackLoader.readScriptContent(def);
+            if (source == null || source.isBlank()) {
+                throw new IllegalArgumentException("Vehicle script not readable: " + def.getScriptPath());
+            }
+            // KaizPatchX ModelObject: スクリプトをそのまま評価し、renderClass…
+            String expanded = com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(source, def.getScriptPath());
+            ScriptEngine se = ScriptUtil.doScript(PRELUDE + expanded, def.getScriptPath());
             Object rcName = se.get("renderClass");
             if (rcName == null) {
                 RealTrainModUnofficial.LOGGER.warn("Vehicle script has no renderClass: {}", def.getId());
@@ -103,15 +101,11 @@ public final class VehicleScriptRenderers {
             renderer.scriptName = def.getId() + " (" + def.getScriptPath() + ")";
             se.put("renderer", renderer);
 
-            // 無音終了 (ネイティブ/メモリ由来) の切り分け用。1 車両につき 1 回だけ出る。
             RealTrainModUnofficial.LOGGER.info("[RTMU] vehicle script init: {} ({})", def.getId(), def.getScriptPath());
             ModelObject modelObject = buildModelObject(def);
-            RealTrainModUnofficial.LOGGER.debug("[RTMU] vehicle model graph built: {} groups={}", def.getId(),
-                    modelObject != null && modelObject.model != null ? modelObject.model.groupObjects.size() : -1);
             jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> modelSet = def.isCarType()
-                    ? new jp.ngt.rtm.modelpack.modelset.ModelSetVehicle(jp.ngt.rtm.modelpack.cfg.VehicleConfigAdapter.get(def))
-                    : new jp.ngt.rtm.modelpack.modelset.ModelSetCompat(jp.ngt.rtm.modelpack.cfg.TrainConfigAdapter.get(def.getId()));
-            // init 内の一部機能 (モニタ等) が失敗しても登録済み Parts で描画を続行する
+                    ? jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getVehicleModelSet(def.getId())
+                    : jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getTrainModelSet(def.getId());
             renderer.init(modelSet, modelObject);
             RealTrainModUnofficial.LOGGER.info("[RTMU] vehicle script init done: {}", def.getId());
 
@@ -122,17 +116,10 @@ public final class VehicleScriptRenderers {
         }
     }
 
-    /**
-     * 描画中の車両モデルの素テクスチャパス集合 (小文字正規化)。
-     * BIND_TEXTURE の再生で「素テクスチャへ戻す bind = 上書き解除」を判定する。
-     */
+    /** 描画中の車両モデルの素テクスチャパス集合 (小文字正規化)。 */
     private static java.util.Set<String> activeDefaultTexPaths = java.util.Set.of();
 
-    // ---- 車両の半透明パス (本家 Forge 描画パス 1) の遅延描画 ----
-    // ★本家 RenderVehicleBase.renderVehicleMain:78 は
-    // int pass = MinecraftForgeClient.getRenderPass;
-    // でForge の描画パスを見ており、車体 (不透明) はパス 0、
-    // 発光/方向幕/半透明 (renderBodyTransparent) はパス 1 で描く。
+    // ---- 車両の半透明パス (本家 Forge 描画パス 1) の遅延描画 ---- ★本家 Re…
     private record DeferredTranslucent(GLRecorder rec, org.joml.Matrix4f pose, org.joml.Matrix3f normal,
                                        org.joml.Matrix4f modelViewAtCapture,
                                        int packedLight, int packedOverlay,
@@ -143,11 +130,7 @@ public final class VehicleScriptRenderers {
 
     private static final java.util.List<DeferredTranslucent> TRANSLUCENT_QUEUE = new java.util.ArrayList<>();
 
-    /**
-     * ワールド描画中か。モデル選択画面のプレビューなどワールド描画の外で
-     * Scripted.render が呼ばれることがあり、そこで積むと次フレームの
-     * ワールド描画で見当違いの場所に出てしまう。その場合は積まずその場で描く。
-     */
+    /** ワールド描画中か。モデル選択画面のプレビューなどワールド描画の外で Scripted.render… */
     private static boolean levelRenderActive;
 
     private record BakedAlpha(Matrix4f modelView, PoseStack pose,
@@ -156,7 +139,7 @@ public final class VehicleScriptRenderers {
             InteriorLighting.Snapshot interior) {}
     private static final java.util.List<BakedAlpha> BAKED_ALPHA_QUEUE = new java.util.ArrayList<>();
 
-    /** Unscripted vehicles need the same terrain-before-alpha ordering as scripted ones. */
+    /** Unscripted vehicles need the same terrain-before-… */
     public static boolean deferBakedAlpha(PoseStack pose,
             java.util.function.BiConsumer<PoseStack,MultiBufferSource> draw) {
         if (!levelRenderActive || com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) return false;
@@ -183,7 +166,6 @@ public final class VehicleScriptRenderers {
             return false;
         }
         // ★シェーダーパック使用中は後回しにしない (設定ではなく自動)。
-        // 後回しにすると車両のガラスだけが AFTER_BLOCK_ENTITIES で描かれる。
         if (com.portofino.realtrainmodunofficial.client.ShaderCompat.active()) {
             return false;
         }
@@ -201,10 +183,7 @@ public final class VehicleScriptRenderers {
         return true;
     }
 
-    /**
-     * 積んでおいた車両の半透明パスを描く。RailDrawQueue がレールを描き終えた直後に呼ぶ。
-     * キューが空でも安全 (何もしない)。
-     */
+    /** 積んでおいた車両の半透明パスを描く。RailDrawQueue がレールを描き終えた直後に呼ぶ。 */
     static void flushDeferredTranslucent() {
         levelRenderActive = false;
         if (TRANSLUCENT_QUEUE.isEmpty() && BAKED_ALPHA_QUEUE.isEmpty()) {
@@ -213,8 +192,7 @@ public final class VehicleScriptRenderers {
         net.minecraft.client.renderer.MultiBufferSource.BufferSource buffer =
             net.minecraft.client.Minecraft.getInstance().renderBuffers().bufferSource();
         try {
-            // Flush each draw before restoring its captured global matrix. LocalSpaceBatch
-            // may have put the entire vehicle transform there, leaving pose as identity.
+            // Flush each draw before restoring its captured glo…
             for (BakedAlpha d : BAKED_ALPHA_QUEUE) {
                 var mv=com.mojang.blaze3d.systems.RenderSystem.getModelViewStack();
                 Vector3f[] savedLights=RailDrawQueue.currentShaderLights();
@@ -236,9 +214,6 @@ public final class VehicleScriptRenderers {
             }
             for (DeferredTranslucent d : TRANSLUCENT_QUEUE) {
                 // ★積んだ時点と再生時でグローバルの ModelView が違うと、その差だけ位置がずれる。
-                // 最終的な変換は (再生時の MV) × pose なので、pose を
-                // inverse(再生時の MV) × (積んだ時点の MV) × pose
-                // にしておけば、その場で描いたときと数学的に同じになる。
                 org.joml.Matrix4f mvNow = new org.joml.Matrix4f(
                     com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix());
                 org.joml.Matrix4f corrected = new org.joml.Matrix4f(d.pose());
@@ -287,7 +262,7 @@ public final class VehicleScriptRenderers {
 
     private static ModelObject buildModelObject(VehicleDefinition def) {
         ModelObject mo = new ModelObject(new TextureSet[0]);
-        // 車体モデルグラフ (CustomAnimator の setFacesFromParts 等が面を参照)
+        // 車体モデルグラフ (CustomAnimator の setFacesFromParts 等が面を…
         try {
             String modelFile = def.getModelFile();
             if (modelFile != null && !modelFile.isBlank()) {
@@ -317,10 +292,7 @@ public final class VehicleScriptRenderers {
         /** 既にログした失敗メッセージ。失敗の種類ごとに 1 回出す (車両ごと 1 回ではない)。 */
         private final java.util.Set<String> loggedFailures = new java.util.HashSet<>();
 
-        // --- スクリプト描画結果のキャッシュ ---------------------------------------------
-        // 本家式マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED)。
-        // スクリプトは render 内で「var MatId = renderer.currentMatId; if(MatId==5){ tessで方向幕描画 }」
-        // のように、描画中のマテリアル番号に応じてオーバーレイを描く。
+        // --- スクリプト描画結果のキャッシュ -----------------------------…
         private volatile int[] overlayMatIds;
 
         /** 1 パスぶんの記録 (通常パス or 発光パス or マテリアル別オーバーレイ)。 */
@@ -328,8 +300,7 @@ public final class VehicleScriptRenderers {
             final GLRecorder rec;
             final int pass;
             final Set<String> excluded;
-            // 非 null = マテリアル別 tessellator オーバーレイ (方向幕等)。この場合は tess 描画のみを
-            // このテクスチャで再生する (本体グループは通常パスで既に描かれているため描かない)。
+            // 非 null = マテリアル別 tessellator オーバーレイ (方向幕等)。
             final ResourceLocation overlayTexture;
             CachedPass(GLRecorder rec, int pass, Set<String> excluded) {
                 this(rec, pass, excluded, null);
@@ -346,8 +317,6 @@ public final class VehicleScriptRenderers {
         private final java.util.Set<String> defaultTexPaths = new java.util.HashSet<>();
 
         // ★以前あった「車両をまたいで使い回す記録の置き場」は撤去した。
-        // 記録はエンティティごとに持つようになり (recordCache)、
-        // 次の車両の描画で中身が書き換わることが無くなったため。
 
         Scripted(VehiclePartsRenderer renderer, ScriptEngine engine, ModelObject modelObject, String defId) {
             this.defId = defId;
@@ -369,16 +338,11 @@ public final class VehicleScriptRenderers {
             }
         }
 
-        /**
-         * 毎フレーム: スクリプト render を記録して再生する。
-         * @return true = 描画を担当した
-         */
+        /** 毎フレーム: スクリプト render を記録して再生する。 */
         public boolean render(Object entity, float partialTick, PoseStack poseStack,
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel bodyModel) {
             // ガラス (半透明) を遅延バッファへ回す判定用に、描画中の車両を記録する。
-            // replay 経路では renderNamedGroups に entity が渡らず null になるため、
-            // この記録が無いとガラスが遅延されず、色付きガラス越しのレールに色が付かない。
             com.portofino.realtrainmodunofficial.client.DeferredTranslucentRenderer.setCurrentVehicle(entity);
             activeDefaultTexPaths = this.defaultTexPaths;
             try {
@@ -393,10 +357,6 @@ public final class VehicleScriptRenderers {
                               MultiBufferSource buffer, int packedLight, int packedOverlay,
                               MqoModelLoader.MqoModel bodyModel) {
             // ★スクリプトの実行回数は RTMU では制御しない (スクリプト任せ)。
-            // ★1 両ぶんをまとめてモデルローカル空間で描く (本家 1.7.10 の glPushMatrix 相当)。
-            // 中では単位行列の pose が渡るので、頂点ごとの CPU 行列演算が消える。
-            // 車体・発光・半透明を全部この 1 つの空間で描くので、
-            // 「同じ面を別経路で変換して深度が数 ULP ずれる」問題も起きない。
             return LocalSpaceBatch.run(poseStack, buffer,
                     (localPose, localBuffer) -> renderReal(entity, partialTick, localPose,
                             localBuffer, packedLight, packedOverlay, bodyModel, null));
@@ -438,16 +398,11 @@ public final class VehicleScriptRenderers {
                         && tp.mode == tq.mode && java.util.Arrays.equals(tp.verts, tq.verts)
                         && java.util.Arrays.equals(tp.normals,tq.normals) && tp.additive==tq.additive && tp.cullFront==tq.cullFront && tp.useCurrentColor==tq.useCurrentColor;
             }
-            // Quaternionf / Set<String> / ResourceLocation / BlockState は equals で比較。
-            // PolygonModel は equals 非オーバーライド = 同一インスタンスのみ一致だが、
-            // モデルオブジェクトは使い回されるのでそれで正しい。
+            // Quaternionf / Set<String> / ResourceLocation / Bl…
             return p.equals(q);
         }
 
-        /**
-         * スクリプト描画の実処理 (本家 RenderVehicleBase.doRender と同じ)。
-         * sink が非 null のとき、再生した各パスの記録を追加してキャッシュに残す。
-         */
+        /** スクリプト描画の実処理 (本家 RenderVehicleBase.doRender と同じ)。 */
         private boolean renderReal(Object entity, float partialTick, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight, int packedOverlay,
                                    MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
@@ -463,36 +418,25 @@ public final class VehicleScriptRenderers {
         private boolean renderRealWithSelection(Object entity, float partialTick, PoseStack poseStack,
                                    MultiBufferSource buffer, int packedLight, int packedOverlay,
                                    MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
-            // ActionParts 対話用: モデルローカル→カメラの行列を記録する (本家 PICK パスの代替)。
-            // LocalSpaceBatch 有効時は pose が単位行列で modelView に外側変換が乗っているため、
-            // 両経路で一致するよう MV * pose を渡す。
+            // ActionParts 対話用: モデルローカル→カメラの行列を記録する (本家 PICK パスの…
             com.portofino.realtrainmodunofficial.client.ActionPartsPicker.record(entity,
                 new org.joml.Matrix4f(com.mojang.blaze3d.systems.RenderSystem.getModelViewMatrix())
                     .mul(poseStack.last().pose()),
                 this.renderer);
-            // 本家 RenderVehicleBase.doRender: 通常描画 (RenderPass.NORMAL) → 発光描画 (renderBodyLight)
+            // 本家 RenderVehicleBase.doRender: 通常描画 (RenderPass.N…
             GLRecorder normal = record(entity, RenderPass.NORMAL.id, partialTick);
-            // ★ isEmpty ではなく hasGeometry で判定する。スクリプトが何も描かずに落ちると
-            // glPushMatrix だけが残り isEmpty==false になるため、「描画済み」と誤判定して
-            // 素のモデル描画がスキップされ、車体が透明になる で発生)。
+            // ★ isEmpty ではなく hasGeometry で判定する。
             if (normal == null || !normal.hasGeometry()) {
                 return false;
             }
             PolygonModel graph = this.modelObject != null ? this.modelObject.model : null;
-            // 本家 ResourceState.exclusionParts: スクリプトが描画から外したパーツ (開いたドア等)。
-            // スクリプトの render 内で add/removeExclusionParts が呼ばれた後に読む。
+            // 本家 ResourceState.exclusionParts: スクリプトが描画から外したパーツ…
             java.util.Set<String> excluded = exclusionPartsOf(entity);
             // ★発光パス (RenderPass.LIGHT) を先に記録する。
-            // 描画はしないので、順序は変わらない。ここで「発光パスが実際に描くグループ」が分かる。
             GLRecorder preLight0 = recordLight0IfNeeded(entity, partialTick, bodyModel);
             java.util.Set<String> coveredGroups = groupsDrawnBy(preLight0);
             MqoModelLoader.setLightCoveredGroups(coveredGroups);
             // ★焼き込み (VBO キャッシュ) はしない。本家 1.7.10 も車両は毎フレーム投げ直している。
-            // 焼くと「いつ焼き直すか」の判定が要り、そこがバグの温床だった
-            // (静止判定・内容キーの衝突・可動部との陰影の食い違い)。
-            // 代わりに LocalSpaceBatch が pose を GPU 側へ移しているので、
-            // 毎フレーム投げても頂点あたりの CPU 演算はゼロで済む。
-            // 色ピッキング FBO: 乗車中の車両だけ、ActionParts を ID 色でオフスクリーンにも流す。
             boolean pick = com.portofino.realtrainmodunofficial.client.ActionPartsPicker
                 .shouldCapture(entity, this.renderer);
             if (pick) {
@@ -513,28 +457,18 @@ public final class VehicleScriptRenderers {
                 // excluded はエンティティ内部のライブ集合なので、キャッシュにはスナップショットを残す。
                 sink.add(new CachedPass(normal, RenderPass.NORMAL.id, excluded == null ? null : Set.copyOf(excluded)));
             }
-            // 軽量化「遠方車両のライト・方向幕を省略」: 車体 (上の NORMAL パス) は描いたので、
-            // 追加の Nashorn 実行になる発光パス・オーバーレイ・半透明パスをこの車両については省く。
-            // 既定 OFF。ON でも近距離の車両は通常どおり全部描く。
-            // ★マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED)。
+            // 軽量化「遠方車両のライト・方向幕を省略」: 車体 (上の NORMAL パス) は描いたので、 追…
             renderMaterialOverlays(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
                     bodyModel, sink);
             // ★発光パス (2-4) は半透明パス (1=窓) より先に描く。
-            // バッファ描画では同フレーム内の描画順 = RenderType の挿入順で、窓 (entityTranslucent)
-            // が先に深度を書くと、後から描いた室内灯/尾灯が窓越しの視線で深度テストに落ち、
-            // 「外から見るとライトが消えている・乗ると点いている」珍現象になる。
-            // ★本家の描画順を GPU 上でも保証する。
             flushBatch(buffer);
             renderBodyLight(entity, partialTick, poseStack, buffer, packedLight, packedOverlay,
                     bodyModel, graph, sink, preLight0);
             flushBatch(buffer);
             // ★半透明パス (TRANSPARENT=1)。
-            // pass1(半透明) を回すが、RTMU は従来 pass1 を飛ばしていた。
-            // ★後回しキューに積まれてフレーム後半まで生きるので、ここは使い回さない。
             GLRecorder transparent = record(entity, RenderPass.TRANSPARENT.id, partialTick, true);
             if (transparent != null && transparent.hasGeometry()) {
                 // ★ここでは描かず、レールを描き終えたあとへ回す (本家 Forge 描画パス 1 と同じ位置)。
-                // 詳細は TRANSLUCENT_QUEUE のコメント。
                 if (!enqueueTranslucent(transparent, poseStack, packedLight, packedOverlay, bodyModel, graph,
                         excluded, entity, this.defaultTexPaths)) {
                     // ワールド描画の外 (モデル選択画面のプレビュー等) は従来どおりその場で描く。
@@ -550,12 +484,7 @@ public final class VehicleScriptRenderers {
         }
 
         /** 本家の即時描画と同じ順序にするため、パスの区切りでバッファを吐き出す。 */
-        /**
-         * 車両描画の途中で BufferSource.endBatch を呼ぶと、
-         * そのフレームでバッファに溜まっている全ての描画が강制的に流れる。
-         * 何がどれだけ溜まっているかはカメラの向きで変わるため、視点を動かすと
-         * 描画順が入れ替わってちらつく疑いがある。
-         */
+        /** 車両描画の途中で BufferSource.endBatch を呼ぶと、 そのフレームでバッファに… */
         private static final boolean FLUSH_BETWEEN_PASSES = true;
 
         private static void flushBatch(MultiBufferSource buffer) {
@@ -567,10 +496,7 @@ public final class VehicleScriptRenderers {
             }
         }
 
-        /**
-         * 発光パス (i==0 = RenderPass.LIGHT) を先行記録する。
-         * renderBodyLight の i==0 と同じ条件で判定すること。
-         */
+        /** 発光パス (i==0 = RenderPass.LIGHT) を先行記録する。 */
         private GLRecorder recordLight0IfNeeded(Object entity, float partialTick,
                                                 MqoModelLoader.MqoModel bodyModel) {
             if (bodyModel == null) {
@@ -583,7 +509,7 @@ public final class VehicleScriptRenderers {
                 return null;
             }
             int mode = train.getTrainStateData(TrainState.TrainStateType.State_Light.id);
-            // 本家 RenderVehicleBase.renderBodyLight の i==0: doRender = (mode == 0 || mode == 1)
+            // 本家 RenderVehicleBase.renderBodyLight の i==0: doRe…
             if (mode != 0 && mode != 1) {
                 return null;
             }
@@ -624,13 +550,7 @@ public final class VehicleScriptRenderers {
             return null;
         }
 
-        /**
-         * 本家 RenderVehicleBase.renderBodyLight の忠実移植。
-         * dir         = 進行方向 (0:前 / 1:後)
-         * mode        = ライト状態 (0:消灯 / 1:前照灯 / 2:前照灯+尾灯)
-         * isFrontEmpty = 進行方向側に連結相手がいない (= 先頭車)
-         * isBackEmpty  = 逆側に連結相手がいない       (= 最後尾車)
-         */
+        /** 本家 RenderVehicleBase.renderBodyLight の忠実移植。 */
         private void renderBodyLight(Object entity, float partialTick, PoseStack poseStack,
                                      MultiBufferSource buffer, int packedLight, int packedOverlay,
                                      MqoModelLoader.MqoModel bodyModel, PolygonModel graph, List<CachedPass> sink,
@@ -638,12 +558,7 @@ public final class VehicleScriptRenderers {
             if (!(entity instanceof EntityTrainBase train)) {
                 return;
             }
-            // ★本家 renderVehicleMain は `if (modelSet.modelObj.light)` で、Light 材質が
-            // 一つも無いパックは LIGHT パスごと実行しない。
-            // 以前はここで「グループ名に light を含む」パックも通し、さらに下の doRender を
-            // ライトモード非依存 (i==0 常時) にしていた。
-            // ★ゲートは本家と同じくテクスチャ指定に Light と書かれているか
-            // (= modelObj.light)。
+            // ★本家 renderVehicleMain は `if (modelSet.modelObj.li…
             if (bodyModel == null || !(bodyModel.hasLightOption() || bodyModel.hasEmissiveBatches())) {
                 return;
             }
@@ -651,7 +566,7 @@ public final class VehicleScriptRenderers {
             int mode = train.getTrainStateData(TrainState.TrainStateType.State_Light.id);
             boolean frontEmpty = train.getConnectedTrain(dir) == null;
             boolean backEmpty = train.getConnectedTrain(1 - dir) == null;
-            // 本家 renderBodyLight の doRender。単行 (isSingleTrain かつ前後とも空) は進行方向で出し分ける。
+            // 本家 renderBodyLight の doRender。
             jp.ngt.rtm.modelpack.cfg.TrainConfig cfg = train.getConfig();
             boolean single = cfg != null && cfg.isSingleTrain && frontEmpty && backEmpty;
 
@@ -673,8 +588,7 @@ public final class VehicleScriptRenderers {
                 if (rec == null || !rec.hasGeometry()) {
                     continue;
                 }
-                // 発光パスも本体と同じ経路で描く。本家の pass0 → 発光 → 半透明 の順序は
-                // flushBatch で保たれる。
+                // 発光パスも本体と同じ経路で描く。本家の pass0 → 発光 → 半透明 の順序は flushBa…
                 replay(rec, poseStack, buffer, packedLight, packedOverlay, bodyModel, graph, pass);
                 if (sink != null) {
                     sink.add(new CachedPass(rec, pass, null));
@@ -682,10 +596,7 @@ public final class VehicleScriptRenderers {
             }
         }
 
-        /**
-         * 完全に静止した車両か? = 速度0 かつ ドア/パンタが端点 (アニメ中でない)。
-         * ここが true の間だけ描画結果をキャッシュする。
-         */
+        /** 完全に静止した車両か? = 速度0 かつ ドア/パンタが端点 (アニメ中でない)。 */
         private static boolean isFullyStatic(Object entity) {
             if (!(entity instanceof EntityTrainBase train)) {
                 return false;
@@ -709,10 +620,7 @@ public final class VehicleScriptRenderers {
         }
 
 
-        /**
-         * 描画結果を左右する車両状態のシグネチャ。これが変わったら即座に描き直す。
-         * (時間依存アニメなど、ここに含まれない変化は CACHE_REFRESH_FRAMES で救済する)
-         */
+        /** 描画結果を左右する車両状態のシグネチャ。これが変わったら即座に描き直す。 */
         private long signature(Object entity) {
             EntityTrainBase train = (EntityTrainBase) entity;
             long h = 1125899906842597L;
@@ -735,17 +643,11 @@ public final class VehicleScriptRenderers {
             return h;
         }
 
-        /** スクリプトの render(entity, pass, partialTick) を 1 パスぶん記録する。 */
+        /** スクリプトの render(entity, pass, partialTick) を 1 パスぶん… */
 
-        // ------------------------------------------------------------------
-        // スクリプト実行をフレームレートから切り離す
-        // ------------------------------------------------------------------
+        // -------------------------------------------------…
 
-        /**
-         * 1 tick を何分割まで記録し直すか。
-         * 車両の描画は毎フレーム Nashorn の render を呼び直している。
-         * ★これは描画を削る変更ではない。描くものは毎フレーム描く。
-         */
+        /** 1 tick を何分割まで記録し直すか。 車両の描画は毎フレーム Nashorn の render… */
         private static final int RECORD_QUANTA_PER_TICK = 4;
 
         /** 1 スロット = ある (パス, マテリアル) の記録と、それを録った時刻。 */
@@ -755,17 +657,11 @@ public final class VehicleScriptRenderers {
             boolean failed;
         }
 
-        /**
-         * エンティティごとの記録。弱参照なので、車両が消えれば一緒に消える。
-         * 描画スレッドからしか触らないので同期は不要。
-         */
+        /** エンティティごとの記録。弱参照なので、車両が消えれば一緒に消える。 */
         private final java.util.WeakHashMap<Object, java.util.Map<Integer, RecordSlot>> recordCache =
             new java.util.WeakHashMap<>();
 
-        /**
-         * いまの「記録時刻」。tick とフレーム内位置をまとめて量子化した値。
-         * ワールドが取れないときは Long#MIN_VALUE を返し、呼び出し側は必ず録り直す。
-         */
+        /** いまの「記録時刻」。tick とフレーム内位置をまとめて量子化した値。 */
         private static long recordQuantum(Object entity, float partialTick) {
             long gameTime;
             if (entity instanceof net.minecraft.world.entity.Entity e && e.level() != null) {
@@ -781,15 +677,10 @@ public final class VehicleScriptRenderers {
             return gameTime * RECORD_QUANTA_PER_TICK + (long) (clamped * RECORD_QUANTA_PER_TICK);
         }
 
-        /**
-         * 記録を取り直すか、前のものを使い回すかを決める。
-         * @param matId 0 = 本体パス、それ以外 = マテリアル別オーバーレイ
-         * @return 記録。スクリプトが何も描かずに落ちたときは null
-         */
+        /** 記録を取り直すか、前のものを使い回すかを決める。 */
         private GLRecorder recordCached(Object entity, int pass, int matId, float partialTick) {
             long quantum = recordQuantum(entity, partialTick);
-            // エンティティが無い (モデル選択画面のプレビュー等) / 時刻が取れない場合は
-            // 使い回さない。使い回す相手を特定できないため。
+            // エンティティが無い (モデル選択画面のプレビュー等) / 時刻が取れない場合は 使い回さない。
             if (entity == null || quantum == Long.MIN_VALUE) {
                 return recordFresh(entity, pass, matId, partialTick, new GLRecorder());
             }
@@ -826,8 +717,7 @@ public final class VehicleScriptRenderers {
                 this.renderer.currentPass = pass;
                 this.renderer.render(entity, pass, partialTick);
             } catch (Throwable t) {
-                // 以前は車両ごとに 1 回しかログしなかったため、起動直後の別要因で 1 回出ると
-                // 以後の失敗が全て無音になっていた。失敗の種類 (メッセージ) ごとに 1 回出す。
+                // 以前は車両ごとに 1 回しかログしなかったため、起動直後の別要因で 1 回出ると 以後の失敗が全て…
                 String logKey = pass + "|" + String.valueOf(t);
                 if (matId == 0 && this.loggedFailures.size() < 32 && this.loggedFailures.add(logKey)) {
                     RealTrainModUnofficial.LOGGER.warn("[RTMU] スクリプト描画に失敗: {} (pass={})",
@@ -841,8 +731,7 @@ public final class VehicleScriptRenderers {
                 com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.secEnd(
                     com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.SEC_RECORD, secStart);
             }
-            // スクリプトが落ちても記録は捨てない。
-            // (発光パスの途中で落ちる車両が多く、記録ごと捨てるとライトが消える)。
+            // スクリプトが落ちても記録は捨てない。 (発光パスの途中で落ちる車両が多く、記録ごと捨てるとライトが…
             this.renderer.consumeScriptFailure();
             return target;
         }
@@ -851,21 +740,12 @@ public final class VehicleScriptRenderers {
             return record(entity, pass, partialTick, false);
         }
 
-        /**
-         * フレーム後半まで持ち越しても他の車両に壊されない
-         * (以前は使い回しバッファだったので専用の記録が要った)
-         * @param fresh 使わない。記録はエンティティごとに持つようになったので、
-         */
+        /** フレーム後半まで持ち越しても他の車両に壊されない (以前は使い回しバッファだったので専用の記録が要… */
         private GLRecorder record(Object entity, int pass, float partialTick, boolean fresh) {
             return recordCached(entity, pass, 0, partialTick);
         }
 
-        /**
-         * マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED) を描く。
-         * スクリプトは render 内で currentMatId を見てオーバーレイを描くため、pass0 の本体描画とは
-         * 別に「オーバーレイ (tess) を持つ matId」で render を呼び直し、tess 描画だけをそのマテリアルの
-         * テクスチャで再生する。
-         */
+        /** マテリアル別 tessellator オーバーレイ (方向幕/速度計/ATC/モニタ/室内LED)… */
         private void renderMaterialOverlays(Object entity, float partialTick, PoseStack poseStack,
                                             MultiBufferSource buffer, int packedLight, int packedOverlay,
                                             MqoModelLoader.MqoModel bodyModel, List<CachedPass> sink) {
@@ -887,7 +767,7 @@ public final class VehicleScriptRenderers {
                 }
                 return;
             }
-            // 初回スキャン: 全マテリアルで render を回し、tess 描画を出す matId を発見・キャッシュ。
+            // 初回スキャン: 全マテリアルで render を回し、tess 描画を出す matId を発見・キ…
             java.util.List<Integer> found = new ArrayList<>();
             for (int matId = 1; matId < matCount; matId++) {
                 if (drawOneOverlay(entity, pass, partialTick, matId, sm, poseStack, buffer, packedLight, packedOverlay, sink)) {
@@ -917,7 +797,7 @@ public final class VehicleScriptRenderers {
             return true;
         }
 
-        /** render を指定 matId で 1 パス記録する (tessellator オーバーレイ捕捉用)。 */
+        /** render を指定 matId で 1 パス記録する (tessellator オーバーレイ捕捉… */
         private GLRecorder recordMat(Object entity, int pass, float partialTick, int matId) {
             return recordCached(entity, pass, matId, partialTick);
         }
@@ -935,8 +815,7 @@ public final class VehicleScriptRenderers {
             if (tex instanceof ResourceLocation rl) {
                 return rl;
             }
-            // ScriptMaterial.texture は ScriptTexture でラップされている (namespace/path を保持)。
-            // ここを ResourceLocation と誤判定して null を返していたため、方向幕がテクスチャ無し=空白だった。
+            // ScriptMaterial.texture は ScriptTexture でラップされている…
             if (tex instanceof MqoModelLoader.ScriptTexture st) {
                 try {
                     return ResourceLocation.fromNamespaceAndPath(st.namespace, st.path);
@@ -954,15 +833,10 @@ public final class VehicleScriptRenderers {
         replay(rec, poseStack, buffer, packedLight, packedOverlay, model, bodyGraph, RenderPass.NORMAL.id, null);
     }
 
-    /**
-     * tessellator 描画 (DRAW_TESS) だけを再生する (本家式マテリアル別オーバーレイ = 方向幕等)。
-     * 本体グループ (RENDER_GROUPS/RENDER_PARTS/DRAW_MODEL_GROUP) は通常パスで既に描かれているので描かない。
-     */
+    /** tessellator 描画 (DRAW_TESS) だけを再生する (本家式マテリアル別オーバー… */
     static void replayTessOnly(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                                int packedLight, int packedOverlay, ResourceLocation defaultTex) {
-        // 方向幕/速度計/ATC/モニタ/室内LED は発光する表示器 (JSON の "Light" マテリアル) なので、
-        // 既定で FULL_BRIGHT にして昼夜問わず読めるようにする。スクリプトが明示 setBrightness した
-        // 場合はそれを優先 (負値リセットは表示器なので FULL_BRIGHT に戻す)。
+        // 方向幕/速度計/ATC/モニタ/室内LED は発光する表示器 (JSON の "Light" マテ…
         long secStart = com.portofino.realtrainmodunofficial.client.ClientRenderProfiler.sec();
         final int fullBright = net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
         int light = fullBright;
@@ -1020,7 +894,7 @@ public final class VehicleScriptRenderers {
                     }
                 }
                 default -> {
-                    // RENDER_GROUPS/RENDER_PARTS/DRAW_MODEL_GROUP/COLOR は本体描画なので無視
+                    // RENDER_GROUPS/RENDER_PARTS/DRAW_MODEL_GROUP/COLOR…
                 }
             }
             }
@@ -1040,25 +914,14 @@ public final class VehicleScriptRenderers {
         replay(rec, poseStack, buffer, packedLight, packedOverlay, model, bodyGraph, legacyPass, null);
     }
 
-    /**
-     * スクリプトが描いたグループを ***_light0/1/2.png に差し替えて重ねる
-     * (本家 ModelObject.renderWithTexture と同じ)。
-     * パーツ (ドアが開いた側の扉など)。null なら除外なし。
-     * @param legacyPass 本家 RenderPass の id。2 以上 (LIGHT/LIGHT_FRONT/LIGHT_BACK) のとき、
-     * @param excluded   本家 ResourceState.exclusionParts。スクリプトが「今は描かない」と指定した
-     */
+    /** スクリプトが描いたグループを ***_light0/1/2.png に差し替えて重ねる (本家 M… */
     static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                        int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
                        PolygonModel bodyGraph, int legacyPass, java.util.Set<String> excluded) {
         replay(rec, poseStack, buffer, packedLight, packedOverlay, model, bodyGraph, legacyPass, excluded, null);
     }
 
-    /**
-     * テクスチャ (モデル定義の "default")。
-     * 本家は描画前にモデルの default テクスチャを bind してからスクリプトを
-     * 呼ぶため、RenderSimpleCatenary.js は自分では bind せず UV だけ指定する。
-     * @param defaultTessTex スクリプトが bindTexture を呼ばずに tessellator で描く場合に使う
-     */
+    /** テクスチャ (モデル定義の "default")。 */
     @SuppressWarnings("unchecked")
     static void replay(GLRecorder rec, PoseStack poseStack, MultiBufferSource buffer,
                                int packedLight, int packedOverlay, MqoModelLoader.MqoModel model,
@@ -1126,9 +989,7 @@ public final class VehicleScriptRenderers {
                     colA = cmd.d;
                 }
                 case BIND_TEXTURE -> {
-                    // 素テクスチャへの「復帰」bind (CustomLightParts の描画後処理等) は上書き解除。
-                    // 解除しないと以降の全パーツがそのテクスチャ+生グラフ描画になり、
-                    // パンタ上げ等でライト描画が走った瞬間にテクスチャが壊れる。
+                    // 素テクスチャへの「復帰」bind (CustomLightParts の描画後処理等) は上書き解…
                     if (cmd.payload instanceof GLRecorder.TexBind tb) {
                         overrideTex = (tb.location() == null || isDefaultTexturePath(tb.rawPath())) ? null : tb.location();
                     } else {
@@ -1138,10 +999,6 @@ public final class VehicleScriptRenderers {
                 case RENDER_PARTS, RENDER_GROUPS -> {
                     if (cmd.payload instanceof Set<?> names) {
                         // 色ピッキング FBO 用: ActionParts を ID 色で専用バッファへ流す。
-                        // ★Parts インスタンスが分かる場合はインスタンス単位で流す。
-                        //   名前一致だけだと、同じグループ名を複数箇所に描くスクリプト
-                        //   (RenderTorii.js の数字キー 10 個 = 全て "key") で別パーツを
-                        //   区別できず、押したキーと違う ID が返る。
                         if (cmd.partsRef instanceof jp.ngt.rtm.render.ActionParts apRef) {
                             com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer.emitParts(
                                 apRef, poseStack, packedLight, packedOverlay);
@@ -1150,21 +1007,18 @@ public final class VehicleScriptRenderers {
                                 (Set<String>) names, poseStack, packedLight, packedOverlay);
                         }
                         if (overrideTex != null && bodyGraph != null) {
-                            // テクスチャ差し替え中 (発光/ヘッドライト等): モデルグラフから
-                            // 同グループの面を差し替えテクスチャで描画 (UV は MQO のまま)
+                            // テクスチャ差し替え中 (発光/ヘッドライト等): モデルグラフから 同グループの面を差し替えテクス…
                             for (Object name : names) {
                                 drawModelGroup(bodyGraph, String.valueOf(name), poseStack, buffer,
                                         light, packedOverlay, overrideTex, colR, colG, colB, colA, true,
                                         legacyPass);
                             }
                         } else if (model != null && legacyPass >= RenderPass.LIGHT.id) {
-                            // 発光パス: Light マテリアルの面だけを ***_light0/1/2.png で描き直す
-                            // (本家 ModelObject.renderWithTexture と同じ。グループ名は見ない)
+                            // 発光パス: Light マテリアルの面だけを ***_light0/1/2.png で描き直す (…
                             model.renderNamedGroupsEmissive(poseStack, LegacyColorBuffer.tint(buffer,colR,colG,colB,colA), light, packedOverlay,
                                     (Set<String>) names, legacyPass);
                         } else if (model != null) {
                             // 本家 RenderVehicleBase と同じく pass で不透明/半透明を切り替える。
-                            // pass0(NORMAL)=不透明テクスチャ、pass1(TRANSPARENT)=window テクスチャ+ブレンド。
                             boolean translucentPass = legacyPass == RenderPass.TRANSPARENT.id;
                             model.renderNamedGroups(poseStack, LegacyColorBuffer.tint(buffer,colR,colG,colB,colA), light, packedOverlay, translucentPass,
                                     (Set<String>) names, null, excluded);
@@ -1173,8 +1027,7 @@ public final class VehicleScriptRenderers {
                 }
                 case DRAW_TESS -> {
                     if (cmd.payload instanceof GLRecorder.TessDraw draw) {
-                        // スクリプトが bind していなければモデル定義の default テクスチャで描く
-                        // (架線スクリプトは bind せず UV だけ指定するため、ここが無いと白板になる)。
+                        // スクリプトが bind していなければモデル定義の default テクスチャで描く (架線スクリ…
                         drawTess(draw, poseStack, draw.useCurrentColor ? LegacyColorBuffer.tint(buffer,colR,colG,colB,colA) : buffer, light, packedOverlay,
                                 overrideTex != null ? overrideTex : defaultTessTex);
                     }
@@ -1187,8 +1040,7 @@ public final class VehicleScriptRenderers {
                     }
                 }
                 case RENDER_BLOCK -> {
-                    // NGTO Builder のミニチュアプレビュー: バニラ BlockState のゴーストを描く
-                    // (a/b/c = ミニチュア内の相対座標)。テクスチャはブロックアトラス側が持つ。
+                    // NGTO Builder のミニチュアプレビュー: バニラ BlockState のゴーストを描く…
                     if (cmd.payload instanceof net.minecraft.world.level.block.state.BlockState st
                             && !st.isAir()) {
                         poseStack.pushPose();
@@ -1214,11 +1066,7 @@ public final class VehicleScriptRenderers {
     private static final int GL_TRIANGLE_FAN = 6;
     private static final int GL_QUADS = 7;
 
-    /**
-     * 前照灯/回転灯のボリュームライト用の加算合成 RenderType。
-     * 本家 renderLightEffect は glBlendFunc(GL_SRC_ALPHA, GL_ONE) で描くため、
-     * 既定の entityTranslucent (アルファ合成) だと光が薄く暗くなる。
-     */
+    /** 前照灯/回転灯のボリュームライト用の加算合成 RenderType。 */
     public static final RenderType ADDITIVE_TESS = RenderType.create(
         "rtmu_additive_light",
         com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY,
@@ -1236,11 +1084,7 @@ public final class VehicleScriptRenderers {
             .setWriteMaskState(net.minecraft.client.renderer.RenderStateShard.COLOR_WRITE)
             .createCompositeState(false));
 
-    /**
-     * 本家 ActionParts の輪郭線用 RenderType。
-     * glCullFace(GL_FRONT) を再現するため CULL を有効にし、描画側で
-     * {@code RenderSystem.cullFace(FRONT)} を設定して<b>即時 flush</b> する。
-     */
+    /** 本家 ActionParts の輪郭線用 RenderType。 */
     public static final RenderType OUTLINE_TESS = RenderType.create(
         "rtmu_outline_light",
         com.mojang.blaze3d.vertex.DefaultVertexFormat.NEW_ENTITY,
@@ -1266,8 +1110,6 @@ public final class VehicleScriptRenderers {
         ResourceLocation tex = texture != null ? texture
                 : ResourceLocation.withDefaultNamespace("textures/misc/white.png");
         // 本家はブレンド有効の即時描画 — 半透明テクスチャ (方向幕/LCD) を正しく合成する。
-        // ボリュームライト (additive) は加算合成で描く。
-        // 輪郭線 (cullFront) は glCullFace(GL_FRONT) を再現する。
         if (draw.cullFront) {
             com.mojang.blaze3d.systems.RenderSystem.enableCull();
             org.lwjgl.opengl.GL11.glCullFace(org.lwjgl.opengl.GL11.GL_FRONT);
@@ -1325,15 +1167,14 @@ public final class VehicleScriptRenderers {
                 }
             }
             default -> {
-                // Unsupported primitive modes do not produce triangles.
+                // Unsupported primitive modes do not produce triang…
             }
         }
         } finally {
             if(previousNormals==null) TESS_NORMALS.remove(); else TESS_NORMALS.set(previousNormals);
         }
         if (draw.cullFront) {
-            // 前面カリングは flush 時の GL 状態で決まる。ここで即時 flush しないと
-            // 復元後の状態で描かれてしまう (= 本家 glCullFace(GL_FRONT) が効かない)。
+            // 前面カリングは flush 時の GL 状態で決まる。
             if (buffer instanceof MultiBufferSource.BufferSource bs) {
                 bs.endBatch(OUTLINE_TESS);
             }
@@ -1367,9 +1208,7 @@ public final class VehicleScriptRenderers {
                                    Vector3f normal, int light, int overlay) {
         int o = index * 9;
         Matrix4f mat = pose.pose();
-        // バニラの addVertex(Matrix4f,..)/setNormal(Pose,..) は頂点ごとに new Vector3f を
-        // 確保する。スクリプト車両は 1 フレームに数万頂点を流すため GC 負荷が大きい。
-        // 変換式は同一のまま確保だけを避ける (見た目は不変)。
+        // バニラの addVertex(Matrix4f,..)/setNormal(Pose,..) は頂…
         VertexConsumer written = VertexWriter.addVertex(vc, mat, v[o], v[o + 1], v[o + 2])
                 .setColor(v[o + 5], v[o + 6], v[o + 7], v[o + 8])
                 .setUv(v[o + 3], v[o + 4])
@@ -1381,11 +1220,7 @@ public final class VehicleScriptRenderers {
         } else VertexWriter.setNormal(written, pose, normal.x, normal.y, normal.z);
     }
 
-    /**
-     * drawModelGroup 用の平坦化済み頂点キャッシュ (モデル → 小文字グループ名 → {x,y,z,u,v,nx,ny,nz}×N)。
-     * 旧実装は毎フレーム「グループ線形探索 + face ごとの int[]/Vector3f 確保 + 法線計算 + UV 範囲チェック」を
-     * やり直していて、これが列車描画 5ms/両 の主犯だった (F8 実測 mGrp=4.4ms/f。
-     */
+    /** drawModelGroup 用の平坦化済み頂点キャッシュ (モデル → 小文字グループ名 → {… */
     private static final java.util.Map<PolygonModel, java.util.Map<String, float[]>> FLAT_GROUP_CACHE =
         new java.util.WeakHashMap<>();
     private static final float[] FLAT_EMPTY = new float[0];
@@ -1404,7 +1239,7 @@ public final class VehicleScriptRenderers {
         return flat;
     }
 
-    /** 旧 drawModelGroup の展開ロジックそのまま (四角形はそのまま/三角形は縮退クアッド/5角以上は扇状分割)。 */
+    /** 旧 drawModelGroup の展開ロジックそのまま (四角形はそのまま/三角形は縮退クアッド… */
     private static float[] buildFlatGroup(GroupObject group, boolean smoothing) {
         return com.portofino.realtrainmodunofficial.client.model.LegacyModelGeometry.flatten(group, smoothing);
     }
@@ -1435,8 +1270,7 @@ public final class VehicleScriptRenderers {
         }
         ResourceLocation tex = texture != null ? texture
                 : ResourceLocation.withDefaultNamespace("textures/misc/white.png");
-        // ModelObject binds the original image for every pass. Texture names do
-        // not select additive blending, and transparent texels are never rewritten.
+        // ModelObject binds the original image for every pa…
         boolean normalPass = legacyPass == RenderPass.NORMAL.id;
         boolean cull = MqoModelLoader.shouldCullModelFaces(null);
         boolean blend = !normalPass;
@@ -1452,14 +1286,12 @@ public final class VehicleScriptRenderers {
         PoseStack.Pose pose = poseStack.last();
         Matrix4f mat = pose.pose();
         org.joml.Matrix3f nm = pose.normal();
-        // 色はバニラ setColor(float×4) の式 (int)(f*255.0F) を 1 回だけ前計算 (結果は同一)。
+        // 色はバニラ setColor(float×4) の式 (int)(f*255.0F) を 1 回だ…
         int cr = (int) (colR * 255.0F);
         int cg = (int) (colG * 255.0F);
         int cb = (int) (colB * 255.0F);
         int ca = (int) (colA * 255.0F);
-        // ★法線の行列変換は頂点ごと。
-        // 面ごと 1 回で済ませていたが、buildFlatGroup がスムージング済みの頂点法線を書くように
-        // なったので 4 頂点は別々の値を持つ。
+        // ★法線の行列変換は頂点ごと。 面ごと 1 回で済ませていたが、buildFlatGroup がスム…
         int[] indices=com.portofino.realtrainmodunofficial.client.model.LegacyTriangleSubmission.indices(flat);
         for(int submitted=0;submitted<(mode==com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS?flat.length/8:indices.length);submitted++) {
             int index=mode==com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS?submitted:indices[submitted];

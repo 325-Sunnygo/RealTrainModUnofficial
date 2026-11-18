@@ -13,10 +13,7 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
-/**
- * ブロック製の乗り物の描画。本家 {@code RenderVehicleBase.renderVehicleNGTO} 相当。
- * NGTO のブロック一覧を 1 個ずつバニラのブロック描画で置く (模型と同じやり方)。
- */
+/** ブロック製の乗り物の描画。本家 RenderVehicleBase.renderVehicleNG… */
 public class NgtoVehicleRenderer extends EntityRenderer<EntityVehicle> {
 
     public NgtoVehicleRenderer(EntityRendererProvider.Context context) {
@@ -37,7 +34,7 @@ public class NgtoVehicleRenderer extends EntityRenderer<EntityVehicle> {
             Mth.lerp(partialTicks, entity.prevRotationRoll, entity.rotationRoll)));
         float scale = obj.scale <= 0.0F ? 1.0F : obj.scale;
         poseStack.scale(scale, scale, scale);
-        //中央を原点にする (NGTO はコーナー原点)
+        // 中央を原点にする (NGTO はコーナー原点)
         poseStack.translate(-obj.ngto.xSize / 2.0D + obj.offsetX,
             obj.offsetY, -obj.ngto.zSize / 2.0D + obj.offsetZ);
 

@@ -5,11 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 
-/**
- * 1x1 の白テクスチャ。
- * 本家の看板は板の側面と (backTexture==2 の) 裏面を「テクスチャ無しの単色」で塗っていた
- * (glDisable(GL_TEXTURE_2D) + 頂点カラー)。
- */
+/** 1x1 の白テクスチャ。 本家の看板は板の側面と (backTexture==2 の) 裏面を「テ… */
 public final class SolidTexture {
     private static ResourceLocation white;
 

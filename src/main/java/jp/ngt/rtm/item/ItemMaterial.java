@@ -6,12 +6,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-/**
- * 部品。本家 {@code new ItemMultiIcon(RTMItem.MaterialType.values())} の移植。
- *
- * <p>本家はメタ 0/1/2/3/4/8 で 6 種を出す。1.21 にメタが無いので
- * {@link RealTrainModUnofficialComponents#ITEM_VARIANT} に<b>本家と同じ id</b> を持たせている。
- */
+/** 部品。本家 new ItemMultiIcon(RTMItem.MaterialType.valu… */
 public class ItemMaterial extends Item {
 
     /** 本家のメタ。表示名と絵をこれで決める。 */
@@ -38,7 +33,7 @@ public class ItemMaterial extends Item {
         return Component.translatable("item." + RealTrainModUnofficial.MODID + ".material." + this.variant);
     }
 
-    /** 本家 {@code RTMItem.MaterialType}。id は飛び番 (8) も含めてそのまま。 */
+    /** 本家 RTMItem.MaterialType。id は飛び番 (8) も含めてそのまま。 */
     public enum MaterialType {
         SHAFT(0),
         WHEEL(1),

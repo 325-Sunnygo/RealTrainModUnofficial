@@ -23,10 +23,7 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 
-/**
- * ペインター (neo mcte)。本家 MCTE ItemPainter の移植。
- * クリックした所を中心に、設定した形と大きさでブロックを塗る。
- */
+/** ペインター (neo mcte)。本家 MCTE ItemPainter の移植。 */
 public class PainterItem extends Item {
 
     public static final String KEY_BLOCK = "Block";

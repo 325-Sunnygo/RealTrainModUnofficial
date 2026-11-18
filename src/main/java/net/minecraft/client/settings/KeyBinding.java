@@ -1,10 +1,6 @@
 package net.minecraft.client.settings;
 
-/**
- * 1.7.10 の net.minecraft.client.settings.KeyBinding スタブ。
- * 1.21 では net.minecraft.client.KeyMapping に置き換わり、net.minecraft.client.settings
- * パッケージ自体が存在しない (=モジュール衝突しない)。
- */
+/** 1.7.10 の net.minecraft.client.settings.KeyBinding… */
 public class KeyBinding implements Comparable<KeyBinding> {
     private final String description;
     private int keyCode;

@@ -19,12 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * 本家 jp.ngt.rtm.entity.npc.macro.MacroRecorder の移植 (運転マクロの録画)。
- * /rtm macro start で録画開始 → 自分で列車を運転 (ノッチ/ドア/警笛が
- * 相対時刻つきで記録される) → /rtm macro stop で
- * config/realtrainmodunofficial/macro/日時.txt に保存。
- */
+/** 本家 jp.ngt.rtm.entity.npc.macro.MacroRecorder の移植… */
 public final class MacroRecorder {
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd_HH.mm.ss");
@@ -99,7 +94,7 @@ public final class MacroRecorder {
         session.commands.add(new TrainCommand(time, type, param));
     }
 
-    /** 本家 recNotch: ノッチの増分を記録 (EntityTrainBase.addNotch から)。 */
+    /** 本家 recNotch: ノッチの増分を記録 (EntityTrainBase.addNotch… */
     public static void recNotch(Entity driver, int notchInc) {
         record(driver, CommandType.Notch, notchInc);
     }

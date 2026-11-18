@@ -5,10 +5,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 
-/**
- * 1台車のレール追従状態。
- * 補間によってなめらかな座標・角度を計算する。
- */
+/** 1台車のレール追従状態。 補間によってなめらかな座標・角度を計算する。 */
 public final class BogieTracker {
 
     public static final int SPLIT_PER_METER = 32;
@@ -36,20 +33,14 @@ public final class BogieTracker {
         return map != null && split > 0;
     }
 
-    /**
-     * 前台車を meters メートル前進させる。
-     * レール区間の端に達したら隣接区間へ乗り換える。
-     */
+    /** 前台車を meters メートル前進させる。 レール区間の端に達したら隣接区間へ乗り換える。 */
     public void advance(double meters, Level level) {
         if (!isValid()) return;
         walkInPlace(meters, level);
         sampleState();
     }
 
-    /**
-     * source 台車の位置から offset メートルだけレールを遡って自身を配置する。
-     * 後台車の配置に使用（offset は負値）。
-     */
+    /** source 台車の位置から offset メートルだけレールを遡って自身を配置する。 */
     public void walkFrom(BogieTracker source, double offset, Level level) {
         if (!source.isValid()) return;
         this.core = source.core;
@@ -62,10 +53,7 @@ public final class BogieTracker {
         alignYawTo(source.yaw);
     }
 
-    /**
-     * 指定ワールド座標の近傍レールを探して位置を初期化する。
-     * @return スナップに成功すれば true
-     */
+    /** 指定ワールド座標の近傍レールを探して位置を初期化する。 */
     public boolean initAt(double x, double y, double z, float initYaw, Level level) {
         jp.ngt.rtm.rail.TileEntityLargeRailCore c = findCore(level, x, y, z);
         if (c == null) c = this.core;
@@ -100,14 +88,9 @@ public final class BogieTracker {
         roll = 0;
     }
 
-    // -------------------------------------------------------------------------
-    // 内部ロジック
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------…
 
-    /**
-     * meters メートル分だけ現在の map/index を前進させる。
-     * meters > 0 で前進（direction 方向）、< 0 で後退。
-     */
+    /** meters メートル分だけ現在の map/index を前進させる。 */
     private void walkInPlace(double meters, Level level) {
         int dir = meters >= 0 ? this.direction : -this.direction;
         double remaining = Math.abs(meters);
@@ -179,10 +162,7 @@ public final class BogieTracker {
         this.roll = map.getCant(split, low);
     }
 
-    /**
-     * 後台車用: source の yaw を参照して自身の yaw 方向を決定し直す。
-     * 後台車の yaw は「列車前進方向の逆」になる。
-     */
+    /** 後台車用: source の yaw を参照して自身の yaw 方向を決定し直す。 */
     private void alignYawTo(float referenceYaw) {
         if (map == null || split <= 0) return;
         int idx = Math.max(0, Math.min(split, (int) Math.round(this.index)));
@@ -193,9 +173,7 @@ public final class BogieTracker {
         this.pitch = snapPitch(map.getRailPitch(split, idx), rawYaw, this.yaw);
     }
 
-    // -------------------------------------------------------------------------
-    // 隣接レール探索
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------…
 
     private record RailTransition(jp.ngt.rtm.rail.TileEntityLargeRailCore core, RailMap map, int split,
                                    double startIndex, int entryDir) {}
@@ -251,9 +229,7 @@ public final class BogieTracker {
         return best;
     }
 
-    // -------------------------------------------------------------------------
-    // 静的ユーティリティ（TrainEntity の連結コードからも使用）
-    // -------------------------------------------------------------------------
+    // -------------------------------------------------…
 
     /** マップの分割数を計算する（RTM 本家と同一ロジック）。 */
     public static int splitForMap(RailMap map) {
@@ -261,10 +237,7 @@ public final class BogieTracker {
         return Math.max(2, (int) (map.getHorizontalPathLength() * SPLIT_PER_METER));
     }
 
-    /**
-     * ブロック位置のレールから本家コア ({@link jp.ngt.rtm.rail.TileEntityLargeRailCore}) を解決する。
-     * コア自身か、レール/道床ブロック ({@code TileEntityLargeRailBase}) の {@code getRailCore()} 経由。
-     */
+    /** ブロック位置のレールから本家コア (jp.ngt.rtm.rail.TileEntityLarge… */
     public static jp.ngt.rtm.rail.TileEntityLargeRailCore findCoreDirect(Level level, BlockPos pos) {
         if (level.getBlockEntity(pos) instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore core && core.isLoaded()) {
             return core;
@@ -278,10 +251,7 @@ public final class BogieTracker {
         return null;
     }
 
-    /**
-     * ワールド座標近傍のレールコアを探す。
-     * まず真上~下の列を検索し、見つからなければ XZ ±1 ブロックも検索する。
-     */
+    /** ワールド座標近傍のレールコアを探す。 まず真上~下の列を検索し、見つからなければ XZ ±1 ブロ… */
     public static jp.ngt.rtm.rail.TileEntityLargeRailCore findCore(Level level, double x, double y, double z) {
         int px = (int) Math.floor(x);
         int py = (int) Math.floor(y);

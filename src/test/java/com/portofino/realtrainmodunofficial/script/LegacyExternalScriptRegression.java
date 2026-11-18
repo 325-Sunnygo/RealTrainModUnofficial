@@ -4,7 +4,7 @@ import java.util.*;
 import java.util.zip.ZipFile;
 import jp.ngt.ngtlib.io.ScriptUtil;
 
-/** Loads real external renderer entry points without a game or a world. */
+/** Loads real external renderer entry points without… */
 public final class LegacyExternalScriptRegression {
     public static void main(String[] args) throws Exception {
         net.neoforged.fml.loading.LoadingModList.of(List.of(),List.of(),List.of(),List.of(),Map.of());
@@ -47,7 +47,7 @@ public final class LegacyExternalScriptRegression {
             try {
                 ScriptUtil.doScriptFunction(engine,"render",null,0,0F);
                 ScriptUtil.doScriptFunction(engine,"render",null,1,0F);
-                // Call the actual HUD function, which the null vehicle preview never enters.
+                // Call the actual HUD function, which the null vehi…
                 engine.eval("renderSharedGui('SRBX regression',new ResourceLocation('minecraft','textures/superrailbuilderx/icon_builder1.png'),[],null)");
                 if(recorder.getCommands().stream().noneMatch(cmd->cmd.op==jp.ngt.ngtlib.renderer.GLRecorder.Op.DRAW_TEXT))throw new AssertionError("SRBX HUD did not draw text: "+name);
                 if (!recorder.hasGeometry()) throw new AssertionError("No preview geometry: "+name);

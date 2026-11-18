@@ -2,9 +2,7 @@ package jp.ngt.rtm.block.decoration;
 
 import jp.ngt.rtm.block.decoration.Face.FaceType;
 
-/**
- * 装飾ブロックの要素 (面の束)。本家 {@code Element} の移植。
- */
+/** 装飾ブロックの要素 (面の束)。本家 Element の移植。 */
 public class Element implements Cloneable {
     public String name;
     public Face[] faces;

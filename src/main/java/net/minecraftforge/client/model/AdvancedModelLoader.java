@@ -2,10 +2,7 @@ package net.minecraftforge.client.model;
 
 import net.minecraft.resources.ResourceLocation;
 
-/**
- * 1.7.10 Forge の net.minecraftforge.client.model.AdvancedModelLoader スタブ。
- * 本家は OBJ/TCN モデルを読み込んで IModelCustom を返す。
- */
+/** 1.7.10 Forge の net.minecraftforge.client.model.Ad… */
 public final class AdvancedModelLoader {
 
     private AdvancedModelLoader() {

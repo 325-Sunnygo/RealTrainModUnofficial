@@ -3,7 +3,7 @@ package com.portofino.realtrainmodunofficial.util;
 import java.util.LinkedHashMap;
 import java.util.function.*;
 
-/** Weighted LRU: recently used models remain protected even while over budget. */
+/** Weighted LRU: recently used models remain protect… */
 public final class ProtectedModelCache<K,V> {
     private record Entry<V>(V value,long bytes,long touched) {}
     private final LinkedHashMap<K,Entry<V>> entries=new LinkedHashMap<>(16,.75F,true);

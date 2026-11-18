@@ -5,22 +5,14 @@ import java.util.Arrays;
 public class TrainConfig extends VehicleBaseConfig implements IConfigWithType {
     public static final String TYPE = "ModelTrain";
 
-    /**
-     * 車両名（重複不可）
-     */
+    /** 車両名（重複不可） */
     public String trainName;
-    /**
-     * 車両のタイプ(EC:電車, DC:気動車, EL:電気機関車, DL:ディーゼル機関車, SL:蒸気機関車, CC:コンテナ車, TC:タンク車, N:なし)
-     */
+    /** 車両のタイプ(EC:電車, DC:気動車, EL:電気機関車, DL:ディーゼル機関車, SL:蒸… */
     public String trainType;
 
-    /**
-     * 車体モデル
-     */
+    /** 車体モデル */
     private ModelSource trainModel2;
-    /**
-     * 台車モデル {front, back}
-     */
+    /** 台車モデル {front, back} */
     private ModelSource[] bogieModel3;
 
     @Deprecated
@@ -34,65 +26,36 @@ public class TrainConfig extends VehicleBaseConfig implements IConfigWithType {
     @Deprecated
     private String bogieTexture;
 
-    /**
-     * ブレーキ緩解音
-     */
+    /** ブレーキ緩解音 */
     public String sound_BrakeRelease;
-    /**
-     * ブレーキ緩解音(弱め)
-     */
+    /** ブレーキ緩解音(弱め) */
     public String sound_BrakeRelease2;
-    /**
-     * ジョイント音を鳴らさない
-     */
+    /** ジョイント音を鳴らさない */
     public boolean muteJointSound;
-    /**
-     * 2回目のジョイント音の遅延具合(m)<br>
-     * [2][1~]
-     */
-    public float[][] jointDelay;//3つ以上の車輪対応,台車前後別
+    /** 2回目のジョイント音の遅延具合(m) [2][1~] */
+    public float[][] jointDelay;// 3つ以上の車輪対応,台車前後別
 
-    /**
-     * 単行かどうか
-     */
+    /** 単行かどうか */
     public boolean isSingleTrain;
 
-    /**
-     * 台車の位置{x, y, z}
-     */
+    /** 台車の位置{x, y, z} */
     private float[][] bogiePos;
-    /**
-     * 車体長の半分
-     */
+    /** 車体長の半分 */
     public float trainDistance;
 
-    /**
-     * 加速度<br>
-     * N km/h/s -> N x 0.0006944
-     */
+    /** 加速度 N km/h/s -> N x 0.0006944 */
     public float accelerateion;
 
-    /**
-     * 加速度ノッチ段数と同一<br>
-     * N km/h/s -> N x 0.0006944
-     */
+    /** 加速度ノッチ段数と同一 N km/h/s -> N x 0.0006944 */
     public float[] accelerateions;
-    /**
-     * ノッチごとの速度上限(1~5段)
-     */
+    /** ノッチごとの速度上限(1~5段) */
     public float[] maxSpeed;
-    /**
-     * GUIオフ時は7段でデフォルトブレーキ段数固定
-     */
+    /** GUIオフ時は7段でデフォルトブレーキ段数固定 */
     public float[] deccelerations;
 
-    /**
-     * カーブでの傾き具合(0.0~1.0)
-     */
+    /** カーブでの傾き具合(0.0~1.0) */
     public float rolling;
-    /**
-     * パンタグラフの摺板位置{X,Z,minY,maxY}
-     */
+    /** パンタグラフの摺板位置{X,Z,minY,maxY} */
     public float[][] pantoPos;
 
     public float rollSpeedCoefficient;
@@ -203,10 +166,7 @@ public class TrainConfig extends VehicleBaseConfig implements IConfigWithType {
         return this.bogiePos;
     }
 
-    /**
-     * モデル製作者の方へ<br>
-     * ここは無視してください
-     */
+    /** モデル製作者の方へ ここは無視してください */
     public static TrainConfig getDummyConfig() {
         TrainConfig config = new TrainConfig();
         config.trainName = "Dummy";

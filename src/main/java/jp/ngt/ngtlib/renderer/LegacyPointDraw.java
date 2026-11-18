@@ -3,7 +3,7 @@ package jp.ngt.ngtlib.renderer;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL32.GL_PROGRAM_POINT_SIZE;
 
-/** Draw actual GL_POINTS and restore both fixed/programmed point-size state. */
+/** Draw actual GL_POINTS and restore both fixed/prog… */
 public final class LegacyPointDraw {
     private LegacyPointDraw() {}
     public static void draw(int count,float size) {

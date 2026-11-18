@@ -12,10 +12,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.concurrent.CompletableFuture;
 
-/**
- * レガシー音源パックのステレオ音をロード時にモノラルへ変換する (LegacyStereoDownmix)。
- * OpenAL はステレオ音源を距離減衰しないため、そのままだと走行音が全域で最大音量になる。
- */
+/** レガシー音源パックのステレオ音をロード時にモノラルへ変換する (LegacyStereoDownm… */
 @Mixin(SoundBufferLibrary.class)
 public abstract class SoundBufferLibraryMixin {
 

@@ -4,11 +4,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * モデルのグループを名前で一時的に隠す (調査用)。
- * 「変な板が出ている」「この部品だけ描かれない」といった報告は、
- * どの部品なのかを先に確定させないと直しようがない。
- */
+/** モデルのグループを名前で一時的に隠す (調査用)。 */
 public final class DebugHiddenGroups {
 
     private static final Set<String> HIDDEN = ConcurrentHashMap.newKeySet();
@@ -16,7 +12,7 @@ public final class DebugHiddenGroups {
     private DebugHiddenGroups() {
     }
 
-    /** @return true = 以後隠す / false = 表示に戻した */
+    
     public static boolean toggle(String groupName) {
         String key = normalize(groupName);
         if (key.isEmpty()) {

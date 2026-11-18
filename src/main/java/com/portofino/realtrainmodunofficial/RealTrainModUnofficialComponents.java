@@ -8,12 +8,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
-/**
- * DataComponentsを追加するクラス
- * DataComponentsは、1.20.5よりNBTタグの代替としてItemStackに導入された状態管理手段。
- * 今後のアップデートでアイテムだけでなくNBTを使用するあらゆる要素に拡大していくと予測されており、
- * これからはNBTタグではなくこちらを利用することが推奨されている。
- */
+/** DataComponentsを追加するクラス DataComponentsは、1.20.5よりNB… */
 public class RealTrainModUnofficialComponents {
     public static final DeferredRegister.DataComponents REGISTRAR = DeferredRegister.createDataComponents(
         Registries.DATA_COMPONENT_TYPE,
@@ -34,12 +29,7 @@ public class RealTrainModUnofficialComponents {
         builder -> builder.persistent(Codec.STRING).networkSynchronized(ByteBufCodecs.STRING_UTF8)
     );
 
-    /**
-     * レールアイテムに焼き込まれた道床ブロック ("minecraft:gravel" など)。
-     *
-     * <p>本家と同じで、アイテムごとに道床が決まっている。
-     * 敷いたあとレールをいじっても道床は変わらない。
-     */
+    /** レールアイテムに焼き込まれた道床ブロック ("minecraft:gravel" など)。 */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> SELECTED_BALLAST
         = REGISTRAR.registerComponentType(
         "selected_ballast",
@@ -52,10 +42,7 @@ public class RealTrainModUnofficialComponents {
         builder -> builder.persistent(CompoundTag.CODEC).networkSynchronized(ByteBufCodecs.COMPOUND_TAG)
     );
 
-    /**
-     * 1.20.5+ DataComponent: TRAIN_FORMATION
-     * Stores train formation data including vehicle IDs and formation name
-     */
+    /** 1.20.5+ DataComponent: TRAIN_FORMATION Stores tra… */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<CompoundTag>> TRAIN_FORMATION
         = REGISTRAR.registerComponentType(
         "train_formation",
@@ -68,21 +55,13 @@ public class RealTrainModUnofficialComponents {
         builder -> builder.persistent(CompoundTag.CODEC).networkSynchronized(ByteBufCodecs.COMPOUND_TAG)
     );
 
-    /**
-     * 弾薬 / 紙幣の種別。
-     *
-     * <p>本家 (1.7.10/1.12.2) はアイテムの<b>メタ</b>で種類を分けているが 1.21 にメタが無い。
-     * 値は本家のメタと同じ (弾薬なら {@code BulletType.id * 4 + 0..2}、紙幣なら {@code MoneyType.id})
-     * にしてあるので、本家の計算式をそのまま移植できる。
-     */
+    /** 弾薬 / 紙幣の種別。 本家 (1.7.10/1.12.2) はアイテムのメタで種類を分けているが… */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Integer>> ITEM_VARIANT
         = REGISTRAR.registerComponentType(
         "item_variant",
         builder -> builder.persistent(Codec.INT).networkSynchronized(ByteBufCodecs.VAR_INT)
     );
-    /**
-     * 液体入りバケツの中身 (本家の NBT {@code type} / {@code temperture} をそのまま持つ)。
-     */
+    /** 液体入りバケツの中身 (本家の NBT type / temperture をそのまま持つ)。 */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<CompoundTag>> FLUID_DATA
         = REGISTRAR.registerComponentType(
         "fluid_data",

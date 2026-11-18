@@ -35,13 +35,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
-/**
- * 本家 RTM (KaizPatchX GuiSelectModel) と同じ挙動のモデル選択画面。
- * 左に中央寄せスクロールの一覧 (選択中が縦中央)。各項目 160×32 にモデルのボタン画像。
- */
+/** 本家 RTM (KaizPatchX GuiSelectModel) と同じ挙動のモデル選択画面。 */
 @OnlyIn(Dist.CLIENT)
 public class ModelSelectScreen extends Screen {
-    /** 選択結果。旧呼び出し互換のため (modelId, dataMapValue) のコンストラクタも残す。 */
+    /** 選択結果。旧呼び出し互換のため (modelId, dataMapValue) のコンストラクタも… */
     public record SelectionResult(String modelId, String dataMapValue, String customName, int color,boolean autoSplit) {
         public SelectionResult(String modelId,String dataMapValue,String customName,int color) {this(modelId,dataMapValue,customName,color,true);}
         public SelectionResult(String modelId, String dataMapValue) {
@@ -64,7 +61,7 @@ public class ModelSelectScreen extends Screen {
     /** 本家 drawScrollBar: つまみは 16×16 (右端 16px がクリック域)。 */
     private static final int SCROLLBAR_W = 16;
     private static final int FIELD_H = 20;
-    /** 本家 ButtonBlue (rtm:textures/gui/button_blue.png)。UV は 1/512 規約。 */
+    /** 本家 ButtonBlue (rtm:textures/gui/button_blue.png)。 */
     private static final net.minecraft.resources.ResourceLocation BUTTON_BLUE =
         net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("rtm", "textures/gui/button_blue.png");
 
@@ -151,11 +148,7 @@ public class ModelSelectScreen extends Screen {
         // JourneyMap は hideGui を無視するので、ミニマップを一時的にオフにする。
         com.portofino.realtrainmodunofficial.client.JourneyMapCompat.setSuppressed(true);
 
-        // 本家 initGui の座標そのまま:
-        //   nameField   (width-205,  5, 120x20) "Custom Name"
-        //   argField    (width-205, 30, 100x20) "Custom Parameters" (RTMU では DataMap)
-        //   searchField (width-80,   5,  60x20) "Search Box"
-        //   colorButton (width-80,  30,  40x20) + 色見本 (width-40,30)-(width-20,50)
+        // 本家 initGui の座標そのまま: nameField (width-205, 5, 120x…
         this.clusterLeftX = width - 205;
         nameField = addBox(width - 205, 5, 120, "Custom Name", initialName);
         searchField = addBox(width - 80, 5, 60, "Search", "");
@@ -177,7 +170,6 @@ public class ModelSelectScreen extends Screen {
             .bounds(bx + bw + bgap, by, bw, bh).build());
 
         // 再オープン時は現在のモデルを選択済みに (これは正しい既定選択)。
-        // 以降スクロールしても選択は動かず、クリックした時だけ変わる。
         this.selectedId = initialSelectedId;
         rebuildFiltered();
     }
@@ -204,24 +196,19 @@ public class ModelSelectScreen extends Screen {
             }
         }
         this.filtered = list;
-        // 表示位置だけ選択中に合わせる。選択(selectedId)はここでは変えない
-        // (スクロール/検索で勝手に選択が動かないように。選択はクリック時のみ)。
+        // 表示位置だけ選択中に合わせる。選択(selectedId)はここでは変えない (スクロール/検索で…
         int idx = indexOf(selectedId);
         currentScroll = idx >= 0 ? idx : 0;
     }
 
     @Override
     public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float pt) {
-        // ここには黒を描かない。
-        // もう一度呼ぶため、ここに黒を置くと「ボタンを描いた後」にもう一枚黒が重なり、
-        // ボタンだけ暗くなる (field は後描画なので明るいまま、という不具合)。
+        // ここには黒を描かない。 もう一度呼ぶため、ここに黒を置くと「ボタンを描いた後」にもう一枚黒が重なり…
     }
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float pt) {
         // 本家 drawDefaultBackground と同じ暗いグラデーションを一番下に一度だけ敷く。
-        // renderBackground には置かない — super.render がそれを再度呼び、ボタンの上に黒が
-        // 重なってボタンだけ暗くなるため。
         g.fillGradient(0, 0, width, height, 0xC0101010, 0xD0101010);
 
         // タイトルは影付きで、明るい空を背景にしても読めるように。
@@ -240,7 +227,7 @@ public class ModelSelectScreen extends Screen {
 
         drawScrollbar(g);
 
-        // 本家 drawColorPalet: (width-40,30)-(width-20,50) に選択色を塗る
+        // 本家 drawColorPalet: (width-40,30)-(width-20,50) に選…
         if (colorField != null) {
             int c = parseColor(colorField.getValue(), initialColor);
             g.fill(width - 40, 30, width - 20, 50, 0xFF000000 | (c & 0xFFFFFF));
@@ -261,19 +248,15 @@ public class ModelSelectScreen extends Screen {
     }
 
 
-    // ============================================================ モデルプレビュー
-    // 本家 GuiSelectModel.renderModel + ModelSet*Client.renderModelInGui の移植。
-    // 本家は「一覧のボタンにマウスを乗せている間だけ」画面右手にモデルを浮かべる。
+    // =================================================…
 
-    /** 本家 GuiButtonSelectModel.preRenderModelInGui: gluPerspective(80, 1.0, 5, 500)。 */
+    /** 本家 GuiButtonSelectModel.preRenderModelInGui: gluP… */
     private static final float PREVIEW_FOV_DEG = 80.0F;
     private static final float PREVIEW_NEAR = 5.0F;
     private static final float PREVIEW_FAR = 500.0F;
 
     private void renderPreview(GuiGraphics g, int mouseX, int mouseY) {
         // ★プレビューは「選択中 (クリックで決定した) モデル」だけを描く。
-        //   ホバーに追従させると (1) スクロールのたびに別モデルを読み込んで重く、
-        //   (2) スクロールしただけで選択されたように見える、の両方が起きる。
         int selIdx = indexOf(selectedId);
         if (selIdx < 0) {
             return;
@@ -298,14 +281,10 @@ public class ModelSelectScreen extends Screen {
                 com.mojang.blaze3d.vertex.VertexSorting.DISTANCE_TO_ORIGIN);
 
             // ★本家 glLoadIdentity 相当。これが要る。
-            // 1.21 の GUI は modelview に translate(0,0,-11000) が入っており、そこへ
-            // near=5 / far=1000 の透視投影を張ると全部が遠クリップされて何も出ない。
             modelView.identity();
             RenderSystem.applyModelViewMatrix();
 
-            // 本家 GuiButtonSelectModel.drawButton の変換そのまま:
-            //   translate(5, 1, -18) → scale(10 / 最大寸法) → translate(0, -高さ/2, 0)
-            //   → Y 回転 (12 秒で 1 周)。機種別の配置は本家に無い。
+            // 本家 GuiButtonSelectModel.drawButton の変換そのまま: trans…
             PoseStack ps = new PoseStack();
             ps.translate(5.0F, 1.0F, -18.0F);
             float[] box = model.getSizeBox();
@@ -319,7 +298,7 @@ public class ModelSelectScreen extends Screen {
             float rotation = (System.currentTimeMillis() % 12000L) * 360.0F / 12000.0F;
             ps.mulPose(Axis.YP.rotationDegrees(rotation));
 
-            // 本家 RenderHelper.enableStandardItemLighting + GL_DEPTH_TEST
+            // 本家 RenderHelper.enableStandardItemLighting + GL_D…
             Lighting.setupFor3DItems();
             // 平行投影で描いた GUI の深度値とは尺度が違うので、いったん深度を流す
             RenderSystem.clear(org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT, Minecraft.ON_OSX);
@@ -346,10 +325,7 @@ public class ModelSelectScreen extends Screen {
         }
     }
 
-    /**
-     * 本家は model.render(null, cfg, 0/1, 0) で pass0/pass1 を描く。
-     * RTMU はスクリプト車両の描画経路が別なので、そちらを優先し、無ければベイク経路で 2 パス描く。
-     */
+    /** 本家は model.render(null, cfg, 0/1, 0) で pass0/pass1… */
     private static void renderPreviewModel(MqoModelLoader.MqoModel model, VehicleDefinition vehicleDef,
                                            PoseStack poseStack, MultiBufferSource.BufferSource buffer,
                                            Object previewEnt, String previewDefinitionId) {
@@ -367,10 +343,6 @@ public class ModelSelectScreen extends Screen {
 
             boolean rendered = false;
             // ★設置物 (信号/照明/踏切等) はパックのスクリプトが「どのランプを出すか」を決める。
-            // ここでスクリプトを走らせないと、在ワールドでは点くライトがプレビューに出ない。
-            // 本家 ModelSetMachineClient.renderModelInGui もスクリプト経由で描く。
-            // entity は null。本家スクリプトは null を「アイテム/GUI 表示」として扱う
-            // (RenderConnectablePole.js 等が明示的に分岐している)。
             if (vehicleDef == null) {
                 try {
                     var objDef = com.portofino.realtrainmodunofficial.installedobject
@@ -396,7 +368,7 @@ public class ModelSelectScreen extends Screen {
                 }
             }
             if (!rendered) {
-                // 本家 pass0 → pass1 の順。entity を渡さないと doCulling も発光判定も引けない。
+                // 本家 pass0 → pass1 の順。entity を渡さないと doCulling も発光判定…
                 MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer,
                     LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY, false, null, null, previewEnt);
                 MqoModelLoader.renderModelWithoutScript(model, poseStack, buffer,
@@ -405,8 +377,7 @@ public class ModelSelectScreen extends Screen {
 
             // 本家 renderPartsInGui 相当: 台車も一緒に出す
             if (vehicleDef != null) {
-                // 在ワールド (RtmBogieRenderer) と同じ判定にする: スクリプトで走り装置を
-                // 動かす車両だけ、車体側に一本化する。
+                // 在ワールド (RtmBogieRenderer) と同じ判定にする: スクリプトで走り装置を 動か…
                 boolean selfDrawsRunningGear = model.hasOwnWheelGroups()
                     && vehicleDef != null && vehicleDef.hasScript();
                 List<VehicleDefinition.BogieDefinition> bogies = vehicleDef.getBogies();
@@ -476,9 +447,7 @@ public class ModelSelectScreen extends Screen {
         if (cached != null) {
             return cached;
         }
-        // ★モデル本体は描画スレッドで読む (本家と同じ)。DynamicTexture の生成/登録は
-        //   描画スレッドでのみ行うことで、初期化コールバックの競合 (NPE) を避ける。
-        //   パースはディスクキャッシュで軽いので、ここで同期ロードしてよい。
+        // ★モデル本体は描画スレッドで読む (本家と同じ)。
         MqoModelLoader.MqoModel model = loadModelNow(id);
         if (model != null) {
             MODEL_CACHE.put(id, model);
@@ -488,11 +457,7 @@ public class ModelSelectScreen extends Screen {
         return model;
     }
 
-    /**
-     * スクリプトを適用するための、ワールドへ追加していない一時車両。
-     * スクリプトは entity の状態を読んで本体やドア・ライトを配置するので、null だと
-     * 例外を投げて「スクリプト無し描画」に落ちる車両が多い。
-     */
+    /** スクリプトを適用するための、ワールドへ追加していない一時車両。 */
     private com.portofino.realtrainmodunofficial.entity.TrainEntity getOrCreatePreviewEntity(
             VehicleDefinition def, MqoModelLoader.MqoModel model) {
         if (def == null || def.getId() == null) {
@@ -525,8 +490,7 @@ public class ModelSelectScreen extends Screen {
 
     private void drawItem(GuiGraphics g, ModelInfo m, int left, int top, boolean selected, int mouseX, int mouseY) {
         boolean hovered = mouseX >= left && mouseX < left + BTN_W && mouseY >= top && mouseY < top + BTN_H;
-        // ぼやけ対策: buttonTexture を「GUIサイズ × guiScale」へニアレスト焼き直しし、1:1 で描く。
-        // こうするとスケーリングが起きず (テクセル=画面ピクセル)、GUI 描画経路の線形補間に関わらず鮮明。
+        // ぼやけ対策: buttonTexture を「GUIサイズ × guiScale」へニアレスト焼き…
         int scale = Math.max(1, (int) Math.round(
             net.minecraft.client.Minecraft.getInstance().getWindow().getGuiScale()));
         net.minecraft.resources.ResourceLocation crisp =
@@ -539,10 +503,7 @@ public class ModelSelectScreen extends Screen {
             String name = safe(m.displayName()).isBlank() ? m.id() : m.displayName();
             g.drawString(font, name, left + 4, top + (BTN_H - 8) / 2, 0xFFFFFFFF, false);
         }
-        // 本家 renderButtonOverlay: button_blue の (0,32)-(160,64) を重ねる
-        // (UV は本家の 1/512 規約 → texW/H=512 で blit すると同じ切り出し)。
-        // ★選択中とホバーを同じ濃さにすると「スクロールしただけで選択された」ように見えるため、
-        //   選択中=50%、ホバー=薄め(20%) にして区別する。
+        // 本家 renderButtonOverlay: button_blue の (0,32)-(160…
         if (selected || hovered) {
             com.mojang.blaze3d.systems.RenderSystem.enableBlend();
             g.setColor(1.0F, 1.0F, 1.0F, selected ? 0.5F : 0.2F);
@@ -552,7 +513,7 @@ public class ModelSelectScreen extends Screen {
         }
     }
 
-    /** 本家 drawScrollBar: 白い 2px の軌道 (width-9〜width-7, 8〜height-8) + 16×16 の青つまみ。 */
+    /** 本家 drawScrollBar: 白い 2px の軌道 (width-9〜width-7, 8〜… */
     private void drawScrollbar(GuiGraphics g) {
         if (filtered.isEmpty()) {
             return;
@@ -560,7 +521,7 @@ public class ModelSelectScreen extends Screen {
         g.fill(width - 9, 8, width - 7, height - 8, 0xFFFFFFFF);
         int thumbY;
         if (draggingScrollbar) {
-            //本家: クリック中はマウス位置そのまま (8〜height-8 に丸めて -8)
+            // 本家: クリック中はマウス位置そのまま (8〜height-8 に丸めて -8)
             double my = lastDragY;
             thumbY = (int) (my < 8 ? 8 : (my >= height - 8 ? height - 8 : my)) - 8;
         } else if (filtered.size() > 1) {
@@ -568,7 +529,7 @@ public class ModelSelectScreen extends Screen {
         } else {
             thumbY = 0;
         }
-        //本家: button_blue の右端 16×16 (UV 0.9375〜1.0, 0〜0.0625 = 512px 換算で 480,0,32,32)
+        // 本家: button_blue の右端 16×16 (UV 0.9375〜1.0, 0〜0.062…
         g.blit(BUTTON_BLUE, width - 16, thumbY, 16, 16, 480.0F, 0.0F, 32, 32, 512, 512);
     }
 
@@ -591,7 +552,7 @@ public class ModelSelectScreen extends Screen {
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
         if (button == 0) {
-            //本家 drawScreen: クリック域は「右端 16px」全高
+            // 本家 drawScreen: クリック域は「右端 16px」全高
             if (mx >= scrollbarX() && mx < width) {
                 draggingScrollbar = true;
                 lastDragY = my;
@@ -674,7 +635,7 @@ public class ModelSelectScreen extends Screen {
         }
     }
 
-    /** 表示位置(currentScroll)だけ動かす。選択(selectedId)は変えない = スクロールで選択しない。 */
+    /** 表示位置(currentScroll)だけ動かす。 */
     private void scrollTo(int idx) {
         if (filtered.isEmpty()) { currentScroll = 0; return; }
         currentScroll = Mth.clamp(idx, 0, filtered.size() - 1);
@@ -688,12 +649,7 @@ public class ModelSelectScreen extends Screen {
         return -1;
     }
 
-    /**
-     * 決定/キャンセルの後に戻る画面。null なら従来どおりプレイ画面へ戻る。
-     *
-     * <p>★{@link #onDone()} は「選択を通知 → onClose()」の順なので、通知の中で
-     * 画面を開いても直後に閉じられてしまう。戻り先はここに持たせて onClose に決めさせる。
-     */
+    /** 決定/キャンセルの後に戻る画面。null なら従来どおりプレイ画面へ戻る。 */
     private java.util.function.Supplier<net.minecraft.client.gui.screens.Screen> returnScreen;
 
     /** 決定/キャンセルの後にこの画面へ戻る (編成の編集画面などから使う)。 */

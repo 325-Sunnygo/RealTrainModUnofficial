@@ -27,13 +27,8 @@ import org.jetbrains.annotations.NotNull;
 import static com.portofino.realtrainmodunofficial.util.UnitConverter.*;
 
 // / 自動車Entityクラス
-public final class CarEntity extends Entity {
-    /**
-     * 本家 EntityVehicleBase.getBrightnessForRender 相当。
-     * 1.7.10 のバニラ Entity.getBrightnessForRender は
-     * int j = MathHelper.floor_double(this.posY + (double)(this.height / 2.0F));
-     * と車体の中心の高さで明るさを取る。
-     */
+public final class CarEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSelector {
+    /** 本家 EntityVehicleBase.getBrightnessForRender 相当。 */
     @Override
     public net.minecraft.world.phys.Vec3 getLightProbePosition(float partialTicks) {
         return new net.minecraft.world.phys.Vec3(
@@ -43,7 +38,16 @@ public final class CarEntity extends Entity {
     private static final EntityDataAccessor<String> DATA_VEHICLE_ID =
         SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.STRING);
 
-    private com.portofino.realtrainmodunofficial.script.CarServerScripts.Entry serverScript;
+    /** 本家 EntityVehicleBase と同じ、車両 1 台につき 1 個の ScriptExe… */
+    public final jp.ngt.rtm.modelpack.ScriptExecuter scriptExecuter = new jp.ngt.rtm.modelpack.ScriptExecuter();
+    private jp.ngt.rtm.sound.SoundUpdaterVehicle soundUpdater;
+
+    public jp.ngt.rtm.sound.SoundUpdaterVehicle getSoundUpdater() {
+        if (this.soundUpdater == null) {
+            this.soundUpdater = new jp.ngt.rtm.sound.SoundUpdaterVehicle(this);
+        }
+        return this.soundUpdater;
+    }
     private boolean attemptedServerScriptLoad;
     private final java.util.Map<String, String> scriptData = new java.util.HashMap<>();
     /** サーバーが flag!=0 で書いた値。毎tick まとめてクライアントへ流す。 */
@@ -51,16 +55,16 @@ public final class CarEntity extends Entity {
     /** 乗客同期を送った相手 (プレイヤー本人には通常届かないため自前で送る)。 */
     private int lastPassengerSyncVehicleId = -1;
 
-    // === RTM 1.7.10/1.12 互換フィールド (SRB3 等のスクリプトが直接読み書きする) ===
+    // === RTM 1.7.10/1.12 互換フィールド (SRB3 等のスクリプトが直接読み書きす…
     /** RTM の yaw 名 (entity.field_70177_z) */
     public float field_70177_z;
     /** RTM の pitch 名 (entity.field_70125_A) */
     public float field_70125_A;
     /** RTM の tick counter 名 (entity.field_70173_aa) */
     public int field_70173_aa;
-    /** RTM の world 参照 (entity.field_70170_p)。WorldCompat 経由でアクセス。 */
+    /** RTM の world 参照 (entity.field_70170_p)。 */
     public jp.ngt.mccompat.WorldCompat field_70170_p;
-    /** RTM の motionX/Y/Z 名 (SRB3 の doFollowing が 0 を書いて漂流を止める)。 */
+    /** RTM の motionX/Y/Z 名 (SRB3 の doFollowing が 0 を書いて漂… */
     public double field_70159_w;
     public double field_70181_x;
     public double field_70179_y;
@@ -72,7 +76,7 @@ public final class CarEntity extends Entity {
     public double field_70165_t;
     public double field_70163_u;
     public double field_70161_v;
-    /** 1.7.10 lastTickPosX/Y/Z (描画補間用。NGTO Builder2 の getInterpolatedPos が読む) */
+    /** 1.7.10 lastTickPosX/Y/Z (描画補間用。 */
     public double field_70142_S;
     public double field_70137_T;
     public double field_70136_U;
@@ -87,8 +91,7 @@ public final class CarEntity extends Entity {
     // / 乗車定員
     private static final int RIDING_CAPACITY = 5;
 
-    // モデル情報
-    // / 前輪のZ座標
+    // モデル情報 / 前輪のZ座標
     public static final float WHEEL_F_COORD = cm2m(158.62274169921875f);
     // / 後輪のZ座標
     public static final float WHEEL_R_COORD = cm2m(-164.98480224609375f);
@@ -97,8 +100,7 @@ public final class CarEntity extends Entity {
     // / 車輪の半径
     public static final float WHEEL_RADIUS = WHEEL_Y_COORD;
 
-    // 性能: 本家 VehicleConfig の既定値をそのまま使う (KaizPatchX VehicleConfig)
-    // / 滑りやすさ
+    // 性能: 本家 VehicleConfig の既定値をそのまま使う (KaizPatchX Vehi…
     protected static final float FRICTION = 0.9F;
     // / 加速度
     protected static final float ACCELERATION = 0.0125F;
@@ -123,13 +125,11 @@ public final class CarEntity extends Entity {
     public CarEntity(EntityType<? extends CarEntity> entityType, Level level) {
         super(entityType, level);
         this.field_70170_p=new jp.ngt.mccompat.WorldCompat(level);
-        // 本家 EntityVehicleBase:85 の ignoreFrustumCheck = true 相当。
-        // SRB / NGTO Builder の描画スクリプトはワールド座標にマーカーや補助線を描くが、
-        // 描画されるのは「車が視錐台に入っているとき」だけ。
+        // 本家 EntityVehicleBase:85 の ignoreFrustumCheck = tr…
         this.noCulling = true;
     }
 
-    /** 本家 EntityCar: this.stepHeight = 2.0F (1ブロックの段差を乗り越える)。 */
+    /** 本家 EntityCar: this.stepHeight = 2.0F (1ブロックの段差を乗り… */
     @Override
     public float maxUpStep() {
         return 2.0F;
@@ -164,7 +164,7 @@ public final class CarEntity extends Entity {
         builder.define(DATA_SPEED, 0.0F);
     }
 
-    /** 本家 EntityVehicleBase.speed の同期値。サーバーが書き、クライアントのスクリプトが読む。 */
+    /** 本家 EntityVehicleBase.speed の同期値。 */
     private static final EntityDataAccessor<Float> DATA_SPEED =
         SynchedEntityData.defineId(CarEntity.class, EntityDataSerializers.FLOAT);
 
@@ -176,7 +176,7 @@ public final class CarEntity extends Entity {
     public void setModelName(String model) {
         var definition=VehicleRegistry.getById(model);
         if(definition==null)for(var candidate:VehicleRegistry.getAll())if(candidate.getDisplayName().equals(model)) {definition=candidate;break;}
-        if(definition!=null) {setVehicleId(definition.getId());attemptedServerScriptLoad=false;serverScript=null;}
+        if(definition!=null) {setVehicleId(definition.getId());attemptedServerScriptLoad=false;}
     }
 
     public String getVehicleId() {
@@ -212,45 +212,27 @@ public final class CarEntity extends Entity {
 
     private void ensureServerScriptLoaded() {
         if (attemptedServerScriptLoad) return;
-        String id = getVehicleId();
-        if (id == null || id.isBlank()) return;
         attemptedServerScriptLoad = true;
-        VehicleDefinition def = VehicleRegistry.getById(id);
-        if (def == null || !def.hasServerScript()) {
-            return;
-        }
-        try {
-            // 本家と同じ Nashorn (jp.ngt 実クラス) でサーバースクリプトを実行
-            serverScript = com.portofino.realtrainmodunofficial.script.CarServerScripts.get(def);
-            attemptedServerScriptLoad = !com.portofino.realtrainmodunofficial.script.CarServerScripts.isLoading(def);
-        } catch (Throwable t) {
-            RealTrainModUnofficial.LOGGER.warn("Failed to load server script for {}: {}", id, t.toString());
-        }
+        // 本家と同じく、ModelSet 構築時に読み込んだ serverSE を使う。
+        this.getModelSet();
     }
 
-    /**
-     * 本家 API: スクリプトから {@code entity.getResourceState()} で呼ばれる。
-     *
-     * <p>★以前は RTMU 独自の薄いラッパ (getDataMap だけ) を返していたため、
-     * 本家スクリプトが使う {@code getResourceName()} が無く
-     * (Tank.js: {@code entity.getResourceState().getResourceName is not a function}) で
-     * サーバースクリプトが落ちていた。本家と同じ {@code ResourceState} を返す。
-     *
-     * <p>DataMap は既存の保存先 (scriptData) とサーバー同期へブリッジしたもので、
-     * 本家と同じく {@code state.dataMap.setXxx(key, value, syncFlag)} がそのまま使える。
-     */
+    /** 本家 API: スクリプトから entity.getResourceState() で呼ばれる。 */
     private final jp.ngt.rtm.modelpack.state.ResourceState resourceState =
         new jp.ngt.rtm.modelpack.state.ResourceState(this::getScriptResourceName, this::getModelSet, new ScriptDataMap(this));
 
+    private jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> dataFormatterSet;
+
     public jp.ngt.rtm.modelpack.state.ResourceState getResourceState() {
+        jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> set = this.getModelSet();
+        if (set != null && set != this.dataFormatterSet) {
+            this.dataFormatterSet = set;
+            set.dataFormatter.initDataMap(this.resourceState.getDataMap());
+        }
         return this.resourceState;
     }
 
-    /**
-     * 本家 ResourceState.getResourceName が返すモデル名 (例 "Crusader")。
-     * RTM 公式スクリプトは {@code modelName == "Crusader"} のように比較するため、
-     * id (vehicle:pack:Crusader) ではなく表示名を返す。
-     */
+    /** 本家 ResourceState.getResourceName が返すモデル名 (例 "Crus… */
     private String getScriptResourceName() {
         VehicleDefinition def = VehicleRegistry.getById(this.getVehicleId());
         if (def == null) {
@@ -264,11 +246,7 @@ public final class CarEntity extends Entity {
     private static final java.util.Set<String> WARNED_SEND_FAILURE =
         java.util.concurrent.ConcurrentHashMap.newKeySet();
 
-    /**
-     * 本家 DataMap を CarEntity の scriptData へブリッジする。
-     * 読み書きは scriptData に対して行い、クライアントで syncFlag!=0 の書き込みは
-     * サーバーへ送る (render スクリプトが書いた砲撃フラグ等を server onUpdate へ届ける)。
-     */
+    /** 本家 DataMap を CarEntity の scriptData へブリッジする。 */
     public static final class ScriptDataMap extends jp.ngt.rtm.modelpack.state.DataMap {
         private final CarEntity car;
 
@@ -298,6 +276,87 @@ public final class CarEntity extends Entity {
         }
 
         @Override
+        public int getHex(String key) {
+            try { return Integer.decode(getString(key)); }
+            catch (Exception e) {
+                try { return (int) Math.round(Double.parseDouble(getString(key))); }
+                catch (Exception ignored) { return 0; }
+            }
+        }
+
+        @Override
+        public jp.ngt.ngtlib.math.Vec3 getVec(String key) {
+            String[] parts = getString(key).trim().split("\\s+");
+            if (parts.length >= 3) {
+                try {
+                    return new jp.ngt.ngtlib.math.Vec3(
+                            Double.parseDouble(parts[0]), Double.parseDouble(parts[1]), Double.parseDouble(parts[2]));
+                } catch (NumberFormatException ignored) {
+                }
+            }
+            return jp.ngt.ngtlib.math.Vec3.ZERO;
+        }
+
+        @Override
+        public Object[] getArray(String key) {
+            String value = getString(key);
+            return value.isEmpty() ? new Object[0] : value.split("\\|", -1);
+        }
+
+        @Override
+        public void setHex(String key, int value, int flag) {
+            apply(key, Integer.toString(value), flag);
+        }
+
+        @Override
+        public void setVec(String key, jp.ngt.ngtlib.math.Vec3 value, int flag) {
+            apply(key, value == null ? "0.0 0.0 0.0"
+                    : value.getX() + " " + value.getY() + " " + value.getZ(), flag);
+        }
+
+        @Override
+        public void setArray(String key, Object value, int flag) {
+            Object stored = value instanceof java.util.Collection<?> col ? col.toArray() : value;
+            if (stored instanceof Object[] array) {
+                StringBuilder sb = new StringBuilder();
+                for (Object element : array) {
+                    if (sb.length() > 0) sb.append('|');
+                    sb.append(element == null ? "" : element);
+                }
+                apply(key, sb.toString(), flag);
+            } else {
+                apply(key, stored == null ? "" : stored.toString(), flag);
+            }
+        }
+
+        @Override
+        public String getArg() {
+            if (car == null) return "";
+            StringBuilder sb = new StringBuilder();
+            for (java.util.Map.Entry<String, String> entry : car.scriptData.entrySet()) {
+                if (sb.length() > 0) sb.append(',');
+                sb.append(entry.getKey()).append("=(String)").append(entry.getValue());
+            }
+            return sb.toString();
+        }
+
+        @Override
+        public void setArg(String arg, boolean overwrite) {
+            if (arg == null || arg.isEmpty() || car == null) return;
+            for (String part : arg.split(",")) {
+                int eq = part.indexOf('=');
+                if (eq <= 0) continue;
+                String key = part.substring(0, eq);
+                if (!overwrite && car.scriptData.containsKey(key)) continue;
+                String value = part.substring(eq + 1);
+                if (value.startsWith("(") && value.indexOf(')') > 0) {
+                    value = value.substring(value.indexOf(')') + 1);
+                }
+                apply(key, value, 0);
+            }
+        }
+
+        @Override
         public void setString(String key, String value, int flag) {
             apply(key, value == null ? "" : value, flag);
         }
@@ -317,11 +376,7 @@ public final class CarEntity extends Entity {
             apply(key, Double.toString(value), flag);
         }
 
-        /**
-         * ローカルへ書き込みつつ、クライアント側で syncFlag!=0 の値はサーバへ送る。
-         * render(クライアント)スクリプトが書いた設置点/ビルドフラグをサーバ onUpdate へ届け、
-         * 実際の敷設/砲撃をサーバで行えるようにする。
-         */
+        /** ローカルへ書き込みつつ、クライアント側で syncFlag!=0 の値はサーバへ送る。 */
         private void apply(String key, String value, int flag) {
             if (car == null) {
                 return;
@@ -332,8 +387,7 @@ public final class CarEntity extends Entity {
                     net.neoforged.neoforge.network.PacketDistributor.sendToServer(
                         new com.portofino.realtrainmodunofficial.network.CarScriptDataPayload(car.getId(), key, value));
                 } catch (Throwable e) {
-                    // ★握りつぶさない。ここが失敗すると「クライアントでは組めているのに
-                    //   サーバーでは何も起きない」になり、原因が一切分からなくなる。
+                    // ★握りつぶさない。ここが失敗すると「クライアントでは組めているのに サーバーでは何も起きない」にな…
                     if (WARNED_SEND_FAILURE.add(key)) {
                         com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
                             "[RTMU] スクリプトデータをサーバーへ送れませんでした key={} 長さ={}: {}",
@@ -344,7 +398,7 @@ public final class CarEntity extends Entity {
         }
     }
 
-    // ===== RTM 1.12.2 MCP 名の互換メソッド (SRB3 等のサーバスクリプトが直接呼ぶ) =====
+    // ===== RTM 1.12.2 MCP 名の互換メソッド (SRB3 等のサーバスクリプトが直接…
     /** func_184188_bt = getPassengers */
     public java.util.List<Entity> func_184188_bt() {
         return this.getPassengers();
@@ -369,12 +423,7 @@ public final class CarEntity extends Entity {
     public void func_70107_b(double x, double y, double z) {
         this.setPos(x, y, z);
     }
-    /**
-     * func_70078_a = mountEntity (1.7.10)。この車が target に乗る (target=null で降りる)。
-     * SRB3 / NGTO Builder のサーバースクリプトは
-     * 「プレイヤーを降ろす → 車をプレイヤーに乗せる」で追従を実現しており、
-     * 本家 1.7.10 の RTMApiCompat.doFollowing が空実装なのはそのため。
-     */
+    /** func_70078_a = mountEntity (1.7.10)。 */
     public void func_70078_a(Object target) {
         if (target == null) {
             this.stopRiding();
@@ -384,9 +433,7 @@ public final class CarEntity extends Entity {
         if (e == null) {
             return;
         }
-        // ★必ず自分と同じレベルの実体へ乗る。
-        // スクリプトが持つラッパー (PlayerCompat) は、スクリプトエンジンが定義ごとに
-        // 共有されている関係で反対サイドのプレイヤーを指していることがある。
+        // ★必ず自分と同じレベルの実体へ乗る。 スクリプトが持つラッパー (PlayerCompat) は、…
         if (e.level() != this.level()) {
             Entity sameSide = this.level().getEntity(e.getId());
             if (sameSide == null) {
@@ -399,24 +446,15 @@ public final class CarEntity extends Entity {
             e = sameSide;
         }
         // 本家 1.7.10 では「車がプレイヤーに乗る」= プレイヤーは車の乗客ではあり得ない。
-        // スクリプトは dismountPlayer → startRiding の順で呼ぶが、降車が何らかの理由で
-        // 効かないと相互に乗った状態になり、rider が毎tick残ってサーバースクリプトが
-        // 「編集終了 (isEndEdit)」の枝から出られなくなる (= 敷設も終了も効かない)。
         this.ejectPassengers();
         boolean ok = this.startRiding(e, true);
         // ★乗り物がプレイヤー本人の場合、そのプレイヤーには乗客同期が届かない。
-        // バニラは乗客の変化を ServerEntity:89 の broadcast で「その乗り物を追跡している
-        // 他のプレイヤー」にだけ送るため、自分に何かが乗ったことを本人は知らない。
         if (ok && e instanceof net.minecraft.server.level.ServerPlayer sp) {
             sp.connection.send(new net.minecraft.network.protocol.game.ClientboundSetPassengersPacket(sp));
         }
     }
 
-    // / 右クリックされた時の処理
-    // /
-    // / @param player 右クリックしたプレイヤー
-    // / @param hand   メインハンドまたはオフハンド
-    // / @return 処理の完了状態
+    // / 右クリックされた時の処理 / / @param player 右クリックしたプレイヤー / @…
     @Override
     public @NotNull InteractionResult interact(@NotNull Player player, @NotNull InteractionHand hand) {
         if (this.canAddPassenger(player)) {
@@ -432,9 +470,7 @@ public final class CarEntity extends Entity {
     }
 
 
-    // / 操縦しているLivingEntity
-    // /
-    // / @return あればそのLivingEntity、なければnull
+    // / 操縦しているLivingEntity / / @return あればそのLivingEntit…
     @Override
     public LivingEntity getControllingPassenger() {
         final var passengers = this.getPassengers();
@@ -442,12 +478,7 @@ public final class CarEntity extends Entity {
         return controllingEntity instanceof LivingEntity controllingLivingEntity ? controllingLivingEntity : null;
     }
 
-    // / 渡された乗客Entityの着席位置
-    // /
-    // / @param passenger   乗客Entity
-    // / @param dimensions  自動車の情報 寸法、目の高さなど
-    // / @param partialTick なぜ？
-    // / @return 位置のベクトル
+    // / 渡された乗客Entityの着席位置 / / @param passenger 乗客Entity…
     @Override
     @NotNull
     protected Vec3 getPassengerAttachmentPoint(@NotNull Entity passenger, @NotNull EntityDimensions dimensions, float partialTick) {
@@ -480,18 +511,13 @@ public final class CarEntity extends Entity {
         return true;
     }
 
-    // / 体当たりをして押せるかどうかだと思われる
-    // /
-    // / @return 常に偽 自動車だし押せなくていいよね
+    // / 体当たりをして押せるかどうかだと思われる / / @return 常に偽 自動車だし押せなくて…
     @Override
     public boolean isPushable() {
         return false;
     }
 
-    /**
-     * 本家 EntityVehicle.applyEntityCollision: 高速で走っている車は乗員以外の生物をはねる
-     * (速度が最大速度の半分を超えたときだけダメージ)。
-     */
+    /** 本家 EntityVehicle.applyEntityCollision: 高速で走っている車は… */
     @Override
     public void push(@NotNull Entity entity) {
         super.push(entity);
@@ -510,9 +536,7 @@ public final class CarEntity extends Entity {
         }
     }
 
-    // / クリック判定を発生させるかどうかだと思われる
-    // /
-    // / @return もちろん発生させる じゃないと乗れない
+    // / クリック判定を発生させるかどうかだと思われる / / @return もちろん発生させる じゃ…
     @Override
     public boolean isPickable() {
         return true;
@@ -545,17 +569,17 @@ public final class CarEntity extends Entity {
     @Override
     public void tick() {
         // ★サーバーは位置同期だけで this.speed を更新しない (移動は運転クライアント主導)。
-        //   さらに super.tick() (= baseTick) が xOld を今tickの位置で上書きするため、
-        //   スクリプト実行時点では getX()-xOld が常に 0 になり、速度が取れなかった。
-        //   上書きされる前に「前tickからの実移動量 (前進が正)」を退避しておく。
         super.tick();
+
+        if (this.level().isClientSide()) {
+            this.getSoundUpdater().update();
+        }
 
         // RTM 互換フィールドを最新値に同期 (SRB3 等のレガシースクリプトが直接読む)
         this.field_70177_z = getYRot();
         this.field_70125_A = getXRot();
         this.field_70173_aa = this.tickCount;
         // 前tickの位置は「今の値で上書きする前」に退避する (描画補間・進行方向算出用)。
-        // field_70165_t/u/v (現在位置) は tick 末尾の移動後に更新する。
         this.field_70142_S = this.xOld;
         this.field_70137_T = this.yOld;
         this.field_70136_U = this.zOld;
@@ -565,7 +589,7 @@ public final class CarEntity extends Entity {
         if (this.field_70170_p == null || this.field_70170_p.getLevel() != this.level()) {
             this.field_70170_p = new jp.ngt.mccompat.WorldCompat(this.level());
         }
-        // rider (1.7.10: field_70153_n) / ridingEntity (field_70154_o) — PlayerCompat で公開
+        // rider (1.7.10: field_70153_n) / ridingEntity (fie…
         {
             var passengers = this.getPassengers();
             net.minecraft.world.entity.player.Player rider = null;
@@ -584,10 +608,7 @@ public final class CarEntity extends Entity {
             }
         }
 
-        // ★乗り物がプレイヤー本人のとき、そのプレイヤーには乗客同期が届かない
-        // (ServerEntity:89 の broadcast は「乗り物を追跡している他のプレイヤー」宛)。
-        // 騎乗した瞬間に 1 回送るだけだと、クライアントがまだ車を認識していない場合に
-        // 取りこぼして車がその場に残る。騎乗している間は定期的に送り直して確実に合わせる。
+        // ★乗り物がプレイヤー本人のとき、そのプレイヤーには乗客同期が届かない (ServerEntity:…
         if (!this.level().isClientSide()
                 && this.getVehicle() instanceof net.minecraft.server.level.ServerPlayer host) {
             if (this.lastPassengerSyncVehicleId != host.getId() || this.tickCount % 20 == 0) {
@@ -600,7 +621,6 @@ public final class CarEntity extends Entity {
         }
 
         // ★別レベルの乗り物に乗ってしまっている車を自己修復する。
-        // この状態になると、その車は自分のレベルのtickから外れて処理が止まる。
         if (this.getVehicle() != null && this.getVehicle().level() != this.level()) {
             RealTrainModUnofficial.LOGGER.warn("[RTMU] 別レベルの乗り物に騎乗していたため降車させました: self={} vehicle={}",
                 this.level().getClass().getSimpleName(), this.getVehicle().level().getClass().getSimpleName());
@@ -608,29 +628,24 @@ public final class CarEntity extends Entity {
         }
 
         // サーバ側で vehicle 紐付けスクリプト（SRB3 等）を毎tick実行する。
-        // クライアントでは何もしない（DataMap 同期は別経路）。
         if (!this.level().isClientSide()) {
             ensureServerScriptLoaded();
-            if (serverScript != null) {
+            if (this.getModelSet().serverSE != null) {
                 // スクリプトが読む1.7.10シムを実値で埋めてから走らせる。
-                // 埋めないと motion が前回値のまま累積し、車が滑って暴れる。
                 net.minecraft.world.phys.Vec3 before = this.getDeltaMovement();
                 this.field_70159_w = before.x;
                 this.field_70181_x = before.y;
                 this.field_70179_y = before.z;
 
-                serverScript.onUpdate(this);
+                this.scriptExecuter.execScript(this);
 
-                // サーバスクリプトが entity.field_70177_z=0 等で向きを制御する(SRB3はyawを0固定
-                // してマーカーをワールド座標で描く)。シムのフィールドを実際の向きへ反映する。
-                // 反映しないと車の実yawが残り、render が回転してマーカーが散らばる。
+                // サーバスクリプトが entity.field_70177_z=0 等で向きを制御する(SRB3はy…
                 this.setYRot(this.field_70177_z);
                 this.setXRot(this.field_70125_A);
                 this.yRotO = this.field_70177_z;
                 this.xRotO = this.field_70125_A;
 
                 // スクリプトが書いた motion (field_70159_w/x/y) を実際の移動へ反映する。
-                // MFCP の車はここで前進/操舵を表現するので、反映しないと 1mm も動かない。
                 double mx = this.field_70159_w;
                 double my = this.field_70181_x;
                 double mz = this.field_70179_y;
@@ -639,9 +654,7 @@ public final class CarEntity extends Entity {
                     this.setDeltaMovement(mx, my, mz);
                 }
             }
-            // ホストプレイヤー追従は本家どおり「車がプレイヤーに騎乗する」で行う
-            // (mc1710 の RTMApiCompat.doFollowing は空実装)。位置ミラーはしない。
-            // サーバ→クライアント scriptData 同期。
+            // ホストプレイヤー追従は本家どおり「車がプレイヤーに騎乗する」で行う (mc1710 の RTMAp…
             if (scriptDataDirty && !scriptData.isEmpty()) {
                 scriptDataDirty = false;
                 net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
@@ -654,11 +667,7 @@ public final class CarEntity extends Entity {
 
         this.prevRotationRoll = this.rotationRoll;
 
-        // ★本家 EntityVehicleBase と同じく<b>サーバー権威</b>で物理を回す。
-        //   乗員の入力は 1.21 では ServerPlayer.setPlayerInput が xxa/zza に入れるので
-        //   サーバーでもそのまま読める。クライアントは何もせず、バニラの補間で位置が来る。
-        //   (クライアント主導だとサーバーの getSpeed が 0 になり、サーバースクリプトが
-        //    動かない等、本家と挙動が食い違って面倒になるためサーバー権威に統一。)
+        // ★本家 EntityVehicleBase と同じくサーバー権威で物理を回す。
         if (!level.isClientSide) {
             if (this.shouldUpdateMotion() && this.getControllingPassenger() instanceof LivingEntity living) {
                 this.updateMotion(living, living.xxa, living.zza);
@@ -776,22 +785,12 @@ public final class CarEntity extends Entity {
         return this.getY();
     }
 
-    /**
-     * 本家 EntityVehicle.getSpeed (スクリプト互換)。
-     * サーバーが物理で求めた速度を同期値から読む (本家と同じく両サイドで同じ値)。
-     */
+    /** 本家 EntityVehicle.getSpeed (スクリプト互換)。 */
     public float getSpeed() {
         return this.entityData.get(DATA_SPEED);
     }
 
-    /**
-     * ★サーバー権威にするため false を返す。
-     *
-     * <p>1.21 の {@code LocalPlayer.tick()} は「操作中の乗り物」に対して
-     * {@code ServerboundMoveVehiclePacket} を送る。true のままだとクライアントの
-     * 位置でサーバーの権威位置が上書きされ、サーバー側の getSpeed やスクリプトが
-     * 本家と食い違う。物理はサーバーだけが回し、クライアントは補間で受ける。
-     */
+    /** ★サーバー権威にするため false を返す。 */
     @Override
     public boolean isControlledByLocalInstance() {
         return false;

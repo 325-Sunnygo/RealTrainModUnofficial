@@ -18,10 +18,7 @@ import net.minecraft.world.level.saveddata.SavedData;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * 信号番号と現示をワールド保存するテーブルです。
- * 対象チャンクが読み込まれていない時も、次回ロード時に最新状態へ戻せます。
- */
+/** 信号番号と現示をワールド保存するテーブルです。 */
 public class SignalNetworkSavedData extends SavedData {
     private static final String DATA_NAME = "realtrainmodunofficial_signal_network";
 

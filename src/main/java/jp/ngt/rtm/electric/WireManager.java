@@ -15,11 +15,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 
-/**
- * 本家 ElectricalWiringManager/WireManager 相当 (簡略忠実版)。
- * ワイヤー (InstalledObject WIRE) の両端をエッジとして接続グラフを保持し、
- * 入力コネクタ/変換器からの信号を BFS で伝播する。
- */
+/** 本家 ElectricalWiringManager/WireManager 相当 (簡略忠実版)。 */
 public final class WireManager {
     private static final Map<Level, Map<BlockPos, Set<BlockPos>>> NETWORKS = new WeakHashMap<>();
 
@@ -29,8 +25,7 @@ public final class WireManager {
     private WireManager() {
     }
 
-    // ---- 架線ジオメトリ (本家 WireManager 相当) ----
-    // 信号伝播 (上の static 群) とは別物。
+    // ---- 架線ジオメトリ (本家 WireManager 相当) ---- 信号伝播 (上の st…
 
     /** 直線の分割数 (本家 SPLIT)。 */
     private static final int SPLIT = 512;
@@ -54,10 +49,7 @@ public final class WireManager {
             this.maxZ = Math.max(d1[0], d2[0]);
         }
 
-        /**
-         * この架線の真下にいるか。車体の向き (yaw) で XZ の許容幅を変える
-         * (斜めに走っていても架線を拾えるように)。
-         */
+        /** この架線の真下にいるか。車体の向き (yaw) で XZ の許容幅を変える (斜めに走っていても架… */
         public boolean inRange(float yaw, double x, double y, double z) {
             float cos = Math.abs((float) Math.cos(Math.toRadians(yaw)));
             float sin = Math.abs((float) Math.sin(Math.toRadians(yaw)));
@@ -141,10 +133,7 @@ public final class WireManager {
         }
     }
 
-    /**
-     * 本家 getWireY: (x,y,z) の上にある架線の Y。無ければ y をそのまま返す。
-     * 複数掛かっていれば一番低いものを採る (パンタは最初に当たる線で止まる)。
-     */
+    /** 本家 getWireY: (x,y,z) の上にある架線の Y。無ければ y をそのまま返す。 */
     public synchronized double getWireY(Level level, float yaw, double x, double y, double z) {
         Map<Long, java.util.List<WireEntry>> byChunk = this.loadedWires.get(level);
         if (byChunk == null) {
@@ -206,10 +195,7 @@ public final class WireManager {
         }
     }
 
-    /**
-     * 信号伝播 (本家 propagateSignal)。origin から接続グラフ全体へ。
-     * 変換器 (Increment/Decrement) を通過する信号はレベルが変換される。
-     */
+    /** 信号伝播 (本家 propagateSignal)。origin から接続グラフ全体へ。 */
     public static void propagate(Level level, BlockPos origin, int signalLevel) {
         if (level == null || level.isClientSide) {
             return;
@@ -252,9 +238,7 @@ public final class WireManager {
             if (!isOrigin) {
                 converter.setElectricity(pos.getX(), pos.getY(), pos.getZ(), lvl);
             }
-            //★本家 TileEntitySC_Increment/Decrement と同じ式。上限で丸めない
-            //  (本家の信号レベルは 0〜127。15 で切ると本家と違う値が流れる)。
-            //  Decrement は 1 以下をそのまま通す (1 → 0 にはならない)。
+            // ★本家 TileEntitySC_Increment/Decrement と同じ式。
             return switch (converter.getConverterType()) {
                 case Increment -> lvl > 0 ? lvl + 1 : 0;
                 case Decrement -> lvl > 1 ? lvl - 1 : lvl;
@@ -262,16 +246,14 @@ public final class WireManager {
             };
         }
         if (be instanceof InstalledObjectBlockEntity io && !isOrigin) {
-            //★本家 TileEntityConnector.onGetElectricity は<b>入力コネクタだけ</b>が受ける。
-            //  出力コネクタは配線から受け取らない (取り付け先を読んで流す側)。
+            // ★本家 TileEntityConnector.onGetElectricity は入力コネクタだ…
             if (io.getCategory() == InstalledObjectCategory.CONNECTOR_INPUT) {
                 io.setElectricity(lvl);
-                //本家 sendElectricity(DIRECT): 取り付け先ブロックへ書き込む
+                // 本家 sendElectricity(DIRECT): 取り付け先ブロックへ書き込む
                 io.deliverToAttached(lvl);
             }
         }
-        // ★本家 ElectricalWiringManager はエンティティ (EntityElectricalWiring) もノードにする。
-        //   RTMU の配線はブロック座標ベースなので、その座標に居る配線エンティティへ流す。
+        // ★本家 ElectricalWiringManager はエンティティ (EntityElectr…
         if (!isOrigin) {
             jp.ngt.rtm.entity.EntityElectricalWiring wiring =
                 jp.ngt.rtm.entity.EntityElectricalWiring.find(level, pos);

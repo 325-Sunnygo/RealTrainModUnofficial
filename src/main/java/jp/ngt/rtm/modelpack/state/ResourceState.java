@@ -6,36 +6,19 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
-/**
- * 本家 jp.ngt.rtm.modelpack.state.ResourceState のスクリプト互換最小移植。
- * スクリプトは getDataMap / getResourceName / add|removeExclusionParts を使う。
- */
+/** 本家 jp.ngt.rtm.modelpack.state.ResourceState のスクリプ… */
 public class ResourceState {
-    /**
-     * 本家 ResourceState.color の既定値は 16777215 (0xFFFFFF = 白)。
-     * Java の既定値 0 のままにしていると黒になる。
-     */
+    /** 本家 ResourceState.color の既定値は 16777215 (0xFFFFFF =… */
     public int color = 16777215;
 
-    /**
-     * 本家は public フィールド。スクリプトが state.dataMap と直接読む。
-     * 車両 (CarEntity) のように外部の保存先へブリッジしたい場合は差し替えられるよう final にしない。
-     */
+    /** 本家は public フィールド。スクリプトが state.dataMap と直接読む。 */
     public DataMap dataMap = new DataMap();
     private final Supplier<String> nameSupplier;
 
-    /**
-     * 本家 ResourceState.getResourceSet が返す ModelSet の供給元。
-     * 新しめのパックスクリプト 等、hi03 系) は設定を
-     * entity.getResourceState.getResourceSet.getConfig で読む
-     * (古いパックは entity.getModelSet.getConfig)。
-     */
+    /** 本家 ResourceState.getResourceSet が返す ModelSet の供給元。 */
     private final Supplier<? extends jp.ngt.rtm.modelpack.modelset.ModelSetBase<?>> resourceSetSupplier;
 
-    /**
-     * 本家 ResourceState.exclusionParts: 「今は描かないパーツ」の名前。
-     * RTM 標準スクリプトはドアの開閉をこれで表現する。
-     */
+    /** 本家 ResourceState.exclusionParts: 「今は描かないパーツ」の名前。 */
     private final Set<String> exclusionParts = ConcurrentHashMap.newKeySet();
 
     public ResourceState(Supplier<String> nameSupplier) {
@@ -48,10 +31,7 @@ public class ResourceState {
         this.resourceSetSupplier = resourceSetSupplier == null ? () -> null : resourceSetSupplier;
     }
 
-    /**
-     * DataMap を外から差し替える版 (CarEntity が既存の保存先 scriptData へブリッジするため)。
-     * 本家の API 面 (getResourceName / getDataMap / state.dataMap) はそのまま使える。
-     */
+    /** DataMap を外から差し替える版 (CarEntity が既存の保存先 scriptData… */
     public ResourceState(Supplier<String> nameSupplier,
                          Supplier<? extends jp.ngt.rtm.modelpack.modelset.ModelSetBase<?>> resourceSetSupplier,
                          DataMap dataMap) {
@@ -61,11 +41,21 @@ public class ResourceState {
         }
     }
 
+    public net.minecraft.nbt.CompoundTag writeToNBT() {
+        return this.dataMap.writeToNBT();
+    }
+
+    public void readFromNBT(net.minecraft.nbt.CompoundTag tag) {
+        if (tag != null && !tag.isEmpty()) {
+            this.dataMap.readFromNBT(tag);
+        }
+    }
+
     public DataMap getDataMap() {
         return this.dataMap;
     }
 
-    /** 本家 getArg: DataMap の全エントリを key=(Type)value,... で返す。 */
+    /** 本家 getArg: DataMap の全エントリを key=(Type)value,... */
     public String getArg() {
         return this.dataMap.getArg();
     }
@@ -75,12 +65,7 @@ public class ResourceState {
         this.dataMap.setArg(arg, overwrite);
     }
 
-    /**
-     * 本家 ResourceState.getResourceSet 互換。
-     * entity.getResourceState.getResourceSet.getConfig 用で、
-     * entity.getModelSet と同じ jp.ngt.rtm.modelpack.modelset.ModelSetCompat
-     * (getConfig を持つ) を返す。
-     */
+    /** 本家 ResourceState.getResourceSet 互換。 */
     public jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> getResourceSet() {
         return this.resourceSetSupplier.get();
     }
@@ -89,13 +74,10 @@ public class ResourceState {
         return this.nameSupplier.get();
     }
 
-    /** 本家 ResourceState.name (モデル選択画面で付けるカスタム名)。未設定なら null。 */
+    /** 本家 ResourceState.name (モデル選択画面で付けるカスタム名)。 */
     private String customName;
 
-    /**
-     * 本家 getName: カスタム名が付いていればそれ、無ければモデル名。
-     * 本家は未設定を "no_name" にするので、その挙動も合わせる。
-     */
+    /** 本家 getName: カスタム名が付いていればそれ、無ければモデル名。 */
     public String getName() {
         if (this.customName != null && !this.customName.isEmpty()) {
             return this.customName;
@@ -136,7 +118,7 @@ public class ResourceState {
         this.exclusionParts.clear();
     }
 
-    /** @return 除外中のパーツ名 (正規化済み)。空なら除外なし。 */
+    
     public Set<String> getExclusionParts() {
         return this.exclusionParts.isEmpty() ? Set.of() : Collections.unmodifiableSet(this.exclusionParts);
     }

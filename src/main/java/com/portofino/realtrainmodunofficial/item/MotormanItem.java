@@ -10,15 +10,11 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 
-/**
- * 本家 jp.ngt.rtm.item.ItemNPC (運転士アイテム、damage=0) の移植。
- * 地面に使用 → 運転士が立って出現 (向きはプレイヤーの逆、15°刻み — 本家同様)
- * 列車に使用 → 運転士が運転台に乗車 (EntityTrainBase.interactTrain 側で処理)
- */
+/** 本家 jp.ngt.rtm.item.ItemNPC (運転士アイテム、damage=0) の移植。 */
 public class MotormanItem extends Item {
 
     public MotormanItem() {
-        super(new Properties().stacksTo(16)); //本家 setMaxStackSize(16)
+        super(new Properties().stacksTo(16)); // 本家 setMaxStackSize(16)
     }
 
     @Override

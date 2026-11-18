@@ -8,10 +8,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 
-/**
- * 本家 jp.ngt.rtm.rail.TileEntityTurnTableCore (KaizPatchX) の忠実移植。
- * TODO(Phase 2): updateTrainYaw (回転中の列車追従) は EntityTrainBase/BogieController 移植後に接続。
- */
+/** 本家 jp.ngt.rtm.rail.TileEntityTurnTableCore (KaizP… */
 public class TileEntityTurnTableCore extends TileEntityLargeRailCore {
     public static final float ROTATION_INC = 0.5F;
     public static final float ROTATION_STEP = 15.0F;
@@ -74,7 +71,7 @@ public class TileEntityTurnTableCore extends TileEntityLargeRailCore {
 
     @Override
     public void createRailMap() {
-        if (this.isLoaded())//同期ができてない状態でのRailMapの生成を防ぐ
+        if (this.isLoaded())// 同期ができてない状態でのRailMapの生成を防ぐ
         {
             RailPosition start = this.railPositions[0];
             RailPosition end = this.railPositions[1];
@@ -128,8 +125,6 @@ public class TileEntityTurnTableCore extends TileEntityLargeRailCore {
         RailMap map = this.getRailMap(null);
         if (map == null || map.getStartRP() == null || map.getEndRP() == null) {
             // ★レールを置いた直後は RailMap がまだ無い。
-            // WAILA 系 MOD は見ているブロックへ毎tick getCloneItemStack を呼ぶので、
-            // ここで落ちるとレール設置の瞬間にクライアントごと落ちる (実測)。
             return "Type:TurnTable";
         }
         return "Type:TurnTable, " +

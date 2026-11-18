@@ -1,6 +1,6 @@
 package jp.ngt.mccompat;
 
-/** 1.7.10 command sender coordinates, including MCP and SRG field names. */
+/** 1.7.10 command sender coordinates, including MCP… */
 public class ChunkCoordinates {
     public int posX, posY, posZ;
 
@@ -10,7 +10,7 @@ public class ChunkCoordinates {
         this.posZ = z;
     }
 
-    // Bean accessors let Nashorn read and write SRG aliases without duplicate mutable fields.
+    // Bean accessors let Nashorn read and write SRG ali…
     public int getField_71574_a() { return this.posX; }
     public void setField_71574_a(int value) { this.posX = value; }
     public int getField_71572_b() { return this.posY; }

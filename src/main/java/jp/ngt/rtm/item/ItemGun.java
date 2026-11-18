@@ -20,14 +20,9 @@ import net.minecraft.world.level.Level;
 
 import java.util.List;
 
-/**
- * 銃。本家 {@code jp.ngt.rtm.item.ItemGun} の移植。
- *
- * <p>残弾は<b>耐久値</b> (damage 0 = 満タン / damage == max = 空)。
- * 空の状態で右クリックすると、インベントリの弾倉を 1 つ消費して装填し、空の弾倉を落とす。
- */
+/** 銃。本家 jp.ngt.rtm.item.ItemGun の移植。 */
 public class ItemGun extends Item {
-    /** 本家 {@code ItemGun.INTERVAL}。 */
+    /** 本家 ItemGun.INTERVAL。 */
     public static final int INTERVAL = 2;
     /** 本家 config「Sound / sound gun」の既定 100 (= 1.0)。 */
     public static final float GUN_SOUND_VOLUME = 1.0F;
@@ -56,10 +51,7 @@ public class ItemGun extends Item {
         return InteractionResultHolder.success(itemstack);
     }
 
-    /**
-     * 本家 {@code setMagazine}: インベントリから残弾のある弾倉を 1 つ取り出し、その残弾を返す。
-     * 見つからなければ 1024 (= 装填しない)。
-     */
+    /** 本家 setMagazine: インベントリから残弾のある弾倉を 1 つ取り出し、その残弾を返す。 */
     private int setMagazine(Player player) {
         Item magazineItem = this.getMagazineFromGunType();
         for (int i = 0; i < player.getInventory().items.size(); ++i) {
@@ -104,10 +96,7 @@ public class ItemGun extends Item {
         return 1;
     }
 
-    /**
-     * 本家 {@code onUsingGun}: アイテムを使っている間 tick ごとに呼ばれる。
-     * 連射でない銃は<b>最初の tick だけ</b>撃つ (count が useDuration と等しいとき)。
-     */
+    /** 本家 onUsingGun: アイテムを使っている間 tick ごとに呼ばれる。 */
     protected boolean onUsingGun(ItemStack itemstack, Level level, Player player, int count) {
         if (count % INTERVAL > 0) {
             return false;
@@ -124,7 +113,7 @@ public class ItemGun extends Item {
                     RealTrainModUnofficialSounds.GUN.get(), SoundSource.PLAYERS, GUN_SOUND_VOLUME * jp.ngt.rtm.RTMConfig.gunSoundVol, 1.0F);
 
                 if (!player.getAbilities().instabuild) {
-                    //薬莢ドロップ (本家と同じで メタ = 弾種 * 4 + 2)
+                    // 薬莢ドロップ (本家と同じで メタ = 弾種 * 4 + 2)
                     int variant = this.gunType.bulletType.id * 4 + 2;
                     player.drop(ItemAmmunition.create(RealTrainModUnofficialItems.BULLET_ITEM.get(), variant),
                         false, false);
@@ -135,11 +124,7 @@ public class ItemGun extends Item {
         return false;
     }
 
-    /**
-     * 本家 {@code PermissionManager.hasPermission(player, RTMCore.USE_GUN)} 相当。
-     * 本家は<b>シングルなら無条件で許可</b>し、マルチでは OP か権限付与済みの人だけ。
-     * RTMU に権限リストの仕組みが無いので、マルチでは OP (権限レベル 2) を条件にしている。
-     */
+    /** 本家 PermissionManager.hasPermission(player, RTMCor… */
     private static boolean hasPermission(Player player) {
         if (!(player instanceof ServerPlayer serverPlayer)) {
             return false;
@@ -169,7 +154,7 @@ public class ItemGun extends Item {
         };
     }
 
-    /** 本家 {@code ItemGun.GunType}。値は一切変えていない。 */
+    /** 本家 ItemGun.GunType。値は一切変えていない。 */
     public enum GunType {
         handgun(BulletType.handgun_9mm, 10, 16, 4.5F, false),
         rifle(BulletType.rifle_7_62mm, 5, 16, 7.5F, false),

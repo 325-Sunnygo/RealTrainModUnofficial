@@ -25,12 +25,7 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-/**
- * mods フォルダに入れた 1.7.10 の建材 mod からブロックテクスチャ
- * (assets/<ns>/textures/blocks/*.png) をかき集め、フルキューブブロックとして登録する。
- * 1.7.10 の Block クラス (Java バイトコード) は 1.21 では実行不可能なので、形状・機能・面別
- * テクスチャは再現できない。
- */
+/** mods フォルダに入れた 1.7.10 の建材 mod からブロックテクスチャ (assets/… */
 public final class ExternalBuildingBlocks {
     /** 生成ブロック/リソースの名前空間 (RTMU 自身)。 */
     public static final String NAMESPACE = RealTrainModUnofficial.MODID;
@@ -55,10 +50,7 @@ public final class ExternalBuildingBlocks {
     private ExternalBuildingBlocks() {
     }
 
-    /**
-     * @Mod コンストラクタから呼ぶ。スキャン → ブロック/アイテム登録 → バス接続。
-     * ここで登録したものは、コンストラクタ後に発火する RegisterEvent (凍結前) で確定する。
-     */
+    /** ここで登録したものは、コンストラクタ後に発火する RegisterEvent (凍結前) で確定す… */
     public static void init(IEventBus modBus) {
         if (initialized) {
             return;
@@ -133,7 +125,7 @@ public final class ExternalBuildingBlocks {
                 if (!lower.endsWith(".png")) {
                     continue;
                 }
-                // assets/<ns>/textures/blocks/<...>.png  (1.7.10 は複数形 blocks)
+                // assets/<ns>/textures/blocks/<...>.png (1.7.10 は複数…
                 String[] parts = name.split("/");
                 if (parts.length < 5
                         || !parts[0].equalsIgnoreCase("assets")
@@ -174,10 +166,7 @@ public final class ExternalBuildingBlocks {
         }
     }
 
-    /**
-     * PNG の IHDR チャンクから {colorType, width, height} を返す。フルデコードしない。
-     * PNG レイアウト: signature(8) len(4) "IHDR"(4) width(4) height(4) bitDepth(1) colorType(1)。
-     */
+    /** PNG の IHDR チャンクから {colorType, width, height} を返す。 */
     private static int[] readPngHeader(ZipFile zip, ZipEntry entry) {
         try (InputStream in = zip.getInputStream(entry)) {
             byte[] h = in.readNBytes(26);

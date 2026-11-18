@@ -28,17 +28,14 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 
-/**
- * 本家 jp.ngt.rtm.item.ItemWrench (KaizPatchX) の忠実移植。
- * モード (本家はダメージ値、ここではコンポーネント):
- */
+/** 本家 jp.ngt.rtm.item.ItemWrench (KaizPatchX) の忠実移植。 */
 public class RtmWrenchItem extends Item {
-    // モード 9 (アンカー移動) 中はアンカー線を右クリックで掴んで動かす (MarkerBlockEntityRenderer)
+    // モード 9 (アンカー移動) 中はアンカー線を右クリックで掴んで動かす (MarkerBlockE…
     private static final int[] MODE_CYCLE = {0, 1, 2, 6, 7, 8, 9, 10, 11, 12};
     /** マーカーをブロック未満の位置に動かす (本家に無い。ペンマーカーの代わり)。 */
     public static final int MODE_OFFSET = 12;
     public static final int MODE_ANCHOR = 9;
-    /** RailPosition.direction (8方位) → マーカー blockstate facing */
+    /** RailPosition.direction (8方位) → マーカー blockstate fa… */
     private static final int[] DIRECTION_META_MAP = {2, 5, 1, 4, 0, 7, 3, 6};
 
     public RtmWrenchItem() {
@@ -144,8 +141,6 @@ public class RtmWrenchItem extends Item {
         BlockPos pos = context.getClickedPos();
 
         // マーカーをクリックした場合は BlockMarker 側 (useItemOn) が処理する。
-        // ただしスニーク中はバニラがブロック操作をスキップして item.use (モードロック切替)
-        // へ行ってしまうため、カント設定 GUI はここで開く。
         if (level.getBlockState(pos).getBlock() instanceof BlockMarker) {
             if (player.isShiftKeyDown()) {
                 if (level.isClientSide
@@ -172,7 +167,7 @@ public class RtmWrenchItem extends Item {
         switch (mode) {
             case 0 -> this.placeMarker(player, level, above, jp.ngt.rtm.rail.RTMRailBlocks.MARKER.get());
             case 1 -> this.placeMarker(player, level, above, jp.ngt.rtm.rail.RTMRailBlocks.MARKER_SWITCH.get());
-            // 本家 onItemUse case 2: 直線マーカー (RTMBlock.markerStraight)
+            // 本家 onItemUse case 2: 直線マーカー (RTMBlock.markerStrai…
             case 2 -> this.placeMarker(player, level, above, jp.ngt.rtm.rail.RTMRailBlocks.MARKER_STRAIGHT.get());
             default -> {
                 return InteractionResult.PASS;
@@ -199,7 +194,7 @@ public class RtmWrenchItem extends Item {
         }
     }
 
-    /** 本家 revertRailToMarker: レールを撤去して RailPosition からマーカーを復元 */
+    /** 本家 revertRailToMarker: レールを撤去して RailPosition からマー… */
     public void revertRailToMarker(Level level, BlockPos pos) {
         BlockEntity tile = level.getBlockEntity(pos);
         if (!(tile instanceof TileEntityLargeRailBase rail)) {

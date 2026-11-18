@@ -6,11 +6,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 本家 jp.ngt.ngtlib.block.BlockSet の 1.21 版。
- * 本家はブロック+メタだが、1.21 はメタが無いため BlockState を保持する
- * (metadata フィールドはスクリプト互換のため 0 固定で残す)。
- */
+/** 本家 jp.ngt.ngtlib.block.BlockSet の 1.21 版。 */
 public class BlockSet {
     public static final BlockSet AIR = new BlockSet(Blocks.AIR, 0);
 
@@ -68,10 +64,7 @@ public class BlockSet {
         return new BlockSet(this.x, this.y, this.z, this.block, this.metadata, nbt, this.state);
     }
 
-    /**
-     * 本家 BlockSet.writeToNBT。
-     * 戻り値はシムの jp.ngt.mccompat.nbt.NBTTagCompound。
-     */
+    /** 本家 BlockSet.writeToNBT。 */
     public jp.ngt.mccompat.nbt.NBTTagCompound writeToNBT() {
         return new jp.ngt.mccompat.nbt.NBTTagCompound(writeToVanillaNBT());
     }

@@ -7,10 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
-/**
- * 同梱パックを専用フォルダ (rtm_default_assets) へ展開する。
- * mods フォルダのファイルは絶対に消さない。
- */
+/** 同梱パックを専用フォルダ (rtm_default_assets) へ展開する。 */
 public final class BundledPackInstaller {
 
     private BundledPackInstaller() {
@@ -24,7 +21,7 @@ public final class BundledPackInstaller {
         }
     }
 
-    /** 同梱デフォルトパックは mods ではなく専用フォルダ (rtm_default_assets) に展開する。 */
+    /** 同梱デフォルトパックは mods ではなく専用フォルダ (rtm_default_assets)… */
     private static void installBundledPacksToDefaultAssets() throws IOException {
         Path assetsDir = DefaultAssetsFolder.ensure();
         Path modsDir = FMLPaths.GAMEDIR.get().resolve("mods");
@@ -34,8 +31,7 @@ public final class BundledPackInstaller {
                 Path target = assetsDir.resolve(fileName);
                 Path userCopy = modsDir.resolve(fileName);
                 if (Files.exists(userCopy)) {
-                    // ユーザーが mods に置いたものを正とする。二重ロードを避けるため、
-                    // こちらが過去に展開したコピー (自前のファイル) だけを片付ける。
+                    // ユーザーが mods に置いたものを正とする。
                     RealTrainModUnofficial.LOGGER.info(
                         "[RTMU] 同梱パック {} は mods 側を優先します (同梱版は展開しません)", fileName);
                     Files.deleteIfExists(target);

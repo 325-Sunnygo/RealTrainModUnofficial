@@ -23,10 +23,7 @@ import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 本家 GuiSignboard の 1.21.1 移植。看板を素手で右クリックすると開く。
- * 左側が板のプレビュー (実際の見た目と同じ配置)、右側が編集パネル。
- */
+/** 本家 GuiSignboard の 1.21.1 移植。看板を素手で右クリックすると開く。 */
 public class SignboardScreen extends Screen {
     private static final int PANEL_W = 130;
     /** 掴み判定の太さ(px)。 */
@@ -55,10 +52,7 @@ public class SignboardScreen extends Screen {
     private EditBox fieldAnimeSpeed;
     private EditBox fieldStation;
 
-    /**
-     * 編集中の文字のフォント名/スタイル。EditBox に出さないのでここで持つ。
-     * (font は Screen 側の描画用 Font なので名前を分ける)
-     */
+    /** 編集中の文字のフォント名/スタイル。EditBox に出さないのでここで持つ。 */
     private String fontName = "Meiryo UI";
     private int style;
     private SignboardAnimeType animeType = SignboardAnimeType.SWITCH;
@@ -74,13 +68,7 @@ public class SignboardScreen extends Screen {
     private double prevDragX;
     private double prevDragY;
 
-    /**
-     * ウィジェットの作り直し要求。
-     * ボタンの onPress の中で直接 rebuildWidgets すると、呼び出し元の
-     * ContainerEventHandler.mouseClicked が「押されたウィジェット」にフォーカスを
-     * セットするのが作り直しの後になるため、破棄済みのボタンがフォーカスを持ち、
-     * その後 Enter を押すと同じボタンがもう一度発火してしまう (Del で2件消える等)。
-     */
+    /** ウィジェットの作り直し要求。 ボタンの onPress の中で直接 rebuildWidgets… */
     private boolean pendingRebuild;
 
     public SignboardScreen(InstalledObjectBlockEntity blockEntity) {
@@ -284,8 +272,7 @@ public class SignboardScreen extends Screen {
                 infos,
                 selection -> {
                     this.definitionId = selection.modelId();
-                    // ModelSelectScreen は選択直後に自分を閉じる (setScreen(null)) ので、
-                    // 次のティックまで待ってから看板エディタへ戻す。
+                    // ModelSelectScreen は選択直後に自分を閉じる (setScreen(null))…
                     mc.tell(() -> mc.setScreen(this));
                 },
                 definitionId,
@@ -444,8 +431,7 @@ public class SignboardScreen extends Screen {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
-        // ウィジェットの作り直しはここで消化する (クリック処理の途中でやるとフォーカスが
-        // 破棄済みボタンに残る)。rebuildWidgets は clearFocus も行う。
+        // ウィジェットの作り直しはここで消化する (クリック処理の途中でやるとフォーカスが 破棄済みボタンに…
         if (pendingRebuild) {
             pendingRebuild = false;
             rebuildWidgets();
@@ -470,8 +456,7 @@ public class SignboardScreen extends Screen {
             }
         }
 
-        //★super.render は renderBackground をもう一度呼び、描いた内容の上に暗幕が乗る。
-        //  ウィジェットだけを描く (ぼかし根絶と同時に入れた描画順の修正)。
+        // ★super.render は renderBackground をもう一度呼び、描いた内容の上に…
         for (net.minecraft.client.gui.components.Renderable renderable : this.renderables) {
             renderable.render(graphics, mouseX, mouseY, partialTick);
         }

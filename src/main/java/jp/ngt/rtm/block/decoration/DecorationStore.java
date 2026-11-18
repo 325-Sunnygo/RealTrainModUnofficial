@@ -13,13 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
-/**
- * 装飾ブロックのモデル置き場。本家 {@code jp.ngt.rtm.block.decoration.DecorationStore} の移植。
- *
- * <p>本家と同じくワールドフォルダの {@code ngt/rtm/decoration/*.json} に保存する。
- * サーバーが登録・保存し、全クライアントへ json を配って {@link #setModel} で反映する
- * (本家は PacketNotice、RTMU は DecorationSyncPayload)。
- */
+/** 装飾ブロックのモデル置き場。本家 jp.ngt.rtm.block.decoration.Deco… */
 public final class DecorationStore {
     public static final DecorationStore INSTANCE = new DecorationStore();
 
@@ -61,7 +55,7 @@ public final class DecorationStore {
     public void registerModel(DecorationModel model, MinecraftServer server) {
         this.serverModelMap.put(model.name, model);
         this.saveModel(model, server);
-        //全クライアントへ配布
+        // 全クライアントへ配布
         net.neoforged.neoforge.network.PacketDistributor.sendToAllPlayers(
             new com.portofino.realtrainmodunofficial.network.DecorationSyncPayload(model.toJson()));
     }

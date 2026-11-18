@@ -13,11 +13,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * 機械 (設置物) の DataMap を client → server で更新する。
- * 本家 BlockMachineBase の DataForm GUI が行う「フォームで入力した値をタイルの
- * DataMap に書き戻す」処理の移植。
- */
+/** 機械 (設置物) の DataMap を client → server で更新する。 */
 public record SetBlockDataMapPayload(BlockPos pos, Map<String, String> values) implements CustomPacketPayload {
 
     public static final Type<SetBlockDataMapPayload> TYPE = new Type<>(

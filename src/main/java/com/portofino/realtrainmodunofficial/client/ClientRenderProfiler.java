@@ -10,10 +10,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import org.lwjgl.glfw.GLFW;
 
-/**
- * 軽量なクライアント側描画プロファイラ。
- * 1 秒単位で描画カテゴリごとの合計時間を集計して、必要な時だけ HUD に出す。
- */
+/** 軽量なクライアント側描画プロファイラ。 1 秒単位で描画カテゴリごとの合計時間を集計して、必要な時… */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class ClientRenderProfiler {
     private static final String[] CATEGORY_NAMES = {"Rail", "RailOld", "Train", "Object"};
@@ -29,7 +26,6 @@ public final class ClientRenderProfiler {
     private static final int[] displayCounts = new int[CATEGORY_NAMES.length];
 
     // CPU が 1 秒間に VertexConsumer へ書き込んだ頂点数 / バッチ数。
-    // 「重さの正体は頂点スループット」なのかを数字で確定させるための計測。
     private static long verticesThisSecond;
     private static long batchesThisSecond;
     private static long displayVertices;
@@ -38,12 +34,10 @@ public final class ClientRenderProfiler {
     private static int displayFrames;
 
     // レールが「統合メッシュ (1本=1VBO)」で描けているか、それとも逐次描画に落ちているか。
-    // レールが重いときの切り分け用: fallback が多ければ焼き込みが効いていない。
     private static int railMergedThisSecond;
     private static int railFallbackThisSecond;
     private static int railBakeThisSecond;
-    // GL ステートを切り替えた回数と VBO を描いた回数。重さは「描画回数」より
-    // 「ステート切替の回数」で決まるので、両方を出して効果を見る。
+    // GL ステートを切り替えた回数と VBO を描いた回数。
     private static int railStateSetupThisSecond;
     private static int railVboDrawThisSecond;
     private static int displayRailMerged;
@@ -85,11 +79,7 @@ public final class ClientRenderProfiler {
         }
     }
 
-    /**
-     * 列車描画中フラグ。addVertices を「列車ぶん」と「それ以外」に分けて数えるために使う。
-     * の実測で、列車を見た瞬間に batches が 96→232 (+136)、頂点が +24000 に増える一方
-     * スクリプト時間はほぼ変わらなかった。
-     */
+    /** 列車描画中フラグ。addVertices を「列車ぶん」と「それ以外」に分けて数えるために使う。 */
     private static boolean inTrain;
     private static long trainVerticesThisSecond;
     private static long trainBatchesThisSecond;
@@ -104,10 +94,7 @@ public final class ClientRenderProfiler {
         inTrain = false;
     }
 
-    /**
-     * 静的 VBO 経路をどの条件で落ちたかの内訳。
-     * 実測で「7 バッチ・31,564 頂点・14ms/frame」= 全バッチが CPU 頂点提出に落ちていた。
-     */
+    /** 静的 VBO 経路をどの条件で落ちたかの内訳。 */
     public static final String[] VBO_SKIP_NAMES = {
         "OK(VBO使用)", "capture", "blend", "transform", "depthBias",
         "overlay", "color", "uvWindow", "shader", "build失敗", "小バッチ"
@@ -136,18 +123,10 @@ public final class ClientRenderProfiler {
         }
     }
 
-    /**
-     * VBO 経路を落ちたバッチの内訳 (グループ名 → 頂点数)。
-     * 「1 両で 17,704 頂点が半透明扱い」は窓にしては多すぎるため、本当にガラスなのか、
-     * 不透明な内装/車体が誤って半透明に分類されているのかを名前で確かめる。
-     */
+    /** VBO 経路を落ちたバッチの内訳 (グループ名 → 頂点数)。 */
     private static final java.util.Map<String, int[]> slowBatches = new java.util.HashMap<>();
 
-    /**
-     * グループごとの「実体バッチ数」。1 秒間に現れた異なるバッチインスタンスを数える。
-     * 描画回数だけでは「小バッチが多数ある」のか「同じバッチを何度も描いている」のか区別できず、
-     * 打つ手が正反対 (バッチ併合 vs 重複描画の除去) になるため、実体数も併せて数える。
-     */
+    /** グループごとの「実体バッチ数」。1 秒間に現れた異なるバッチインスタンスを数える。 */
     private static final java.util.Map<String, java.util.Set<Integer>> slowBatchIds = new java.util.HashMap<>();
 
     public static void countSlowBatch(String groupName, int verts, int reason) {
@@ -199,10 +178,7 @@ public final class ClientRenderProfiler {
         slowBatchIds.clear();
     }
 
-    /**
-     * 列車描画 (Train=約5ms/両) の内側の区間計測。
-     * スクリプト/頂点数/ドローコール数は実測でシロだった (2026-07-20)。
-     */
+    /** 列車描画 (Train=約5ms/両) の内側の区間計測。 */
     public static final String[] SECTION_NAMES = {
         "lookup", "riders", "scripted", "baked", "signs",
         "record", "replay", "groups", "loop", "vbo", "getBuf", "submit",
@@ -220,10 +196,9 @@ public final class ClientRenderProfiler {
     public static final int SEC_VBO = 9;
     public static final int SEC_GETBUF = 10;
     public static final int SEC_SUBMIT = 11;
-    /** replay 内の DRAW_TESS (drawTess = 方向幕/モニタ等の tessellator 描画)。 */
+    /** replay 内の DRAW_TESS (drawTess = 方向幕/モニタ等の tessell… */
     public static final int SEC_TESS = 12;
-    /**
-     */
+    
     public static final int SEC_MODELGRP = 13;
 
     private static final long[] sectionNs = new long[SECTION_NAMES.length];
@@ -257,22 +232,35 @@ public final class ClientRenderProfiler {
     }
 
     public static long begin() {
-        return System.nanoTime();
+        // 計測 OFF 中は無負荷 (通常プレイの hot path から nanoTime を追い出す)。
+        return overlayEnabled ? System.nanoTime() : 0L;
     }
 
     public static void endRailOld(long startNs) {
+        if (startNs == 0L) {
+            return;
+        }
         record(CATEGORY_RAIL_OLD, startNs);
     }
 
     public static void endRail(long startNs) {
+        if (startNs == 0L) {
+            return;
+        }
         record(CATEGORY_RAIL, startNs);
     }
 
     public static void endTrain(long startNs) {
+        if (startNs == 0L) {
+            return;
+        }
         record(CATEGORY_TRAIN, startNs);
     }
 
     public static void endInstalledObject(long startNs) {
+        if (startNs == 0L) {
+            return;
+        }
         record(CATEGORY_OBJECT, startNs);
     }
 
@@ -324,7 +312,6 @@ public final class ClientRenderProfiler {
         lastSnapshotNs = now;
 
         // 画面のオーバーレイと同じ内容をログにも残す。
-        // スクリーンショットを撮らなくても、ログを見れば負荷の内訳が分かるようにする。
         if (overlayEnabled) {
             logSnapshot();
         }
@@ -349,10 +336,7 @@ public final class ClientRenderProfiler {
         logTrainSections();
     }
 
-    /**
-     * Train区間の 1 秒スナップショットをログに出す。単位は全て ms/frame。
-     * 「未計上」「判定他」の残差こそが見たい数字 (計測していない場所に犯人がいる)。
-     */
+    /** Train区間の 1 秒スナップショットをログに出す。単位は全て ms/frame。 */
     private static void logTrainSections() {
         if (displaySectionCounts[SEC_SCRIPTED] == 0 && displaySectionCounts[SEC_BAKED] == 0
             && displaySectionCounts[SEC_LOOP] == 0) {

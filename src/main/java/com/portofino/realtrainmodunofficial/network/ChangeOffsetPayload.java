@@ -10,10 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/**
- * 本家 GuiChangeOffset (バール右クリックの微調整 GUI) のサーバー反映。
- * Offset X/Y/Z, Rotation Roll/Pitch/Yaw, Scale。
- */
+/** 本家 GuiChangeOffset (バール右クリックの微調整 GUI) のサーバー反映。 */
 public record ChangeOffsetPayload(BlockPos pos, float offX, float offY, float offZ,
                                   float roll, float pitch, float yaw, float scale)
         implements CustomPacketPayload {

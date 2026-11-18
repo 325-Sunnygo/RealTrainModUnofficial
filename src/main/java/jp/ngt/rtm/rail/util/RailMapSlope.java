@@ -9,10 +9,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * 本家 jp.ngt.rtm.rail.util.RailMapSlope (KaizPatchX) の忠実移植。
- * slopeType 0-3 → 長さ 16/8/4/2、固定ピッチ 3.576334/7.125016/14.03624/26.56505°。
- */
+/** 本家 jp.ngt.rtm.rail.util.RailMapSlope (KaizPatchX)… */
 public class RailMapSlope extends RailMapBasic {
     private final float dirDeg;
     private final byte slopeType;

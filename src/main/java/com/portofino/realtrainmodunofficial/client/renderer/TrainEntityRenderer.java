@@ -57,10 +57,10 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 float dx = (x - 31.5f) / 32.0f;
                 float dy = (y - 31.5f) / 32.0f;
                 float r = (float) Math.sqrt(dx * dx + dy * dy);
-                // Smooth power falloff: bright center → transparent edge
+                // Smooth power falloff: bright center → transparent…
                 float alpha = r >= 1.0f ? 0.0f : (float) Math.pow(1.0f - r, 1.5);
                 int a = Math.min(255, (int)(alpha * 255));
-                // NativeImage stores ABGR (A at bit24, B at bit16, G at bit8, R at bit0)
+                // NativeImage stores ABGR (A at bit24, B at bit16,…
                 img.setPixelRGBA(x, y, (a << 24) | 0x00FFFFFF);
             }
         }
@@ -85,11 +85,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         }
     }
 
-    /**
-     * 本家 RenderVehicleBase.preRenderBody の移植。
-     * useInteriorLighting = cfg.interiorLights != null && getLightValue(vehicle) < 7
-     * if (lightState > 0 && useInteriorLighting) GLHelper.setLightmapMaxBrightness;
-     */
+    /** 本家 RenderVehicleBase.preRenderBody の移植。 */
     public static int applyInteriorLighting(net.minecraft.world.level.Level level, double x, double y, double z,
                                             boolean hasInteriorLights, int interiorLightState, int packedLight) {
         if (level == null || !hasInteriorLights || interiorLightState <= 0) {
@@ -117,9 +113,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
 
     @Override
     public boolean shouldRender(TrainEntity entity, Frustum frustum, double camX, double camY, double camZ) {
-        // Use a square box (halfLength on all horizontal axes) so the train stays
-        // visible regardless of rotation. A Z-only offset disappears when the train
-        // faces east/west and the camera is slightly off-center.
+        // Use a square box (halfLength on all horizontal ax…
         double halfLength = Math.max(3.0D, entity.getTrainDistance() + 3.0D);
         AABB renderBounds = new AABB(
             entity.getX() - halfLength, entity.getY() - 1.5D, entity.getZ() - halfLength,
@@ -149,9 +143,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         if (model.getScriptEngine() != null && entity.getScriptEngine() != model.getScriptEngine()) {
             entity.setScriptEngine(model.getScriptEngine());
         }
-        if (entity.getSoundScriptEngine() == null && def.hasSoundScript()) {
-            entity.setSoundScriptEngine(MqoModelLoader.loadSoundScriptForVehicle(def));
-        }
+        // 走行音スクリプトは ModelSetVehicleBaseClient.se を SoundUpd…
 
         boolean failed = false;
         poseStack.pushPose();
@@ -160,16 +152,14 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             poseStack.mulPose(Axis.YP.rotationDegrees(renderYaw));
 
             // Pitch: 坂で車体が水平のまま浮かないように適用。
-            // GL11.glRotated で body に独自に pitch を加える車両があり、二重回転で異常傾斜の原因になる。
             float renderPitch = Mth.lerp(partialTicks, entity.xRotO, entity.getXRot());
             renderPitch = Mth.clamp(renderPitch, -45.0F, 45.0F);
-            // 坂で車体を傾ける。スクリプトの有無に関わらず適用 (RTM 標準スクリプトは
-            // pitch を自前で扱わないため、こちらで適用しても二重傾斜にはならない)。
+            // 坂で車体を傾ける。スクリプトの有無に関わらず適用 (RTM 標準スクリプトは pitch を自前で…
             if (Math.abs(renderPitch) > 0.001F) {
                 poseStack.mulPose(Axis.XP.rotationDegrees(-renderPitch));
             }
 
-            // Banking/cant: same formula as TrainBogieEntityRenderer.
+            // Banking/cant: same formula as TrainBogieEntityRen…
             float yawDelta = Mth.wrapDegrees(entity.getYRot() - entity.yRotO);
             float horizSpeed = (float) entity.getDeltaMovement().horizontalDistance();
             float bankAngle = Mth.clamp(-yawDelta * horizSpeed * 5.0F, -10.0F, 10.0F);
@@ -177,12 +167,27 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 poseStack.mulPose(Axis.ZP.rotationDegrees(bankAngle));
             }
 
-            // Apply model offset and scale (TrainEntity Y がすでに body center に合わせて
-            // RTM_VEHICLE_Y_OFFSET 分上げてあるので、ここでは +0.2 のような追加リフトをしない)
+            // 車両の揺れ。本家は車体が完全に固定だが、実車の左右動・上下動・ヨーイングを 速度に応じた微小振幅で…
+            if (com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.swayEnabled) {
+                float speed = Math.abs(entity.getSpeed());
+                float intensity = com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.swayIntensity
+                        * Mth.clamp(speed / 0.6F, 0.0F, 1.0F);
+                if (intensity > 0.001F) {
+                    float t = (entity.tickCount + partialTicks) * 0.13F
+                            * com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.swaySpeed;
+                    poseStack.translate(
+                            Mth.sin(t * 1.73F) * intensity * 0.018F,
+                            Mth.sin(t * 2.37F) * intensity * 0.010F,
+                            Mth.cos(t * 1.19F) * intensity * 0.006F);
+                    poseStack.mulPose(Axis.ZP.rotationDegrees(Mth.sin(t * 1.61F) * intensity * 0.32F));
+                    poseStack.mulPose(Axis.XP.rotationDegrees(Mth.sin(t * 2.11F) * intensity * 0.16F));
+                    poseStack.mulPose(Axis.YP.rotationDegrees(Mth.sin(t * 0.97F) * intensity * 0.18F));
+                }
+            }
+
+            // Apply model offset and scale (TrainEntity Y がすでに…
             poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);
-            // ★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。本家は
-            // NGTOParts.render の中だけで glScalef(scale) するので、スクリプトが台車/ドアを
-            // 置く glTranslatef はブロック単位のまま。ここで掛けると全部が中央に寄る。
+            // ★ボクセルモデル (.ngto/.ngtz) はここで縮尺を掛けない。
             if (!model.isVoxelModel()) {
                 poseStack.scale(def.getModelScale(), def.getModelScale(), def.getModelScale());
             }
@@ -199,35 +204,32 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             double cameraDistanceSq = mc.gameRenderer.getMainCamera().getPosition()
                 .distanceToSqr(entity.getX(), entity.getY() + 1.5D, entity.getZ());
             boolean compatibilityHeavy = def.isDoCulling() || shouldUseCompatibilityRendering(def, model);
-            double nearThreshold = compatibilityHeavy ? 34.0D : 48.0D;
-            double aggressiveThreshold = compatibilityHeavy ? 40.0D : 56.0D;
-            double rollsignThreshold = compatibilityHeavy ? 42.0D : 64.0D;
-            double lightThreshold = compatibilityHeavy ? 64.0D : 96.0D;
+            double nearThreshold = com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.vehicleInteriorDistance;
+            double aggressiveThreshold = nearThreshold + (compatibilityHeavy ? 6.0D : 8.0D);
+            double rollsignThreshold = com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.vehicleRollsignDistance;
+            double lightThreshold = com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.vehicleLightDistance;
             boolean nearTrain = cameraDistanceSq < nearThreshold * nearThreshold;
-            // ★本家は内装を距離で間引かない。
-            // 室内の面そのものが見えているからで、内装を消すと光も消える。
+            // ★本家は内装を距離で間引かない。 室内の面そのものが見えているからで、内装を消すと光も消える。
             boolean distanceCulling = false;
-            boolean renderInterior = ridingThisTrain || !distanceCulling || nearTrain;
+            boolean renderInterior = com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.renderInterior
+                    && (ridingThisTrain || !distanceCulling || nearTrain);
             boolean aggressiveDistanceCulling = distanceCulling && !ridingThisTrain
                 && cameraDistanceSq > aggressiveThreshold * aggressiveThreshold;
-            boolean renderRollsigns = ridingThisTrain || cameraDistanceSq < rollsignThreshold * rollsignThreshold;
-            boolean renderLights = ridingThisTrain || cameraDistanceSq < lightThreshold * lightThreshold;
+            boolean renderRollsigns = com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.renderRollsigns
+                    && (ridingThisTrain || cameraDistanceSq < rollsignThreshold * rollsignThreshold);
+            boolean renderLights = com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.renderLights
+                    && (ridingThisTrain || cameraDistanceSq < lightThreshold * lightThreshold);
             int trainPackedLight = resolveTrainPackedLight(entity, packedLight);
 
             boolean modelScriptRunning = model.hasRenderScript();
-            // def.hasScript covers cases where the JS engine failed to load (e.g. unsupported JS runtime)
-            // but the pack was designed with a renderer script (e.g. SL packs with rod animation).
-            // In that case, wheel/truck groups belong in the main model and must NOT be filtered out.
+            // def.hasScript covers cases where the JS engine fa…
             boolean modelHasScript = modelScriptRunning || def.hasScript();
             // ★ボクセルモデル (.ngto/.ngtz) + スクリプト稼働中は、ベイク側を一切描かない。
-            // 本家 NGTZModel はパーツを自分のグリッド中央へ寄せて描き、位置決めはスクリプトの
-            // glTranslatef が行う。
             boolean voxelDrawnByScript = model.isVoxelModel() && modelScriptRunning;
             MqoModelLoader.GroupPredicate groupFilter = voxelDrawnByScript
                 ? groupName -> false
                 : groupName -> shouldRenderTrainGroup(groupName, renderInterior, aggressiveDistanceCulling, compatibilityHeavy, def, modelHasScript, modelScriptRunning);
-            // 本家 BasicVehiclePartsRenderer と同じく、動かす部品は JSON の objects で決まる。
-            // 名前に "door" を含むか等の推測はしない (本家に無いし、扉/panel 等の命名で外れる)。
+            // 本家 BasicVehiclePartsRenderer と同じく、動かす部品は JSON の o…
             java.util.Map<String, java.util.List<PartsStep>> leftChains = partsChains(def.getLeftDoors());
             java.util.Map<String, java.util.List<PartsStep>> rightChains = partsChains(def.getRightDoors());
             var partDrawOrder = com.portofino.realtrainmodunofficial.client.model.LegacyVehiclePartOrder.create(
@@ -245,12 +247,11 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                     applyPartsTransform(stack, rightChains, groupName, entity.doorMoveR);
                 }
                 @Override public boolean mayModify(String groupName) {
-                    // 動かない batch は pushPose 不要 ⇒ Pose (Matrix4f+Matrix3f) 確保を回避。
+                    // 動かない batch は pushPose 不要 ⇒ Pose (Matrix4f+Matrix3…
                     if (groupName == null || groupName.isEmpty()) return false;
                     if (isRunningGearGroup(groupName)) return true;
                     if (leftChains.isEmpty() && rightChains.isEmpty()) {
-                        // ドア定義の無いパックは名前推定フォールバックに掛かる可能性がある
-                        // ドア定義が無いなら動かす対象も無い (名前推定はしない)。
+                        // ドア定義の無いパックは名前推定フォールバックに掛かる可能性がある ドア定義が無いなら動かす対象も無…
                         return false;
                     }
                     return hasPartsTransform(leftChains, groupName) || hasPartsTransform(rightChains, groupName);
@@ -264,20 +265,24 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             if (LOGGED_VEHICLES.add(entity.getVehicleId())) {
                 java.util.Set<String> allGroups = model.getAllNormalizedGroupNames();
             }
-            // 列車の実座標から取り直した lightmap を使用し、室内灯OFFの外装が夜に白く浮かないようにする。
-            // 発光 pass は MqoModelLoader/TrainScriptSystem 側で室内灯ONの内装だけに制限する。
+            // 列車の実座標から取り直した lightmap を使用し、室内灯OFFの外装が夜に白く浮かないように…
             int bodyLight = applyInteriorLighting(entity.level(), entity.getX(), entity.getY(), entity.getZ(),
                 !def.getInteriorLights().isEmpty(), entity.isInteriorLightOn() ? 1 : 0, trainPackedLight);
             com.portofino.realtrainmodunofficial.client.render.InteriorLighting.begin(
                 def.getInteriorLights(), false, entity.level().getGameTime() * 50L);
             try {
                 MqoModelLoader.renderModel(model, poseStack, buffer, bodyLight, groupFilter, doorTransform, entity);
+                // 車体表面の雨粒 (軽量レイヤー)。バニラの雨と違い車体を貫通しない。
+                com.portofino.realtrainmodunofficial.client.render.VehicleRainLayer.render(
+                        entity, def, poseStack, buffer, bodyLight, partialTicks, model.isVoxelModel());
             } finally {
                 com.portofino.realtrainmodunofficial.client.render.InteriorLighting.end();
             }
             // 台車は車体と同じ変換内で描画し、各台車ごとにレール高へ補正する。
             try {
-                renderBogiesInline(entity, def, model, poseStack, buffer, trainPackedLight, partialTicks);
+                if (com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.renderBogies) {
+                    renderBogiesInline(entity, def, model, poseStack, buffer, trainPackedLight, partialTicks);
+                }
             } catch (Throwable t) {
                 com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER
                     .debug("Inline bogie render failed for {}: {}", entity.getVehicleId(), t.toString());
@@ -350,7 +355,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             || lower.contains("台車");
     }
 
-    /** 本家 EntityVehicleBase.MAX_DOOR_MOVE。開度は doorMove / これ。 */
+    /** 本家 EntityVehicleBase.MAX_DOOR_MOVE。 */
     public static final float MAX_DOOR_MOVE = 60.0F;
 
     /** 本家 VehicleParts の変換 1 段 (pos を原点にした transform 列)。 */
@@ -361,10 +366,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             java.util.Map<String, java.util.List<PartsStep>>> PARTS_CHAIN_CACHE =
             java.util.Collections.synchronizedMap(new java.util.IdentityHashMap<>());
 
-    /**
-     * 本家 BasicVehiclePartsRenderer.getParts 相当。
-     * 親子の入れ子を「グループ名 → 根から順に適用する変換列」へ平坦化する。
-     */
+    /** 本家 BasicVehiclePartsRenderer.getParts 相当。 */
     public static java.util.Map<String, java.util.List<PartsStep>> partsChains(
             java.util.List<VehicleDefinition.DoorAnimationDefinition> parts) {
         if (parts == null || parts.isEmpty()) {
@@ -405,12 +407,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 || chains.containsKey(groupName.toLowerCase(java.util.Locale.ROOT));
     }
 
-    /**
-     * 本家 BasicVehiclePartsRenderer.renderParts の忠実移植。
-     * translate(pos) → transform を並び順に全て適用 → translate(-pos)
-     * transform の要素数 3 = 平行移動 {x,y,z} × move
-     * 4 = 回転 {angle × move, vecX, vecY, vecZ}
-     */
+    /** 本家 BasicVehiclePartsRenderer.renderParts の忠実移植。 */
     public static void applyPartsTransform(PoseStack poseStack,
                                            java.util.Map<String, java.util.List<PartsStep>> chains,
                                            String groupName, float progressTicks) {
@@ -474,8 +471,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             return;
         }
         if (doors == null || doors.isEmpty()) {
-            // ★定義が無いなら動かさない。本家にドア名を推測する仕組みは無い
-            //   (本家パックはドアの動きをスクリプトで書く)。
+            // ★定義が無いなら動かさない。本家にドア名を推測する仕組みは無い (本家パックはドアの動きをスクリプ…
             return;
         }
         applyPartsTransform(poseStack, partsChains(doors), groupName, progressTicks);
@@ -492,11 +488,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         renderConfiguredRollsigns(entity.getDestinationIndex(), entity.getRollsignAnimation(), def, poseStack, buffer, packedLight);
     }
 
-    /**
-     * 車両 JSON の rollsigns (頂点座標 + UV で定義された方向幕パネル) を描く。
-     * 本家 RenderVehicleBase.renderRollsign と同じで、描画スクリプトの有無に関係なく
-     * エンジン側が描く。
-     */
+    /** 車両 JSON の rollsigns (頂点座標 + UV で定義された方向幕パネル) を描く。 */
     static void renderConfiguredRollsigns(int rawDestinationIndex, float animation, VehicleDefinition def, PoseStack poseStack,
                                           MultiBufferSource buffer, int packedLight) {
         if (def == null) {
@@ -506,11 +498,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 def.getRollsignNames(), def.getRollsigns(), poseStack, buffer, packedLight);
     }
 
-    /**
-     * RTMU 追加: 種別幕 (方向幕と同じ仕組みで別テクスチャ・別インデックス State_Type)。
-     * 種別幕は本家に無く幕回し用の連続値も持たないので、doAnimation でも index を静的表示する
-     * (animation に index をそのまま渡す = f1 が整数のままスナップ)。
-     */
+    /** RTMU 追加: 種別幕 (方向幕と同じ仕組みで別テクスチャ・別インデックス State_Type… */
     static void renderConfiguredTypeSigns(int rawTypeIndex, VehicleDefinition def, PoseStack poseStack,
                                           MultiBufferSource buffer, int packedLight) {
         if (def == null) {
@@ -520,10 +508,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 def.getTypeSignNames(), def.getTypeSigns(), poseStack, buffer, packedLight);
     }
 
-    /**
-     * uv+pos で定義された幕パネル群を、名前数で縦分割したテクスチャの index 番目の帯で描く。
-     * 方向幕 (rollsigns) と種別幕 (typeSigns) の共通処理。
-     */
+    /** uv+pos で定義された幕パネル群を、名前数で縦分割したテクスチャの index 番目の帯で描く。 */
     private static void renderSignPanels(int rawIndex, float animation, String packName, String texturePath,
                                          List<String> names, List<VehicleDefinition.RollsignDefinition> panels,
                                          PoseStack poseStack, MultiBufferSource buffer, int packedLight) {
@@ -550,15 +535,12 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             float uMax = uv[1];
             float baseVMin = uv[2];
             float baseVMax = uv[3];
-            // ★本家 RenderVehicleBase.renderRollsign と同じ:
-            // f1 = doAnimation ? getRollsignAnimation (連続値で滑らかに幕回し) : 行先 index (段でスナップ)。
+            // ★本家 RenderVehicleBase.renderRollsign と同じ: f1 = do…
             float f1 = rollsign.doAnimation() ? animation : (float) discreteIndex;
             float segment = (baseVMax - baseVMin) / (float) count;
             float vMin = baseVMin + segment * f1;
             float vMax = baseVMin + segment * (f1 + 1.0F);
-            // ★本家は disableLighting が false のときに GL のライティングを切って
-            // ライトマップを最大にする = 幕が自己発光する。名前と逆なので注意
-            // (RTMU は条件が反転していて、光るべき幕が暗いままだった)。
+            // ★本家は disableLighting が false のときに GL のライティングを切って…
             int signLight = rollsign.disableLighting() ? packedLight : 0x00F000F0;
 
             for (float[][] quad : rollsign.pos()) {
@@ -608,14 +590,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             .setNormal(nx, ny, nz);
     }
 
-    /**
-     * 焼き込みフォールバック時のグループ選別。
-     *
-     * <p>スクリプトが未ロード/失敗のとき、全ての authored グループを描くと
-     * 連結曲げ用の代替メッシュ (body-90 / body-180 等) まで重なり、車体が反転して
-     * 見えることがある。本家は使用する Parts だけを登録するので、フォールバックでは
-     * 代替メッシュ/影/ガイドを従来どおり除外する。
-     */
+    /** 焼き込みフォールバック時のグループ選別。 スクリプトが未ロード/失敗のとき、全ての authore… */
     private static boolean shouldRenderTrainGroup(String groupName, boolean renderInterior,
                                                   boolean aggressiveDistanceCulling, boolean compatibilityHeavy,
                                                   VehicleDefinition def, boolean hasScript, boolean scriptActuallyRunning) {
@@ -677,10 +652,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         return true;
     }
 
-    /**
-     * 連結曲げ用の角度バリアント (末尾 "-NN" で NN>=10、(mx)鏡像サフィックスは先に剥がす) か。
-     * 例: body-90, body-180(mx), bogie1-90, type_1-90。NN<10 は対象外。
-     */
+    /** 連結曲げ用の角度バリアント (末尾 "-NN" で NN>=10、(mx)鏡像サフィックスは先に剥… */
     private static boolean isAngleBendVariant(String normalized) {
         String s = normalized.endsWith("(mx)") ? normalized.substring(0, normalized.length() - 4) : normalized;
         int dash = s.lastIndexOf('-');
@@ -696,11 +668,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
     }
 
 
-    /**
-     * 台車冗長描画: TrainBogieEntity が機能しない場合の保険として、本体描画と同じ
-     * poseStack 状態で各 bogie 位置に bogie モデルを直接描く。poseStack は呼び出し時点で
-     * 既に yaw / banking / model offset / model scale が適用済み。
-     */
+    /** 台車冗長描画: TrainBogieEntity が機能しない場合の保険として、本体描画と同じ p… */
     private static void renderBogiesInline(TrainEntity entity, VehicleDefinition def,
                                            MqoModelLoader.MqoModel bodyModel,
                                            PoseStack poseStack, MultiBufferSource buffer,
@@ -708,9 +676,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         if (def == null || def.getBogies().isEmpty()) {
             return;
         }
-        // 蒸気機関車など、車体MQOが車輪・台車を自前で持ちスクリプトで描く車両は、
-        // RTMの読み込めない ModelBogie.class が汎用台車に置換されて二重描画/散乱する。
-        // 自前走り装置がある場合は .class 置換台車を描かない (本物のMQO台車を持つEMUは対象外)。
+        // 蒸気機関車など、車体MQOが車輪・台車を自前で持ちスクリプトで描く車両は、 RTMの読み込めない…
         boolean selfDrawsRunningGear = bodyModel != null
             && (bodyModel.hasOwnWheelGroups() || bodyModel.hasOwnBogieGroups());
         float baseYaw = Mth.rotLerp(partialTicks, entity.yRotO, entity.getYRot());
@@ -727,11 +693,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
         }
     }
 
-    /**
-     * 本家 RenderBogie は台車モデルを無条件に描く。
-     * 描かないのは「モデルセットがダミー」= パック側が台車を無効にしている時だけなので、
-     * ここも air/none 等のダミー指定だけを見る。
-     */
+    /** 本家 RenderBogie は台車モデルを無条件に描く。 */
     private static boolean shouldSkipInlineBogie(boolean selfDrawsRunningGear, VehicleDefinition.BogieDefinition bogieDef) {
         if (bogieDef == null || bogieDef.modelFile() == null || bogieDef.modelFile().isBlank()) {
             return true;
@@ -758,11 +720,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
             || (hasManyOverlayFeatures && totalVertices >= 12_000 && batchCount >= 96);
     }
 
-    /**
-     * 前照灯・尾灯の光。本家 {@code RenderVehicleBase.renderLightEffect} へ丸投げする。
-     * ★ここは旧実装 (TrainEntity) の経路。設置される列車は EntityTrain なので
-     *   本命は {@link RtmTrainRenderer} 側。
-     */
+    /** 前照灯・尾灯の光。本家 RenderVehicleBase.renderLightEffect へ… */
     private static void renderConfiguredLights(TrainEntity entity, VehicleDefinition def,
                                                com.portofino.realtrainmodunofficial.client.model.MqoModelLoader.MqoModel model,
                                                PoseStack poseStack, MultiBufferSource buffer, float renderYaw,

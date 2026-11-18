@@ -20,13 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-/**
- * 本家 PartsRenderer の ActionParts 対話 (PICK パス + onRightClick / onRightDrag) の移植。
- *
- * <p>当たりパーツの判定は {@link com.portofino.realtrainmodunofficial.client.render.ActionPartsPickBuffer}
- * (色ピッキング FBO) が行う。本家は GL_SELECT を使っていたが core profile で削除されているため、
- * ActionParts を ID 色で描いて画面中央ピクセルを読む方式で再現している。
- */
+/** 本家 PartsRenderer の ActionParts 対話 (PICK パス + onRi… */
 @EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
 public final class ActionPartsPicker {
 
@@ -59,11 +53,7 @@ public final class ActionPartsPicker {
     /** 設置物 (エンティティ/ブロック) を候補にする距離。 */
     private static final double MAX_PICK_DISTANCE = 8.0D;
 
-    /**
-     * フレーム先頭で候補とホバーを捨てる。
-     * 以降の描画で各オブジェクトが {@link #setHoveredId} を呼び、最も近いものが採用される。
-     * クリックはフレームとフレームの間に届くので、直前フレームの確定結果が使われる。
-     */
+    /** フレーム先頭で候補とホバーを捨てる。 以降の描画で各オブジェクトが #setHoveredId を… */
     @SubscribeEvent
     public static void onRenderFramePre(net.neoforged.neoforge.client.event.RenderFrameEvent.Pre event) {
         bestEntity = null;
@@ -76,9 +66,7 @@ public final class ActionPartsPicker {
     private ActionPartsPicker() {
     }
 
-    /**
-     * プレイヤーが実際に乗っている車両実体 (座席に乗っていればその列車)。
-     */
+    /** プレイヤーが実際に乗っている車両実体 (座席に乗っていればその列車)。 */
     private static Object riddenVehicle() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) {
@@ -114,14 +102,7 @@ public final class ActionPartsPicker {
         CONTEXTS.put(entity, new Context(host, parts));
     }
 
-    /**
-     * このオブジェクトの ActionParts を色ピッキングすべきか。
-     *
-     * <p>本家 {@code PartsRenderer} は「描画中のオブジェクト」すべてで ActionParts を拾う
-     * (GL_SELECT で最も手前のパーツを選ぶ)。RTMU は色ピッキング FBO のコストがあるため、
-     * 乗車中の車両は従来どおり、設置物 (ATC/列車検知器/車止め/踏切など) は
-     * <b>近く前方にあるものだけ</b>を候補にする。
-     */
+    /** このオブジェクトの ActionParts を色ピッキングすべきか。 */
     public static boolean shouldCapture(Object entity, ActionPartsHost host) {
         if (entity == null || host == null) {
             return false;
@@ -216,13 +197,7 @@ public final class ActionPartsPicker {
         return mc.player.getEyePosition().distanceToSqr(target);
     }
 
-    /**
-     * 色ピッキング FBO の結果 (パーツ ID) を反映する。
-     * ID は ActionParts.id (1 始まり)。0 以下は「当たり無し」。
-     *
-     * <p>設置物は複数が同時に候補になるので、フレーム内で<b>最も近いもの</b>を採用する
-     * (本家 GL_SELECT の「最も手前のパーツを選ぶ」に相当)。
-     */
+    /** 色ピッキング FBO の結果 (パーツ ID) を反映する。 */
     public static void setHoveredId(Object entity, int id) {
         Context ctx = CONTEXTS.get(entity);
         if (ctx == null) {
@@ -307,7 +282,7 @@ public final class ActionPartsPicker {
             dragging = false;
             dispatch(ctx.host, "onRightClick", target, hit);
         } else {
-            // DRAG_X / DRAG_Y: 本家は押下時に onRightClick を呼ばない (onRightDrag のみ)。
+            // DRAG_X / DRAG_Y: 本家は押下時に onRightClick を呼ばない (onRi…
             dragging = true;
         }
         return true;

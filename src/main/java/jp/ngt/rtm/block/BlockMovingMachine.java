@@ -20,12 +20,7 @@ import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * 移動装置。本家 {@code jp.ngt.rtm.block.BlockMovingMachine} の移植。
- *
- * <p>2 つ置いてバールで右クリックすると繋がり、その 2 点の間でブロックの塊を運ぶ。
- * バール以外で右クリックすると設定画面 (大きさ・ずらし・速さ)。
- */
+/** 移動装置。本家 jp.ngt.rtm.block.BlockMovingMachine の移植。 */
 public class BlockMovingMachine extends BaseEntityBlock {
     public static final MapCodec<BlockMovingMachine> CODEC = simpleCodec(p -> new BlockMovingMachine(false));
 
@@ -77,7 +72,7 @@ public class BlockMovingMachine extends BaseEntityBlock {
             if (!level.isClientSide()
                 && level.getBlockEntity(pos) instanceof TileEntityMovingMachine tile) {
                 if (this.generator) {
-                    //本家メタ 1: バールで乗り物を生成
+                    // 本家メタ 1: バールで乗り物を生成
                     tile.generateVehicle(player);
                 } else if (!tile.hasPair()) {
                     tile.searchMM();

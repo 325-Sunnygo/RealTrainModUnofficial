@@ -4,13 +4,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
-/**
- * 本家 {@code jp.ngt.rtm.gui.GuiCamera} の移植。
- *
- * <p>本家は {@code ItemCamera.onItemUse} (ブロック右クリック) から開かれ、
- * R/G/B/Hex/Alpha/Radius のラベルと、色見本の四角を描くだけの画面。
- * RTMU で独自実装だった「撮り鉄モード切替」をやめ、本家どおりこの画面を開く。
- */
+/** 本家 jp.ngt.rtm.gui.GuiCamera の移植。 */
 public class CameraScreen extends Screen {
 
     public CameraScreen() {
@@ -31,7 +25,7 @@ public class CameraScreen extends Screen {
         g.drawCenteredString(this.font, "Alpha", halfW - 95, 115, 0xFFFFFF);
         g.drawCenteredString(this.font, "Radius", halfW + 12, 65, 0xFFFFFF);
 
-        // 本家は NGTTessellator で (halfW+8,20)-(halfW+40,52) に無色の四角を描く。
+        // 本家は NGTTessellator で (halfW+8,20)-(halfW+40,52) に…
         g.fill(halfW + 8, 20, halfW + 40, 52, 0xFFFFFFFF);
     }
 

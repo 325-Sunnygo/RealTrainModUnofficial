@@ -3,7 +3,7 @@ package com.portofino.realtrainmodunofficial.client.model;
 import java.util.*;
 import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition.DoorAnimationDefinition;
 
-/** Body first, then configured left/right parts, with each parent's children immediately after it. */
+/** Body first, then configured left/right parts, wit… */
 public final class LegacyVehiclePartOrder {
     private LegacyVehiclePartOrder() {}
     public static Map<String,Integer> create(List<DoorAnimationDefinition> left,List<DoorAnimationDefinition> right) {

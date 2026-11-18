@@ -10,7 +10,7 @@ import net.minecraft.client.renderer.texture.*;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.opengl.GL11;
 
-/** Exercises actual RenderType state setup and BufferUploader, without starting Minecraft. */
+/** Exercises actual RenderType state setup and Buffe… */
 public final class LegacyProductionBlendRegression {
     private static Object allocate(Class<?> type) throws Exception {
         var f=sun.misc.Unsafe.class.getDeclaredField("theUnsafe");f.setAccessible(true);

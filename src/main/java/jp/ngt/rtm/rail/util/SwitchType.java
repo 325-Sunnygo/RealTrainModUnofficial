@@ -6,10 +6,7 @@ import net.minecraft.world.level.Level;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 本家 jp.ngt.rtm.rail.util.SwitchType (KaizPatchX) の忠実移植。
- * 1.21 適合: World→Level, Entity 座標アクセサのみ変更。ロジックは本家のまま。
- */
+/** 本家 jp.ngt.rtm.rail.util.SwitchType (KaizPatchX) の… */
 public abstract class SwitchType {
     public final byte id;
     protected RailMapSwitch[] railMaps;
@@ -42,8 +39,7 @@ public abstract class SwitchType {
 
     /** TileEntity.updateEntityのタイミングで呼ばれる */
     public void onUpdate(Level world) {
-        // 軽量化: 全分岐レールコアが両サイド毎tick通る。Arrays.stream は毎tick Stream+ラムダを
-        // アロケートするので素の for に (挙動は完全に同じ、GC 圧を下げるだけ)。
+        // 軽量化: 全分岐レールコアが両サイド毎tick通る。
         for (Point point : this.points) {
             point.onUpdate(world);
         }
@@ -77,7 +73,7 @@ public abstract class SwitchType {
         return point;
     }
 
-    // ================= 以下は Remaster 暫定互換 API (Phase 1 の BE 差し替え完了後に削除予定) =================
+    // ================= 以下は Remaster 暫定互換 API (Phase 1…
 
     /** @deprecated Remaster 独自 API。本家に存在しない。 */
     @Deprecated
@@ -137,7 +133,7 @@ public abstract class SwitchType {
         return indices;
     }
 
-    /****************************************************************************************************/
+    /** *************************************************… */
 
     // Y字
     public static class SwitchBasic extends SwitchType {
@@ -192,7 +188,7 @@ public abstract class SwitchType {
         }
     }
 
-    /****************************************************************************************************/
+    /** *************************************************… */
 
     // N字
     public static class SwitchSingleCross extends SwitchType {
@@ -219,7 +215,7 @@ public abstract class SwitchType {
                 for (RailPosition rpB : normalList) {
                     if (rpA.direction != rpB.direction) {
                         boolean flag = (rpA == rpRoot1);
-                        RailPosition rp2 = flag ? rpRoot2 : rpRoot1;//sw-sw側のend
+                        RailPosition rp2 = flag ? rpRoot2 : rpRoot1;// sw-sw側のend
                         RailDir b2 = rpA.getDir(rp2, rpB);
                         if (flag) {
                             b0 = b2;
@@ -231,7 +227,7 @@ public abstract class SwitchType {
                 }
                 ++rmsCount;
             }
-            rails[2] = new RailMapSwitch(rpRoot1, rpRoot2, b0, b1, this.fixRTMRailMapVersion);//渡り部分
+            rails[2] = new RailMapSwitch(rpRoot1, rpRoot2, b0, b1, this.fixRTMRailMapVersion);// 渡り部分
             this.railMaps = rails;
             this.activeRails.add(this.railMaps[0]);
             this.activeRails.add(this.railMaps[1]);
@@ -274,7 +270,7 @@ public abstract class SwitchType {
                 int n1 = map1.getNearlestPoint(16, entity.getX(), entity.getZ());
                 int n2 = map2.getNearlestPoint(16, entity.getX(), entity.getZ());
                 double[] pos1 = map1.getRailPos(16, n1);
-                double[] pos2 = map1.getRailPos(16, n2);//本家のまま (map1)
+                double[] pos2 = map1.getRailPos(16, n2);// 本家のまま (map1)
                 double d1 = entity.distanceToSqr(pos1[1], 0.0D, pos1[0]);
                 double d2 = entity.distanceToSqr(pos2[1], 0.0D, pos2[0]);
                 return d1 < d2 ? map1 : map2;
@@ -287,7 +283,7 @@ public abstract class SwitchType {
         }
     }
 
-    /****************************************************************************************************/
+    /** *************************************************… */
 
     // シーサスクロッシング
     public static class SwitchScissorsCross extends SwitchType {
@@ -386,7 +382,7 @@ public abstract class SwitchType {
             for (int j = 0; j < 2; ++j) {
                 for (int i = 0; i < 4; ++i) {
                     RailMapSwitch rms = this.railMaps[i];
-                    if (rms.startDir == rms.endDir)//渡り部分
+                    if (rms.startDir == rms.endDir)// 渡り部分
                     {
                         if (j == 0) {
                             if (rms.isGettingPowered(world)) {
@@ -401,10 +397,10 @@ public abstract class SwitchType {
                                 rms.setState(false);
                             }
                         }
-                    } else//直線部分
+                    } else// 直線部分
                     {
                         if (j == 1) {
-                            if (openRMS == null)//渡り部分未開通
+                            if (openRMS == null)// 渡り部分未開通
                             {
                                 rms.setState(true);
                                 this.activeRails.add(rms);
@@ -444,7 +440,7 @@ public abstract class SwitchType {
         }
     }
 
-    /****************************************************************************************************/
+    /** *************************************************… */
 
     // ダイヤモンドクロス
     public static class SwitchDiamondCross extends SwitchType {
@@ -507,7 +503,7 @@ public abstract class SwitchType {
             int n1 = map1.getNearlestPoint(16, entity.getX(), entity.getZ());
             int n2 = map2.getNearlestPoint(16, entity.getX(), entity.getZ());
             double[] pos1 = map1.getRailPos(16, n1);
-            double[] pos2 = map1.getRailPos(16, n2);//本家のまま (map1)
+            double[] pos2 = map1.getRailPos(16, n2);// 本家のまま (map1)
             double d1 = entity.distanceToSqr(pos1[1], 0.0D, pos1[0]);
             double d2 = entity.distanceToSqr(pos2[1], 0.0D, pos2[0]);
             return d1 < d2 ? map1 : map2;

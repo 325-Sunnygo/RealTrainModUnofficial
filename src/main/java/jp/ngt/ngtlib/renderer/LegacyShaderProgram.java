@@ -2,7 +2,7 @@ package jp.ngt.ngtlib.renderer;
 
 import static org.lwjgl.opengl.GL20.*;
 
-/** The original source-string API, implemented against the current OpenGL context. */
+/** The original source-string API, implemented again… */
 public final class LegacyShaderProgram {
     private LegacyShaderProgram() {}
     public static int create(String vertexSource,String fragmentSource) {

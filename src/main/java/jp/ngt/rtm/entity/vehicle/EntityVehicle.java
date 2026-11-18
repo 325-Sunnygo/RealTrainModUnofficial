@@ -20,22 +20,12 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * 運転できる乗り物 (車/船/飛行機) の基底。本家 {@code jp.ngt.rtm.entity.vehicle.EntityVehicle} の移植。
- *
- * <p>物理は本家の式そのまま (加速/最大速度/摩擦/滑り/ブロック高さからのピッチ・ロール)。
- * 設定値はパックが無いので本家 {@code VehicleConfig} の<b>既定値</b>で固定:
- * 摩擦 0.9 / 加速 0.0125 / 最大速度 0.8 / 最大ヨー 15 / ヨー係数 4.5。
- *
- * <p>★同期は本家 (毎 tick サーバー計算 + パケット) ではなく、
- * バニラのボートと同じ<b>運転者クライアント主導</b>にしてある
- * ({@code getControllingPassenger} が運転者を返すと、位置はバニラが同期する)。
- */
+/** 運転できる乗り物 (車/船/飛行機) の基底。 */
 public abstract class EntityVehicle extends Entity {
     private static final EntityDataAccessor<CompoundTag> NGTO =
         SynchedEntityData.defineId(EntityVehicle.class, EntityDataSerializers.COMPOUND_TAG);
 
-    //本家 VehicleConfig の既定値
+    // 本家 VehicleConfig の既定値
     protected static final float FRICTION = 0.9F;
     protected static final float ACCELERATION = 0.0125F;
     protected static final float MAX_SPEED = 0.8F;
@@ -52,7 +42,7 @@ public abstract class EntityVehicle extends Entity {
     @Nullable
     private VehicleNGTO vngto;
 
-    //補間 (非運転クライアント用)
+    // 補間 (非運転クライアント用)
     private int lerpSteps;
     private double lerpX;
     private double lerpY;
@@ -96,7 +86,7 @@ public abstract class EntityVehicle extends Entity {
 
         if (this.isControlledByLocalInstance()) {
             this.lerpSteps = 0;
-            //運転者の入力で動かす (本家 updateMovement)
+            // 運転者の入力で動かす (本家 updateMovement)
             if (this.shouldUpdateMotion() && this.getFirstPassenger() instanceof LivingEntity living) {
                 this.updateMotion(living, living.xxa, living.zza);
             } else {
@@ -131,7 +121,7 @@ public abstract class EntityVehicle extends Entity {
     protected void updateMotion(LivingEntity entity, float moveStrafe, float moveForward) {
         this.speed += moveForward * ACCELERATION;
         float f0 = -moveStrafe * YAW_COEFFICIENT;
-        f0 *= (float) (this.speed / MAX_SPEED);   //changeYawOnStopping=false 既定
+        f0 *= (float) (this.speed / MAX_SPEED);   // changeYawOnStopping=false 既定
         f0 = Mth.clamp(f0, -MAX_YAW, MAX_YAW);
         this.setYRot(this.getYRot() + f0);
 
@@ -202,7 +192,7 @@ public abstract class EntityVehicle extends Entity {
         if (Math.abs(pitch) < 0.01F) pitch = 0.0F;
         if (Math.abs(roll) < 0.01F) roll = 0.0F;
 
-        //本家: 変化量を前回と平均して滑らかにする
+        // 本家: 変化量を前回と平均して滑らかにする
         float pitchDif = pitch - prevPitch;
         pitch = prevPitch + (pitchDif + this.prevPitchDif) * 0.5F;
         this.prevPitchDif = pitch - prevPitch;
@@ -269,8 +259,7 @@ public abstract class EntityVehicle extends Entity {
     public boolean hurt(DamageSource source, float amount) {
         if (!this.level().isClientSide() && source.getEntity() instanceof Player player) {
             this.discard();
-            //★生成した乗り物はブロックから作った物なのでアイテムは落とさない
-            //  (本家は itemVehicle を落とすが、RTMU に船/飛行機のアイテムは無い)
+            // ★生成した乗り物はブロックから作った物なのでアイテムは落とさない (本家は itemVehicle…
             return true;
         }
         return false;

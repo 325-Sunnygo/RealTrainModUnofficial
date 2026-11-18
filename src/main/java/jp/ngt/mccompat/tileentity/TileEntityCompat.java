@@ -4,18 +4,10 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
-/**
- * 1.7.10 の TileEntity の NBT 読み書きを 1.21 へ橋渡しする静的ヘルパー。
- * WorldCompat.func_147438_o は素の BlockEntity を返す (スクリプトが
- * 実クラスのメソッドを直接呼ぶため)。
- */
+/** 1.7.10 の TileEntity の NBT 読み書きを 1.21 へ橋渡しする静的ヘルパー。 */
 public final class TileEntityCompat {
 
-    /**
-     * field_145850_b = TileEntity.worldObj。
-     * レシーバがバニラ BlockEntity でフィールドを足せないため、
-     * PackScriptSource.remapFieldAccess がここへ回してくる。
-     */
+    /** field_145850_b = TileEntity.worldObj。 */
     public static jp.ngt.mccompat.WorldCompat field_145850_b(Object tile) {
         if (tile instanceof net.minecraft.world.level.block.entity.BlockEntity be && be.getLevel() != null) {
             return new jp.ngt.mccompat.WorldCompat(be.getLevel());
@@ -62,7 +54,7 @@ public final class TileEntityCompat {
         tile.setChanged();
     }
 
-    /** func_145841_b / func_189515_b = writeToNBT。渡された tag に書き込んで返す。 */
+    /** func_145841_b / func_189515_b = writeToNBT。 */
     public static Object func_145841_b(Object tileObj, Object nbt) {
         if (!(tileObj instanceof BlockEntity tile)) {
             return nbt;

@@ -8,11 +8,7 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-/**
- * MQO (Metasequoia) テキストの唯一の読み取り口。
- * 以前は同じ書式を 2 箇所で別々に解析していた (ModelLoader のグラフ生成と、
- * 描画用バッチを組む MqoModelLoader)。
- */
+/** MQO (Metasequoia) テキストの唯一の読み取り口。 */
 public final class MqoReader {
     private static final Pattern OBJECT_NAME = Pattern.compile("Object\\s+\"([^\"]*)\"");
     private static final Pattern TEX = Pattern.compile("tex\\(\"([^\"]*)\"\\)");
@@ -46,25 +42,16 @@ public final class MqoReader {
         default void verticesStart() {
         }
 
-        /**
-         * 頂点 1 個。MQO の生の単位 (スケール前)。
-         * z を持たない 2 成分表記の場合 z は 0。
-         */
+        /** 頂点 1 個。MQO の生の単位 (スケール前)。 z を持たない 2 成分表記の場合 z は 0。 */
         default void vertex(float x, float y, float z) {
         }
 
-        /**
-         * 面 1 枚。vertexIndices は直前の vertex チャンク内の番号、
-         * 順序も MQO の記述どおり。uvs は count * 2 個、無ければ null。
-         */
+        /** 面 1 枚。vertexIndices は直前の vertex チャンク内の番号、 順序も MQO… */
         default void face(int count, int materialId, int[] vertexIndices, float[] uvs) {
         }
     }
 
-    /**
-     * .mqoz (zip 内に .mqo) にも対応してテキストを取り出す。
-     * 文字コードは Shift_JIS 前提 (MQO の既定)。
-     */
+    /** .mqoz (zip 内に .mqo) にも対応してテキストを取り出す。 */
     public static String extractText(byte[] bytes, String name) throws IOException {
         if (bytes == null) {
             return null;
@@ -96,7 +83,7 @@ public final class MqoReader {
         if (text == null || handler == null) {
             return;
         }
-        // 0=外, 1=vertex, 2=face, 3=Material, 4=読み飛ばす (BVertex 等の未対応チャンク)
+        // 0=外, 1=vertex, 2=face, 3=Material, 4=読み飛ばす (BVert…
         int chunk = 0;
         int materialIndex = 0;
         for (String raw : text.split("\\R")) {

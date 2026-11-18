@@ -4,12 +4,7 @@ import net.minecraft.world.phys.Vec3;
 
 import java.util.Map;
 
-/**
- * 貨物 (コンテナ / 火砲) のパック定義。
- *
- * <p>本家 {@code ContainerConfig} / {@code FirearmConfig} の必要な所だけを 1 つにまとめたもの。
- * どちらも {@code ModelContainer_*.json} / {@code ModelFirearm_*.json} から読む。
- */
+/** 貨物 (コンテナ / 火砲) のパック定義。 */
 public class CargoDefinition {
 
     public enum Kind {

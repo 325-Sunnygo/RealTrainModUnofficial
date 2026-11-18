@@ -11,17 +11,14 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
-/**
- * 駅コアの中身。本家 {@code jp.ngt.rtm.block.tileentity.TileEntityStation} の移植。
- * 駅名を持つだけ。本家は {@code MSIMS} という駅の索引にも登録するが、RTMU に MSIMS は無い。
- */
+/** 駅コアの中身。本家 jp.ngt.rtm.block.tileentity.TileEntityS… */
 public class TileEntityStation extends BlockEntity {
     private String stationName;
     public int maxHeight;
 
     public TileEntityStation(BlockPos pos, BlockState state) {
         super(RealTrainModUnofficialBlockEntities.STATION.get(), pos, state);
-        //本家と同じで、置いた瞬間は重複しない仮の名前
+        // 本家と同じで、置いた瞬間は重複しない仮の名前
         this.stationName = String.format("default_%d", System.currentTimeMillis());
     }
 

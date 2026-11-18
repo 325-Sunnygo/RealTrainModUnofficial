@@ -39,10 +39,7 @@ public record TrainSoundPayload(int trainEntityId, String soundId, float volume,
         return TYPE;
     }
 
-    /**
-     * サーバーから、その列車を見ている全プレイヤーへ 1 回だけ音を鳴らす。
-     * legacySoundId は本家の書式 ("rtm:sounds/train/lever.ogg" 等) でよい。
-     */
+    /** サーバーから、その列車を見ている全プレイヤーへ 1 回だけ音を鳴らす。 */
     public static void broadcast(net.minecraft.world.entity.Entity train, String legacySoundId, float volume, float pitch) {
         broadcast(train,legacySoundId,volume,pitch,16F);
     }
@@ -50,8 +47,15 @@ public record TrainSoundPayload(int trainEntityId, String soundId, float volume,
         if (train == null || train.level().isClientSide() || legacySoundId == null || legacySoundId.isBlank() || range<=0) {
             return;
         }
-        net.neoforged.neoforge.network.PacketDistributor.sendToPlayersTrackingEntityAndSelf(
-            train, new TrainSoundPayload(train.getId(), legacySoundId, volume, pitch,range));
+        // 本家 PacketPlaySound と同じ 256 ブロック以内へ送る (範囲はクライアント減衰で決まる)。
+        if (train.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            var payload = new TrainSoundPayload(train.getId(), legacySoundId, volume, pitch, range);
+            for (net.minecraft.server.level.ServerPlayer player : serverLevel.players()) {
+                if (player.distanceToSqr(train) <= 256.0D * 256.0D) {
+                    net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(player, payload);
+                }
+            }
+        }
     }
 
     public static void handleOnClient(TrainSoundPayload payload, IPayloadContext context) {
@@ -60,12 +64,10 @@ public record TrainSoundPayload(int trainEntityId, String soundId, float volume,
             if (minecraft.level == null || payload.soundId() == null || payload.soundId().isBlank()) {
                 return;
             }
-            // 旧 TrainEntity / 本家系 EntityTrainBase のどちらでも鳴らす
-            // (以前は TrainEntity 決め打ちで、実際に出る本家系の列車では黙って捨てていた)
+            // 旧 TrainEntity / 本家系 EntityTrainBase のどちらでも鳴らす (以前…
             net.minecraft.world.entity.Entity entity = minecraft.level.getEntity(payload.trainEntityId());
             if (LegacyScriptSoundManager.isTrain(entity) || entity instanceof jp.ngt.rtm.entity.train.EntityBogie) {
-                // サーバー発の離散イベント音 (レバー/警笛/緩解音等): 抑制なしで送られた回数だけ鳴らす
-                // (連続ノッチ操作のガタガタ音は本家挙動。スクリプト用の抑制を通すと欠落する)
+                // サーバー発の離散イベント音 (レバー/警笛/緩解音等): 抑制なしで送られた回数だけ鳴らす (連続…
                 LegacyScriptSoundManager.playLegacyId(entity, payload.soundId(), payload.volume(), payload.pitch(), false, true,payload.range());
             }
         });

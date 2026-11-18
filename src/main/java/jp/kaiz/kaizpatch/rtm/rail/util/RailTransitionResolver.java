@@ -7,7 +7,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import java.util.*;
 
-/** Port of KaizPatchX's endpoint-directed rail transition and bounded nearest search. */
+/** Port of KaizPatchX's endpoint-directed rail trans… */
 public final class RailTransitionResolver {
     private RailTransitionResolver() {}
     public static int findNearestPointAround(RailMap map,int split,int previous,double x,double z,float movement) {

@@ -98,10 +98,7 @@ public final class ClientHooks {
         invokeClient("openSignalControllerScreen", new Class<?>[]{Object.class}, controller);
     }
 
-    /**
-     * 本家 guiIdSelectEntityModel: 設置済み列車をシフト右クリックしたときのモデル選択画面。
-     * 決定するとそのエンティティのモデルが差し替わる (アイテムではなく実体が対象)。
-     */
+    /** 本家 guiIdSelectEntityModel: 設置済み列車をシフト右クリックしたときのモデ… */
     public static void openEntityModelSelectScreen(Object vehicle) {
         invokeClient("openEntityModelSelectScreen", new Class<?>[]{Object.class}, vehicle);
     }
@@ -145,7 +142,7 @@ public final class ClientHooks {
         invokeClient("openTicketVendorScreen", new Class<?>[]{BlockPos.class}, pos);
     }
 
-    /** 標識のテクスチャ変更: 素手で右クリック (本家 guiIdSelectTileEntityTexture) */
+    /** 標識のテクスチャ変更: 素手で右クリック (本家 guiIdSelectTileEntityTex… */
     public static void openRailroadSignScreen(BlockPos pos) {
         invokeClient("openRailroadSignScreen", new Class<?>[]{BlockPos.class}, pos);
     }
@@ -155,7 +152,7 @@ public final class ClientHooks {
         invokeClient("toggleCamera", new Class<?>[]{});
     }
 
-    /** カメラ: ブロック右クリックで本家 GuiCamera 相当の画面を開く (本家 ItemCamera.onItemUse)。 */
+    /** カメラ: ブロック右クリックで本家 GuiCamera 相当の画面を開く (本家 ItemCame… */
     public static void openCameraScreen() {
         invokeClient("openCameraScreen", new Class<?>[]{});
     }
@@ -172,12 +169,7 @@ public final class ClientHooks {
         invokeClient("showScriptErrorMessage", new Class<?>[]{String.class}, message);
     }
 
-    /**
-     * 道床 (レール下の砂利) を焼き直させる。
-     *
-     * <p>道床はレールベースのブロックがチャンクメッシュへ焼くが、形はレールコアの線形から
-     * 引くので、コアが後から届くとベース側は「コア無し」で焼かれたままになる。
-     */
+    /** 道床 (レール下の砂利) を焼き直させる。 */
     public static void invalidateRailMesh(Level level, int x, int y, int z) {
         invokeClient("invalidateRailMesh",
             new Class<?>[]{Level.class, int.class, int.class, int.class},
@@ -190,9 +182,7 @@ public final class ClientHooks {
             level, x0, y0, z0, x1, y1, z1);
     }
 
-    // 軽量化: 解決済み Class / Method をキャッシュする。踏切・スピーカー等の走行音つき設置物は
-    // tickCrossingGateSound を毎 client tick 通るため、その都度 Class.forName + getMethod (リフレクション
-    // 走査) を回すのは無駄。このクラス内に「同名・別引数数」のメソッドは無いので name+引数数で一意にキー化できる。
+    // 軽量化: 解決済み Class / Method をキャッシュする。
     private static volatile Class<?> hooksClass;
     private static final java.util.Map<String, java.lang.reflect.Method> METHOD_CACHE =
         new java.util.concurrent.ConcurrentHashMap<>();
