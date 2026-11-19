@@ -167,23 +167,7 @@ public class TrainEntityRenderer extends EntityRenderer<TrainEntity> {
                 poseStack.mulPose(Axis.ZP.rotationDegrees(bankAngle));
             }
 
-            // 車両の揺れ。本家は車体が完全に固定だが、実車の左右動・上下動・ヨーイングを 速度に応じた微小振幅で…
-            if (com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.swayEnabled) {
-                float speed = Math.abs(entity.getSpeed());
-                float intensity = com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.swayIntensity
-                        * Mth.clamp(speed / 0.6F, 0.0F, 1.0F);
-                if (intensity > 0.001F) {
-                    float t = (entity.tickCount + partialTicks) * 0.13F
-                            * com.portofino.realtrainmodunofficial.client.VehicleVisualSettings.swaySpeed;
-                    poseStack.translate(
-                            Mth.sin(t * 1.73F) * intensity * 0.018F,
-                            Mth.sin(t * 2.37F) * intensity * 0.010F,
-                            Mth.cos(t * 1.19F) * intensity * 0.006F);
-                    poseStack.mulPose(Axis.ZP.rotationDegrees(Mth.sin(t * 1.61F) * intensity * 0.32F));
-                    poseStack.mulPose(Axis.XP.rotationDegrees(Mth.sin(t * 2.11F) * intensity * 0.16F));
-                    poseStack.mulPose(Axis.YP.rotationDegrees(Mth.sin(t * 0.97F) * intensity * 0.18F));
-                }
-            }
+            // 車体の左右動・上下動・回転を行う独自スウェイは本家に存在せず、
 
             // Apply model offset and scale (TrainEntity Y がすでに…
             poseStack.translate(def.getModelOffset().x, def.getModelOffset().y, def.getModelOffset().z);

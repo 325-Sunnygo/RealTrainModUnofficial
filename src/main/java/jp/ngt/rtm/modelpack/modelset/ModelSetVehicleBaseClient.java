@@ -5,13 +5,9 @@ import jp.ngt.rtm.modelpack.ModelPackManager;
 import jp.ngt.rtm.modelpack.cfg.VehicleBaseConfig;
 import jp.ngt.rtm.render.ModelObject;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-
 import javax.script.ScriptEngine;
 
 /** 本家 jp.ngt.rtm.modelpack.modelset.ModelSetVehicleB… */
-@OnlyIn(Dist.CLIENT)
 public abstract class ModelSetVehicleBaseClient<T extends VehicleBaseConfig> extends ModelSetVehicleBase<T> {
     public final ModelObject vehicleModel;
     public final ResourceLocation buttonTexture;

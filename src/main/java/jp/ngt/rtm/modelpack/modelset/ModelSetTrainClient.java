@@ -1,11 +1,8 @@
 package jp.ngt.rtm.modelpack.modelset;
 
 import jp.ngt.rtm.modelpack.cfg.TrainConfig;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 
 /** 本家 jp.ngt.rtm.modelpack.modelset.ModelSetTrainCli… */
-@OnlyIn(Dist.CLIENT)
 public class ModelSetTrainClient extends ModelSetVehicleBaseClient<TrainConfig> {
     public final String sound_brakeRelease_s;
     public final String sound_brakeRelease_w;

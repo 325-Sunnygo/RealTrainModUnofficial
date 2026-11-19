@@ -74,13 +74,6 @@ public final class VehicleVisualSettings {
     public static float rainTurbulence = 0.5F;
     public static boolean rainCameraMotion = true;
     public static float rainLightResponse = 0.6F;
-    // ---- sway ----
-    public static boolean swayEnabled = true;
-    public static float swayIntensity = 1.0F;
-    public static float swaySpeed = 1.0F;
-    public static float swayCurveGain = 1.0F;
-    public static float swayPassengerGain = 1.0F;
-
     // ---- follow / lod ----
     public static int smoothFollowDelayMs = 100;
     public static int modelLod = 1;
@@ -187,11 +180,6 @@ public final class VehicleVisualSettings {
         public float rainTurbulence = 0.5F;
         public boolean rainCameraMotion = true;
         public float rainLightResponse = 0.6F;
-        public boolean swayEnabled = true;
-        public float swayIntensity = 1.0F;
-        public float swaySpeed = 1.0F;
-        public float swayCurveGain = 1.0F;
-        public float swayPassengerGain = 1.0F;
         public int smoothFollowDelayMs = 100;
         public int modelLod = 1;
 
@@ -252,11 +240,6 @@ public final class VehicleVisualSettings {
             rainTurbulence = this.rainTurbulence;
             rainCameraMotion = this.rainCameraMotion;
             rainLightResponse = this.rainLightResponse;
-            swayEnabled = this.swayEnabled;
-            swayIntensity = this.swayIntensity;
-            swaySpeed = this.swaySpeed;
-            swayCurveGain = this.swayCurveGain;
-            swayPassengerGain = this.swayPassengerGain;
             smoothFollowDelayMs = this.smoothFollowDelayMs;
             modelLod = this.modelLod;
         }
