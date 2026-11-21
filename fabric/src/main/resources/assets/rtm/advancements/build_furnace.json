@@ -1,0 +1,23 @@
+{
+    "display": {
+        "icon": {
+            "item": "rtm:fire_brick",
+            "data": 0
+        },
+        "title": {
+            "translate": "advancements.rtm.build_furnace.title"
+        },
+        "description": {
+            "translate": "advancements.rtm.build_furnace.description"
+        }
+    },
+    "parent": "rtm:root",
+    "criteria": {
+        "build_furnace": {
+            "trigger": "minecraft:placed_block",
+            "conditions": {
+                "block": "rtm:fire_brick"
+            }
+        }
+    }
+}

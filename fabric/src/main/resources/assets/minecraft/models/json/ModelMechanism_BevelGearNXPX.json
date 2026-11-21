@@ -1,0 +1,19 @@
+{
+	"name": "bevel_gear_nxpx",
+	"model": {
+		"modelFile": "bevel_gear.mqoz",
+		"textures": [["default", "textures/mechanism/mecha_simple.png", ""]],
+		"rendererPath": "scripts/RenderBevelGear.js"
+	},
+	"buttonTexture": "textures/mechanism/button_bevel_gear_nxpx.png",
+	"type": "TRANSMISSION",
+	"transmissionRatioON": [0.0, 0.0, -1.0, 0.0, 1.0],
+	"transmissionRatioOFF": [0.0, 0.0, -1.0, 0.0, 1.0],
+	"maxSpeed": 10000.0,
+	"acceleration": 0.0,
+	"radius": 0.0,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479"
+}

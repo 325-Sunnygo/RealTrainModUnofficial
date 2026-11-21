@@ -1,0 +1,16 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.neoforged.net/releases' }
+    }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.9.0'
+}
+
+//別配布の移植 mod (別 jar): RTMU-WebCTC / RTMU-ATSAssistMod
+include 'webctc'
+include 'atsa'
+//乗客シミュレーションは RTMU 本体へ統合済み (旧 passenger サブプロジェクトは廃止)。
+//ソースは src/main/java/com/portofino/rtmupassenger/ にある。

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RealTrainMod Unofficial</title>
+    <meta
+      name="description"
+      content="RealTrainMod Unofficial の公式ホームページ。ダウンロード、導入方法、更新状況をわかりやすくまとめています。"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="preload" as="image" href="./assets/hero.jpg" />
+  </head>
+  <body>
+    <header class="site-header" id="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="#">
+          <img src="./assets/rtmu.png" alt="RealTrainMod Unofficial ロゴ" class="brand-logo" />
+          <div class="brand-text">
+            <strong>RealTrainMod Unofficial</strong>
+          </div>
+        </a>
+        <nav class="main-nav">
+          <a href="#download">ダウンロード</a>
+          <a href="#guide">導入方法</a>
+          <a href="#updates">更新状況</a>
+          <a href="#faq">FAQ</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <!-- ヒーロー: E257 の実スクリーンショットを背景に、ゆっくりズーム + 文字がせり上がる -->
+      <section class="hero">
+        <div class="hero-bg" aria-hidden="true"></div>
+        <div class="hero-overlay" aria-hidden="true"></div>
+        <div class="hero-diamonds" aria-hidden="true">
+          <span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+
+        <div class="container hero-inner">
+          <div class="hero-copy">
+            <p class="hero-kicker anim-up" style="--d: 0ms">MINECRAFT 1.21.1 × NEOFORGE</p>
+            <h1 class="anim-up" style="--d: 90ms">RealTrainMod <span class="grad">Unofficial</span></h1>
+            <p class="lead anim-up" style="--d: 180ms">RealTrainMod Unofficialの公式ホームページです。</p>
+            <div class="hero-actions anim-up" style="--d: 270ms">
+              <a
+                class="button primary"
+                href="https://github.com/325-Sunnygo/RealTrainModUnofficial"
+                target="_blank"
+                rel="noreferrer"
+              >
+                最新版をダウンロード
+              </a>
+              <a class="button secondary" href="#guide">導入方法を見る</a>
+              <a
+                class="button discord-button"
+                href="https://discord.com/invite/q26nghFS3H"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <svg
+                  class="discord-icon"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M20.317 4.369A19.791 19.791 0 0 0 15.885 3c-.191.328-.403.77-.554 1.116a18.273 18.273 0 0 0-5.487 0A11.64 11.64 0 0 0 9.29 3a19.736 19.736 0 0 0-4.434 1.37C2.053 8.58 1.291 12.687 1.672 16.737a19.9 19.9 0 0 0 5.426 2.756c.439-.6.83-1.235 1.167-1.904a12.955 12.955 0 0 1-1.839-.883c.155-.113.306-.231.451-.353 3.547 1.664 7.4 1.664 10.904 0 .147.122.298.24.452.353-.585.34-1.2.635-1.84.883.338.669.728 1.304 1.168 1.904a19.852 19.852 0 0 0 5.428-2.756c.446-4.695-.762-8.765-3.272-12.368ZM9.049 14.674c-1.066 0-1.94-.972-1.94-2.165 0-1.193.854-2.165 1.94-2.165 1.094 0 1.958.981 1.939 2.165 0 1.193-.854 2.165-1.939 2.165Zm5.903 0c-1.066 0-1.939-.972-1.939-2.165 0-1.193.854-2.165 1.939-2.165 1.095 0 1.959.981 1.94 2.165 0 1.193-.845 2.165-1.94 2.165Z"
+                  />
+                </svg>
+                Discordに参加
+              </a>
+            </div>
+          </div>
+
+          <aside class="download-summary anim-up" style="--d: 360ms">
+            <h2>配布情報</h2>
+            <dl class="summary-list">
+              <div>
+                <dt>バージョン</dt>
+                <dd class="rtmu-version">v0.0.0</dd>
+              </div>
+              <div>
+                <dt>ファイル形式</dt>
+                <dd>.jar</dd>
+              </div>
+              <div>
+                <dt>ファイルサイズ</dt>
+                <dd>約90.5MB</dd>
+              </div>
+            </dl>
+          </aside>
+        </div>
+
+        <div class="hero-scroll" aria-hidden="true"><span></span></div>
+      </section>
+
+      <!-- 走行灯が流れる線路ふうの区切り -->
+      <div class="rail-divider" aria-hidden="true"></div>
+
+      <section class="section" id="download">
+        <div class="container">
+          <div class="section-heading" data-reveal>
+            <p class="section-label">Download</p>
+            <h2>ダウンロード</h2>
+          </div>
+          <div class="panel glow-border" data-reveal>
+            <div class="download-card">
+              <div>
+                <h3>RealTrainMod Unofficial <span class="rtmu-version">v0.0.0</span></h3>
+                <p>配布ページは GitHub で公開しています。詳細とダウンロードは GitHub から確認できます。</p>
+              </div>
+              <a
+                class="button primary"
+                href="https://github.com/325-Sunnygo/RealTrainModUnofficial"
+                target="_blank"
+                rel="noreferrer"
+              >
+                GitHubで見る
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-muted overview-section">
+        <div class="overview-bg" aria-hidden="true"></div>
+        <div class="container">
+          <div class="section-heading" data-reveal>
+            <p class="section-label">Overview</p>
+            <h2>概要</h2>
+          </div>
+          <div class="simple-grid">
+            <details class="panel overview-item" data-reveal style="--d: 0ms">
+              <summary>概要1　RTMUとは</summary>
+              <div class="overview-body">
+                <p>
+                  本MODは、ngt5479さんが開発された「RealTrainMod (RTM)」の非公式 1.21.1 改造・移植版です。本家RTMとの互換性があります。
+                </p>
+              </div>
+            </details>
+            <details class="panel overview-item" data-reveal style="--d: 90ms">
+              <summary>概要2　さにーごとは</summary>
+              <div class="overview-body">
+                <p>RTMが大好きなただの高校生（2026年時点）です。</p>
+              </div>
+            </details>
+            <details class="panel overview-item" data-reveal style="--d: 180ms">
+              <summary>概要3　スペシャルサンクス</summary>
+              <div class="overview-body">
+                <ul class="thanks-list">
+                  <li>ngt5479さん</li>
+                  <li>hi03さん</li>
+                  <li>冬嶺さん</li>
+                  <li>meitetsu600Vさん</li>
+                  <li>まささん</li>
+                  <li>RTMU鯖の皆さん</li>
+                </ul>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="guide">
+        <div class="container">
+          <div class="section-heading" data-reveal>
+            <p class="section-label">Guide</p>
+            <h2>導入方法</h2>
+          </div>
+          <div class="steps-list">
+            <article class="step-item" data-reveal style="--d: 0ms">
+              <span class="step-index">1</span>
+              <div>
+                <h3>1.21.1 の NeoForge を導入した起動構成を用意</h3>
+                <p>Minecraft 1.21.1 で NeoForge が導入されている起動構成を、先に準備してください。</p>
+              </div>
+            </article>
+            <article class="step-item" data-reveal style="--d: 120ms">
+              <span class="step-index">2</span>
+              <div>
+                <h3>Mod の jar ファイルをダウンロード</h3>
+                <p>GitHub の配布ページから、RealTrainMod Unofficial の jar ファイルをダウンロードしてください。</p>
+              </div>
+            </article>
+            <article class="step-item" data-reveal style="--d: 240ms">
+              <span class="step-index">3</span>
+              <div>
+                <h3>1.21.1 の NeoForge フォルダに jar ファイルを導入</h3>
+                <p>ダウンロードした jar ファイルを、1.21.1 の NeoForge 環境の mods フォルダへ入れてください。</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-muted" id="updates">
+        <div class="container">
+          <div class="section-heading" data-reveal>
+            <p class="section-label">Updates</p>
+            <h2>更新状況</h2>
+          </div>
+          <div class="updates-list">
+            <article class="panel update-panel" data-reveal>
+              <p class="update-date"><span class="live-dot" aria-hidden="true"></span>現在</p>
+              <h3>Discordにてプレリリース公開中</h3>
+              <p>最新の案内や配布に関する情報は、Discord サーバーでも確認できます。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="faq">
+        <div class="container">
+          <div class="section-heading" data-reveal>
+            <p class="section-label">FAQ</p>
+            <h2>よくある質問</h2>
+          </div>
+          <div class="faq-list">
+            <details class="panel" data-reveal style="--d: 0ms">
+              <summary>起動しないときは？</summary>
+              <p>起動しない場合は、使用している環境の状況を添えて Discord サーバーにてお問い合わせください。</p>
+            </details>
+            <details class="panel" data-reveal style="--d: 90ms">
+              <summary>既存の RTM アドオンは使用できますか？</summary>
+              <p>はい、使用できます。</p>
+            </details>
+            <details class="panel" data-reveal style="--d: 180ms">
+              <summary>バグを見つけた場合はどうすればいいですか？</summary>
+              <p>不具合の内容をできるだけ詳しくまとめて、Discord サーバーにてお問い合わせください。</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="section section-muted">
+        <div class="container">
+          <div class="section-heading" data-reveal>
+            <p class="section-label">Related</p>
+            <h2>関連リンク</h2>
+          </div>
+          <div class="panel" data-reveal style="--d: 0ms">
+            <div class="download-card">
+              <div>
+                <h3>作者のXはこちら</h3>
+                <p>作者の最新情報やお知らせは X でも確認できます。</p>
+              </div>
+              <a
+                class="button secondary"
+                href="https://x.com/325_Sunnygo"
+                target="_blank"
+                rel="noreferrer"
+              >
+                作者のXはこちら
+              </a>
+            </div>
+          </div>
+          <div class="panel" data-reveal style="--d: 90ms">
+            <div class="download-card">
+              <div>
+                <h3>MCTEU はこちら</h3>
+                <p>MCTE Unofficial の配布ページは Modrinth で確認できます。</p>
+              </div>
+              <a
+                class="button secondary"
+                href="https://modrinth.com/mod/mcteunofficial"
+                target="_blank"
+                rel="noreferrer"
+              >
+                MCTEUはこちら
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="rail-divider" aria-hidden="true"></div>
+      <div class="container footer-inner footer-center">
+        <p class="footer-mark">325</p>
+      </div>
+    </footer>
+
+    <script src="./script.js"></script>
+  </body>
+</html>

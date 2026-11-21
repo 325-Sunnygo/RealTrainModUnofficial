@@ -1,0 +1,5 @@
+{
+  "variants": {
+    "": { "model": "atsassistmod:block/ifttt" }
+  }
+}

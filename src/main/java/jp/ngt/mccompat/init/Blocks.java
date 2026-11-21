@@ -1,0 +1,134 @@
+package jp.ngt.mccompat.init;
+
+import net.minecraft.world.level.block.Block;
+
+/** 1.7.10 net.minecraft.init.Blocks のスクリプト互換 (SRG フィ… */
+public final class Blocks {
+    private Blocks() {
+    }
+
+    /** air */
+    public static final Block field_150350_a = net.minecraft.world.level.block.Blocks.AIR;
+    /** stone */
+    public static final Block field_150348_b = net.minecraft.world.level.block.Blocks.STONE;
+    /** dirt */
+    public static final Block field_150346_d = net.minecraft.world.level.block.Blocks.DIRT;
+    /** grass (1.7.10 Blocks.grass) */
+    public static final Block field_150349_c = net.minecraft.world.level.block.Blocks.GRASS_BLOCK;
+    /** snow_layer (1.7.10 Blocks.snow_layer, 薄い雪) */
+    public static final Block field_150431_aC = net.minecraft.world.level.block.Blocks.SNOW;
+    /** snow (1.7.10 Blocks.snow, 雪ブロック) */
+    public static final Block field_150433_aE = net.minecraft.world.level.block.Blocks.SNOW_BLOCK;
+    /** gravel */
+    public static final Block field_150351_n = net.minecraft.world.level.block.Blocks.GRAVEL;
+    /** wool */
+    public static final Block field_150325_L = net.minecraft.world.level.block.Blocks.WHITE_WOOL;
+    /** glass */
+    public static final Block field_150359_w = net.minecraft.world.level.block.Blocks.GLASS;
+    /** glowstone */
+    public static final Block field_150426_aN = net.minecraft.world.level.block.Blocks.GLOWSTONE;
+    /** iron_block */
+    public static final Block field_150339_S = net.minecraft.world.level.block.Blocks.IRON_BLOCK;
+    /** stained_hardened_clay (白色ハードクレイ相当) */
+    public static final Block field_150406_ce = net.minecraft.world.level.block.Blocks.WHITE_TERRACOTTA;
+    /** hardened_clay (無着色テラコッタ、メタ無し) — 信号のブロック検知が向き決めに使う */
+    public static final Block field_150405_ch = net.minecraft.world.level.block.Blocks.TERRACOTTA;
+    /** glass_pane (無着色、メタ無し) */
+    public static final Block field_150410_aZ = net.minecraft.world.level.block.Blocks.GLASS_PANE;
+
+    // ---- レッドストーン出力系 (列車検知器のサーバースクリプトが置く) ---- 1.7.10…
+
+    /** redstone_block */
+    public static final Block field_150451_bX = net.minecraft.world.level.block.Blocks.REDSTONE_BLOCK;
+    /** stained_glass (メタ = 色) */
+    public static final Block field_150399_cn = net.minecraft.world.level.block.Blocks.WHITE_STAINED_GLASS;
+    /** stained_glass_pane (メタ = 色) */
+    public static final Block field_150397_co = net.minecraft.world.level.block.Blocks.WHITE_STAINED_GLASS_PANE;
+    /** carpet (メタ = 色) */
+    public static final Block field_150404_cg = net.minecraft.world.level.block.Blocks.WHITE_CARPET;
+    /** redstone_lamp (消灯) */
+    public static final Block field_150379_bu = net.minecraft.world.level.block.Blocks.REDSTONE_LAMP;
+    /** redstone_torch */
+    public static final Block field_150429_aA = net.minecraft.world.level.block.Blocks.REDSTONE_TORCH;
+    /** lever */
+    public static final Block field_150442_at = net.minecraft.world.level.block.Blocks.LEVER;
+
+    // ---- 1.7.10 メタ互換: 1.21 の色別ブロック → (白色版=基準ブロック, 色メタ…
+    private static final String[] COLORS_16 = {
+        "white", "orange", "magenta", "light_blue", "yellow", "lime", "pink", "gray",
+        "light_gray", "cyan", "purple", "blue", "brown", "green", "red", "black"
+    };
+    private static final java.util.Map<Block, Block> CANON = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<Block, Integer> META = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 色別ブロックを白色版(1.7.10 の基準ブロック)へ正規化。非色ブロックはそのまま返す。 */
+    /** func_149716_u = Block.hasTileEntity。 */
+    public static boolean func_149716_u(Object block) {
+        if (block instanceof net.minecraft.world.level.block.EntityBlock) {
+            return true;
+        }
+        if (block instanceof Block b) {
+            return b.defaultBlockState().hasBlockEntity();
+        }
+        return false;
+    }
+
+    public static Block canonical(Block block) {
+        if (block == null) return null;
+        Block b = CANON.get(block);
+        if (b == null) { decodeColor(block); b = CANON.get(block); }
+        return b;
+    }
+
+    /** 色別ブロックの 1.7.10 相当メタ (0-15, DyeColor 順)。非色ブロックは 0。 */
+    public static int colorMeta(Block block) {
+        if (block == null) return 0;
+        Integer m = META.get(block);
+        if (m == null) { decodeColor(block); m = META.get(block); }
+        return m;
+    }
+
+    /** 1.7.10 の (block, meta) を 1.21 の BlockState へ解決する。 */
+    public static net.minecraft.world.level.block.state.BlockState stateFor(Block block, int meta) {
+        if (block == null) {
+            return net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        }
+        if (meta <= 0) {
+            return block.defaultBlockState();
+        }
+        String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
+        if (path.startsWith("white_")) {
+            String colored = COLORS_16[meta & 15] + path.substring("white".length());
+            Block b2 = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                .getOptional(net.minecraft.resources.ResourceLocation.withDefaultNamespace(colored))
+                .orElse(null);
+            if (b2 != null) {
+                return b2.defaultBlockState();
+            }
+        }
+        return block.defaultBlockState();
+    }
+
+    private static void decodeColor(Block block) {
+        Block base = block;
+        int meta = 0;
+        try {
+            String path = net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(block).getPath();
+            for (int i = 0; i < COLORS_16.length; i++) {
+                String prefix = COLORS_16[i] + "_";
+                if (path.startsWith(prefix)) {
+                    // 同じ系列の白色版が実在するときだけ色ファミリと判定 (orange_tulip 等は除外)。
+                    Block white = net.minecraft.core.registries.BuiltInRegistries.BLOCK
+                        .getOptional(net.minecraft.resources.ResourceLocation.withDefaultNamespace(
+                            "white_" + path.substring(prefix.length())))
+                        .orElse(null);
+                    if (white != null) { base = white; meta = i; }
+                    break;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        CANON.put(block, base);
+        META.put(block, meta);
+    }
+}

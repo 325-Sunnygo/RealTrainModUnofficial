@@ -1,0 +1,160 @@
+package com.portofino.realtrainmodunofficial.script;
+
+import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
+import com.portofino.realtrainmodunofficial.vehicle.VehicleDefinition;
+import jp.ngt.ngtlib.io.NGTFileLoader;
+import jp.ngt.ngtlib.io.ScriptUtil;
+
+import javax.script.Invocable;
+import javax.script.ScriptEngine;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * 車両 (ModelVehicle) の serverScriptPath を本家と同じ Nashorn で実行する。
+ * SRB3 / NGTO Builder のサーバースクリプト (onUpdate(entity, executer)) 用。
+ */
+public final class CarServerScripts {
+
+    private static final Map<String, Entry> CACHE = new ConcurrentHashMap<>();
+    private static final Entry INVALID = new Entry(null);
+
+    private CarServerScripts() {
+    }
+
+    public static Entry get(VehicleDefinition def) {
+        if (def == null || !def.hasServerScript()) {
+            return null;
+        }
+        Entry cached=CACHE.get(def.getId());if(cached!=null)return cached==INVALID?null:cached;
+        String key="vehicle-server|"+def.getId();
+        var compilation=AsyncScriptCompiler.requestPrepared(key,def.getServerScriptPath(),()->prepare(def));
+        if(!compilation.isDone())return null;
+        try {
+            Entry entry=CACHE.computeIfAbsent(def.getId(),id->create(def,compilation.join()));
+            return entry==INVALID?null:entry;
+        } catch(java.util.concurrent.CompletionException failure) {
+            RealTrainModUnofficial.LOGGER.warn("Failed to compile server script for {}",def.getId(),failure);CACHE.put(def.getId(),INVALID);return null;
+        } finally {AsyncScriptCompiler.release(key);}
+    }
+
+    public static boolean isLoading(VehicleDefinition def) {return def!=null && def.hasServerScript() && !CACHE.containsKey(def.getId());}
+
+    /** 読み込み結果を捨てて next get で読み直させる (診断コマンド用)。 */
+    public static void forget(String id) {
+        if (id != null) {
+            CACHE.remove(id);
+            AsyncScriptCompiler.release("vehicle-server|"+id);
+        }
+    }
+
+    private static LegacyExecutionIncludes.Prepared prepare(VehicleDefinition def) {
+        String path=def.getServerScriptPath();byte[] bytes=NGTFileLoader.findAsset(path);
+        if(bytes==null)bytes=NGTFileLoader.findAsset("scripts/"+path);
+        if(bytes==null)throw new IllegalArgumentException("Server script not found: "+path);
+        return LegacyExecutionIncludes.prepare(PackScriptSource.decode(bytes),path,NGTFileLoader::findAsset,PackScriptSource.SERVER_PRELUDE);
+    }
+    private static Entry create(VehicleDefinition def,javax.script.CompiledScript compiled) {
+        try {
+            String path=def.getServerScriptPath();
+            // Compilation is CPU-only; evaluate and execute world callbacks on the server caller.
+            ScriptEngine engine=compiled.getEngine();compiled.eval();
+            // ★SRB3 専用ブリッジ __SRB__ は本家に無く、どの同梱スクリプトも参照しないため撤去。
+            //どのツールのサーバー側が動いているかログで追えるようにする
+            //(クライアントの "vehicle script init" と対になる)
+            RealTrainModUnofficial.LOGGER.info("[RTMU] サーバースクリプト読み込み: {} ({})",
+                def.getId(), path);
+            return new Entry(engine);
+        } catch (Throwable t) {
+            RealTrainModUnofficial.LOGGER.warn("Failed to init server script for {}", def.getId(), t);
+            return INVALID;
+        }
+    }
+
+    public static final class Entry {
+        private final ScriptEngine engine;
+        private boolean warned;
+        // エンティティごとの ScriptExecuter (NGTO Builder の Measure が executer.count % 20 を使う。
+        // null を渡すと毎 tick TypeError で onUpdate が中断していた)。
+        private final java.util.Map<Object, jp.ngt.rtm.modelpack.ScriptExecuter> executers =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
+
+        private boolean warnedClientSide;
+
+        Entry(ScriptEngine engine) {
+            this.engine = engine;
+        }
+
+        /** 本家 ModelSetBase.serverSE 相当 (TrainSpeedManager / ScriptExecuter が参照する)。 */
+        public ScriptEngine engine() {
+            return this.engine;
+        }
+
+        /** onUpdate(entity, executer) を 1tick 分実行。 */
+        public void onUpdate(Object entity) {
+            if (engine == null) {
+                return;
+            }
+            // ★サーバースクリプトはサーバーでしか実行してはならない。
+            // クライアントで走ると、SRB の buildNormalRail がクライアントのワールドへ
+            // ブロックを置いてしまい (サーバーには存在しないので即消える)、
+            // 「敷設したのに何も残らない」状態になる。
+            net.minecraft.server.MinecraftServer srv =
+                net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+            boolean onServerThread = srv != null && srv.isSameThread();
+            if (!onServerThread) {
+                if (!warnedClientSide) {
+                    warnedClientSide = true;
+                    String lv = "?";
+                    boolean cs = false;
+                    if (entity instanceof net.minecraft.world.entity.Entity e) {
+                        lv = e.level().getClass().getSimpleName();
+                        cs = e.level().isClientSide();
+                    }
+                    RealTrainModUnofficial.LOGGER.warn(
+                        "[RTMU] サーバースクリプトがサーバースレッド外で呼ばれました (実行を中止): "
+                        + "thread={} level={} isClientSide={}",
+                        Thread.currentThread().getName(), lv, cs);
+                }
+                return;
+            }
+            try {
+                java.util.Map<String,String> requests=null;
+                if(entity instanceof com.portofino.realtrainmodunofficial.entity.CarEntity car) {
+                    for(var data:car.scriptDataMap().entrySet())if(data.getKey().endsWith("Request") && !data.getValue().isEmpty()) {
+                        if(requests==null)requests=new java.util.LinkedHashMap<>();requests.put(data.getKey(),data.getValue());
+                    }
+                }
+                jp.ngt.rtm.modelpack.ScriptExecuter executer = executerFor(entity);
+                if (executer != null) {
+                    executer.updateScript(engine, entity);
+                }
+                if(requests!=null && entity instanceof com.portofino.realtrainmodunofficial.entity.CarEntity car)for(var request:requests.entrySet()) {
+                    String resultKey=request.getKey().substring(0,request.getKey().length()-7)+"Result";
+                    String result=car.scriptDataMap().getOrDefault(resultKey,"");
+                    if(result.contains("invalid_request")) {
+                        String value=request.getValue();if(value.length()>8192)value=value.substring(0,8192)+"...";
+                        RealTrainModUnofficial.LOGGER.warn("[RTMU] rejected script request: model={} key={} result={} request={}",car.getVehicleId(),request.getKey(),result,value);
+                    }
+                }
+            } catch (Throwable t) {
+                // ★本家 ScriptUtil.doScriptIgnoreError と同じく「エラーは無視して毎tick呼ぶ」。
+                //   RTMU は以前「N 回失敗したら停止」という独自処理を入れており、
+                //   一度失敗したモデルのサーバースクリプトが以後一切動かなくなっていた。
+                if (!warned) {
+                    warned = true;
+                    RealTrainModUnofficial.LOGGER.warn("[ScriptUtil] server onUpdate failed", t);
+                }
+            }
+        }
+
+        private jp.ngt.rtm.modelpack.ScriptExecuter executerFor(Object entity) {
+            if (!(entity instanceof net.minecraft.world.entity.Entity e)
+                    || !(e.level() instanceof net.minecraft.server.level.ServerLevel serverLevel)) {
+                return null;
+            }
+            return executers.computeIfAbsent(entity, k ->
+                new jp.ngt.rtm.modelpack.ScriptExecuter(serverLevel, e.position(), e.getName().getString()));
+        }
+    }
+}

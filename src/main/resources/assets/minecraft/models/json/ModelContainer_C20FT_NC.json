@@ -1,0 +1,14 @@
+{
+  "containerName": "C20FT_NC",
+  "model": {
+      "modelFile": "Model_C20FT_NC.mqo",
+      "textures": [["default", "textures/container/c_red.png", ""]],
+      "rendererPath": "scripts/RenderC20FT_NC.js"
+  },
+	"buttonTexture": "textures/container/button_C20FT_NC.png",
+	"containerWidth": 2.49,
+	"containerHeight": 2.0,
+	"containerLength": 3.62,
+  "doCulling": true,
+  "tags": "ngt5479"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "PictureMonitor",
+  "model": {
+      "modelFile": "monitor_3x2.mqo",
+      "textures": [["default", "textures/machine/monitor.png", ""]],
+      "rendererPath": "scripts/RenderPictureMonitor.js"
+  },
+  "buttonTexture": "textures/machine/button_PictureMonitor.png",
+  "machineType": "Light",
+  "rotateByMetadata": false,
+  "brightness": [0, 15],
+  "useCustomColor": false,
+  "smoothing": true,
+  "doCulling": true,
+  "accuracy": "LOW",
+  "tags": "ngt5479",
+  "defaultData": "scale=(Double)1.0,url=(String)https://dl.dropboxusercontent.com/s/p0nbrnjzq6fw9dj/rainbow.gif"
+}

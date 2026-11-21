@@ -1,0 +1,10 @@
+{
+  "variants":{
+    "facing=down" :{"model":"rtm:slot"},
+    "facing=up"   :{"model":"rtm:slot", "x":180},
+    "facing=north":{"model":"rtm:slot", "x":270},
+    "facing=south":{"model":"rtm:slot", "x":90},
+    "facing=west" :{"model":"rtm:slot", "x":90, "y":90},
+    "facing=east" :{"model":"rtm:slot", "x":90, "y":270}
+  }
+}

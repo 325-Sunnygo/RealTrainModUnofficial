@@ -1,0 +1,24 @@
+{
+	"trainName": "Test7",
+	"trainType": "Test",
+
+	"trainModel2": {
+		"modelFile": "test7.mqoz",
+		"textures": [["default", "textures/train/223/223.png"]]
+	},
+	"bogieModel2": {
+		"modelFile": "wdt59.mqoz",
+		"textures": [["default", "textures/train/223/wdt59.png"]]
+  },
+
+	"buttonTexture": "textures/train/objTest/button_objTest.png",
+	"playerPos": [[0.0, 0.0, 9.5], [0.0, 0.0, -9.5]],
+	"bogiePos": [[0.0, 0.0, 6.6], [0.0, 0.0, -6.6]],
+	"trainDistance": 10.25,
+	"isSingleTrain": true,
+	"doCulling": true,
+	"smoothing": true,
+	"scale": 1.0,
+	"collisionParts": ["-all"],
+	"tags": "ngt5479"
+}

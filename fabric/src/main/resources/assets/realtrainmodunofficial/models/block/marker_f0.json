@@ -1,0 +1,4 @@
+{
+    "parent": "realtrainmodunofficial:block/marker_base",
+    "textures": { "tex": "realtrainmodunofficial:block/marker_0" }
+}

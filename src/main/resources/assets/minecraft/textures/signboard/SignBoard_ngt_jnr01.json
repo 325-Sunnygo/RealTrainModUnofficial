@@ -1,0 +1,10 @@
+{
+  "texture": "ngt_jnr01",
+	"backTexture": 0,
+  "height": 1.5,
+  "width": 2.0,
+  "depth": 0.25,
+  "frame": 1,
+  "animationCycle": 1,
+  "color" : 0
+}

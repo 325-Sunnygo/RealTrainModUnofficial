@@ -1,0 +1,22 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "SSSS ",
+    " M II"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    },
+    "M": {
+      "item": "realtrainmodunofficial:magazine_smg"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:smg",
+    "count": 1
+  }
+}

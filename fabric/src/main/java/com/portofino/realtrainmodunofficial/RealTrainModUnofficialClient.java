@@ -1,0 +1,55 @@
+package com.portofino.realtrainmodunofficial;
+
+import com.portofino.realtrainmodunofficial.client.PackRequirementWarnings;
+import net.minecraft.client.Minecraft;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
+import net.neoforged.neoforge.client.gui.ConfigurationScreen;
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
+
+// このクラスは専用サーバーではロードされません。ここからクライアント側のコードにアクセスしても安全です。
+@Mod(value = RealTrainModUnofficial.MODID, dist = Dist.CLIENT)
+// EventBusSubscriber を使用すると、@SubscribeEvent でアノテーションされたクラス内のすべての静的メソッドを自動的に登録できます。
+@EventBusSubscriber(modid = RealTrainModUnofficial.MODID, value = Dist.CLIENT)
+public class RealTrainModUnofficialClient {
+    public RealTrainModUnofficialClient(ModContainer container) {
+        // NeoForgeがこのMODのコンフィグ画面を作成できるようにします。
+        // コンフィグ画面は、Mods画面＞自分のModをクリック＞コンフィグをクリックで表示されます。
+        container.registerExtensionPoint(IConfigScreenFactory.class, ConfigurationScreen::new);
+    }
+
+    @SubscribeEvent
+    static void onClientSetup(FMLClientSetupEvent event) {
+        // クライアントのセットアップ・コード
+        com.portofino.realtrainmodunofficial.script.TrainScriptSystem.getInstance().initialize();
+        // Fabric invokes this before Minecraft creates the resource manager.
+        // The reload listener installed by RtmuFabricClientInit performs initialization.
+        PackRequirementWarnings.refresh();
+        // オンライン連携 (GitHub アップデート確認)。バックグラウンドで実行。
+        com.portofino.realtrainmodunofficial.online.RtmuOnlineServices.init();
+        // RTMU 設定 (自動カント/自動高さ) をファイルから読み込む。
+    }
+
+    /** ワールド入室時に RTMU 設定をサーバーへ同期 (敷設時・乗客上限でサーバーが参照するため)。 */
+    @SubscribeEvent
+    static void onLoggingIn(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingIn event) {
+        com.portofino.realtrainmodunofficial.client.ServerPackClient.begin();
+    }
+
+    /**
+     * ワールドを抜けたら看板まわりのキャッシュを捨てる。
+     * 看板の文字は OS フォントを焼いた GL テクスチャなので、放っておくとワールドを
+     * 出入りするたびに溜まっていく。
+     */
+    @SubscribeEvent
+    static void onLoggingOut(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
+        com.portofino.realtrainmodunofficial.client.ServerPackClient.end();
+        com.portofino.realtrainmodunofficial.client.mirror.MirrorRenderer.clear();
+        com.portofino.realtrainmodunofficial.client.signboard.FontImage.clearCache();
+        com.portofino.realtrainmodunofficial.client.signboard.tt.TimeTableManager.INSTANCE.invalidate();
+    }
+}

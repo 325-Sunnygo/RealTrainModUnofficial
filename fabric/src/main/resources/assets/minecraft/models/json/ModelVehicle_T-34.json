@@ -1,0 +1,24 @@
+{
+  "name": "T-34",
+  "model": {
+      "modelFile": "t34.mqo",
+      "textures": [["default", "textures/vehicle/t34.png", ""]],
+      "rendererPath": "scripts/RenderTank.js"
+  },
+  "buttonTexture": "textures/vehicle/button_t34.png",
+  "soundScriptPath": "scripts/sound_crusader.js",
+  "headLights": [],
+  "tailLights": [],
+  "vehicleType": "Car",
+  "size": [3.0, 2.7],
+  "playerPos": [[0.25, 2.0, 0.0]],
+  "vibration":[0.01, 0.025],
+  "useCustomColor": true,
+  "smoothing": true,
+  "doCulling": true,
+  "changeYawOnStopping": true,
+  "accuracy": "MEDIUM",
+  "tags": "ngt5479 T-34 Tank",
+  "serverScriptPath": "scripts/server/Tank.js",
+	"collisionParts": ["wb1", "body1", "body2", "body5", "turret1", "turret3"]
+}

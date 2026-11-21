@@ -1,0 +1,45 @@
+{
+	"trainName": "MechaCentipede",
+	"trainType": "CC",
+
+	"trainModel2": {
+		"modelFile": "mecha_centipede.mqoz",
+		"textures": [["default", "textures/train/mecha_centipede/mecha_centipede.png", "Light, OneTex"]],
+		"rendererPath": "scripts/RenderMechaCentipede.js"
+	},
+	"bogieModel2": {
+		"modelFile": "ModelBogie.class",
+		"textures": [["default", "textures/train/tp.png"]]
+	},
+
+  "buttonTexture": "textures/train/mecha_centipede/button_mecha_centipede.png",
+  "sound_Stop": "",
+  "sound_S_A": "",
+  "sound_Acceleration": "",
+  "sound_Deceleration": "",
+  "sound_D_S": "",
+  "sound_Horn": "",
+
+  "seatPos": [],
+  "playerPos": [
+    [0.0, 2.0, 0.0],
+    [0.0, 2.0, 0.0]
+  ],
+  "bogiePos": [
+    [0.0, 0.0, 0.5],
+    [0.0, 0.0, -0.5]
+  ],
+	"jointDelay" : [[0.0], [0.0]],
+	"maxSpeed": [0.1, 0.2, 0.3, 0.4, 0.4],
+	"trainDistance": 0.8,
+	"wheelRotationSpeed": 0.016,
+	"isSingleTrain": true,
+	"doCulling": true,
+	"smoothing": true,
+	"accuracy": "MEDIUM",
+	"rollSpeedCoefficient":0.25,
+	"rollVariationCoefficient":0.51,
+	"rollWidthCoefficient":1.25,
+	"collisionParts": ["body", "joint_f", "joint_b"],
+	"tags": "ngt5479"
+}

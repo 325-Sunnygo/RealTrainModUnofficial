@@ -1,0 +1,17 @@
+{
+  "name": "VehicleTest",
+	"model": {
+      "modelFile": "vehicle_test.mqoz",
+      "textures": [["default", "textures/vehicle/cv33.png", ""]]
+  },
+	"buttonTexture": "textures/vehicle/button_vehicle_test.png",
+	"vehicleType": "Car",
+	"size": [1.0, 1.0],
+	"playerPos": [[0.3571, 0.75, 1.0]],
+	"vibration":[0.01, 0.025],
+	"offset": [0.0, 0.0, 0.0],
+	"smoothing": true,
+	"doCulling": true,
+	"collisionParts": ["-all"],
+	"tags": "ngt5479"
+}

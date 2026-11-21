@@ -1,0 +1,116 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "realtrainmodunofficial:item/ammo_handgun"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 0
+      },
+      "model": "realtrainmodunofficial:item/ammo_cannonball"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 1
+      },
+      "model": "realtrainmodunofficial:item/bullet_cannonball"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 2
+      },
+      "model": "realtrainmodunofficial:item/case_cannonball"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 4
+      },
+      "model": "realtrainmodunofficial:item/ammo_handgun"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 5
+      },
+      "model": "realtrainmodunofficial:item/bullet_handgun"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 6
+      },
+      "model": "realtrainmodunofficial:item/case_handgun"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 12
+      },
+      "model": "realtrainmodunofficial:item/ammo_rifle"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 13
+      },
+      "model": "realtrainmodunofficial:item/bullet_rifle"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 14
+      },
+      "model": "realtrainmodunofficial:item/case_rifle"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 16
+      },
+      "model": "realtrainmodunofficial:item/ammo_rifle"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 17
+      },
+      "model": "realtrainmodunofficial:item/bullet_rifle"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 18
+      },
+      "model": "realtrainmodunofficial:item/case_rifle"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 20
+      },
+      "model": "realtrainmodunofficial:item/ammo_cannonball"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 21
+      },
+      "model": "realtrainmodunofficial:item/bullet_cannonball"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 22
+      },
+      "model": "realtrainmodunofficial:item/case_cannonball"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 24
+      },
+      "model": "realtrainmodunofficial:item/ammo_cannonball"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 25
+      },
+      "model": "realtrainmodunofficial:item/bullet_cannonball"
+    },
+    {
+      "predicate": {
+        "realtrainmodunofficial:variant": 26
+      },
+      "model": "realtrainmodunofficial:item/case_cannonball"
+    }
+  ]
+}

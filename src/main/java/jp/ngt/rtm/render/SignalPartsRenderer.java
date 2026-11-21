@@ -1,0 +1,52 @@
+package jp.ngt.rtm.render;
+
+import com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntity;
+
+/** 本家 jp.ngt.rtm.render.SignalPartsRenderer の移植。 */
+public class SignalPartsRenderer extends TileEntityPartsRenderer {
+
+    public SignalPartsRenderer(String... par1) {
+        super(par1);
+    }
+
+    /** 本家: TileEntitySignal.getSignal — 現在の現示レベル */
+    public int getSignal(Object tile) {
+        return tile instanceof InstalledObjectBlockEntity be ? be.getSignal() : 0;
+    }
+
+    /** 本家: TileEntitySignal.getBlockDirection / getRotat… */
+    public float getBlockDirection(Object tile) {
+        return tile instanceof InstalledObjectBlockEntity be ? be.getBlockDirection() : 0.0F;
+    }
+
+    public float getRotation(Object tile) {
+        return tile instanceof InstalledObjectBlockEntity be ? be.getRotation() : 0.0F;
+    }
+
+    /** 本家: TileEntitySignal.getRotationPitch。 */
+    public float getPitch(Object tile) {
+        return tile instanceof InstalledObjectBlockEntity be ? be.getMountPitch() : 0.0F;
+    }
+
+    /** 本家: TileEntitySignal.getRotationRoll。 */
+    public float getRoll(Object tile) {
+        return tile instanceof InstalledObjectBlockEntity be ? be.getMountRoll() : 0.0F;
+    }
+
+    /** 本家: TileEntitySignal.getRenderBlock (isOpaqueCube… */
+    public net.minecraft.world.level.block.Block getBlock(Object tile) {
+        if (tile instanceof BlockEntity be && be.getLevel() != null) {
+            return be.getLevel().getBlockState(be.getBlockPos()).getBlock();
+        }
+        return net.minecraft.world.level.block.Blocks.AIR;
+    }
+
+    /** 本家: 信号が埋まっているブロックが不透明か (時計の両面描画判定に使う) */
+    public boolean isOpaqueCube(Object tile) {
+        if (tile instanceof BlockEntity be && be.getLevel() != null) {
+            return be.getLevel().getBlockState(be.getBlockPos()).isSolidRender(be.getLevel(), be.getBlockPos());
+        }
+        return false;
+    }
+}

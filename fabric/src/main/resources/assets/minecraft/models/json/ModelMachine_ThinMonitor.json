@@ -1,0 +1,52 @@
+{
+	"name": "ThinMonitor",
+	"model": {
+		"modelFile": "monitor_thin.mqo",
+		"textures": [["default", "textures/machine/monitor.png", ""]],
+		"rendererPath": "scripts/RenderThinEBB.js"
+	},
+	"buttonTexture": "textures/machine/button_ThinMonitor.png",
+	"machineType": "Light",
+	"rotateByMetadata": false,
+	"brightness": [0, 7],
+	"useCustomColor": false,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "LOW",
+	"tags": "ngt5479",
+	"defaultValues": [
+		{
+			"type": "String",
+			"key": "picture",
+			"value": "minecraft:textures/ebb/ebb_pattern01.gif",
+			"suggestions": ["-file"],
+			"pattern": ["", "ebb", "gif"]
+		},
+		{
+			"type": "Int",
+			"key": "resolution",
+			"value": "16",
+			"minmax": [1, 256]
+		},
+		{
+			"type": "Double",
+			"key": "sizeX",
+			"value": "1.0"
+		},
+		{
+			"type": "Double",
+			"key": "sizeY",
+			"value": "1.0"
+		},
+		{
+			"type": "Int",
+			"key": "offsetU",
+			"value": "0"
+		},
+		{
+			"type": "Int",
+			"key": "offsetV",
+			"value": "0"
+		}
+	]
+}

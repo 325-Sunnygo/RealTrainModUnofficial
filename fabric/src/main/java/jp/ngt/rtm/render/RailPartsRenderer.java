@@ -1,0 +1,348 @@
+package jp.ngt.rtm.render;
+
+import jp.ngt.ngtlib.io.ScriptUtil;
+import jp.ngt.rtm.rail.TileEntityLargeRailCore;
+import jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore;
+
+/**
+ * 本家 jp.ngt.rtm.render.RailPartsRenderer の移植。
+ * レールスクリプトの renderRailStatic/renderRailDynamic/shouldRenderObject を仲介する。
+ */
+public class RailPartsRenderer extends PartsRenderer {
+    public RailPartsRenderer() { this(new String[0]); }
+    public RailPartsRenderer(String... args) {
+        super(args);
+    }
+
+    public void renderRail(TileEntityLargeRailCore tile, double x, double y, double z,
+                           float partialTicks, RenderPass pass) {
+        this.currentPass = pass.id;
+        if (pass == RenderPass.NORMAL) {
+            this.renderRailStatic(tile, x, y, z, partialTicks, pass.id);
+        }
+        this.renderRailDynamic(tile, x, y, z, partialTicks, pass.id);
+    }
+
+    public void renderRailStatic(TileEntityLargeRailCore tile, double x, double y, double z, float partialTicks) {
+        this.renderRailStatic(tile, x, y, z, partialTicks, this.currentPass);
+    }
+
+    public void renderRailDynamic(TileEntityLargeRailCore tile, double x, double y, double z, float partialTicks) {
+        this.renderRailDynamic(tile, x, y, z, partialTicks, this.currentPass);
+    }
+
+    public double[] getRailWorldRenderOrigin(TileEntityLargeRailCore tile) {
+        jp.ngt.rtm.rail.util.RailPosition rp = tile.getRailPositions()[0];
+        return new double[]{tile.getBlockPos().getX() + rp.posX - rp.blockX,
+                tile.getBlockPos().getZ() + rp.posZ - rp.blockZ};
+    }
+
+    /** One Nashorn-visible signature: mixed (Level,int...) and (Object,double...)
+     * overloads are ambiguous for JavaScript coordinates. Keep the reference rail
+     * renderer's integer-coordinate conversion and brightness sampling.
+     */
+    @Override
+    public int getBrightness(Object world, double x, double y, double z) {
+        return world instanceof net.minecraft.world.level.Level level
+                ? brightnessAt(level, (int) x, (int) y, (int) z) : 0;
+    }
+
+    public void setBrightness(int brightness) {
+        jp.ngt.ngtlib.renderer.GLHelper.setBrightness(brightness);
+    }
+
+    public int[] getRailBrightness(net.minecraft.world.level.Level level, int x, int y, int z, float[][] positions) {
+        return getRailBrightness(level, new net.minecraft.core.BlockPos(x, y, z), positions);
+    }
+
+    /** 現在描画中のレール index (0=メイン, 1..=subRails)。スクリプトがリフレクション参照。 */
+    public int currentRailIndex;
+
+    /**
+     * 分岐コア用: renderStaticParts が描画する RailMap の差し替え。
+     * getRailMap(null) は分岐で先頭マップしか返さないため、呼び出し側
+     * (RailScriptRenderers) が getAllRailMaps の各マップを設定してマップごとに回す。
+     */
+    public jp.ngt.rtm.rail.util.RailMap renderMapOverride;
+
+    /** 本家: モデルの全グループ名 (renderKey 計算やスクリプトが使う)。 */
+    public String[] getAllObjNames() {
+        ModelObject mo = this.getModelObject();
+        if (mo == null || mo.model == null) {
+            return new String[0];
+        }
+        return mo.model.getGroupObjects().stream()
+                .map(g -> g.name)
+                .toArray(String[]::new);
+    }
+
+    /**
+     * 本家: レール描画原点 (先頭 RailPosition のブロック端数)。
+     * 表示リストの平行移動や、スクリプトが原点補正するときに使う。
+     */
+    public double[] getRailRenderOrigin(Object tileObj) {
+        if (!(tileObj instanceof jp.ngt.rtm.rail.TileEntityLargeRailCore core)) {
+            return new double[]{0.0D, 0.0D, 0.0D};
+        }
+        jp.ngt.rtm.rail.util.RailPosition[] rps = core.getRailPositions();
+        if (rps == null || rps.length == 0 || rps[0] == null) {
+            return new double[]{0.0D, 0.0D, 0.0D};
+        }
+        jp.ngt.rtm.rail.util.RailPosition rp = rps[0];
+        return new double[]{
+            rp.posX - (double) rp.blockX,
+            rp.posY - (double) rp.blockY - 0.0625D,
+            rp.posZ - (double) rp.blockZ
+        };
+    }
+
+    public boolean isSwitchRail(Object tile) {
+        return tile instanceof TileEntityLargeRailSwitchCore;
+    }
+
+    public void renderRailStatic(TileEntityLargeRailCore tile, double x, double y, double z, float partialTicks, int pass) {
+        if (ScriptUtil.hasFunction(this.script, "renderRailStatic")) {
+            ScriptUtil.doScriptFunction(this.script, "renderRailStatic", tile, x, y, z, partialTicks, pass);
+        }
+    }
+
+    public void renderRailDynamic(TileEntityLargeRailCore tile, double x, double y, double z, float partialTicks, int pass) {
+        if (ScriptUtil.hasFunction(this.script, "renderRailDynamic")) {
+            ScriptUtil.doScriptFunction(this.script, "renderRailDynamic", tile, x, y, z, partialTicks, pass);
+        }
+    }
+
+    /** 通常パイプラインの各オブジェクトを描画するかどうか (端のトリミング等)。 */
+    public boolean shouldRenderObject(TileEntityLargeRailCore tile, String objName, double len, double pos) {
+        if (this.script == null) {
+            return true;
+        }
+        Object result = ScriptUtil.doScriptIgnoreError(this.script, "shouldRenderObject", tile, objName, len, pos);
+        if (result instanceof Boolean b) {
+            return b;
+        }
+        return true;
+    }
+
+    /**
+     * 描画対象モデルのオブジェクト名一覧 (renderStaticParts 用)。
+     * クライアント側 (RailScriptRenderers) が呼出前に設定する。
+     */
+    public java.util.Set<String> modelGroupNames = java.util.Set.of();
+
+    /**
+     * 本家のデフォルトレール描画。
+     * renderer.renderStaticParts(tileEntity, x, y, z) として呼ばれる。
+     */
+    /**
+     * 本家 renderRailMapStatic の忠実移植 (GLRecorder 記録)。
+     * BRE 系スクリプトが分岐の非可動側レールを描くのに使う:
+     */
+    public void renderRailMapStatic(Object tileObj, Object railMapObj, int max, int startIndex, int endIndex, Parts... pArray) {
+        if (!(tileObj instanceof jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore tileEntity)
+                || !(railMapObj instanceof jp.ngt.rtm.rail.util.RailMap rm)) {
+            return;
+        }
+        jp.ngt.ngtlib.renderer.GLRecorder rec = jp.ngt.ngtlib.renderer.GLRecorder.active();
+        if (rec == null || max < 1) {
+            return;
+        }
+        double[] origPos = rm.getRailPos(max, 0);
+        double origHeight = rm.getRailHeight(max, 0);
+        // 本家 KaizPatchX RailPartsRenderer.renderRailMapStatic: origin は
+        // 「core ブロック + railPositions[0] の実位置 (posX - blockX)」。
+        // SRB3 の freePos RP や rp[0]≠コア始点マーカーの分岐・クロッシングでも正しく描ける。
+        // 描画姿勢は blockPos 基準 (BlockEntityRenderer の pose)。点はワールド座標なので
+        // 「ワールド点 - blockPos」で相対化する (本家は +origin を後から掛ける分だけ異なる)。
+        float moveX = (float) (origPos[1] - tileEntity.getBlockPos().getX());
+        float moveZ = (float) (origPos[0] - tileEntity.getBlockPos().getZ());
+
+        for (int i = startIndex; i <= endIndex; i++) {
+            double[] p1 = rm.getRailPos(max, i);
+            double h = rm.getRailHeight(max, i);
+            float x0 = moveX + (float) (p1[1] - origPos[1]);
+            float y0 = (float) (h - origHeight);
+            float z0 = moveZ + (float) (p1[0] - origPos[0]);
+            float yaw = rm.getRailRotation(max, i);
+            float pitch = rm.getRailPitch(max, i);
+            rec.push();
+            rec.translate(x0, y0, z0);
+            rec.rotate(yaw, 0.0F, 1.0F, 0.0F);
+            rec.rotate(-pitch, 1.0F, 0.0F, 0.0F);
+            for (Parts parts : pArray) {
+                if (parts != null) {
+                    parts.render(this);
+                }
+            }
+            rec.pop();
+        }
+    }
+
+    /**
+     * レール 1 区間の明るさ。レール面のすぐ上で拾う。
+     * そこが完全に真っ暗 (= ブロックの中でサンプリングしてしまった) の時だけ 1〜2 段上へ
+     * 逃がす。
+     */
+    private static int sampleBrightness(TileEntityLargeRailCore tile, double wx, double wy, double wz) {
+        net.minecraft.world.level.Level level = tile.getLevel();
+        if (level == null) {
+            return 0;
+        }
+        net.minecraft.core.BlockPos sp = net.minecraft.core.BlockPos.containing(wx, wy + 0.25D, wz);
+        int light = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, sp);
+        if (light == 0) {
+            light = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, sp.above());
+        }
+        if (light == 0) {
+            light = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, sp.above(2));
+        }
+        return light;
+    }
+
+    /**
+     * 本家 RailPartsRendererBase.createRailPos の忠実移植。
+     * 全 RailMap の 0.5m 刻み各点を {x, y, z, yaw, -pitch, cant} で返す。
+     */
+    public static float[][] createRailPos(TileEntityLargeRailCore tile) {
+        jp.ngt.rtm.rail.util.RailMap[] rms = tile.getAllRailMaps();
+        if (rms == null || rms.length == 0) {
+            return null;
+        }
+        java.util.List<float[]> list = new java.util.ArrayList<>();
+        for (jp.ngt.rtm.rail.util.RailMap rm : rms) {
+            if (rm == null) {
+                continue;
+            }
+            int max=LegacyRailSampling.split(rm.getLength(),tile.getRailRenderMinimumSplit());
+            if(max<1) continue;
+            double[] stPoint = rm.getRailPos(max, 0);
+            double startH = rm.getStartRP().posY;
+            // 描画姿勢は blockPos 基準。
+            float moveX = (float) (stPoint[1] - tile.getBlockPos().getX());
+            float moveZ = (float) (stPoint[0] - tile.getBlockPos().getZ());
+            for (int i = 0; i <= LegacyRailSampling.lastIndex(max,tile.getRailRenderEndOffset()); ++i) {
+                double[] cur = rm.getRailPos(max, i);
+                list.add(new float[]{
+                    moveX + (float) (cur[1] - stPoint[1]),
+                    (float) (rm.getRailHeight(max, i) - startH),
+                    moveZ + (float) (cur[0] - stPoint[0]),
+                    rm.getRailRotation(max, i),
+                    -rm.getRailPitch(max, i),
+                    rm.getCant(max, i)});
+            }
+        }
+        return list.isEmpty() ? null : list.toArray(new float[0][]);
+    }
+
+    /**
+     * 本家 getRailBrightness の忠実移植。各点の位置で明るさを拾う。
+     * ★コアブロック 1 点で代表させてはいけない。
+     */
+    public static int[] getRailBrightness(net.minecraft.world.level.Level level,
+                                          net.minecraft.core.BlockPos origin, float[][] rp) {
+        int[] out = new int[rp.length];
+        if (level == null) {
+            return out;
+        }
+        for (int i = 0; i < rp.length; i++) {
+            int x = origin.getX() + net.minecraft.util.Mth.floor(rp[i][0]);
+            int y = origin.getY() + net.minecraft.util.Mth.floor(rp[i][1]);
+            int z = origin.getZ() + net.minecraft.util.Mth.floor(rp[i][2]);
+            out[i] = brightnessAt(level, x, y, z);
+        }
+        return out;
+    }
+
+    /** 本家 getBrightness: 0 なら 1 段上へ逃がす。 */
+    private static int brightnessAt(net.minecraft.world.level.Level level, int x, int y, int z) {
+        net.minecraft.core.BlockPos p = new net.minecraft.core.BlockPos(x, y, z);
+        int b = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, p);
+        if (b <= 0) {
+            b = net.minecraft.client.renderer.LevelRenderer.getLightColor(level, p.above());
+        }
+        return b;
+    }
+
+    /**
+     * 本家 KaizPatchX createStaticRenderKey の忠実移植。
+     * レール形状・各点の明るさ・モデル (オブジェクト名/テクスチャ) をまとめた 1 個の int。
+     */
+    public static int createStaticRenderKey(float[][] fa, int[] brightness, int modelKey) {
+        int key = 31 * java.util.Arrays.deepHashCode(fa) + java.util.Arrays.hashCode(brightness);
+        return 31 * key + modelKey;
+    }
+
+    public void renderStaticParts(Object tileObj, double x, double y, double z) {
+        if (!(tileObj instanceof TileEntityLargeRailCore tile)) {
+            return;
+        }
+        jp.ngt.ngtlib.renderer.GLRecorder rec = jp.ngt.ngtlib.renderer.GLRecorder.active();
+        if (rec == null) {
+            return;
+        }
+        // ★本家 createRailPos と同じく全 RailMap を 1 回の呼び出しで回す。
+        // 分岐は RailMap を複数持つので、1 本しか見ないと分岐側のルートに土台 (道床/枕木) が
+        // 付かない。
+        jp.ngt.rtm.rail.util.RailMap[] maps;
+        if (this.renderMapOverride != null) {
+            maps = new jp.ngt.rtm.rail.util.RailMap[]{this.renderMapOverride};
+        } else {
+            maps = tile.getAllRailMaps();
+            if (maps == null || maps.length == 0) {
+                jp.ngt.rtm.rail.util.RailMap single = tile.getRailMap(null);
+                if (single == null) {
+                    return;
+                }
+                maps = new jp.ngt.rtm.rail.util.RailMap[]{single};
+            }
+        }
+        net.minecraft.core.BlockPos origin = tile.getBlockPos();
+        int logicalCount=0;
+        for(var map:maps) if(map!=null) {
+            int split=LegacyRailSampling.split(map.getLength(),tile.getRailRenderMinimumSplit());
+            if(split>0) logicalCount+=LegacyRailSampling.lastIndex(split,tile.getRailRenderEndOffset())+1;
+        }
+        int logicalIndex=0;
+        for (jp.ngt.rtm.rail.util.RailMap map : maps) {
+        if (map == null) {
+            continue;
+        }
+        double length = map.getLength();
+        int max=LegacyRailSampling.split(length,tile.getRailRenderMinimumSplit());
+        if(max<1) continue;
+        for (int i=0;i<=LegacyRailSampling.lastIndex(max,tile.getRailRenderEndOffset());i++,logicalIndex++) {
+            java.util.Set<String> allowed = new java.util.LinkedHashSet<>();
+            for (String name : this.modelGroupNames) {
+                if (LegacyRailSampling.crossSection(name,logicalIndex,logicalCount,tile.shouldRenderRailStartCap(),tile.shouldRenderRailEndCap())
+                        && this.shouldRenderObject(tile,name,logicalCount,logicalIndex)) {
+                    allowed.add(name.trim().toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+            if (allowed.isEmpty()) {
+                continue;
+            }
+            double[] p1 = map.getRailPos(max, i);
+            double h = map.getRailHeight(max, i);
+            float yaw = map.getRailYaw(max, i);
+            float pitch = map.getRailPitch(max, i);
+            float roll = map.getRailRoll(max, i);
+
+            // 描画姿勢は blockPos 基準。 x/y/z はスクリプト渡しのオフセット。
+            float relX = (float) (x + p1[1] - origin.getX());
+            float relY = (float) (y + h - origin.getY() - 0.0625D);
+            float relZ = (float) (z + p1[0] - origin.getZ());
+
+            // 本家 renderRailMapStatic と同じく、明るさは区間ごとにサンプリングする。
+            // ★コアブロック 1 点で全長を代表させてはいけない。
+            rec.brightness(sampleBrightness(tile, origin.getX() + relX, origin.getY() + relY, origin.getZ() + relZ));
+            rec.push();
+            rec.translate(relX, relY, relZ);
+            rec.rotate(yaw, 0.0F, 1.0F, 0.0F);
+            rec.rotate(-pitch, 1.0F, 0.0F, 0.0F);
+            rec.rotate(roll, 0.0F, 0.0F, 1.0F);
+            rec.renderGroups(allowed);
+            rec.pop();
+        }
+        }
+    }
+}

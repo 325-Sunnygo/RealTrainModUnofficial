@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "   ",
+    "PPP",
+    "IRI"
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "P": {
+      "item": "minecraft:stone_pressure_plate"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:train_detector",
+    "count": 3
+  },
+  "category": "misc"
+}

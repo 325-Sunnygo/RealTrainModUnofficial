@@ -1,0 +1,39 @@
+{
+  "required": true,
+  "package": "com.portofino.realtrainmodunofficial.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BlockLightEngineMixin",
+    "LightEngineAccessor",
+    "DimensionDataStorageMixin",
+    "PackRepositoryMixin",
+    "PlayerMixin",
+    "ServerPlayerGameModeMixin"
+  ],
+  "client": [
+    "CameraAnglesMixin",
+    "CameraMixin",
+    "GameRendererMixin",
+    "GuiLayerMixin",
+    "ItemInHandRendererMixin",
+    "KeyMappingAccessor",
+    "KeyMappingMixin",
+    "KeyboardHandlerMixin",
+    "MinecraftInteractionMixin",
+    "MinecraftScreenMixin",
+    "MouseHandlerMixin",
+    "SoundBufferAccessor",
+    "SoundBufferLibraryMixin",
+    "LegacySoundChannelMixin",
+    "LegacyMarkerKeysMixin",
+    "MirrorTargetMixin",
+    "MirrorLevelTargetsMixin",
+    "MirrorFrustumMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

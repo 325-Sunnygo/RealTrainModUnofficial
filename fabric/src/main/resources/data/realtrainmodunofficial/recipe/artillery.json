@@ -1,0 +1,25 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "SSSSS",
+    "    S",
+    "SSSSS",
+    " III ",
+    " III "
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:item_cargo",
+    "count": 1,
+    "components": {
+      "realtrainmodunofficial:item_variant": 1
+    }
+  }
+}

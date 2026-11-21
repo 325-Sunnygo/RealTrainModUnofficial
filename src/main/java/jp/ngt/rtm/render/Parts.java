@@ -1,0 +1,83 @@
+package jp.ngt.rtm.render;
+
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
+
+/** 本家 jp.ngt.rtm.render.Parts の移植。 スクリプト用法: */
+public class Parts {
+    public final String[] objNames;
+    private final String[] names;
+    private final Set<String> nameSet;
+    // 正規化済み (小文字) 名前 Set。GLRecorder 再生側の IdentityHashMa…
+    private final Set<String> normalizedNames;
+    private jp.ngt.ngtlib.renderer.model.GroupObject[] objs;
+    /** 本家 ActionParts.id: registerParts で 1 始まりで振られるピッキン… */
+    public int id;
+
+    /** 操作パーツ (ActionParts) か。本家は instanceof で判定する。 */
+    public boolean isActionParts() {
+        return false;
+    }
+
+    public Parts(String... names) {
+        this.names = names != null ? names : new String[0];
+        this.objNames = this.names;
+        this.nameSet = new LinkedHashSet<>(Arrays.asList(this.names));
+        Set<String> normalized = new LinkedHashSet<>();
+        for (String name : this.names) {
+            if (name != null) {
+                normalized.add(name.trim().toLowerCase(java.util.Locale.ROOT));
+            }
+        }
+        this.normalizedNames = java.util.Collections.unmodifiableSet(normalized);
+    }
+
+    public String[] getNames() {
+        return this.names;
+    }
+
+    /** 本家 objNames フィールド互換 (スクリプトが直接参照する)。 */
+    public String[] getObjNames() {
+        return this.names;
+    }
+
+    public void init(PartsRenderer renderer) {
+    }
+
+    /** 本家 getObjects(IModelNGT) 互換 — PolygonModel からグループ… */
+    public jp.ngt.ngtlib.renderer.model.GroupObject[] getObjects(Object model) {
+        if (this.objs == null) {
+            if (model instanceof jp.ngt.ngtlib.renderer.model.PolygonModel pm) {
+                this.objs=new jp.ngt.ngtlib.renderer.model.GroupObject[this.names.length];
+                for(int i=0;i<this.names.length;i++) {
+                    for(var group:pm.getGroupObjects()) if(this.names[i].equals(group.name)) { this.objs[i]=group; break; }
+                }
+            } else {
+                this.objs = new jp.ngt.ngtlib.renderer.model.GroupObject[0];
+            }
+        }
+        return this.objs;
+    }
+
+    public boolean containsName(String objName) {
+        return objName != null && this.nameSet.contains(objName);
+    }
+
+    public void render(PartsRenderer renderer) {
+        // 名前ごとの記録ではなく正規化済み Set を 1 コマンドで記録する (再生側キャッシュに同一イン…
+        renderer.recordRenderPartsSet(this.normalizedNames, this);
+    }
+
+    public void render(Object renderer) {
+        if (renderer instanceof PartsRenderer pr) {
+            this.render(pr);
+        }
+    }
+
+    /** 本家ignoreMatId: マテリアルIDを無視して描くか。既定false。 */
+    public boolean ignoreMatId(PartsRenderer renderer) {
+        return false;
+    }
+
+}

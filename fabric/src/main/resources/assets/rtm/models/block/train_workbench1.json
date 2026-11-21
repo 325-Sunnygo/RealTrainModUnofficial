@@ -1,0 +1,12 @@
+{
+    "parent": "minecraft:block/cube",
+    "textures": {
+        "particle" : "rtm:blocks/workbench_top",
+        "down"     : "rtm:blocks/workbench_top",
+        "up"       : "rtm:blocks/workbench_top",
+        "north"    : "rtm:blocks/workbench_front_1",
+        "east"     : "rtm:blocks/workbench_side_1",
+        "south"    : "rtm:blocks/workbench_front_1",
+        "west"     : "rtm:blocks/workbench_side_1"
+    }
+}

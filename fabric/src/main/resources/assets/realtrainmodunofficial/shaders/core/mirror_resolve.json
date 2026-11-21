@@ -1,0 +1,20 @@
+{
+  "vertex": "realtrainmodunofficial:mirror_resolve",
+  "fragment": "realtrainmodunofficial:mirror_resolve",
+  "attributes": [
+    "Position",
+    "UV0"
+  ],
+  "samplers": [
+    {
+      "name": "Sampler0"
+    },
+    {
+      "name": "Sampler1"
+    },
+    {
+      "name": "Sampler2"
+    }
+  ],
+  "uniforms": []
+}

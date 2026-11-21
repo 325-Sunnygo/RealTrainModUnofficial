@@ -1,0 +1,52 @@
+{
+  "variants": {
+    "amount=0": {
+      "model": "realtrainmodunofficial:block/furnace_fire_0"
+    },
+    "amount=1": {
+      "model": "realtrainmodunofficial:block/furnace_fire_1"
+    },
+    "amount=2": {
+      "model": "realtrainmodunofficial:block/furnace_fire_2"
+    },
+    "amount=3": {
+      "model": "realtrainmodunofficial:block/furnace_fire_3"
+    },
+    "amount=4": {
+      "model": "realtrainmodunofficial:block/furnace_fire_4"
+    },
+    "amount=5": {
+      "model": "realtrainmodunofficial:block/furnace_fire_5"
+    },
+    "amount=6": {
+      "model": "realtrainmodunofficial:block/furnace_fire_6"
+    },
+    "amount=7": {
+      "model": "realtrainmodunofficial:block/furnace_fire_7"
+    },
+    "amount=8": {
+      "model": "realtrainmodunofficial:block/furnace_fire_8"
+    },
+    "amount=9": {
+      "model": "realtrainmodunofficial:block/furnace_fire_9"
+    },
+    "amount=10": {
+      "model": "realtrainmodunofficial:block/furnace_fire_10"
+    },
+    "amount=11": {
+      "model": "realtrainmodunofficial:block/furnace_fire_11"
+    },
+    "amount=12": {
+      "model": "realtrainmodunofficial:block/furnace_fire_12"
+    },
+    "amount=13": {
+      "model": "realtrainmodunofficial:block/furnace_fire_13"
+    },
+    "amount=14": {
+      "model": "realtrainmodunofficial:block/furnace_fire_14"
+    },
+    "amount=15": {
+      "model": "realtrainmodunofficial:block/furnace_fire_15"
+    }
+  }
+}

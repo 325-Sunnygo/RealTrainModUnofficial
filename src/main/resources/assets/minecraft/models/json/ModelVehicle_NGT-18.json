@@ -1,0 +1,28 @@
+{
+  "name": "NGT-18",
+	"model": {
+      "modelFile": "NGT-18.mqo",
+      "textures": [["default", "textures/vehicle/NGT-18.png", "AlphaBlend"]],
+	    "rendererPath": "scripts/RenderNGT-18.js"
+  },
+	"buttonTexture": "textures/vehicle/button_NGT-18.png",
+  "guiScriptPath": "scripts/gui/RenderGuiFighter.js",
+  "guiTexture": "textures/gui/fighter_hud.png",
+	"vehicleType": "Plane",
+	"size": [2.5, 2.9],
+	"playerPos": [[0.0, 1.1, 1.55]],
+	"scale": 1.0,
+	"friction": [0.9, 0.999],
+	"acceleration": [0.01, 0.05],
+	"maxSpeed": [1.0, 3.0],
+	"maxYaw": [15.0, 2.5],
+	"pitchCoefficient": [2.5, 2.5],
+	"yawCoefficient": [2.5, 2.5],
+	"rollCoefficient": [45.0, 45.0],
+  "smoothing": true,
+  "doCulling": true,
+	"changeYawOnStopping": true,
+  "hoveringSpeed": 0.05,
+	"collisionParts": ["-all"],
+  "tags": "ngt5479"
+}
