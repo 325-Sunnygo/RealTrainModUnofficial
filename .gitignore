@@ -22,6 +22,9 @@ eclipse
 run
 runs
 run-data
+# (例外) 同梱リソース: src/main/resources と bundled_pack_src は除外しない
+!src/main/resources/**
+!bundled_pack_src/**
 
 repo
 
@@ -53,3 +56,8 @@ passenger/
 
 # Runtime logs can contain local paths and player/server information.
 /logs/
+
+# (最終) 同梱リソースは全てコミットする — 後の除外ルールより優先させるため末尾に置く
+!src/main/resources/**
+!bundled_pack_src/**
+!src/main/resources/assets/realtrainmodunofficial/vehicle_packs/**
