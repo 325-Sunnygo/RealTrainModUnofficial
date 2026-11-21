@@ -1,0 +1,15 @@
+{
+  "name":"tube_light",
+  "model":{
+    "modelFile": "tube_light.mqoz",
+    "textures": [["default", "textures/wire/illumination.png", "AlphaBlend, Light"]],
+  	"rendererPath": "scripts/RenderIllumination.js"
+  },
+  "buttonTexture": "textures/wire/button_tube_light.png",
+  "deflectionCoefficient":0.125,
+  "lengthCoefficient":0.0625,
+  "sectionLength":0.25,
+  "useCustomColor": true,
+  "doCulling": true,
+  "smoothing":true
+}

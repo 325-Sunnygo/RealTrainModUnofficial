@@ -1,0 +1,142 @@
+package com.portofino.realtrainmodunofficial.online;
+
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
+import net.neoforged.fml.ModList;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+
+/**
+ * RTMU のオンライン連携 (クライアント専用・起動時に1回、バックグラウンドで実行)。
+ * アップデート通知: GitHub の最新リリースと現在のバージョンを比較し、
+ * 古ければタイトル画面にお知らせを出す (OnlineClientHooks)。
+ */
+public final class RtmuOnlineServices {
+
+    private RtmuOnlineServices() {
+    }
+
+    /** GitHub リポジトリ (最新リリースの取得先)。 */
+    private static final String GITHUB_LATEST_API =
+            "https://api.github.com/repos/325-Sunnygo/RealTrainModUnofficial/releases/latest";
+
+    // --- 結果 (バックグラウンドスレッドが書き、描画/イベントスレッドが読む) ---
+    private static volatile String updateLatestVersion; //新しいバージョンがある時のみ非null
+    private static volatile String updateUrl = "https://github.com/325-Sunnygo/RealTrainModUnofficial/releases";
+    private static volatile boolean started;
+
+    /** クライアントセットアップから 1 回呼ぶ。ネットワークはバックグラウンドで行う。 */
+    public static void init() {
+        if (started || !jp.ngt.rtm.RTMConfig.versionCheck) {
+            return;
+        }
+        started = true;
+        jp.ngt.ngtlib.util.VersionChecker.checkVersion();
+        Thread t = new Thread(RtmuOnlineServices::checkUpdate, "RTMU-Online-Check");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /** 新しいバージョンがあるか。あればバージョン文字列、なければ null。 */
+    public static String getUpdateLatestVersion() {
+        return jp.ngt.rtm.RTMConfig.versionCheck?updateLatestVersion:null;
+    }
+
+    public static String getUpdateUrl() {
+        return updateUrl;
+    }
+
+    // ------------------------------------------------------------------
+    private static HttpClient newClient() {
+        return HttpClient.newBuilder()
+                .connectTimeout(Duration.ofSeconds(8))
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+    }
+
+    private static void checkUpdate() {
+        if (!jp.ngt.rtm.RTMConfig.versionCheck) return;
+        try {
+            HttpRequest req = HttpRequest.newBuilder(URI.create(GITHUB_LATEST_API))
+                    .timeout(Duration.ofSeconds(10))
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", "RealTrainModUnofficial-UpdateCheck")
+                    .GET().build();
+            HttpResponse<String> res = newClient().send(req, HttpResponse.BodyHandlers.ofString());
+            if (res.statusCode() != 200) {
+                return;
+            }
+            JsonObject json = JsonParser.parseString(res.body()).getAsJsonObject();
+            String tag = json.has("tag_name") ? json.get("tag_name").getAsString() : "";
+            if (json.has("html_url")) {
+                updateUrl = json.get("html_url").getAsString();
+            }
+            String latest = normalizeVersion(tag);
+            String current = normalizeVersion(currentModVersion());
+            if (!latest.isEmpty() && !current.isEmpty() && compareVersions(latest, current) > 0) {
+                updateLatestVersion = latest;
+            } else {
+            }
+        } catch (Exception e) {
+        }
+    }
+
+    private static String currentModVersion() {
+        try {
+            return ModList.get().getModContainerById(RealTrainModUnofficial.MODID)
+                    .map(c -> c.getModInfo().getVersion().toString()).orElse("");
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    /** 先頭の v や空白を除き、数字とドット以外で打ち切る ("v1.0.7-beta" → "1.0.7")。 */
+    private static String normalizeVersion(String v) {
+        if (v == null) {
+            return "";
+        }
+        String s = v.trim();
+        if (s.startsWith("v") || s.startsWith("V")) {
+            s = s.substring(1);
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if ((c >= '0' && c <= '9') || c == '.') {
+                sb.append(c);
+            } else {
+                break;
+            }
+        }
+        return sb.toString();
+    }
+
+    /** "1.0.7" 形式の数値セグメント比較。a>b なら正。 */
+    private static int compareVersions(String a, String b) {
+        String[] as = a.split("\\.");
+        String[] bs = b.split("\\.");
+        int n = Math.max(as.length, bs.length);
+        for (int i = 0; i < n; i++) {
+            int ai = i < as.length ? parseIntSafe(as[i]) : 0;
+            int bi = i < bs.length ? parseIntSafe(bs[i]) : 0;
+            if (ai != bi) {
+                return Integer.compare(ai, bi);
+            }
+        }
+        return 0;
+    }
+
+    private static int parseIntSafe(String s) {
+        try {
+            return Integer.parseInt(s);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+}

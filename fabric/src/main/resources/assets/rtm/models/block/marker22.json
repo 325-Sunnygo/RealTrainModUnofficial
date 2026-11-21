@@ -1,0 +1,6 @@
+{
+    "parent": "rtm:block/marker",
+    "textures": {
+        "tex": "rtm:blocks/marker2_2"
+    }
+}

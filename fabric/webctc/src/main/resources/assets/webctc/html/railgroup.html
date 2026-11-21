@@ -1,0 +1,593 @@
+<!doctype html>
+<!--
+  本家 WebCTC RailGroupManager (front/pages/RailGroupManager.kt + components/railgroup/*) の
+  忠実レプリカ。3ペイン構成は本家のまま:
+    左: 地図 (レールをクリックで選択、Shift で複数選択、選択=lightblue / RG所属=orange / hover=green)
+    中: RailGroups (検索、Create RailGroup / Create Folder、フォルダツリー)
+    右: Detail (Name / UUID / Folder / Rails / RedStone Pos / Display Pos / Next RailGroup / 転てつ設定 / 保存・削除)
+-->
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WebCTC - RailGroup</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{font-family:'Noto Sans JP',sans-serif;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+  header{position:sticky;top:0;background:#3d3d3d;display:flex;align-items:center;justify-content:space-between;
+         padding:8px 24px;box-shadow:0 2px 4px -1px rgba(0,0,0,.2),0 4px 5px 0 rgba(0,0,0,.14);z-index:10}
+  .logo-btn{background:none;border:none;padding:8px;cursor:pointer}
+  .logo{height:50px;padding:5px 15px;background:white;border-radius:10px;display:block}
+  #main{flex:1;display:flex;min-height:0}
+  #mapsvg{flex:1;background:darkslategray;touch-action:none;cursor:grab;min-width:0}
+  #mapsvg.drag{cursor:grabbing}
+  #mid{width:340px;background:whitesmoke;padding:0 16px 16px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+  #right{width:25%;background:silver;padding:0 16px 16px;overflow-y:auto}
+  h1{font-size:1.6em}
+  input[type=text],input[type=number],select{padding:6px 8px;border:1px solid #aaa;border-radius:4px;font-size:13px}
+  button{cursor:pointer;font-size:13px}
+  .btn{background:#1976d2;color:white;border:none;border-radius:4px;padding:8px 14px;
+       box-shadow:0 3px 1px -2px rgba(0,0,0,.2)}
+  .btn:disabled{background:#9e9e9e}
+  .btn.outlined{background:none;color:#1976d2;border:1px solid #1976d2;padding:4px 10px;box-shadow:none}
+  .btn.danger{background:#d32f2f}
+  .icon-btn{background:none;border:none;padding:2px 6px;font-size:14px;opacity:.7}
+  .icon-btn:hover{opacity:1}
+  #tree{flex:1;overflow-y:auto;background:white;border-radius:4px;
+        box-shadow:0 2px 1px -1px rgba(0,0,0,.2),0 1px 1px 0 rgba(0,0,0,.14)}
+  .rg-row,.folder-row{display:flex;align-items:center;justify-content:space-between;padding:6px 8px;
+        cursor:pointer;border-bottom:1px solid rgba(0,0,0,.08);font-size:13px}
+  .rg-row:hover,.folder-row:hover{background:rgba(0,0,0,.04)}
+  .rg-row.active{background:rgba(25,118,210,.18)}
+  .rg-count{color:#666;font-size:12px;margin-left:8px}
+  .folder-name{font-weight:bold}
+  .indent{margin-left:16px;border-left:1px solid rgba(0,0,0,.1)}
+  .box{margin-bottom:16px}
+  .box .box-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:8px;font-size:14px}
+  .paper{background:white;border-radius:4px;box-shadow:0 2px 1px -1px rgba(0,0,0,.2),0 1px 1px 0 rgba(0,0,0,.14)}
+  .row{display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid rgba(0,0,0,.06);font-size:13px}
+  .row input[type=number]{width:64px}
+  .row input.key{flex:1;min-width:60px}
+  .card{background:white;border-radius:4px;padding:8px;margin-bottom:8px;
+        box-shadow:0 2px 1px -1px rgba(0,0,0,.2),0 1px 1px 0 rgba(0,0,0,.14)}
+  .uuid{font-family:monospace;font-size:11px;word-break:break-all}
+  label.small{font-size:12px;color:#444;display:block;margin-bottom:2px}
+</style>
+</head>
+<body>
+<header>
+  <button class="logo-btn" onclick="location.href='/'">
+    <svg class="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 190.058 51">
+      <path fill="darkslategray" d="M 176.8482360839844 51.00030136108398 C 161.1449890136719 51.00030136108398 151.6050109863281 41.16689682006836 151.6050109863281 26.12430191040039 C 151.6050109863281 9.833400726318359 162.9063415527344 0 178.0227355957031 0 L 190.0575256347656 0 L 190.0575256347656 7.485298156738281 L 178.3890075683594 7.485298156738281 C 168.3360290527344 7.485298156738281 161.0711975097656 13.79610061645508 161.0711975097656 25.68330001831055 C 161.0711975097656 36.54359817504883 167.4558410644531 43.5150032043457 178.3161315917969 43.5150032043457 L 190.0575256347656 43.5150032043457 L 190.0575256347656 51.00030136108398 L 176.8482360839844 51.00030136108398 Z M 128.3435974121094 51.00030136108398 L 128.3435974121094 7.485298156738281 L 114.2550048828125 7.485298156738281 L 114.2550048828125 0 L 151.6059265136719 0 L 151.6059265136719 7.485298156738281 L 137.3697204589844 7.485298156738281 L 137.3697204589844 51.00030136108398 L 128.3435974121094 51.00030136108398 Z M 101.0457153320313 51.00030136108398 C 85.342529296875 51.00030136108398 75.80252075195313 41.16689682006836 75.80252075195313 26.12430191040039 C 75.80252075195313 9.833400726318359 87.10382080078125 0 102.22021484375 0 L 114.2550048828125 0 L 114.2550048828125 7.485298156738281 L 102.5865173339844 7.485298156738281 C 92.53350830078125 7.485298156738281 85.26870727539063 13.79610061645508 85.26870727539063 25.68330001831055 C 85.26870727539063 36.54359817504883 91.6533203125 43.5150032043457 102.5136108398438 43.5150032043457 L 114.2550048828125 43.5150032043457 L 114.2550048828125 51.00030136108398 L 101.0457153320313 51.00030136108398 Z M 30.64410400390625 28.99170303344727 C 29.37692260742188 28.53719711303711 28.30230712890625 27.86580276489258 27.42031860351563 26.97659683227539 C 26.53921508789063 26.08829879760742 25.86422729492188 24.99029922485352 25.39532470703125 23.6807975769043 C 24.92730712890625 22.37219619750977 24.69329833984375 20.85750198364258 24.69329833984375 19.1348991394043 C 24.69329833984375 17.42670059204102 24.92730712890625 15.87329864501953 25.39532470703125 14.47560119628906 C 25.86422729492188 13.07699966430664 26.52572631835938 11.87910079956055 27.37982177734375 10.88010025024414 C 28.23391723632813 9.881099700927734 29.26980590820313 9.109798431396484 30.48931884765625 8.565299987792969 C 31.70880126953125 8.021697998046875 33.0687255859375 7.749000549316406 34.57080078125 7.749000549316406 C 36.05850219726563 7.749000549316406 37.3734130859375 7.980300903320313 38.51730346679688 8.441997528076172 C 39.66030883789063 8.902797698974609 40.617919921875 9.547199249267578 41.38922119140625 10.37339782714844 C 42.16140747070313 11.20050048828125 42.74639892578125 12.18510055541992 43.14602661132813 13.32899856567383 C 43.54562377929688 14.47200012207031 43.74542236328125 15.72570037841797 43.74542236328125 17.08919906616211 C 43.74542236328125 17.43390274047852 43.734619140625 17.88119888305664 43.71392822265625 18.43290328979492 C 43.69320678710938 18.98369979858398 43.66262817382813 19.50030136108398 43.6212158203125 19.98270034790039 L 29.81790161132813 19.98270034790039 C 29.81790161132813 20.90520095825195 29.95919799804688 21.71789932250977 30.2418212890625 22.42080307006836 C 30.52349853515625 23.12369918823242 30.92312622070313 23.71229934692383 31.43972778320313 24.18749618530273 C 31.956298828125 24.66270065307617 32.576416015625 25.02450180053711 33.30001831054688 25.27199935913086 C 34.022705078125 25.5203971862793 34.82550048828125 25.64459609985352 35.70660400390625 25.64459609985352 C 36.726318359375 25.64459609985352 37.81802368164063 25.56540298461914 38.98171997070313 25.40700149536133 C 40.14630126953125 25.24860000610352 41.35501098632813 24.99029922485352 42.60870361328125 24.63209915161133 L 42.60870361328125 28.64069747924805 C 42.0714111328125 28.79189682006836 41.48550415039063 28.92959976196289 40.85189819335938 29.05379867553711 C 40.21832275390625 29.17799758911133 39.57122802734375 29.28779983520508 38.90969848632813 29.38409805297852 C 38.24819946289063 29.48039627075195 37.58041381835938 29.55330276489258 36.90542602539063 29.60100173950195 C 36.23040771484375 29.64960098266602 35.57611083984375 29.67390060424805 34.9425048828125 29.67390060424805 C 33.3441162109375 29.67390060424805 31.91131591796875 29.44620132446289 30.64410400390625 28.99170303344727 Z M 31.34701538085938 12.78089904785156 C 30.5343017578125 13.62779998779297 30.05191040039063 14.822998046875 29.90072631835938 16.36650085449219 L 38.62081909179688 16.36650085449219 C 38.63430786132813 15.53939819335938 38.53082275390625 14.81940078735352 38.310302734375 14.20650100708008 C 38.08981323242188 13.59360122680664 37.791015625 13.08779907226563 37.412109375 12.68819808959961 C 37.033203125 12.28860092163086 36.59222412109375 11.99250030517578 36.089111328125 11.79899978637695 C 35.58599853515625 11.60639953613281 35.0460205078125 11.51009750366211 34.46731567382813 11.51009750366211 C 33.20010375976563 11.51009750366211 32.15969848632813 11.93399810791016 31.34701538085938 12.78089904785156 Z M 52.49612426757813 29.22929763793945 C 51.18032836914063 29.00249862670898 49.92391967773438 28.69559860229492 48.72512817382813 28.30949783325195 L 48.72512817382813 0 L 53.76690673828125 0 L 53.76690673828125 6.860698699951172 L 53.56082153320313 10.99349975585938 C 54.318603515625 10.01519775390625 55.20330810546875 9.230400085449219 56.2158203125 8.638198852539063 C 57.22830200195313 8.045097351074219 58.4442138671875 7.749000549316406 59.86260986328125 7.749000549316406 C 61.10281372070313 7.749000549316406 62.205322265625 7.997398376464844 63.16921997070313 8.493297576904297 C 64.13311767578125 8.989200592041016 64.943115234375 9.694797515869141 65.597412109375 10.61100006103516 C 66.251708984375 11.52719879150391 66.751220703125 12.6359977722168 67.09500122070313 13.93830108642578 C 67.43972778320313 15.23970031738281 67.61160278320313 16.70399856567383 67.61160278320313 18.32940292358398 C 67.61160278320313 20.25809860229492 67.33981323242188 21.92490005493164 66.79531860351563 23.32979965209961 C 66.251708984375 24.73469924926758 65.49392700195313 25.90289688110352 64.5228271484375 26.83259963989258 C 63.55172729492188 27.76230239868164 62.40420532226563 28.45080184936523 61.08212280273438 28.89899826049805 C 59.760009765625 29.3463020324707 58.32000732421875 29.57040023803711 56.76300048828125 29.57040023803711 C 55.23391723632813 29.57040023803711 53.81192016601563 29.45699691772461 52.49612426757813 29.22929763793945 Z M 56.23651123046875 13.10129928588867 C 55.4580078125 13.78979873657227 54.63540649414063 14.72669982910156 53.76690673828125 15.91109848022461 L 53.76690673828125 25.08659744262695 C 54.16650390625 25.23779678344727 54.6588134765625 25.36200332641602 55.24472045898438 25.45830154418945 C 55.8297119140625 25.55459976196289 56.42550659179688 25.60319900512695 57.0321044921875 25.60319900512695 C 57.831298828125 25.60319900512695 58.5576171875 25.43760299682617 59.2119140625 25.10729598999023 C 59.8662109375 24.77609634399414 60.42422485351563 24.30810165405273 60.88592529296875 23.70149612426758 C 61.34762573242188 23.09579849243164 61.70220947265625 22.35509872436523 61.94970703125 21.48029708862305 C 62.1981201171875 20.60550308227539 62.32232666015625 19.6245002746582 62.32232666015625 18.53549575805664 C 62.32232666015625 17.37900161743164 62.239501953125 16.39350128173828 62.07391357421875 15.5807991027832 C 61.9083251953125 14.76810073852539 61.67071533203125 14.10029983520508 61.36111450195313 13.57649993896484 C 61.051513671875 13.05270004272461 60.672607421875 12.67110061645508 60.22442626953125 12.42990112304688 C 59.777099609375 12.18869781494141 59.26409912109375 12.06809997558594 58.6854248046875 12.06809997558594 C 57.831298828125 12.06809997558594 57.0150146484375 12.41279983520508 56.23651123046875 13.10129928588867 Z M 14.42340087890625 29.19869613647461 L 11.75759887695313 20.87099838256836 L 10.7864990234375 17.48160171508789 L 9.8568115234375 20.95380020141602 L 7.232421875 29.19869613647461 L 1.5084228515625 29.19869613647461 L 0 2.190597534179688 L 4.48382568359375 2.190597534179688 L 5.124603271484375 19.5066032409668 L 5.29022216796875 24.23879623413086 L 6.508819580078125 20.02409744262695 L 9.484222412109375 10.41479873657227 L 12.68731689453125 10.41479873657227 L 15.82830810546875 20.60190200805664 L 16.8408203125 24.1973991394043 L 16.92361450195313 19.98270034790039 L 17.60580444335938 2.190597534179688 L 21.92401123046875 2.190597534179688 L 20.3948974609375 29.19869613647461 L 14.42340087890625 29.19869613647461 Z"/>
+    </svg>
+  </button>
+  <span style="color:white;font-weight:bold">RailGroup Manager</span>
+</header>
+
+<div id="main">
+  <svg id="mapsvg" xmlns="http://www.w3.org/2000/svg">
+    <g id="mtx">
+      <g id="grails" stroke="white"></g>
+      <g id="gsignals" stroke="lightgray" stroke-width="0.5"></g>
+      <g id="gwaypoints"></g>
+    </g>
+  </svg>
+  <div id="mid">
+    <h1>RailGroups</h1>
+    <input type="text" id="search" placeholder="Search Box" oninput="renderTree()">
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="createRailGroup()">Create RailGroup</button>
+      <button class="btn" onclick="createFolder(null)">Create Folder</button>
+    </div>
+    <div id="tree"></div>
+  </div>
+  <div id="right">
+    <h1>Detail</h1>
+    <div id="detail"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+const SVGNS = "http://www.w3.org/2000/svg";
+let railList = [], signalList = [], waypointList = [], railGroups = [], folders = [];
+let selectedRails = new Set(); //"x,y,z"
+let activeUUID = null;
+let edit = null;              //編集中の RailGroup (deep copy)
+let hoveringRail = null;
+let shiftDown = false;
+window.addEventListener('keydown', e => { if (e.key === 'Shift') shiftDown = true; });
+window.addEventListener('keyup', e => { if (e.key === 'Shift') shiftDown = false; });
+
+const posKey = p => `${p.x},${p.y},${p.z}`;
+
+//---------------- SVG アイコン (本家は MUI icons — 絵文字は使わない) ----------------
+const ICONS = {
+  delete: 'M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z',
+  edit: 'M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z',
+  copy: 'M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z',
+  folder: 'M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z',
+  add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+};
+function svgIcon(name, size = 16){
+  return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="currentColor" style="vertical-align:middle"><path d="${ICONS[name]}"/></svg>`;
+}
+
+//---------------- panzoom (index.html と同じ挙動) ----------------
+const mtx = document.getElementById('mtx');
+const svg = document.getElementById('mapsvg');
+let tx = 0, ty = 0, scale = 1;
+function applyTransform(){ mtx.setAttribute('transform', `translate(${tx} ${ty}) scale(${scale})`); }
+let dragging = false, lastX = 0, lastY = 0, moved = 0;
+svg.addEventListener('pointerdown', e => { dragging = true; moved = 0; lastX = e.clientX; lastY = e.clientY; svg.classList.add('drag'); svg.setPointerCapture(e.pointerId); });
+svg.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  moved += Math.abs(e.clientX - lastX) + Math.abs(e.clientY - lastY);
+  tx += e.clientX - lastX; ty += e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  applyTransform();
+});
+svg.addEventListener('pointerup', () => { dragging = false; svg.classList.remove('drag'); });
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect = svg.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const factor = e.deltaY < 0 ? 1.25 : 0.8;
+  const ns = Math.max(0.05, Math.min(64, scale * factor));
+  tx = mx - (mx - tx) * (ns / scale);
+  ty = my - (my - ty) * (ns / scale);
+  scale = ns;
+  applyTransform();
+}, { passive: false });
+
+//---------------- 地図描画 (WRailHover: クリック選択 + 色分け) ----------------
+function railColor(rail){
+  const key = posKey(rail.pos);
+  if (hoveringRail === key) return 'green';                       //Detail hover (本家 Global styles)
+  if (edit && edit.railPosList.some(p => posKey(p) === key)) return 'orange';
+  if (selectedRails.has(key)) return 'lightblue';
+  if (rail.isTrainOnRail) return 'red';
+  return null; //グループ既定 (white)
+}
+function renderRails(){
+  const g = document.getElementById('grails');
+  g.textContent = '';
+  for (const rail of railList){
+    const gr = document.createElementNS(SVGNS, 'g');
+    const color = railColor(rail);
+    if (color) gr.setAttribute('stroke', color);
+    gr.style.cursor = 'pointer';
+    gr.addEventListener('click', () => {
+      if (moved > 4) return; //ドラッグと区別
+      const key = posKey(rail.pos);
+      //本家 WRailHover.onClick の選択ロジック
+      if (selectedRails.size === 1 && selectedRails.has(key)) {
+        selectedRails.clear();
+      } else {
+        if (!shiftDown) selectedRails.clear();
+        if (selectedRails.has(key)) selectedRails.delete(key); else selectedRails.add(key);
+      }
+      renderRails();
+    });
+    for (const rm of rail.railMaps){
+      const line = document.createElementNS(SVGNS, 'line');
+      line.setAttribute('x1', rm.startRP.posX); line.setAttribute('y1', rm.startRP.posZ);
+      line.setAttribute('x2', rm.endRP.posX);   line.setAttribute('y2', rm.endRP.posZ);
+      line.setAttribute('stroke-width', 3); //クリックしやすく (見た目は本家同様細く別線で上書き)
+      line.setAttribute('stroke-opacity', 0);
+      gr.appendChild(line);
+      const vis = document.createElementNS(SVGNS, 'line');
+      vis.setAttribute('x1', rm.startRP.posX); vis.setAttribute('y1', rm.startRP.posZ);
+      vis.setAttribute('x2', rm.endRP.posX);   vis.setAttribute('y2', rm.endRP.posZ);
+      if (rm.isNotActive && !color) vis.setAttribute('stroke', 'gray');
+      gr.appendChild(vis);
+    }
+    g.appendChild(gr);
+  }
+}
+function getSignalColor(level){
+  switch(level){
+    case 0: return 'darkslategray';
+    case 1: return 'rgb(2045,0,0)';
+    case 2: return 'rgb(255,153,0)';
+    case 3: return 'rgb(255,204,0)';
+    case 4: return 'rgb(155,255,0)';
+    case 5: return 'rgb(51,204,0)';
+    default: return 'rgb(51,102,255)';
+  }
+}
+function renderSignals(){
+  const g = document.getElementById('gsignals');
+  g.textContent = '';
+  //本家 WSignalGroup: "x,z-rotation" でグループ化し、柱 + 横線 + 現示円を描く
+  const groups = new Map();
+  for (const s of signalList){
+    const key = `${s.pos.x},${s.pos.z}-${s.rotation}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(s);
+  }
+  for (const signals of groups.values()){
+    const sorted = signals.slice().sort((a, b) => a.pos.y - b.pos.y);
+    const base = sorted[0];
+    const rotation = base.rotation;
+    const cos = Math.cos((270 + rotation) * (Math.PI / 180));
+    const sin = Math.sin((270 + rotation) * (Math.PI / 180));
+    const bx = base.pos.x, bz = base.pos.z;
+    const n = sorted.length;
+
+    const l1 = document.createElementNS(SVGNS, 'line');
+    l1.setAttribute('x1', bx - (n - 1) * 3.5 * cos); l1.setAttribute('y1', bz + (n - 1) * 3.5 * sin);
+    l1.setAttribute('x2', bx + 4.0 * cos);           l1.setAttribute('y2', bz - 4.0 * sin);
+    g.appendChild(l1);
+    const l2 = document.createElementNS(SVGNS, 'line');
+    l2.setAttribute('x1', bx + 4.0 * cos + 1.5 * sin); l2.setAttribute('y1', bz + 1.5 * cos - 4.0 * sin);
+    l2.setAttribute('x2', bx + 4.0 * cos - 1.5 * sin); l2.setAttribute('y2', bz - 1.5 * cos - 4.0 * sin);
+    g.appendChild(l2);
+
+    sorted.forEach((signal, index) => {
+      const blockDirectionRotation = signal.blockDirection * 90;
+      const diff = (rotation - blockDirectionRotation + 360) % 360;
+      const isLeft = diff < 180 && diff !== 0 && n > 1;
+      const isRight = diff > 180 && diff !== 0 && n > 1;
+      const offsetCx = ((isLeft ? 3.0 : isRight ? -3.0 : 0.0)) * sin + (-index * 3.5 - (isLeft || isRight ? 1.0 : 0.0)) * cos;
+      const offsetCy = (isLeft ? 3.0 : isRight ? -3.0 : 0.0) * cos + (index * 3.5 + (isLeft || isRight ? 1.0 : 0.0)) * sin;
+      const cx = signal.pos.x + offsetCx, cy = signal.pos.z + offsetCy;
+      if (isLeft || isRight){
+        const pl = document.createElementNS(SVGNS, 'polyline');
+        pl.setAttribute('fill', 'none');
+        pl.setAttribute('points', [
+          `${cx},${cy}`,
+          `${cx + 3.0 * cos},${cy - 3.0 * sin}`,
+          `${cx + 3.0 * cos - (isLeft ? 3.0 : -3.0) * sin},${cy - 3.0 * sin - (isLeft ? 3.0 : -3.0) * cos}`
+        ].join(' '));
+        g.appendChild(pl);
+      }
+      const c = document.createElementNS(SVGNS, 'circle');
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', 1.5);
+      c.setAttribute('fill', getSignalColor(signal.signalLevel));
+      c.setAttribute('stroke', 'none');
+      g.appendChild(c);
+    });
+  }
+}
+
+//---------------- ツリー (RailGroupTreeView 相当) ----------------
+function renderTree(){
+  const tree = document.getElementById('tree');
+  tree.textContent = '';
+  const search = document.getElementById('search').value.trim().toLowerCase();
+  if (search) {
+    railGroups.filter(rg => rg.name.toLowerCase().includes(search))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(rg => tree.appendChild(rgRow(rg)));
+    return;
+  }
+  const renderLevel = (parentUuid, container) => {
+    folders.filter(f => (f.parentUuid || null) === parentUuid)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(folder => {
+        const row = document.createElement('div');
+        row.className = 'folder-row';
+        row.innerHTML = `<span class="folder-name">${svgIcon('folder')} ${escapeHtml(folder.name)}</span>`;
+        const ops = document.createElement('span');
+        ops.innerHTML = '';
+        addIcon(ops, 'edit', 'リネーム', () => renameFolder(folder));
+        addIcon(ops, 'add', 'サブフォルダ作成', () => createFolder(folder.uuid));
+        addIcon(ops, 'delete', 'フォルダ削除', () => deleteFolder(folder));
+        row.appendChild(ops);
+        container.appendChild(row);
+        const child = document.createElement('div');
+        child.className = 'indent';
+        container.appendChild(child);
+        renderLevel(folder.uuid, child);
+      });
+    railGroups.filter(rg => (rg.folderUuid || null) === parentUuid)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .forEach(rg => container.appendChild(rgRow(rg)));
+  };
+  renderLevel(null, tree);
+}
+function rgRow(rg){
+  const row = document.createElement('div');
+  row.className = 'rg-row' + (rg.uuid === activeUUID ? ' active' : '');
+  row.innerHTML = `<span>${escapeHtml(rg.name)}<span class="rg-count">${rg.railPosList.length}</span></span>`;
+  row.onclick = () => { setActive(rg.uuid); };
+  return row;
+}
+function addIcon(parent, icon, title, onclick){
+  const b = document.createElement('button');
+  b.className = 'icon-btn'; b.innerHTML = svgIcon(icon); b.title = title;
+  b.onclick = e => { e.stopPropagation(); onclick(); };
+  parent.appendChild(b);
+}
+function escapeHtml(s){ return (s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function setActive(uuid){
+  activeUUID = uuid;
+  const rg = railGroups.find(r => r.uuid === uuid);
+  edit = rg ? JSON.parse(JSON.stringify(rg)) : null;
+  hoveringRail = null;
+  renderTree(); renderDetail(); renderRails();
+}
+
+//---------------- Detail (RailGroupDetailComponent 相当) ----------------
+function renderDetail(){
+  const root = document.getElementById('detail');
+  root.textContent = '';
+  if (!edit) return;
+  const rg = edit;
+
+  //Name
+  root.appendChild(labeled('Name', textInput(rg.name, v => rg.name = v)));
+
+  //UUID (コピー)
+  const uuidBox = document.createElement('div');
+  uuidBox.className = 'box';
+  uuidBox.innerHTML = `<span class="uuid">${rg.uuid}</span>`;
+  addIcon(uuidBox, 'copy', 'UUIDをコピー', () => navigator.clipboard.writeText(rg.uuid));
+  root.appendChild(uuidBox);
+
+  //Folder
+  const folderSel = document.createElement('select');
+  folderSel.appendChild(new Option('(なし)', ''));
+  folders.forEach(f => folderSel.appendChild(new Option(f.name, f.uuid)));
+  folderSel.value = rg.folderUuid || '';
+  folderSel.onchange = () => rg.folderUuid = folderSel.value || null;
+  root.appendChild(labeled('Folder', folderSel));
+
+  //Rails (地図で選択して Add — 本家 BoxRailList)
+  root.appendChild(listBox('Rails', rg.railPosList, {
+    add: { label: 'Add', onclick: () => {
+      for (const key of selectedRails){
+        const [x, y, z] = key.split(',').map(Number);
+        if (!rg.railPosList.some(p => posKey(p) === key)) rg.railPosList.push({x, y, z});
+      }
+      renderDetail(); renderRails();
+    }},
+    render: (pos, row) => {
+      row.textContent = `${pos.x}, ${pos.y}, ${pos.z}`;
+      row.onmouseenter = () => { hoveringRail = posKey(pos); renderRails(); };
+      row.onmouseleave = () => { hoveringRail = null; renderRails(); };
+    },
+    onChange: () => { renderRails(); }
+  }));
+
+  //RedStone Pos (key 付き — 本家 BoxPosIntWithKeyList)
+  root.appendChild(posListBox('RedStone Pos', rg.rsPosList, true));
+
+  //Display Pos (信号機の位置 — 本家 BoxPosIntList)
+  root.appendChild(posListBox('Display Pos', rg.displayPosList, false));
+
+  //Next RailGroup (本家 BoxRailGroupList)
+  const nextBox = document.createElement('div');
+  nextBox.className = 'box';
+  nextBox.innerHTML = `<div class="box-head">Next RailGroup</div>`;
+  const nextPaper = document.createElement('div');
+  nextPaper.className = 'paper';
+  rg.nextRailGroupList.forEach((uuid, i) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const input = textInput(uuid, v => rg.nextRailGroupList[i] = v);
+    input.className = 'key';
+    row.appendChild(input);
+    addIcon(row, 'delete', '削除', () => { rg.nextRailGroupList.splice(i, 1); renderDetail(); });
+    nextPaper.appendChild(row);
+  });
+  nextBox.appendChild(nextPaper);
+  const addNext = document.createElement('button');
+  addNext.className = 'btn outlined'; addNext.textContent = 'Add';
+  addNext.style.marginTop = '4px';
+  addNext.onclick = () => { rg.nextRailGroupList.push(''); renderDetail(); };
+  nextBox.appendChild(addNext);
+  root.appendChild(nextBox);
+
+  //Switch Settings (本家 BoxSwitchSettingList)
+  const swBox = document.createElement('div');
+  swBox.className = 'box';
+  swBox.innerHTML = `<div class="box-head">転てつ設定 (Switch Settings)</div>`;
+  rg.switchSettings.forEach((setting, si) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.appendChild(labeled('Name', textInput(setting.name, v => setting.name = v)));
+    card.appendChild(posRows('Switch RS Pos', setting.switchRsPos, false));
+    //settingMap: key → boolean
+    const mapDiv = document.createElement('div');
+    mapDiv.innerHTML = `<label class="small">Setting Map (key → 転てつ方向)</label>`;
+    setting.settingMap.forEach((entry, ei) => {
+      const row = document.createElement('div');
+      row.className = 'row';
+      const keyInput = textInput(entry.key, v => entry.key = v);
+      keyInput.className = 'key';
+      row.appendChild(keyInput);
+      const check = document.createElement('input');
+      check.type = 'checkbox'; check.checked = !!entry.value;
+      check.onchange = () => entry.value = check.checked;
+      row.appendChild(check);
+      addIcon(row, 'delete', '削除', () => { setting.settingMap.splice(ei, 1); renderDetail(); });
+      mapDiv.appendChild(row);
+    });
+    const addEntry = document.createElement('button');
+    addEntry.className = 'btn outlined'; addEntry.textContent = '+ entry';
+    addEntry.onclick = () => { setting.settingMap.push({key:'', value:false}); renderDetail(); };
+    mapDiv.appendChild(addEntry);
+    card.appendChild(mapDiv);
+    const delSetting = document.createElement('button');
+    delSetting.className = 'btn outlined'; delSetting.textContent = '設定を削除';
+    delSetting.style.marginTop = '4px';
+    delSetting.onclick = () => { rg.switchSettings.splice(si, 1); renderDetail(); };
+    card.appendChild(delSetting);
+    swBox.appendChild(card);
+  });
+  const addSetting = document.createElement('button');
+  addSetting.className = 'btn outlined'; addSetting.textContent = 'Add Setting';
+  addSetting.onclick = () => { rg.switchSettings.push({name:'Default Name', switchRsPos:[], settingMap:[]}); renderDetail(); };
+  swBox.appendChild(addSetting);
+  root.appendChild(swBox);
+
+  //保存 / 削除
+  const actions = document.createElement('div');
+  actions.style.cssText = 'display:flex;justify-content:space-between;margin-top:8px';
+  const save = document.createElement('button');
+  save.className = 'btn'; save.textContent = '保存';
+  save.onclick = async () => {
+    save.disabled = true;
+    await fetch(`/api/railgroups/${rg.uuid}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(rg)});
+    await loadRailGroups();
+    setActive(rg.uuid);
+  };
+  const del = document.createElement('button');
+  del.className = 'btn danger'; del.textContent = '削除';
+  del.onclick = async () => {
+    if (!confirm(`RailGroup: ${rg.name} を削除しますか？`)) return;
+    await fetch(`/api/railgroups/${rg.uuid}`, {method:'DELETE'});
+    activeUUID = null; edit = null;
+    await loadRailGroups();
+    renderTree(); renderDetail(); renderRails();
+  };
+  actions.appendChild(save); actions.appendChild(del);
+  root.appendChild(actions);
+}
+
+function labeled(label, el){
+  const div = document.createElement('div');
+  div.className = 'box';
+  div.innerHTML = `<label class="small">${label}</label>`;
+  div.appendChild(el);
+  return div;
+}
+function textInput(value, onchange){
+  const input = document.createElement('input');
+  input.type = 'text'; input.value = value ?? ''; input.style.width = '100%';
+  input.oninput = () => onchange(input.value);
+  return input;
+}
+function listBox(title, list, opts){
+  const box = document.createElement('div');
+  box.className = 'box';
+  const head = document.createElement('div');
+  head.className = 'box-head';
+  head.textContent = title;
+  if (opts.add){
+    const b = document.createElement('button');
+    b.className = 'btn outlined'; b.textContent = opts.add.label;
+    b.onclick = opts.add.onclick;
+    head.appendChild(b);
+  }
+  box.appendChild(head);
+  const paper = document.createElement('div');
+  paper.className = 'paper';
+  list.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    const span = document.createElement('span');
+    span.style.flex = '1';
+    opts.render(item, span);
+    row.appendChild(span);
+    addIcon(row, 'delete', '削除', () => { list.splice(i, 1); renderDetail(); if (opts.onChange) opts.onChange(); });
+    paper.appendChild(row);
+  });
+  box.appendChild(paper);
+  return box;
+}
+//x,y,z(,key) の編集可能リスト
+function posListBox(title, list, withKey){
+  const box = document.createElement('div');
+  box.className = 'box';
+  box.innerHTML = `<div class="box-head">${title}</div>`;
+  box.appendChild(posRows(null, list, withKey));
+  return box;
+}
+function posRows(label, list, withKey){
+  const div = document.createElement('div');
+  if (label) div.innerHTML = `<label class="small">${label}</label>`;
+  const paper = document.createElement('div');
+  paper.className = 'paper';
+  list.forEach((pos, i) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    for (const axis of ['x','y','z']){
+      const input = document.createElement('input');
+      input.type = 'number'; input.value = pos[axis] ?? 0; input.placeholder = axis;
+      input.oninput = () => pos[axis] = parseInt(input.value) || 0;
+      row.appendChild(input);
+    }
+    if (withKey){
+      const key = document.createElement('input');
+      key.type = 'text'; key.className = 'key'; key.placeholder = 'key (省略可)';
+      key.value = pos.key ?? '';
+      key.oninput = () => pos.key = key.value;
+      row.appendChild(key);
+    }
+    addIcon(row, 'delete', '削除', () => { list.splice(i, 1); renderDetail(); });
+    paper.appendChild(row);
+  });
+  div.appendChild(paper);
+  const add = document.createElement('button');
+  add.className = 'btn outlined'; add.textContent = 'Add';
+  add.style.marginTop = '4px';
+  add.onclick = () => { list.push(withKey ? {x:0,y:0,z:0,key:''} : {x:0,y:0,z:0}); renderDetail(); };
+  div.appendChild(add);
+  return div;
+}
+
+//---------------- API ----------------
+async function createRailGroup(){
+  const rg = await (await fetch('/api/railgroups', {method:'POST'})).json();
+  await loadRailGroups();
+  setActive(rg.uuid);
+}
+async function createFolder(parentUuid){
+  const folder = await (await fetch('/api/railgroups/folders', {method:'POST'})).json();
+  if (parentUuid){
+    folder.parentUuid = parentUuid;
+    await fetch(`/api/railgroups/folders/${folder.uuid}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(folder)});
+  }
+  await loadFolders();
+  renderTree();
+}
+async function renameFolder(folder){
+  const name = prompt('フォルダ名', folder.name);
+  if (name == null || name === folder.name) return;
+  folder.name = name;
+  await fetch(`/api/railgroups/folders/${folder.uuid}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(folder)});
+  await loadFolders();
+  renderTree();
+}
+async function deleteFolder(folder){
+  if (!confirm(`フォルダ: ${folder.name} を削除しますか？ (中身は親フォルダへ移動)`)) return;
+  await fetch(`/api/railgroups/folders/${folder.uuid}`, {method:'DELETE'});
+  await Promise.all([loadFolders(), loadRailGroups()]);
+  renderTree();
+}
+async function loadRailGroups(){ railGroups = await (await fetch('/api/railgroups')).json(); }
+async function loadFolders(){ folders = await (await fetch('/api/railgroups/folders')).json(); }
+
+(async function init(){
+  const [rails, signals, waypoints] = await Promise.all([
+    fetch('/api/rails').then(r => r.json()),
+    fetch('/api/signals').then(r => r.json()).catch(() => []),
+    fetch('/api/waypoints').then(r => r.json()).catch(() => []),
+    loadRailGroups(), loadFolders()
+  ]);
+  railList = rails; signalList = signals; waypointList = waypoints;
+  //初期表示: レール全体が入るよう中心へ
+  if (railList.length){
+    const xs = railList.map(r => r.pos.x), zs = railList.map(r => r.pos.z);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+    const rect = svg.getBoundingClientRect();
+    tx = rect.width / 2 - cx; ty = rect.height / 2 - cz;
+    applyTransform();
+  }
+  renderRails(); renderSignals(); renderTree(); renderDetail();
+  //在線状態は 3 秒ごとに更新 (レール色)
+  setInterval(async () => {
+    try {
+      railList = await (await fetch('/api/rails')).json();
+      renderRails();
+    } catch (e) {}
+  }, 3000);
+})();
+</script>
+</body>
+</html>

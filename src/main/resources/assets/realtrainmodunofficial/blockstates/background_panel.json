@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "realtrainmodunofficial:block/invisible" },
+    "facing=south": { "model": "realtrainmodunofficial:block/invisible" },
+    "facing=east": { "model": "realtrainmodunofficial:block/invisible" },
+    "facing=west": { "model": "realtrainmodunofficial:block/invisible" }
+  }
+}

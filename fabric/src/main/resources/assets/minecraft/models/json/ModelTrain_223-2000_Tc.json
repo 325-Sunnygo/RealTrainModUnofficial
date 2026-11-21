@@ -1,0 +1,124 @@
+{
+	"trainName": "223-2000_Tc",
+	"trainType": "EC",
+
+	"trainModel2": {
+		"modelFile": "223.mqoz",
+		"textures": [["default", "textures/train/223/223.png", "AlphaBlend, Light, OneTex"]],
+		"rendererPath": "scripts/Render223.js"
+	},
+	"bogieModel2": {
+		"modelFile": "wdt59.mqoz",
+		"textures": [["default", "textures/train/223/wdt59.png"]]
+	},
+
+	"buttonTexture": "textures/train/223/button_223-2000_Tc.png",
+	"rollsignNames": [
+		"新快速", "快速", "普通", "空き", "空き", "空き", 
+		"空き", "空き", "団体", "臨時", "試運転", "回送"
+	],
+	"serverScriptPath": "scripts/server/223.js",
+
+	"sound_Horn": "rtm:sounds/train/rtm_223mh.ogg",
+	"sound_BrakeRelease": "rtm:sounds/train/rtm_223_release.ogg",
+	"sound_BrakeRelease2": "rtm:sounds/train/brakeR_w.ogg",
+	"sound_Announcement": [["関空快速", "rtm:sounds/train/rtm_223_kankuRapid.ogg"], ["Test", "hoge:sounds/train/test.ogg"]],
+	"soundScriptPath": "scripts/sound_223.js",
+
+  "headLights": [
+    {
+      "type": 0,
+      "color": 16773328,
+      "pos": [0.925, 0.35, 10.13],
+      "r": 0.75
+    },
+	{
+      "type": 0,
+      "color": 16773328,
+      "pos": [-0.925, 0.35, 10.13],
+      "r": 0.75
+    },
+	{
+      "type": 1,
+      "color": 16773328,
+      "pos": [0.925, 0.35, 10.1],
+      "r": 1.25
+    },
+    {
+      "type": 1,
+      "color": 16773328,
+      "pos": [-0.925, 0.35, 10.1],
+      "r": 1.25
+    },
+    {
+      "type": 0,
+      "color": 15790208,
+      "pos": [0.675, 0.35, 10.13],
+      "r": 0.7
+    },
+    {
+      "type": 0,
+      "color": 15790208,
+      "pos": [-0.675, 0.35, 10.13],
+      "r": 0.7
+    }
+  ],
+
+  "tailLights": [
+    {
+      "type": 0,
+      "color": 16711760,
+      "pos": [0.8, 0.2, 10.03],
+      "r": 0.5
+    },
+    {
+      "type": 0,
+      "color": 16711760,
+      "pos": [-0.8, 0.2, 10.03],
+      "r": 0.5
+    }
+  ],
+
+	"interiorLights": [
+		{
+			"pos": [0.0, 2.5, 9.0]
+		},
+		{
+			"pos": [0.0, 2.5, -9.0]
+		}
+	],
+
+	"seatPosF": [
+		[0.825, 0.05, 4.675, 2], [0.825, 0.05, 3.825, 2], [0.825, 0.05, 2.975, 2], [0.825, 0.05, 2.125, 2], 
+		[0.825, 0.05, -4.675, 2], [0.825, 0.05, -3.825, 2], [0.825, 0.05, -2.975, 2], [0.825, 0.05, -2.125, 2], 
+		[0.825, 0.05, -8.925, 2], 
+		[-0.825, 0.05, 4.675, 2], [-0.825, 0.05, 3.825, 2], [-0.825, 0.05, 2.975, 2], [-0.825, 0.05, 2.125, 2], 
+		[-0.825, 0.05, -4.675, 2], [-0.825, 0.05, -3.825, 2], [-0.825, 0.05, -2.975, 2], [-0.825, 0.05, -2.125, 2], 
+		[-0.825, 0.05, -8.925, 2]
+	],
+
+	"trainDistance": 10.25,
+	"playerPos": [[0.8, 0.0, 8.975], [-0.8, 0.0, -8.975]],
+	"bogiePos": [[0.0, 0.0, 6.6], [0.0, 0.0, -6.6]],
+	"pantoPos": [[0.0, 6.8, 0.0, 0.0], [0.0, -6.8, 4.0, 5.0]],
+	"maxSpeed": [0.40, 0.84, 1.08, 1.39, 1.67],
+	"rolling": 0.4,
+	"smoothing": true,
+	"doCulling": true,
+	"rollSpeedCoefficient":0.125,
+	"rollVariationCoefficient":0.51,
+	"rollWidthCoefficient":1.0,
+	"tags": "ngt5479 223 JRW",
+	"customButtons": [
+		["敦賀", "近江塩津", "長浜", "米原", "野洲", "京都", "大阪", "西明石", "加古川", "姫路", "網干", "播州赤穂"],
+		["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]
+	],
+	"collisionParts": [
+		"roof", "aircon", "floor", "uf_unit", "side_door", "side_win2", "side_win_b", "window", "back", "tdoor_b", "cover_b", "cover2_b",
+		"roof_f", "floor_f", "ctrl", "head_door",
+		"head_223-2000", "head_door_223-2000", "window_h_223-2000",
+		"side_door_223", "side_win_223",
+		"door_bl", "door_br", "door_fl", "door_fr",
+		"door_bl_223", "door_br_223", "door_fl_223", "door_fr_223"
+	]
+}

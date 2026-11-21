@@ -1,0 +1,19 @@
+{
+	"name": "clutch",
+	"model": {
+		"modelFile": "clutch.mqoz",
+		"textures": [["default", "textures/mechanism/clutch.png", ""]],
+		"rendererPath": "scripts/RenderClutch.js"
+	},
+	"buttonTexture": "textures/mechanism/button_clutch.png",
+	"type": "TRANSMISSION",
+	"transmissionRatioON": [0.0, 0.0, 0.0, 0.0, 0.0],
+	"transmissionRatioOFF": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"maxSpeed": 10000.0,
+	"acceleration": 0.0,
+	"radius": 0.0,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479"
+}

@@ -1,0 +1,39 @@
+{
+  "firearmName": "18MRL",
+  "model": {
+      "modelFile": "18MRL.mqo",
+      "textures": [["default", "rtm:textures/200mm_rocket.png", ""]],
+      "rendererPath": "scripts/Render18MRL.js"
+  },
+  "buttonTexture": "textures/firearm/button_18MRL.png",
+  "modelPartsN": {
+    "objects": [],
+    "pos": [0.0, 0.0, 0.0]
+  },
+  "modelPartsY": {
+    "objects": [],
+    "pos": [0.0, 0.0, 0.0]
+  },
+  "modelPartsX": {
+    "objects": [],
+    "pos": [0.0, 0.6, -1.15]
+  },
+  "modelPartsBarrel": {
+    "objects": [],
+    "pos": [0.0, 1.55, 0.0]
+  },
+  "muzzlePos": [0.0, 1.55, 1.55],
+  "playerPos": [0.0, 1.0, -1.15],
+  "yaw": [180.0, -180.0],
+  "pitch": [90.0, 0.0],
+  "rotationSpeedY": 1.0,
+  "rotationSpeedX": 1.0,
+  "recoil": 0.8,
+  "ammoType": 6,
+  "rateOfFire": 20,
+  "magazineSize": 18,
+  "fpvMode": true,
+  "smoothing": true,
+  "doCulling": true,
+  "tags": "ngt5479"
+}

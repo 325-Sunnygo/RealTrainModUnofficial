@@ -1,0 +1,725 @@
+package jp.ngt.rtm.entity.train;
+
+import jp.ngt.ngtlib.math.NGTMath;
+import jp.ngt.rtm.entity.train.util.BogieController;
+import jp.ngt.rtm.modelpack.cfg.TrainConfig;
+import jp.ngt.rtm.rail.TileEntityLargeRailBase;
+import jp.ngt.rtm.rail.TileEntityLargeRailCore;
+import jp.ngt.rtm.rail.TileEntityLargeRailSwitchCore;
+import jp.ngt.rtm.rail.util.RailMap;
+import jp.ngt.ngtlib.math.Vec3;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.util.Mth;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+
+import java.util.List;
+import java.util.UUID;
+
+/** 本家 jp.ngt.rtm.entity.train.EntityBogie (KaizPatch… */
+public class EntityBogie extends Entity {
+    /** ベジェ曲線の分割精度(1m当たり) */
+    private static final int SPLITS_PER_METER = 360;
+
+    private static final EntityDataAccessor<Integer> DATA_TRAIN_ID =
+            SynchedEntityData.defineId(EntityBogie.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Byte> DATA_IS_FRONT =
+            SynchedEntityData.defineId(EntityBogie.class, EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Byte> DATA_BOGIE_ID =
+            SynchedEntityData.defineId(EntityBogie.class, EntityDataSerializers.BYTE);
+
+    private EntityTrainBase parentTrain;
+    /** 連結可能かどうか */
+    public boolean isActivated = false;
+    /** 走る向き（≠ rotationYaw） */
+    public float movingYaw;
+    private UUID unloadedTrain;
+
+    private TileEntityLargeRailCore currentRailObj;
+    private RailMap currentRailMap;
+    /** {x, y, z} */
+    private final double[] posBuf = new double[3];
+    /** {yaw, pitch, yaw2, cant} */
+    private final float[] rotationBuf = new float[4];
+    private int split = -1;
+    private int prevPosIndex;
+    private float jointDelay;
+    /** 何本目の継ぎ目か (jointDelay 配列のインデックス)。レール変更で 0 に戻る。 */
+    private int jointIndex;
+    /** 今いるレールが反響音指定か (トンネル/高架下)。 */
+    private boolean reverbSound;
+
+    public float rotationRoll;
+    public float prevRotationRoll;
+
+    // パックスクリプト互換 (1.7.10 SRG フィールド、tick 毎更新)
+    public float field_70177_z;
+    public float field_70125_A;
+    public int field_70173_aa;
+
+    // クライアント補間
+    private int carPosRotationInc;
+    private float carYaw, carPitch, carRoll;
+
+    public EntityBogie(EntityType<?> type, Level level) {
+        super(type, level);
+        this.noPhysics = true;
+        // 本家 EntityBogie:89 this.ignoreFrustumCheck = true;
+        this.noCulling = true;
+    }
+
+    public EntityBogie(EntityType<?> type, Level level, byte id) {
+        this(type, level);
+        this.setBogieId(id);
+    }
+
+    @Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        builder.define(DATA_TRAIN_ID, 0);
+        builder.define(DATA_IS_FRONT, (byte) 0);
+        builder.define(DATA_BOGIE_ID, (byte) 0);
+    }
+
+    @Override
+    protected void addAdditionalSaveData(CompoundTag nbt) {
+        nbt.putBoolean("isFront", this.isFront());
+        nbt.putByte("bogieId", this.getBogieId());
+        if (this.getTrain() != null) {
+            UUID uuid = this.getTrain().getUUID();
+            nbt.putLong("trainUUID_Most", uuid.getMostSignificantBits());
+            nbt.putLong("trainUUID_Least", uuid.getLeastSignificantBits());
+        }
+    }
+
+    @Override
+    protected void readAdditionalSaveData(CompoundTag nbt) {
+        this.setFront(nbt.getBoolean("isFront"));
+        this.setBogieId(nbt.getByte("bogieId"));
+        if (nbt.contains("trainUUID_Most") && nbt.contains("trainUUID_Least")) {
+            UUID uuid = new UUID(nbt.getLong("trainUUID_Most"), nbt.getLong("trainUUID_Least"));
+            if (!this.loadTrainFromUUID(uuid)) {
+                this.unloadedTrain = uuid;
+            }
+        }
+    }
+
+    private boolean loadTrainFromUUID(UUID uuid) {
+        if (this.level() instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            Entity entity = serverLevel.getEntity(uuid);
+            if (entity instanceof EntityTrainBase train) {
+                this.setTrain(train);
+                train.setBogie(this.getBogieId(), this);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public boolean canBeCollidedWith() {
+        return !this.isRemoved();
+    }
+
+    @Override
+    public boolean isPickable() {
+        return !this.isRemoved();
+    }
+
+    /** 当たり判定をレール面まで下げる。 本家の台車は getYOffset == 0 でレール高さそのも… */
+    @Override
+    protected AABB makeBoundingBox() {
+        return super.makeBoundingBox().move(0.0D, -EntityTrainBase.TRAIN_HEIGHT, 0.0D);
+    }
+
+    /** レールに乗っているか (currentRailMap 保持)。停車中のピッチ維持判定に使用。 */
+    public boolean hasRailMap() {
+        return this.currentRailMap != null;
+    }
+
+    /** 現在乗っているレールコア (WebCTC の RailGroup 在線判定などが使う)。 */
+    public TileEntityLargeRailCore getCurrentRailObj() {
+        return this.currentRailObj;
+    }
+
+    
+    public boolean updateBogiePos(float speed, float trainLength, EntityBogie frontBogie) {
+        if (this.updateCollision()) {
+            return false;
+        }
+
+        this.movingYaw = Mth.wrapDegrees(this.getYRot() + (this.isFront() ? 0.0F : 180.0F));
+
+        double px = this.getX() + (double) NGTMath.sin(this.movingYaw) * (double) speed;
+        double py = this.getY();
+        double pz = this.getZ() + (double) NGTMath.cos(this.movingYaw) * (double) speed;
+
+        if (!this.resetRailObj(px, py, pz)) {
+            if (this.getTrain() != null) {
+                this.getTrain().stopTrain(true);
+            }
+            return false;
+        }
+
+        RailMap rm = this.currentRailMap;
+        int pIndex = 0;
+        // 本家 KaizPatchX と同じ分岐処理。
+        // frontBogie が無いときだけ周囲探索、prevPosIndex==-1 のときは全体最近点、
+        // それ以外は前回位置の近傍で台車間距離が一致する点を探す。
+        if (frontBogie == null) {
+            pIndex = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findNearestPointAround(rm,this.split,this.prevPosIndex,px,pz,speed);
+        } else if (this.prevPosIndex == -1) {
+            pIndex = rm.getNearlestPoint(this.split, px, pz);
+        } else {
+            // 移動範囲を制限して、「台車からの距離は同じでも位置は真逆」な点の検出を防ぐ
+            int indexInc = (int) ((Math.abs(speed) + 0.25F) * (float) SPLITS_PER_METER);
+            int indexMin = Math.max(this.prevPosIndex - indexInc, 0);
+            int indexMax = Math.min(this.prevPosIndex + indexInc, this.split);
+            pIndex=jp.ngt.rtm.entity.train.util.LegacyBogieSearch.trailingIndex(
+                rm,this.split,indexMin,indexMax,py,frontBogie.getPosBuf(),trainLength);
+        }
+        this.prevPosIndex = pIndex;
+
+        double[] posZX = rm.getRailPos(this.split, pIndex);
+        py = rm.getRailHeight(this.split, pIndex) + EntityTrainBase.TRAIN_HEIGHT;
+        float railYaw = Mth.wrapDegrees(rm.getRailRotation(this.split, pIndex));
+        float movYaw = fixBogieYaw(this.movingYaw, railYaw);
+        float yaw = fixBogieYaw(this.getYRot(), movYaw);
+        float pitch = fixBogiePitch(rm.getRailPitch(this.split, pIndex), railYaw, yaw);
+        float cant = rm.getCant(this.split, pIndex);
+
+        if (Math.abs(Mth.wrapDegrees(railYaw - yaw)) > 90.0F) {
+            cant *= -1.0F;
+        }
+
+        if ((this.getX() == posZX[1]) && (this.getZ() == posZX[0])) {
+            return true;// 低速時に斜めレールで走行しない問題回避
+        }
+
+        this.posBuf[0] = posZX[1];
+        this.posBuf[1] = py;
+        this.posBuf[2] = posZX[0];
+        this.rotationBuf[0] = yaw;
+        this.rotationBuf[1] = pitch;
+        this.rotationBuf[2] = movYaw;
+        this.rotationBuf[3] = cant;
+
+        if (this.jointDelay > 0.0F) {
+            this.jointDelay -= Math.abs(speed);
+            if (this.jointDelay <= 0.0F) {
+                this.playJointSound();
+            }
+        }
+
+        return true;
+    }
+
+    private static double distanceSq(double x0, double y0, double z0, double x1, double y1, double z1) {
+        double dx = x1 - x0;
+        double dy = y1 - y0;
+        double dz = z1 - z0;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    
+    /**
+     * 移動先にレールがあれば true。
+     * 本家 KaizPatchX EntityBogie.resetRailObj と同じ:
+     * - core を getRail で決める (跨ぎ済み接続コア / その場レール / 接続コア)
+     * - 分岐器では getNearestPoint(this).getActiveRailMap(level) の開通側を使う
+     * - 別ロジカルレールへの移行で接続できなければ切り替えず、true を返す
+     * - ロジカル上同じレールなら接続可否に関わらず切り替える
+     */
+    private boolean resetRailObj(double px, double py, double pz) {
+        TileEntityLargeRailCore coreObj = this.getRail(px, py, pz);
+
+        if (coreObj == null) {
+            return false;
+        }
+
+        if (this.currentRailObj != coreObj) {
+            boolean sameLogicalRail = this.currentRailObj != null
+                    && this.currentRailObj.isSameLogicalRail(coreObj);
+            RailMap previousRailMap = this.currentRailMap;
+            RailMap railMap;
+            if (coreObj instanceof TileEntityLargeRailSwitchCore switchObj) {
+                jp.ngt.rtm.rail.util.SwitchType sw = switchObj.getSwitch();
+                jp.ngt.rtm.rail.util.Point np = sw != null ? sw.getNearestPoint(this) : null;
+                railMap = np != null ? np.getActiveRailMap(level()) : null;
+            } else {
+                railMap = coreObj.getRailMap(this);
+            }
+
+            if (railMap == null) {
+                return this.currentRailMap != null;
+            }
+            if (this.currentRailMap != null && !sameLogicalRail
+                    && !this.currentRailMap.canConnect(railMap)) {
+                return true;
+            }
+
+            this.currentRailObj = coreObj;
+            this.currentRailMap = railMap;
+            this.split = (int) (this.currentRailMap.getLength() * (double) SPLITS_PER_METER);
+            this.prevPosIndex = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedEntryIndex(
+                    previousRailMap, this.currentRailMap, this.split
+            );
+            if (!sameLogicalRail) {
+                this.onChangeRail(coreObj);
+            }
+        }
+
+        return true;
+    }
+
+    /** 別レールに移動した際呼び出し */
+    protected void onChangeRail(TileEntityLargeRailCore newRail) {
+        // 新しいレールの反響音指定を引き継ぎ、継ぎ目カウントを最初から数え直す
+        this.reverbSound = newRail != null && newRail.isReberbSound();
+        this.jointIndex = 0;
+        // 継ぎ目は音だけ。車体を揺らす入力は持たない (上を参照)
+        this.playJointSound();
+    }
+
+    /** 既定のジョイント音 (パックが sound_Joint を指定しない場合)。 */
+    private static final String JOINT_SOUND = "rtm:train/joint";
+    private static final String JOINT_SOUND_REVERB = "rtm:train/joint_reverb";
+
+    /** 本家 playJointSound: レール継ぎ目の「ガタン」を鳴らし、次の継ぎ目までの距離を決め… */
+    protected void playJointSound() {
+        EntityTrainBase train = this.getTrain();
+        if (train == null) {
+            return;
+        }
+        TrainConfig cfg = train.getConfig();
+        if (cfg == null || cfg.muteJointSound || cfg.jointDelay == null) {
+            return;
+        }
+        int bogieId = this.getBogieId();
+        if (bogieId < 0 || bogieId >= cfg.jointDelay.length || cfg.jointDelay[bogieId] == null) {
+            return;
+        }
+
+        if (!this.level().isClientSide()) {
+            float maxSpeed = cfg.maxSpeed != null && cfg.maxSpeed.length > 0
+                    ? cfg.maxSpeed[cfg.maxSpeed.length - 1] : 1.8F;
+            // 速いほど高いピッチ (1.0〜1.5)
+            float pitch = maxSpeed > 0.0F
+                    ? (Math.abs(train.getSpeed()) / maxSpeed) * 0.5F + 1.0F : 1.0F;
+            String sound;
+            if (cfg.sound_Joint != null && cfg.sound_JointReverb != null) {
+                sound = this.reverbSound ? cfg.sound_JointReverb : cfg.sound_Joint;
+            } else {
+                sound = this.reverbSound ? JOINT_SOUND_REVERB : JOINT_SOUND;
+            }
+            // 継ぎ目音は離散イベント: 登録制ラッチを通さず毎回鳴らす
+            com.portofino.realtrainmodunofficial.network.TrainSoundPayload.broadcast(this,sound,1.0F,pitch,jp.ngt.rtm.RTMConfig.trainJointSoundRange);
+        }
+
+        int size = cfg.jointDelay[bogieId].length;
+        if (this.jointIndex < size - 1) {
+            int index0 = this.reverseJointArray() ? size - this.jointIndex - 1 : this.jointIndex;
+            ++this.jointIndex;
+            int index1 = this.reverseJointArray() ? size - this.jointIndex - 1 : this.jointIndex;
+            this.jointDelay = Math.abs(cfg.jointDelay[bogieId][index1] - cfg.jointDelay[bogieId][index0]);
+        }
+    }
+
+    /** 本家 reverseJointArray: 進行方向と台車位置の組み合わせで、 jointDela… */
+    protected boolean reverseJointArray() {
+        EntityTrainBase train = this.getTrain();
+        if (train == null) {
+            return false;
+        }
+        return (train.getTrainDirection() == 0) ^ (this.getBogieId() == 0);
+    }
+
+    /** 本家 setBogieSize: 台車の当たり判定サイズ。 */
+    public void setBogieSize(float width, float height) {
+        this.setBoundingBox(this.getBoundingBox().inflate(0.0D));
+        this.refreshDimensions();
+    }
+
+    /** 本家 Lockable: 施錠対象は親車両。 */
+    public Object getTarget(Object world, int x, int y, int z) {
+        return this.getTrain();
+    }
+
+    public boolean lock(Object player, String code) {
+        return true;
+    }
+
+    public boolean unlock(Object player, String code) {
+        return true;
+    }
+
+    /** 本家 getProhibitedAction: 1 = 破壊禁止。 */
+    public int getProhibitedAction() {
+        return 1;
+    }
+
+    private TileEntityLargeRailCore getRail(double px, double py, double pz) {
+        TileEntityLargeRailCore crossedRail = jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findCrossedConnectedCore(
+                this.level(),
+                this.currentRailObj,
+                this.currentRailMap,
+                this.split,
+                this.prevPosIndex,
+                this.getX(),
+                this.getZ(),
+                px,
+                pz,
+                this.movingYaw
+        );
+        if (crossedRail != null) {
+            return crossedRail;
+        }
+
+        int x = net.minecraft.util.Mth.floor(px);
+        int z = net.minecraft.util.Mth.floor(pz);
+        this.level().getChunk(x >> 4, z >> 4);
+        TileEntityLargeRailBase railObj = TileEntityLargeRailBase.getRailFromCoordinates(this.level(), px, py, pz);
+        if (railObj == null) {
+            return jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.findConnectedCore(
+                    this.level(),
+                    this.currentRailObj,
+                    this.currentRailMap,
+                    this.split,
+                    this.prevPosIndex,
+                    this.getX(),
+                    this.getZ(),
+                    px,
+                    pz,
+                    this.movingYaw
+            );
+        }
+
+        TileEntityLargeRailCore coreObj = railObj.getRailCore();
+        if (coreObj == null) {
+            return null;
+        }
+
+        return jp.kaiz.kaizpatch.rtm.rail.util.RailTransitionResolver.keepCurrentSectionCore(this.currentRailObj, coreObj);
+    }
+
+    public double[] getPosBuf() {
+        return this.posBuf;
+    }
+
+    public void moveBogie(EntityTrainBase train, double x, double y, double z, BogieController.UpdateFlag flag) {
+        this.setPos(x, y, z);
+        switch (flag) {
+            case ALL -> {
+                this.setYRot(this.rotationBuf[0]);
+                this.setXRot(this.rotationBuf[1]);
+                this.movingYaw = this.rotationBuf[2];
+                this.rotationRoll = this.rotationBuf[3];
+            }
+            case YAW -> {
+                float movYaw = fixBogieYaw(this.movingYaw, train.getYRot());
+                float yaw = fixBogieYaw(this.getYRot(), movYaw);
+                this.setYRot(yaw % 360.0F);
+                this.movingYaw = movYaw;
+            }
+            case NONE -> {
+            }
+        }
+    }
+
+    /** BogieController.updateBogies から毎 tick (本家 updateB… */
+    public void updateBogie() {
+        this.prevRotationRoll = this.rotationRoll;
+        this.xo = this.getX();
+        this.yo = this.getY();
+        this.zo = this.getZ();
+
+        if (this.level().isClientSide) {
+            this.updatePosAndRotationClient();
+        }
+    }
+
+    protected void updatePosAndRotationClient() {
+        // ★ここに遅延バッファを入れてはいけない。 バニラは移動パケットに回転が無いとき lerpTo へ…
+        if (this.carPosRotationInc > 0) {
+            float d0 = 1.0F / (float) this.carPosRotationInc;
+            this.setYRot(this.getYRot() + Mth.wrapDegrees(this.carYaw - this.getYRot()) * d0);
+            this.setXRot(this.getXRot() + (this.carPitch - this.getXRot()) * d0);
+            this.rotationRoll += (this.carRoll - this.rotationRoll) * d0;
+            --this.carPosRotationInc;
+        }
+        EntityTrainBase train = this.getTrain();
+        if (train != null) {
+            TrainConfig cfg = train.getConfig();
+            if (cfg != null) {
+                // Clientでの台車エンティティ位置は車両位置から (弦 = 車体位置 + bogiePos を直…
+                float[][] pos = cfg.getBogiePos();
+                int bogieIndex = this.getBogieId();
+                Vec3 v31 = new Vec3(pos[bogieIndex][0], pos[bogieIndex][1], pos[bogieIndex][2]);
+                v31 = v31.rotateAroundX(train.getXRot());
+                v31 = v31.rotateAroundY(train.getYRot());
+                this.setPos(train.getX() + v31.getX(), train.getY() + v31.getY(), train.getZ() + v31.getZ());
+            }
+        }
+    }
+
+    @Override
+    public void tick() {
+        this.checkUnloadTrain();
+
+        if (!this.level().isClientSide) {
+            if (this.currentRailObj != null) {
+                this.currentRailObj.colliding = true;
+            } else {
+                this.resetRailObj(this.getX(), this.getY(), this.getZ());
+            }
+        }
+
+        // パックスクリプト互換 SRG フィールドの更新
+        this.field_70177_z = this.getYRot();
+        this.field_70125_A = this.getXRot();
+        this.field_70173_aa = this.tickCount;
+    }
+
+    /** getBrightnessForRender 互換 (スクリプト用) */
+    public int func_70070_b() {
+        net.minecraft.core.BlockPos pos = net.minecraft.core.BlockPos.containing(this.getX(), this.getY() + 0.5D, this.getZ());
+        return net.minecraft.client.renderer.LevelRenderer.getLightColor(this.level(), pos);
+    }
+
+    public int func_70070_b(float partialTick) {
+        return this.func_70070_b();
+    }
+
+    private void checkUnloadTrain() {
+        if (this.unloadedTrain != null && !this.level().isClientSide) {
+            if (this.loadTrainFromUUID(this.unloadedTrain)) {
+                this.unloadedTrain = null;
+            }
+        }
+    }
+
+    @Override
+    public boolean hurt(DamageSource source, float amount) {
+        if (this.getTrain() == null || this.getTrain().isRemoved()) {
+            if (!this.level().isClientSide) {
+                this.discard();
+            }
+            return true;
+        }
+        return this.getTrain().hurt(source, amount);
+    }
+
+    
+    private boolean updateCollision() {
+        double dis = this.getBbWidth() * 2.0F;
+        List<Entity> list = this.level().getEntities(this,
+                new AABB(this.getX() - dis, this.getY() - EntityTrainBase.TRAIN_HEIGHT, this.getZ() - dis,
+                        this.getX() + dis, this.getY() + EntityTrainBase.TRAIN_HEIGHT, this.getZ() + dis));
+        this.collideWithBumpingPost();
+        return this.collideWithEntities(list);
+    }
+
+    /** 本家 EntityBogie.collideWithBumpingPost の移植。 */
+    private void collideWithBumpingPost() {
+        EntityTrainBase train = this.getTrain();
+        // 本家: 先頭台車のときだけ判定する。動いていない列車は調べる必要が無い。
+        if (train == null || train.getTrainDirection() != this.getBogieId() || train.getSpeed() == 0.0F) {
+            return;
+        }
+        final double range = 1.75D;
+        final double rangeSq = range * range;
+        final int r = Mth.ceil(range);
+        net.minecraft.core.BlockPos center = this.blockPosition();
+        for (int dx = -r; dx <= r; ++dx) {
+            for (int dy = -1; dy <= 2; ++dy) {
+                for (int dz = -r; dz <= r; ++dz) {
+                    net.minecraft.core.BlockPos pos = center.offset(dx, dy, dz);
+                    if (!(this.level().getBlockEntity(pos)
+                            instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be)
+                            || be.getCategory()
+                                != com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory.BUMPING_POST) {
+                        continue;
+                    }
+                    // 車止めはレールに吸着して置かれる。実際の位置はブロックの (x+0.5, y, z+0.5) にレ…
+                    net.minecraft.world.phys.Vec3 offset = be.getRenderOffset();
+                    double px = pos.getX() + 0.5D + offset.x;
+                    double py = pos.getY() + offset.y;
+                    double pz = pos.getZ() + 0.5D + offset.z;
+                    if (this.distanceToSqr(px, py, pz) <= rangeSq) {
+                        train.stopTrain(true);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean collideWithEntities(List<Entity> list) {
+        EntityBogie nearestBogie = null;
+        double distanceSq = Double.MAX_VALUE;
+
+        for (Entity entity : list) {
+            if (entity instanceof EntityBogie bogie) {
+                if (this.collideWithBogie(bogie)) {
+                    double d0 = this.distanceToSqr(entity);
+                    if (d0 < distanceSq) {
+                        nearestBogie = bogie;
+                        distanceSq = d0;
+                    }
+                }
+            } else if (entity instanceof LivingEntity living) {
+                this.collideWithLiving(living);
+            }
+        }
+
+        if (nearestBogie != null) {
+            this.connectBogie(nearestBogie);
+            return true;
+        }
+
+        return false;
+    }
+
+    
+    private boolean collideWithBogie(EntityBogie bogie) {
+        EntityTrainBase train = this.getTrain();
+        EntityTrainBase train2 = bogie.getTrain();
+
+        if (train != null && train2 != null && !train.equals(train2)) {
+            // 連結してるのは無視
+            if (train.getFormation() != null && train.getFormation().containBogie(bogie)) {
+                return false;
+            }
+
+            // 範囲外
+            if (!train.inConnectableRange(train2)) {
+                return false;
+            }
+
+            // 違う線路上なら無視
+            RailMap rm0 = TileEntityLargeRailBase.getRailMapFromCoordinates(this.level(), this, this.getX(), this.getY(), this.getZ());
+            RailMap rm1 = TileEntityLargeRailBase.getRailMapFromCoordinates(this.level(), bogie, bogie.getX(), bogie.getY(), bogie.getZ());
+            if (!(rm0 != null && rm0.canConnect(rm1))) {
+                return false;
+            }
+
+            // 連結可能
+            if (this.isActivated || bogie.isActivated) {
+                return true;
+            }
+
+            // 衝突処理 (弾性)
+            float speed0 = train.getSpeed();
+            float speed1 = train2.getSpeed();
+            boolean b0 = train.getTrainDirection() == this.getBogieId();
+            boolean b1 = train2.getTrainDirection() == bogie.getBogieId();
+
+            float sp0 = b0 ? speed0 : -speed0;
+            float sp1 = b1 ? -speed1 : speed1;
+            if (sp0 - sp1 >= 0.0F) {
+                train2.setSpeed(b0 ^ b1 ? speed0 : -speed0);
+                train.setSpeed(b0 ^ b1 ? speed1 : -speed1);
+            }
+        }
+
+        return false;
+    }
+
+    private void connectBogie(EntityBogie bogie) {
+        if (this.getTrain() != null) {
+            this.getTrain().connectTrain(this, bogie);
+        }
+        this.isActivated = false;
+        bogie.isActivated = false;
+    }
+
+    private void collideWithLiving(LivingEntity entity) {
+        EntityTrainBase train = this.getTrain();
+        if (train == null) {
+            return;
+        }
+        if (!entity.equals(train.getControllingPassenger()) && !entity.isPassenger()) {
+            float speed = train.getSpeed();
+            double dis = NGTMath.pow((this.getBbWidth() / 2.0F) + 0.375F, 2);
+
+            if (speed > 0.0F && this.distanceToSqr(entity) < dis) {
+                double d2 = entity.getX() - this.getX();
+                double d3 = entity.getZ() - this.getZ();
+                double d4 = (d2 * d2 + d3 * d3);
+                entity.push(d2 / d4 * 10.0D, 0.3D, d3 / d4 * 10.0D);
+                float damage = speed * 7.2F;
+                entity.hurt(this.damageSources().mobAttack(null), damage);
+            }
+        }
+    }
+
+    @Override
+    public void lerpTo(double x, double y, double z, float yaw, float pitch, int steps) {
+        this.carPosRotationInc = steps;
+        this.carYaw = yaw;
+        this.carPitch = pitch;
+    }
+
+    public void setRoll(float par1) {
+        this.carRoll = par1;
+    }
+
+    @Override
+    public net.minecraft.world.InteractionResult interact(Player player, net.minecraft.world.InteractionHand hand) {
+        if (this.getTrain() != null) {
+            return player.isShiftKeyDown()
+                    ? this.getTrain().interact(player, hand)
+                    : this.getTrain().interactTrain(this, player);
+        }
+        return net.minecraft.world.InteractionResult.SUCCESS;
+    }
+
+    public void setTrain(EntityTrainBase train) {
+        this.entityData.set(DATA_TRAIN_ID, train.getId());
+        this.parentTrain = train;
+    }
+
+    public EntityTrainBase getTrain() {
+        if (this.parentTrain == null || this.parentTrain.isRemoved()) {
+            Entity entity = this.level().getEntity(this.entityData.get(DATA_TRAIN_ID));
+            if (entity instanceof EntityTrainBase train) {
+                this.parentTrain = train;
+            }
+        }
+        return this.parentTrain;
+    }
+
+    public void setFront(boolean par1) {
+        this.entityData.set(DATA_IS_FRONT, par1 ? (byte) 1 : (byte) 0);
+    }
+
+    public boolean isFront() {
+        return this.entityData.get(DATA_IS_FRONT) == 1;
+    }
+
+    public byte getBogieId() {
+        return this.entityData.get(DATA_BOGIE_ID);
+    }
+
+    public void setBogieId(byte par1) {
+        this.entityData.set(DATA_BOGIE_ID, par1);
+    }
+
+    
+    public static float fixBogieYaw(float yaw1, float yaw2) {
+        float f0 = Math.abs(yaw1 - yaw2);
+        f0 = f0 > 180.0F ? 360.0F - f0 : f0;
+        return Mth.wrapDegrees(f0 > 90.0F ? yaw2 + 180.0F : yaw2);
+    }
+
+    public static float fixBogiePitch(float railPitch, float railYaw, float bogieYaw) {
+        return Mth.wrapDegrees(Math.abs(bogieYaw - railYaw) > 45.0F ? -railPitch : railPitch);
+    }
+}

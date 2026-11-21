@@ -1,0 +1,600 @@
+package jp.ngt.rtm.render;
+
+import jp.ngt.ngtlib.io.ScriptUtil;
+import jp.ngt.ngtlib.math.NGTMath;
+import jp.ngt.ngtlib.renderer.GLRecorder;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+
+import javax.script.ScriptEngine;
+
+/** 本家 jp.ngt.rtm.render.PartsRenderer の段階的移植 (レールスクリ… */
+public class PartsRenderer implements com.portofino.realtrainmodunofficial.client.ActionPartsHost {
+    public static java.util.Calendar CALENDAR = java.util.Calendar.getInstance();
+
+    // スクリプトが時刻系API (getTick/getSystemTime/getMCTime等) を…
+    private static boolean timeAccessed;
+
+    /** 時刻系APIが呼ばれたら立てる。 ★public。 */
+    public static void markTimeAccessed() {
+        timeAccessed = true;
+    }
+
+    /** 1回ぶんの描画前に呼んで検知フラグを倒す。 */
+    public static void clearTimeAccessed() {
+        timeAccessed = false;
+    }
+
+    /** 直前の描画中に時刻系APIが読まれたか。 */
+    public static boolean wasTimeAccessed() {
+        return timeAccessed;
+    }
+
+    /** 本家 PACKAGE_NAME: スクリプトの renderClass 解決に使う既定パッケージ。 */
+    public static final String PACKAGE_NAME = "jp.ngt.rtm.render";
+    /** 本家 rendererMap: renderClass 名 → クラス。 */
+    public static java.util.Map<String, Class<?>> rendererMap = new java.util.HashMap<>();
+    /** 本家 BRIGHTNESS_RATE: 輝度値の正規化係数。 */
+    protected static final double BRIGHTNESS_RATE = 1.0D / 256.0D;
+    protected static final boolean DEBUG = false;
+    /** 本家 DIV_NUM: ライトエフェクトの円周分割数。 */
+    protected static final byte DIV_NUM = 32;
+    /** 本家 ANGLE: DIV_NUM 分割 1 つ分の角度 (ラジアン)。 */
+    protected static final float ANGLE = (float) (Math.PI * 2.0D / (double) DIV_NUM);
+
+    protected ScriptEngine script;
+    /** 本家のフィールド名は modelObj (KaizPatchX PartsRenderer.jav… */
+    protected ModelObject modelObj = new ModelObject(null);
+    protected Object modelSet;
+    protected final java.util.List<Parts> partsList = new java.util.ArrayList<>();
+    protected final java.util.Map<Integer, Object> dataMap = new java.util.HashMap<>();
+
+    /** 本家 targetsList: クリック可能パーツ (ActionParts) の一覧。 */
+    protected final java.util.List<Parts> targetsList = new java.util.ArrayList<>();
+    /** 本家 hittedEntity: 今カーソルが当たっている車両。 */
+    public Object hittedEntity;
+    /** 本家 hittedParts: 車両ごとの当たっているパーツ。 */
+    protected final java.util.Map<Object, Parts> hittedParts = new java.util.HashMap<>();
+
+    /** 本家: マテリアルごとの描画パスで現在のマテリアル ID (スクリプトが直接参照) */
+    public int currentMatId;
+    public int currentPass;
+
+    /** 直近の render でスクリプトが例外を投げたか。 ★これが無いと「モデルが透明になる」。 */
+    private boolean scriptFailed;
+
+    public PartsRenderer(String... par1) {
+    }
+
+    /** スクリプトを実行し、例外が出たら #scriptFailed を立てる。 */
+    protected void execRenderScript(Object entity, int pass, float partialTick) {
+        if (this.script == null) {
+            return;
+        }
+        // ★フォールバック廃止: render 関数が無い場合のみ素モデル描画。それ以外の例外は
+        //   ログに出すだけで、描画処理自体は継続させる (スクリプトが途中まで描いた分を活かす)。
+        try {
+            jp.ngt.ngtlib.io.ScriptUtil.doScriptFunction(this.script, "render", entity, pass, partialTick);
+        } catch (Throwable t) {
+            Throwable cause = t.getCause() != null ? t.getCause() : t;
+            if (cause instanceof NoSuchMethodException
+                    && String.valueOf(cause.getMessage()).contains("render")) {
+                return; // render 関数が無いだけ = 素モデル描画 (本家仕様)
+            }
+            String key = pass + "|" + cause;
+            if (this.loggedScriptFailures.size() < 32 && this.loggedScriptFailures.add(key)) {
+                com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                        "[RTMU] 描画スクリプト内で例外 (描画は継続) pass={} script={}: {}",
+                        pass, this.scriptName == null ? "?" : this.scriptName, String.valueOf(cause));
+            }
+        }
+    }
+
+    /** 既にログした失敗 (pass, 例外) の組。 */
+    private final java.util.Set<String> loggedScriptFailures = new java.util.HashSet<>();
+
+    /** ログ用のスクリプト名。どのパックが落ちたか判らないと追えない。 */
+    public String scriptName;
+
+    /** 直近の render が失敗したかを読み取ってフラグを下ろす。 */
+    public boolean consumeScriptFailure() {
+        boolean failed = this.scriptFailed;
+        this.scriptFailed = false;
+        return failed;
+    }
+
+    public void setScript(ScriptEngine se) {
+        this.script = se;
+    }
+
+    public void setScript(ScriptEngine engine, Object resource) {
+        this.setScript(engine);
+    }
+
+    public ScriptEngine getScript() {
+        return this.script;
+    }
+
+    public void init(Object modelSet, Object modelObject) {
+        this.modelSet = modelSet;
+        if (modelObject instanceof ModelObject mo) {
+            this.modelObj = mo;
+        }
+        if (this.script != null) {
+            try {
+                ScriptUtil.doScriptFunction(this.script, "init", modelSet, this.modelObj);
+            } catch (Throwable t) {
+                Throwable cause = t.getCause() != null ? t.getCause() : t;
+                // init を持たないスクリプトは正常
+                if (!(cause instanceof NoSuchMethodException)) {
+                    // ★握りつぶさない。init が落ちるとパーツ登録も定数の代入も行われず、 スクリプトは「例外なしで…
+                    com.portofino.realtrainmodunofficial.RealTrainModUnofficial.LOGGER.warn(
+                        "[RTMU] スクリプトの init が落ちました script={}: {}",
+                        this.scriptName == null ? "?" : this.scriptName, String.valueOf(cause));
+                }
+            }
+        }
+        this.partsList.forEach(parts -> parts.init(this));
+    }
+
+    public ModelObject getModelObject() {
+        return this.modelObj;
+    }
+
+    /** 本家 targetsList: クリック可能パーツ (ActionParts) の一覧。 */
+    @Override
+    public java.util.List<Parts> getTargetsList() {
+        return this.targetsList;
+    }
+
+    /** ActionPartsPicker 用: グループ頂点を持つポリゴンモデル。 */
+    @Override
+    public jp.ngt.ngtlib.renderer.model.PolygonModel getPolygonModel() {
+        return this.modelObj != null ? this.modelObj.model : null;
+    }
+
+    /** 本家 hittedParts / hittedEntity を更新する (スクリプトが参照する)。 */
+    @Override
+    public void setHoveredParts(Object entity, Parts part) {
+        this.hittedEntity = entity;
+        if (part != null) {
+            this.hittedParts.put(entity, part);
+        } else {
+            this.hittedParts.remove(entity);
+        }
+    }
+
+    /** 本家のフィールド名は modelObj。Nashorn はプロパティ参照を getter へ 解決… */
+    public ModelObject getModelObj() {
+        return this.modelObj;
+    }
+
+    public Parts registerParts(Parts par1) {
+        this.partsList.add(par1);
+        // 本家はクリック可能パーツ (ActionParts) を targetsList にも積み、id…
+        if (par1 != null && par1.isActionParts()) {
+            par1.id = this.targetsList.size() + 1;
+            this.targetsList.add(par1);
+        }
+        return par1;
+    }
+
+    /** 本家シグネチャ getRendererWithScript(ResourceLocation pa… */
+    public static PartsRenderer getRendererWithScript(Object resource, String... args)
+            throws ReflectiveOperationException {
+        if (resource instanceof ScriptEngine se) {
+            return getRendererWithScript(se, args);
+        }
+        String script = jp.ngt.rtm.modelpack.ModelPackManager.INSTANCE.getScript(resource);
+        if (script == null || script.isBlank()) {
+            return null;
+        }
+        ScriptEngine se = jp.ngt.ngtlib.io.ScriptUtil.doScript(
+                com.portofino.realtrainmodunofficial.script.PackScriptSource.PRELUDE
+                        + com.portofino.realtrainmodunofficial.script.PackScriptSource.prepare(script, String.valueOf(resource)));
+        return getRendererWithScript(se, args);
+    }
+
+    /** 本家 getRendererWithScript: スクリプトの renderClass で指定さ… */
+    public static PartsRenderer getRendererWithScript(ScriptEngine se, String... args)
+            throws ReflectiveOperationException {
+        String className = se == null ? null : String.valueOf(se.get("renderClass"));
+        Class<?> clazz = className == null || className.isEmpty() || "null".equals(className)
+                ? PartsRenderer.class
+                : rendererMap.computeIfAbsent(className, n -> {
+                    try {
+                        return Class.forName(n.contains(".") ? n : PACKAGE_NAME + "." + n);
+                    } catch (ClassNotFoundException e) {
+                        return PartsRenderer.class;
+                    }
+                });
+        PartsRenderer renderer = (PartsRenderer) clazz
+                .getConstructor(String[].class).newInstance((Object) args);
+        renderer.setScript(se);
+        if (se != null) {
+            se.put("renderer", renderer);
+        }
+        return renderer;
+    }
+
+    /** 本家: 指定された座標を中心として回転 (GL 記録) */
+    public void rotate(float angle, char axis, float x, float y, float z) {
+        GLRecorder r = GLRecorder.active();
+        if (r == null) {
+            return;
+        }
+        r.translate(x, y, z);
+        switch (axis) {
+            case 'X' -> r.rotate(angle, 1.0F, 0.0F, 0.0F);
+            case 'Y' -> r.rotate(angle, 0.0F, 1.0F, 0.0F);
+            case 'Z' -> r.rotate(angle, 0.0F, 0.0F, 1.0F);
+            default -> {
+            }
+        }
+        r.translate(-x, -y, -z);
+    }
+
+    /** 本家 sigmoid(float) */
+    public float sigmoid(float par1) {
+        if (par1 == 1.0F || par1 == 0.0F) {
+            return par1;
+        }
+        float f0 = (par1 - 0.5F) * 5.0F;
+        float f1 = (float) ((double) f0 / Math.sqrt(1.0D + (double) f0 * (double) f0));
+        return (f1 + 1.0F) * 0.5F;
+    }
+
+    /** 本家: modelSet.getConfig.getName — スクリプトが車種判定に使う */
+    /** 本家 RailPartsRendererBase 限定の API だが、パックによっては車両/設置… */
+    public void renderStaticParts(Object tile, double x, double y, double z) {
+    }
+
+    public String getModelName() {
+        if (this.modelSet instanceof jp.ngt.rtm.modelpack.modelset.ModelSetBase<?> set
+                && set.getConfig() instanceof jp.ngt.rtm.modelpack.cfg.ModelConfig cfg) {
+            return cfg.getName();
+        }
+        return "";
+    }
+
+    /** 本家 PartsRenderer.getColor: 対象の ResourceState.colo… */
+    public int getColor(Object entity) {
+        if (entity instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity io) {
+            return io.getWireColor();
+        }
+        // 本家: ResourceState.color (プレイヤーが設定する色)。
+        if (entity instanceof jp.ngt.rtm.modelpack.IModelSelector selector
+                && selector.getResourceState() instanceof jp.ngt.rtm.modelpack.state.ResourceState state) {
+            return state.color;
+        }
+        return 16777215;
+    }
+
+    public int getMCTime() {
+        markTimeAccessed();
+        Level level = Minecraft.getInstance().level;
+        return level == null ? 0 : (int) (level.getDayTime() % 24000L);
+    }
+
+    public int getMCHour() {
+        return ((this.getMCTime() / 1000) + 6) % 24;
+    }
+
+    public int getMCMinute() {
+        return (int) ((float) (this.getMCTime() % 1000) * 0.06F);
+    }
+
+    public int getSystemTime() {
+        markTimeAccessed();
+        return (int) ((System.currentTimeMillis() / 1000L) % 86400L);
+    }
+
+    public long getSystemTimeMillis() {
+        markTimeAccessed();
+        return System.currentTimeMillis();
+    }
+    public int getSystemHour() {
+        markTimeAccessed();
+        return CALENDAR.get(java.util.Calendar.HOUR_OF_DAY);
+    }
+
+    public int getSystemMinute() {
+        markTimeAccessed();
+        return CALENDAR.get(java.util.Calendar.MINUTE);
+    }
+
+    public int getSystemSecond() {
+        markTimeAccessed();
+        return CALENDAR.get(java.util.Calendar.SECOND);
+    }
+
+    public int getSystemMillisecond() {
+        markTimeAccessed();
+        CALENDAR.setTimeInMillis(System.currentTimeMillis());
+        return CALENDAR.get(java.util.Calendar.MILLISECOND);
+    }
+
+    public Object getData(int id) {
+        Object v = this.dataMap.get(id);
+        return v != null ? v : 0;
+    }
+
+    public void setData(int id, Object value) {
+        this.dataMap.put(id, value);
+    }
+
+    /** 本家: 前照灯のボリュームライト描画 (KaizPatchX PartsRenderer.rend… */
+    public void renderLightEffect(Object normal, double[] pos, float rL, float rS,
+                                  float length, int color, int type, boolean reverse) {
+        if (pos == null || pos.length < 3) {
+            return;
+        }
+        renderLightEffectS(normal, pos[0], pos[1], pos[2], rL, rS, length, color, type, reverse);
+    }
+
+    /** 本家 PartsRenderer.renderLightEffectS の移植。 */
+    public static void renderLightEffectS(Object normal, double x, double y, double z,
+                                          float rL, float rS, float length, int color, int type, boolean reverse) {
+        GLRecorder recorder = GLRecorder.active();
+        if (recorder == null) {
+            return;
+        }
+        jp.ngt.ngtlib.math.Vec3 viewerVec =
+            normal instanceof jp.ngt.ngtlib.math.Vec3 ? getViewerVec(x, y, z) : null;
+        if (viewerVec != null) {
+            // 視点依存 = カメラを動かすと形が変わる。焼き込みキーに混ぜてはいけない印。
+            recorder.markViewDependent();
+        }
+        // 本家 renderLightEffect は disableLighting → setLight…
+        recorder.brightness(0xF000F0);
+        for (com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.Piece p
+                : com.portofino.realtrainmodunofficial.client.render.LightEffectGeometry.compute(
+                    normal, viewerVec, rL, rS, length, color, type, reverse)) {
+            recorder.drawTess(new GLRecorder.TessDraw(p.mode, p.verts, true));
+        }
+        // 以降の描画は環境光へ戻す (本家 enableLighting)。
+        recorder.brightness(-1);
+    }
+
+    /** Parts.render から呼ばれる (GLRecorder への記録)。 */
+    public void recordRenderParts(String objName) {
+        GLRecorder r = GLRecorder.active();
+        if (r != null) {
+            r.renderParts(objName);
+        }
+    }
+
+    /** Parts.render から呼ばれる — 正規化済み名前 Set を 1 コマンドで記録。 */
+    public void recordRenderPartsSet(java.util.Set<String> normalizedNames) {
+        this.recordRenderPartsSet(normalizedNames, null);
+    }
+
+    /** Parts インスタンス付き版。色ピッキング (ActionParts) で同名パーツを区別するた… */
+    public void recordRenderPartsSet(java.util.Set<String> normalizedNames, Object partsRef) {
+        GLRecorder r = GLRecorder.active();
+        if (r != null) {
+            r.partsRef(partsRef);
+            r.renderGroups(normalizedNames);
+        }
+    }
+
+    public void bindTexture(Object texture) {
+        // GLRecorder に BIND_TEXTURE として記録 (null でデフォルト復帰)
+        jp.ngt.ngtlib.util.NGTUtilClient.bindTexture(texture);
+    }
+
+    /** 本家: 対象に乗員がいるか (NPC/車両スクリプトが使う)。 */
+    public boolean isRidden(Object entity) {
+        if (entity instanceof net.minecraft.world.entity.Entity e) {
+            return !e.getPassengers().isEmpty();
+        }
+        return false;
+    }
+
+    /** 本家: 設置物がレッドストーン給電されているか。 */
+    public boolean isPowered(Object entity) {
+        if (entity instanceof com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity be) {
+            return be.isPowered();
+        }
+        if (entity instanceof BlockEntity be) {
+            Level lvl = be.getLevel();
+            if (lvl != null) {
+                return lvl.hasNeighborSignal(be.getBlockPos());
+            }
+        }
+        return false;
+    }
+
+    /** 本家: 描画視点 (運転席) のプレイヤーの向き。 */
+    public float getPlayerYaw() {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        return mc.player != null ? mc.player.getYRot() : 0.0F;
+    }
+
+    /** 本家 (1.7.10) の PartsRenderer.getPlayerYaw(entity)。 */
+    /** RTM 1.7.10 互換: 対象エンティティの向き (yaw)。 */
+    public float getYaw(Object entity) {
+        if (entity instanceof net.minecraft.world.entity.Entity e) {
+            return e.getYRot();
+        }
+        return 0.0F;
+    }
+
+    public float getPlayerYaw(Object entity) {
+        try {
+            if (entity instanceof net.minecraft.world.entity.Entity e) {
+                if (e.getControllingPassenger() instanceof net.minecraft.world.entity.LivingEntity living) {
+                    return living.getYRot();
+                }
+                java.util.List<net.minecraft.world.entity.Entity> passengers = e.getPassengers();
+                if (!passengers.isEmpty()
+                        && passengers.get(0) instanceof net.minecraft.world.entity.LivingEntity living) {
+                    return living.getYRot();
+                }
+                return e.getYRot();
+            }
+        } catch (Throwable ignored) {
+        }
+        return this.getPlayerYaw();
+    }
+
+    /** Empty legacy slots are null, including native Ite… */
+    public Object getInventoryItem(Object entity, int slot) {
+        return jp.ngt.ngtlib.renderer.LegacyItemRenderer.inventoryItem(entity,slot);
+    }
+
+    public int getStackSize(Object stack) {
+        var nativeStack=jp.ngt.mccompat.ItemStackCompat.unwrap(stack);
+        return nativeStack==null ? 0 : nativeStack.getCount();
+    }
+
+    public void renderItem(Object entity, Object item) {
+        jp.ngt.ngtlib.renderer.LegacyItemRenderer.INSTANCE.renderItem(entity,item,0);
+    }
+
+    /** 本家: world.getLightBrightnessForSkyBlocks 相当のパック輝度。 */
+    public int getBrightness(Object world, double x, double y, double z) {
+        if (world instanceof Level level) {
+            BlockPos pos = new BlockPos(Mth.floor(x), Mth.floor(y), Mth.floor(z));
+            return net.minecraft.client.renderer.LevelRenderer.getLightColor(level, pos);
+        }
+        return 0xF000F0;
+    }
+
+    public void setBrightness(int packedLight) {
+        GLRecorder r = GLRecorder.active();
+        if (r != null) {
+            r.brightness(packedLight);
+        }
+    }
+
+    /** 本家 GLHelper.disableLighting/enableLighting をレンダラー… */
+    public void disableLighting() {
+        jp.ngt.ngtlib.renderer.GLHelper.disableLighting();
+    }
+
+    public void enableLighting() {
+        jp.ngt.ngtlib.renderer.GLHelper.enableLighting();
+    }
+
+    public Level getWorld(Object tile) {
+        if (tile instanceof BlockEntity be) {
+            return be.getLevel();
+        }
+        return Minecraft.getInstance().level;
+    }
+
+    public int getX(Object tile) {
+        return tile instanceof BlockEntity be ? be.getBlockPos().getX() : 0;
+    }
+
+    public int getY(Object tile) {
+        return tile instanceof BlockEntity be ? be.getBlockPos().getY() : 0;
+    }
+
+    public int getZ(Object tile) {
+        return tile instanceof BlockEntity be ? be.getBlockPos().getZ() : 0;
+    }
+
+    public double sigmoid(double x, double c) {
+        return NGTMath.sigmoid(x, c);
+    }
+
+    /** 本家 PartsRenderer.spawnParticle: 粒子名 (文字列) で粒子を出す。 */
+    public void spawnParticle(Object entity, String name, double posX, double posY, double posZ,
+                              double speedX, double speedY, double speedZ) {
+        Level level = getWorld(entity);
+        if (level != null && level.isClientSide) {
+            level.addParticle(jp.ngt.mccompat.EnumParticleTypes.particleByLegacyName(name),
+                    posX, posY, posZ, speedX, speedY, speedZ);
+        }
+    }
+
+    public void debug(String msg, Object... args) {
+        jp.ngt.ngtlib.io.NGTLog.debug(msg, args);
+    }
+
+    public void debug(String msg) {
+        jp.ngt.ngtlib.io.NGTLog.debug(msg);
+    }
+
+    /** 本家preRender: 既定は何もしない。 */
+    public void preRender(Object t, boolean smoothing, boolean culling, float par3) {
+    }
+
+    /** 本家postRender: 既定は何もしない。 */
+    public void postRender(Object t, boolean smoothing, boolean culling, float par3) {
+    }
+
+    /** 本家render: サブクラスが実装。 */
+    public void render(Object t, int pass, float partialTick) {
+        this.currentPass = pass;
+        this.execRenderScript(t, pass, partialTick);
+    }
+
+    /** 本家getViewerVec: 対象座標→視点のベクトル。 */
+    public static jp.ngt.ngtlib.math.Vec3 getViewerVec(double x, double y, double z) {
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        net.minecraft.world.entity.Entity viewer = mc.getCameraEntity() != null ? mc.getCameraEntity() : mc.player;
+        if (viewer == null) {
+            return new jp.ngt.ngtlib.math.Vec3(0.0D, 1.0D, 0.0D);
+        }
+        return new jp.ngt.ngtlib.math.Vec3(
+            viewer.getX() - x, viewer.getEyeY() - y, viewer.getZ() - z);
+    }
+
+    /** 本家validPath: アセットが存在するか。 */
+    public boolean validPath(String path) {
+        return path != null && !path.isBlank()
+            && jp.ngt.ngtlib.io.NGTFileLoader.findAsset(path) != null;
+    }
+
+
+
+    /** 本家TileEntityPartsRenderer.getMetadata互換。 */
+    public int getMetadata(Object tile) {
+        if (tile instanceof BlockEntity be && be.getLevel() != null) {
+            return jp.ngt.ngtlib.block.BlockUtil.getMetadata(be.getLevel(),
+                be.getBlockPos().getX(), be.getBlockPos().getY(), be.getBlockPos().getZ());
+        }
+        return 0;
+    }
+
+
+    /** 本家 rotateAndRender: 指定座標を中心に 3 軸回転してからパーツを描く。 */
+    public void rotateAndRender(Parts parts, float x, float y, float z,
+                                float rotationX, float rotationY, float rotationZ) {
+        GLRecorder r = GLRecorder.active();
+        if (r == null || parts == null) {
+            return;
+        }
+        r.push();
+        r.translate(x, y, z);
+        r.rotate((float) Math.toDegrees(rotationZ), 0.0F, 0.0F, 1.0F);
+        r.rotate((float) Math.toDegrees(rotationY), 0.0F, 1.0F, 0.0F);
+        r.rotate((float) Math.toDegrees(rotationX), 1.0F, 0.0F, 0.0F);
+        r.translate(-x, -y, -z);
+        parts.render(this);
+        r.pop();
+    }
+
+
+    // ---- ★GraalJS 互換オーバーロード (Nashorn は Double→float を暗黙変換したが GraalJS はしない) ----
+
+    /** GraalJS 用: Double 引数・axis は文字列/文字両方受け付ける。 */
+    public void rotate(double angle, Object axis, double x, double y, double z) {
+        char c = String.valueOf(axis).charAt(0);
+        this.rotate((float) angle, c, (float) x, (float) y, (float) z);
+    }
+
+    /** GraalJS 用。 */
+    public void rotateAndRender(Parts parts, double x, double y, double z,
+                                double rotationX, double rotationY, double rotationZ) {
+        this.rotateAndRender(parts, (float) x, (float) y, (float) z,
+                (float) rotationX, (float) rotationY, (float) rotationZ);
+    }
+
+}

@@ -1,0 +1,26 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "FGFGF",
+    "BE EB",
+    "FGFGF"
+  ],
+  "key": {
+    "F": {
+      "item": "minecraft:iron_block"
+    },
+    "G": {
+      "item": "minecraft:glass"
+    },
+    "B": {
+      "item": "realtrainmodunofficial:bogie"
+    },
+    "E": {
+      "item": "realtrainmodunofficial:material_engine"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:diesel_train",
+    "count": 1
+  }
+}

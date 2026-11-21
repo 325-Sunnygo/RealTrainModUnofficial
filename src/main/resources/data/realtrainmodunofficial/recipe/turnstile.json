@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "SFS",
+    "SRS",
+    "SRS"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "F": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:ticket_gate",
+    "count": 2
+  },
+  "category": "misc"
+}

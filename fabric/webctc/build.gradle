@@ -1,0 +1,40 @@
+//RTMU-WebCTC_1.21.1 — 本家 WebCTC (org.webctc, AGPL-3.0, Kaiz_JP & masa0300) の 1.21.1 移植。
+//RTMU 本体とは別 jar として配布する (RTMU に依存)。
+plugins {
+    id 'java-library'
+    id 'net.neoforged.gradle.userdev'
+}
+
+version = webctc_version
+group = 'org.webctc'
+
+base {
+    archivesName = 'RTMU-WebCTC_1.21.1'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+repositories {
+    mavenLocal()
+}
+
+dependencies {
+    implementation "net.neoforged:neoforge:${neo_version}"
+    //RTMU 本体のクラス (TrainEntity / RailRegistry 等) をコンパイル参照。
+    //実行時は mods フォルダの RTMU jar が提供する。
+    compileOnly rootProject
+}
+
+//RTMU 本体と同じ: ビルドしたら Modrinth の Server test プロファイルへ自動配置
+def modrinthModsDir = file("${System.properties['user.home']}/Library/Application Support/ModrinthApp/profiles/Server test/mods")
+
+tasks.register('copyJarToModrinthMods', Copy) {
+    dependsOn tasks.named('jar')
+    onlyIf { modrinthModsDir.isDirectory() }
+    from(tasks.named('jar').flatMap { it.archiveFile })
+    into(modrinthModsDir)
+}
+
+tasks.named('build').configure {
+    finalizedBy(tasks.named('copyJarToModrinthMods'))
+}

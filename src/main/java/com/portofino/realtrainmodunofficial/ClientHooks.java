@@ -1,0 +1,217 @@
+package com.portofino.realtrainmodunofficial;
+
+import com.portofino.realtrainmodunofficial.installedobject.InstalledObjectCategory;
+import com.portofino.realtrainmodunofficial.item.TrainItem;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
+
+public final class ClientHooks {
+    private static final String CLIENT_HOOKS_CLASS = "com.portofino.realtrainmodunofficial.client.ClientHooksClient";
+
+    private ClientHooks() {
+    }
+
+    /** 駅コアの駅名編集画面。 */
+    public static void openStationCoreScreen(BlockPos pos) {
+        invokeClient("openStationCoreScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 設置済み貨物のモデル選択画面。 */
+    public static void openCargoModelScreen(int entityId) {
+        invokeClient("openCargoModelScreen", new Class<?>[]{int.class}, entityId);
+    }
+
+    /** 貨物アイテムのモデル選択画面。 */
+    public static void openCargoItemModelScreen(boolean offHand) {
+        invokeClient("openCargoItemModelScreen", new Class<?>[]{boolean.class}, offHand);
+    }
+
+    /** 移動装置の設定画面。 */
+    public static void openMovingMachineScreen(BlockPos pos) {
+        invokeClient("openMovingMachineScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 設置済み NPC のモデル選択画面。 */
+    public static void openNpcModelScreen(int entityId) {
+        invokeClient("openNpcModelScreen", new Class<?>[]{int.class}, entityId);
+    }
+
+    /** NPC アイテムのモデル選択画面。 */
+    public static void openNpcItemModelScreen(boolean offHand) {
+        invokeClient("openNpcItemModelScreen", new Class<?>[]{boolean.class}, offHand);
+    }
+
+    /** 信号変換機の設定画面。 */
+    public static void openSignalConverterScreen(BlockPos pos) {
+        invokeClient("openSignalConverterScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 装飾ブロックの編集画面 (本家 guiIdDecoration)。 */
+    public static void openDecorationEditScreen() {
+        invokeClient("openDecorationEditScreen", new Class<?>[]{});
+    }
+
+    /** NPC の商売画面 (本家 GuiSalesperson)。 */
+    public static void openNpcTradeScreen(int entityId) {
+        invokeClient("openNpcTradeScreen", new Class<?>[]{int.class}, entityId);
+    }
+
+
+
+    /** ペインター設定画面 (neo mcte)。 */
+    public static void openPainterSettingsScreen(ItemStack stack, boolean offHand) {
+        invokeClient("openPainterSettingsScreen", new Class<?>[]{ItemStack.class, boolean.class}, stack, offHand);
+    }
+
+
+    /** ミニチュア設定画面 (neo mcte)。手を渡して、その手のスタックだけを対象にする。 */
+    public static void openMiniatureSettingsScreen(ItemStack stack, boolean offHand) {
+        invokeClient("openMiniatureSettingsScreen", new Class<?>[]{ItemStack.class, boolean.class}, stack, offHand);
+    }
+
+    public static void openRailSelectScreen(Player player, ItemStack stack) {
+        invokeClient("openRailSelectScreen", new Class<?>[]{Player.class, ItemStack.class}, player, stack);
+    }
+
+    public static void openTrainSelectScreen(Player player, ItemStack stack, TrainItem.Category category) {
+        invokeClient("openTrainSelectScreen", new Class<?>[]{Player.class, ItemStack.class, TrainItem.Category.class}, player, stack, category);
+    }
+
+    public static void openTrainSelectScreen(Player player, ItemStack stack) {
+        invokeClient("openTrainSelectScreen", new Class<?>[]{Player.class, ItemStack.class}, player, stack);
+    }
+
+    public static void openCarSelectScreen(Player player, ItemStack stack) {
+        invokeClient("openCarSelectScreen", new Class<?>[]{Player.class, ItemStack.class}, player, stack);
+    }
+
+    public static void openInstalledObjectSelectScreen(Player player, ItemStack stack, InstalledObjectCategory category) {
+        invokeClient("openInstalledObjectSelectScreen", new Class<?>[]{Player.class, ItemStack.class, InstalledObjectCategory.class}, player, stack, category);
+    }
+
+    /** SignalControllerMod (masa300) 移植: 設定 GUI */
+    public static void openSignalControllerScreen(Object controller) {
+        invokeClient("openSignalControllerScreen", new Class<?>[]{Object.class}, controller);
+    }
+
+    /** 本家 guiIdSelectEntityModel: 設置済み列車をシフト右クリックしたときのモデ… */
+    public static void openEntityModelSelectScreen(Object vehicle) {
+        invokeClient("openEntityModelSelectScreen", new Class<?>[]{Object.class}, vehicle);
+    }
+
+    /** 本家 GuiChangeOffset: バールで設置物を右クリック → 微調整 GUI */
+    public static void openChangeOffsetScreen(Object blockEntity) {
+        invokeClient("openChangeOffsetScreen", new Class<?>[]{Object.class}, blockEntity);
+    }
+
+    /** レールのカント設定: レンチでマーカーをシフト右クリック */
+    /** マーカーの位置調整 (レンチのモード 12): ブロック未満のずれを入れる */
+    public static void openMarkerOffsetScreen(Object marker) {
+        invokeClient("openMarkerOffsetScreen", new Class<?>[]{Object.class}, marker);
+    }
+
+    public static void openMarkerCantScreen(Object marker) {
+        invokeClient("openMarkerCantScreen", new Class<?>[]{Object.class}, marker);
+    }
+
+    /** 機械の customForm (DataMap) 編集画面。 */
+    public static void openMachineConfigScreen(BlockPos pos) {
+        invokeClient("openMachineConfigScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    public static void openSpeakerScreen(BlockPos pos) {
+        invokeClient("openSpeakerScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 看板エディタ: 看板を素手で右クリック (本家 GuiSignboard) */
+    public static void openSignboardScreen(BlockPos pos) {
+        invokeClient("openSignboardScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 列車検知器の設定: 検知器を素手で右クリック */
+    public static void openDetectorConfigScreen(BlockPos pos) {
+        invokeClient("openDetectorConfigScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 券売機: 素手で右クリック (本家 GuiTicketVendor) */
+    public static void openTicketVendorScreen(BlockPos pos) {
+        invokeClient("openTicketVendorScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** 標識のテクスチャ変更: 素手で右クリック (本家 guiIdSelectTileEntityTex… */
+    public static void openRailroadSignScreen(BlockPos pos) {
+        invokeClient("openRailroadSignScreen", new Class<?>[]{BlockPos.class}, pos);
+    }
+
+    /** カメラ: 右クリックでファインダーモードを開閉 (本家 GuiCamera 相当) */
+    public static void toggleCamera() {
+        invokeClient("toggleCamera", new Class<?>[]{});
+    }
+
+    /** カメラ: ブロック右クリックで本家 GuiCamera 相当の画面を開く (本家 ItemCame… */
+    public static void openCameraScreen() {
+        invokeClient("openCameraScreen", new Class<?>[]{});
+    }
+
+    public static void stopCrossingGateSound(Level level, BlockPos pos) {
+        invokeClient("stopCrossingGateSound", new Class<?>[]{Level.class, BlockPos.class}, level, pos);
+    }
+
+    public static void tickCrossingGateSound(com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity blockEntity) {
+        invokeClient("tickCrossingGateSound", new Class<?>[]{com.portofino.realtrainmodunofficial.blockentity.InstalledObjectBlockEntity.class}, blockEntity);
+    }
+
+    public static void showScriptErrorMessage(String message) {
+        invokeClient("showScriptErrorMessage", new Class<?>[]{String.class}, message);
+    }
+
+    /** 道床 (レール下の砂利) を焼き直させる。 */
+    public static void invalidateRailMesh(Level level, int x, int y, int z) {
+        invokeClient("invalidateRailMesh",
+            new Class<?>[]{Level.class, int.class, int.class, int.class},
+            level, x, y, z);
+    }
+
+    public static void refreshRailBallast(Level level, int x0, int y0, int z0, int x1, int y1, int z1) {
+        invokeClient("refreshRailBallast",
+            new Class<?>[]{Level.class, int.class, int.class, int.class, int.class, int.class, int.class},
+            level, x0, y0, z0, x1, y1, z1);
+    }
+
+    // 軽量化: 解決済み Class / Method をキャッシュする。
+    private static volatile Class<?> hooksClass;
+    private static final java.util.Map<String, java.lang.reflect.Method> METHOD_CACHE =
+        new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static void invokeClient(String methodName, Class<?>[] parameterTypes, Object... args) {
+        if (FMLEnvironment.dist != Dist.CLIENT) {
+            return;
+        }
+        try {
+            java.lang.reflect.Method method = resolveClientMethod(methodName, parameterTypes);
+            method.invoke(null, args);
+        } catch (Exception e) {
+        }
+    }
+
+    private static java.lang.reflect.Method resolveClientMethod(String methodName, Class<?>[] parameterTypes)
+            throws ReflectiveOperationException {
+        String key = methodName + "/" + parameterTypes.length;
+        java.lang.reflect.Method cached = METHOD_CACHE.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        Class<?> hooks = hooksClass;
+        if (hooks == null) {
+            hooks = Class.forName(CLIENT_HOOKS_CLASS);
+            hooksClass = hooks;
+        }
+        java.lang.reflect.Method method = hooks.getMethod(methodName, parameterTypes);
+        METHOD_CACHE.put(key, method);
+        return method;
+    }
+}

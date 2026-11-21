@@ -1,0 +1,22 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "SSSM ",
+    "   WW"
+  ],
+  "key": {
+    "S": {
+      "item": "realtrainmodunofficial:material_sheet_steel"
+    },
+    "W": {
+      "item": "minecraft:oak_planks"
+    },
+    "M": {
+      "item": "realtrainmodunofficial:magazine_rifle"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:rifle",
+    "count": 1
+  }
+}

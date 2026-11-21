@@ -1,0 +1,20 @@
+{
+	"name": "pulley_1000mm",
+	"model": {
+		"modelFile": "pulley_1000mm.mqoz",
+		"textures": [["default", "textures/mechanism/pulley.png", ""]],
+		"rendererPath": "scripts/RenderGear.js"
+	},
+	"buttonTexture": "textures/mechanism/button_pulley_1000mm.png",
+	"type": "PULLEY",
+	"transmissionRatioON": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"transmissionRatioOFF": [1.0, 0.0, 0.0, 0.0, 0.0],
+	"maxSpeed": 10000.0,
+	"acceleration": 0.0,
+	"radius": 0.5,
+	"teethCount": 0,
+	"smoothing": true,
+	"doCulling": true,
+	"accuracy": "MEDIUM",
+	"tags": "ngt5479"
+}

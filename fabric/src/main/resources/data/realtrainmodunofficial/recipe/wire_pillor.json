@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "ISI",
+    "ISI",
+    " S "
+  ],
+  "key": {
+    "S": {
+      "item": "minecraft:stone"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:overhead_line_pole",
+    "count": 6
+  },
+  "category": "misc"
+}

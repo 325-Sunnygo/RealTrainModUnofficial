@@ -1,0 +1,36 @@
+//RTMU-ATSAssistMod_1.21.1 — 本家 ATSAssistMod (jp.kaiz.atsassistmod, GPL-3.0, Kaiz_JP) の 1.21.1 移植。
+//RTMU 本体とは別 jar として配布する (RTMU に依存)。
+plugins {
+    id 'java-library'
+    id 'net.neoforged.gradle.userdev'
+}
+
+version = atsa_version
+group = 'jp.kaiz.atsassistmod'
+
+base {
+    archivesName = 'RTMU-ATSAssistMod_1.21.1'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+dependencies {
+    implementation "net.neoforged:neoforge:${neo_version}"
+    //RTMU 本体のクラス (EntityTrainBase / TrainState 等) をコンパイル参照。
+    //実行時は mods フォルダの RTMU jar が提供する。
+    compileOnly rootProject
+}
+
+//RTMU 本体と同じ: ビルドしたら Modrinth の Server test プロファイルへ自動配置
+def modrinthModsDir = file("${System.properties['user.home']}/Library/Application Support/ModrinthApp/profiles/Server test/mods")
+
+tasks.register('copyJarToModrinthMods', Copy) {
+    dependsOn tasks.named('jar')
+    onlyIf { modrinthModsDir.isDirectory() }
+    from(tasks.named('jar').flatMap { it.archiveFile })
+    into(modrinthModsDir)
+}
+
+tasks.named('build').configure {
+    finalizedBy(tasks.named('copyJarToModrinthMods'))
+}

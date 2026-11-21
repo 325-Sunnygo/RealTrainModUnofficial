@@ -1,0 +1,172 @@
+package com.portofino.realtrainmodunofficial.client;
+
+import jp.ngt.rtm.entity.train.EntityTrainBase;
+import jp.ngt.rtm.modelpack.cfg.TrainConfig;
+import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.Map;
+import java.util.WeakHashMap;
+
+/** 立ち乗り (standing-ride): 走行中の列車の床に立っているプレイヤーを、列車の移動・… */
+public final class StandingRideClient {
+
+    /** 取得判定: 床面から上下この範囲に足があれば「乗った」とみなす (歩いて乗り込む用)。 */
+    private static final double SURFACE_MARGIN = 0.3D;
+    /** 保持判定: 既に乗っている間は下方向に緩める (段差・小さな揺れで落ちない)。 */
+    private static final double RIDE_MARGIN = 1.0D;
+    /** 車体幅方向の余裕。 */
+    private static final double SIDE_MARGIN = 0.15D;
+    /** 床面 Y への吸着補正係数と 1 tick あたり最大補正量。 */
+    private static final double Y_CORRECTION_FACTOR = 0.35D;
+    private static final double MAX_Y_CORRECTION = 0.6D;
+
+    /** 列車ごとの前 tick 位置 {x, y, z, yaw}。 */
+    private static final Map<EntityTrainBase, double[]> PREV = new WeakHashMap<>();
+    /** この game tick で既にローカルプレイヤーを運んだ車両があるか (二重加算防止)。 */
+    private static long lastCarriedGameTime = -1000L;
+    /** ローカルプレイヤーを最後に運んだ game tick (ヒステリシス判定用)。 */
+    private static long lastRideGameTime = -1000L;
+    private StandingRideClient() {
+    }
+
+    /** この車両で、その足元の高さに一番近い車内床の Y。 */
+    private static double floorY(EntityTrainBase train, double feetY) {
+        double[] levels = train.getInteriorFloorLevels();
+        if (levels.length == 0) {
+            return train.getInteriorFloorY();
+        }
+        double best = train.getY() + levels[0];
+        double bestDist = Math.abs(feetY - best);
+        for (int i = 1; i < levels.length; i++) {
+            double y = train.getY() + levels[i];
+            double d = Math.abs(feetY - y);
+            if (d < bestDist) {
+                bestDist = d;
+                best = y;
+            }
+        }
+        return best;
+    }
+
+    /** EntityTrainBase#tick (クライアント) から毎 tick 呼ぶ。 */
+    public static void tick(EntityTrainBase train) {
+        double curX = train.getX();
+        double curY = train.getY();
+        double curZ = train.getZ();
+        float curYaw = train.getYRot();
+
+        double[] prev = PREV.get(train);
+        if (prev == null) {
+            // 初回は差分ゼロ。次 tick から追従開始。
+            PREV.put(train, new double[]{curX, curY, curZ, curYaw});
+            return;
+        }
+        double dx = curX - prev[0];
+        double dy = curY - prev[1];
+        double dz = curZ - prev[2];
+        float dYaw = Mth.wrapDegrees(curYaw - (float) prev[3]);
+        double prevX = prev[0];
+        double prevZ = prev[2];
+        prev[0] = curX;
+        prev[1] = curY;
+        prev[2] = curZ;
+        prev[3] = curYaw;
+
+        Player player = Minecraft.getInstance().player;
+        if (player == null || !player.isAlive() || player.isPassenger()
+                || player.isSpectator() || player.getAbilities().flying
+                || player.level() != train.level()) {
+            return;
+        }
+
+        long now = train.level().getGameTime();
+        boolean rideHold = (now - lastRideGameTime) <= 2L;
+        double yMargin = rideHold ? RIDE_MARGIN : SURFACE_MARGIN;
+
+        if (!isStandingOn(train, player, rideHold, yMargin)) {
+            return;
+        }
+        // 連結: 同じ game tick で別車両が既に運んでいたら二重加算しない。
+        if (lastCarriedGameTime == now) {
+            return;
+        }
+        lastCarriedGameTime = now;
+        lastRideGameTime = now;
+
+        carry(player, train, prevX, prevZ, dx, dy, dz, dYaw);
+    }
+
+    /** プレイヤーの足が、この車両の床面フットプリント内にあるか。 */
+    private static boolean isStandingOn(EntityTrainBase train, Player player, boolean rideHold, double yMargin) {
+        double relX = player.getX() - train.getX();
+        double relZ = player.getZ() - train.getZ();
+
+        double rad = Math.toRadians(train.getYRot());
+        double sin = Math.sin(rad);
+        double cos = Math.cos(rad);
+        // 車体ローカル座標: length = 進行方向, width = 幅方向
+        double localLength = relX * sin + relZ * cos;
+        double localWidth = relX * cos - relZ * sin;
+
+        double halfWidth = EntityTrainBase.TRAIN_WIDTH / 2.0D + SIDE_MARGIN;
+        double halfLength = getHalfLength(train);
+        double widthMargin = rideHold ? halfWidth + 0.5D : halfWidth;
+        double lengthMargin = rideHold ? halfLength + 0.3D : halfLength;
+
+        if (Math.abs(localWidth) > widthMargin || Math.abs(localLength) > lengthMargin) {
+            return false;
+        }
+
+        double feetY = player.getBoundingBox().minY;
+        double floorY = floorY(train, feetY);
+        return feetY >= floorY - yMargin && feetY <= floorY + 0.5D;
+    }
+
+    /** 車体中心から端までの長さ (config trainDistance)。 */
+    private static double getHalfLength(EntityTrainBase train) {
+        TrainConfig cfg = train.getConfig();
+        if (cfg != null && cfg.trainDistance > 0.0F) {
+            return cfg.trainDistance;
+        }
+        return EntityTrainBase.TRAIN_WIDTH / 2.0D;
+    }
+
+    /** 列車の並進・旋回ぶんをローカルプレイヤーに加える (床に吸着＋落下無効化)。 */
+    private static void carry(Player player, EntityTrainBase train, double prevX, double prevZ,
+                             double dx, double dy, double dz, float dYaw) {
+        double addX;
+        double addZ;
+        if (dYaw != 0.0F) {
+            // 車体中心 (前 tick) まわりにプレイヤー相対位置を回す。
+            double relX = player.getX() - prevX;
+            double relZ = player.getZ() - prevZ;
+            double rad = Math.toRadians(dYaw);
+            double cos = Math.cos(rad);
+            double sin = Math.sin(rad);
+            double rotX = relX * cos + relZ * sin;
+            double rotZ = relZ * cos - relX * sin;
+            addX = (train.getX() + rotX) - player.getX();
+            addZ = (train.getZ() + rotZ) - player.getZ();
+        } else {
+            addX = dx;
+            addZ = dz;
+        }
+
+        double floorY = floorY(train, player.getBoundingBox().minY);
+        double yError = floorY - player.getY();
+        double yCorrection = Mth.clamp(yError * Y_CORRECTION_FACTOR, -MAX_Y_CORRECTION, MAX_Y_CORRECTION);
+
+        // SELF: プレイヤー自身の歩行入力 (別途 travel で適用済み) に上乗せして運ぶ。
+        player.move(MoverType.SELF, new Vec3(addX, dy + yCorrection, addZ));
+
+        // 床に貼り付け: 落下加速を殺し、落下ダメージ・浮遊を防ぐ。
+        Vec3 dm = player.getDeltaMovement();
+        player.setDeltaMovement(dm.x, 0.0D, dm.z);
+        player.fallDistance = 0.0F;
+        player.setOnGround(true);
+    }
+}

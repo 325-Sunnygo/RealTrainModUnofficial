@@ -1,0 +1,55 @@
+package jp.ngt.mccompat;
+
+import net.minecraft.core.particles.ParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
+
+import java.util.Map;
+
+/** 1.7.10 net.minecraft.util.EnumParticleTypes の互換。 */
+public enum EnumParticleTypes {
+    EXPLOSION_NORMAL(ParticleTypes.POOF, "explode"),
+    EXPLOSION_LARGE(ParticleTypes.EXPLOSION, "largeexplode"),
+    EXPLOSION_HUGE(ParticleTypes.EXPLOSION_EMITTER, "hugeexplosion"),
+    SMOKE_NORMAL(ParticleTypes.SMOKE, "smoke"),
+    SMOKE_LARGE(ParticleTypes.LARGE_SMOKE, "largesmoke"),
+    CLOUD(ParticleTypes.CLOUD, "cloud"),
+    FLAME(ParticleTypes.FLAME, "flame"),
+    LAVA(ParticleTypes.LAVA, "lava"),
+    CRIT(ParticleTypes.CRIT, "crit"),
+    SPLASH(ParticleTypes.SPLASH, "splash"),
+    WATER_BUBBLE(ParticleTypes.BUBBLE, "bubble"),
+    WATER_DROP(ParticleTypes.RAIN, "droplet"),
+    DRIP_WATER(ParticleTypes.DRIPPING_WATER, "dripWater"),
+    SUSPENDED(ParticleTypes.UNDERWATER, "suspended"),
+    SNOWBALL(ParticleTypes.ITEM_SNOWBALL, "snowballpoof"),
+    HEART(ParticleTypes.HEART, "heart");
+
+    public final ParticleOptions particle;
+    public final String legacyName;
+
+    EnumParticleTypes(ParticleOptions particle, String legacyName) {
+        this.particle = particle;
+        this.legacyName = legacyName;
+    }
+
+    private static final Map<String, EnumParticleTypes> BY_LEGACY;
+
+    static {
+        java.util.HashMap<String, EnumParticleTypes> m = new java.util.HashMap<>();
+        for (EnumParticleTypes t : values()) {
+            m.put(t.legacyName.toLowerCase(java.util.Locale.ROOT), t);
+        }
+        BY_LEGACY = java.util.Collections.unmodifiableMap(m);
+    }
+
+    /** 1.7.10 の粒子名 ("explode" 等) から ParticleOptions を引く。 */
+    public static ParticleOptions particleByLegacyName(String name) {
+        if (name != null) {
+            EnumParticleTypes t = BY_LEGACY.get(name.toLowerCase(java.util.Locale.ROOT));
+            if (t != null) {
+                return t.particle;
+            }
+        }
+        return ParticleTypes.SMOKE;
+    }
+}

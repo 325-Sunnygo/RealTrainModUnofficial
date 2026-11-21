@@ -1,0 +1,15 @@
+{
+  "name": "Torii",
+  "model": {
+      "modelFile": "torii.mqoz",
+      "textures": [["default", "textures/machine/torii.png", "AlphaBlend"]],
+  	  "rendererPath": "scripts/RenderTorii.js"
+  },
+  "buttonTexture": "textures/machine/button_torii.png",
+  "machineType": "Antenna_Receive",
+  "followRailAngle": true,
+  "smoothing": true,
+  "doCulling": true,
+  "accuracy": "MEDIUM",
+  "tags": "ngt5479"
+}

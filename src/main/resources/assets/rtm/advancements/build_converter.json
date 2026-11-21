@@ -1,0 +1,21 @@
+{
+    "display": {
+        "icon": {
+            "item": "rtm:steel_material",
+            "data": 0
+        },
+        "title": {
+            "translate": "advancements.rtm.build_converter.title"
+        },
+        "description": {
+            "translate": "advancements.rtm.build_converter.description"
+        },
+        "frame": "challenge"
+    },
+    "parent": "rtm:get_steel",
+    "criteria": {
+        "build_converter": {
+            "trigger": "minecraft:impossible"
+        }
+    }
+}

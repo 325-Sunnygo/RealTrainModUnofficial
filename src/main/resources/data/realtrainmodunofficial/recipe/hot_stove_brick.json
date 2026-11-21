@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "NDN",
+    "DCD",
+    "NDN"
+  ],
+  "key": {
+    "N": {
+      "item": "minecraft:nether_brick"
+    },
+    "D": {
+      "item": "minecraft:soul_sand"
+    },
+    "C": {
+      "item": "minecraft:clay_ball"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:hot_stove_brick",
+    "count": 6
+  },
+  "category": "misc"
+}

@@ -1,0 +1,427 @@
+package jp.ngt.ngtlib.renderer;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/** スクリプトの GL11 呼び出しを記録し、PoseStack へ再生するためのオペコードバッファ。 */
+public final class GLRecorder {
+
+    public enum Op {
+        PUSH, POP, TRANSLATE, ROTATE, SCALE, MULT_MATRIX, LOAD_MATRIX, PROJECTION, COLOR_MASK, DRAW_TEXT, COLOR, BRIGHTNESS, RENDER_PARTS, RENDER_GROUPS,
+        /** テクスチャ差し替え (payload: ResourceLocation, null=デフォルトに… */
+        BIND_TEXTURE,
+        /** NGTTessellator の即時描画 (payload: TessDraw) */
+        DRAW_TESS,
+        /** ModelLoader で読んだ PolygonModel のグループ描画 (payload: O… */
+        DRAW_MODEL_GROUP,
+        /** バニラ BlockState のゴースト描画 (payload: BlockState、a/b/c… */
+        RENDER_BLOCK, RENDER_ITEM, RENDER_GUI_ITEM, LOAD_NAME
+    }
+
+    public record TextDraw(String text,float x,float y,int color,boolean shadow) {}
+    public void colorMask(boolean r,boolean g,boolean b,boolean a) {addCmd(Op.COLOR_MASK,r?1:0,g?1:0,b?1:0,a?1:0,null);}
+    public void drawText(String text,float x,float y,int color,boolean shadow) {addCmd(Op.DRAW_TEXT,0,0,0,0,null,new TextDraw(text,x,y,color,shadow));}
+    public void loadMatrix(float[] matrix) {addCmd(Op.LOAD_MATRIX,0,0,0,0,null,matrix.clone());}
+    public void projection(float[] matrix) {addCmd(Op.PROJECTION,0,0,0,0,null,matrix.clone());}
+    public final LegacyMatrixState matrices = new LegacyMatrixState(this);
+    public void loadName(int name) { addCmd(Op.LOAD_NAME,0,0,0,0,null,Integer.valueOf(name)); }
+
+    public record GuiItemDraw(net.minecraft.world.item.ItemStack stack, int x, int y, boolean decorations, String text, Object font, float depth) {}
+    public void renderGuiItem(net.minecraft.world.item.ItemStack stack,int x,int y,boolean decorations,String text,Object font,float depth) {
+        addCmd(Op.RENDER_GUI_ITEM,0,0,0,0,null,new GuiItemDraw(stack.copy(),x,y,decorations,text,font,depth));
+    }
+
+    public record ItemDraw(net.minecraft.world.item.ItemStack stack, int seed) {}
+
+    public void renderItem(net.minecraft.world.item.ItemStack stack,int seed) {
+        addCmd(Op.RENDER_ITEM,0,0,0,0,null,new ItemDraw(stack.copy(),seed));
+    }
+
+    /** NGTTessellator.draw の記録データ。 */
+    public static final class TessDraw {
+        public final int mode;
+        public final float[] verts;
+        /** 加算合成 (GL_SRC_ALPHA, GL_ONE) で描くか。 */
+        public final boolean additive;
+        public final float[] normals;
+        /** 前面カリング (本家 ActionParts の輪郭線 glCullFace(GL_FRONT))… */
+        public final boolean cullFront;
+        public final boolean useCurrentColor;
+
+        public TessDraw(int mode, float[] verts) {
+            this(mode, verts, false, false);
+        }
+
+        public TessDraw(int mode, float[] verts, boolean additive) {
+            this(mode, verts, additive, false);
+        }
+
+        public TessDraw(int mode, float[] verts, boolean additive, boolean cullFront) {
+            this(mode,verts,additive,cullFront,null);
+        }
+
+        public TessDraw(int mode, float[] verts, boolean additive, boolean cullFront, float[] normals) {
+            this(mode,verts,additive,cullFront,normals,false);
+        }
+        public TessDraw(int mode, float[] verts, boolean additive, boolean cullFront, float[] normals, boolean useCurrentColor) {
+            this.useCurrentColor=useCurrentColor;
+            this.normals = normals;
+            this.mode = mode;
+            this.verts = verts;
+            this.additive = additive;
+            this.cullFront = cullFront;
+        }
+    }
+
+    /** 1 コマンド。 ★フィールドは使い回しのため final ではない。 */
+    public static final class Cmd {
+        public Op op;
+        public float a, b, c, d;
+        public String name;
+        public Object payload;
+        /** RENDER_PARTS / RENDER_GROUPS を出した jp.ngt.rtm.rend… */
+        public Object partsRef;
+        public LegacyRenderState.Snapshot state;
+
+        Cmd(Op op, float a, float b, float c, float d, String name) {
+            this(op, a, b, c, d, name, null);
+        }
+
+        Cmd(Op op, float a, float b, float c, float d, String name, Object payload) {
+            set(op, a, b, c, d, name, payload);
+        }
+
+        void set(Op op, float a, float b, float c, float d, String name, Object payload) {
+            this.op = op;
+            this.a = a;
+            this.b = b;
+            this.c = c;
+            this.d = d;
+            this.name = name;
+            this.payload = payload;
+            this.partsRef = null;
+            this.state = null;
+        }
+    }
+
+    private static final ThreadLocal<GLRecorder> ACTIVE = new ThreadLocal<>();
+
+    private final List<Cmd> cmds = new ArrayList<>();
+    private final LegacyRenderState state = new LegacyRenderState();
+    public LegacyRenderState state() { return this.state; }
+
+    public static GLRecorder active() {
+        return ACTIVE.get();
+    }
+
+    public static void activate(GLRecorder recorder) {
+        ACTIVE.set(recorder);
+    }
+
+    public static void deactivate() {
+        GL11Facade.resetImmediate();
+        ACTIVE.remove();
+    }
+
+    /** 記録と同時に集計しておく値。 以前は contentKey / hasGeometry / has… */
+    private int contentHash = 1;
+    private boolean geometry;
+    private boolean tess;
+    /** 記録中に「視点依存の光エフェクト (renderLightEffect に normal を渡した… */
+    private boolean viewDependent;
+
+    /** 生きているコマンド数 (cmds.size ではない。使い回しのため配列は縮めない)。 */
+    private int size;
+
+    /** 次に積む RENDER_PARTS/RENDER_GROUPS へ添える Parts インスタンス… */
+    private Object pendingPartsRef;
+
+    /** 直後に積む RENDER_PARTS/RENDER_GROUPS へ Parts インスタンスを添… */
+    public void partsRef(Object parts) {
+        this.pendingPartsRef = parts;
+    }
+
+    /** 別の記録から取り込むとき用。 */
+    private void add(Cmd cmd) {
+        addCmd(cmd.op, cmd.a, cmd.b, cmd.c, cmd.d, cmd.name, cmd.payload, cmd.state);
+        // 取り込みでも色ピッキング用のインスタンス参照を保つ
+        if (cmd.partsRef != null && this.size > 0) {
+            this.cmds.get(this.size - 1).partsRef = cmd.partsRef;
+        }
+    }
+
+    /** payload 無し版。 */
+    private void addCmd(Op op, float a, float b, float c, float d, String name) {
+        addCmd(op, a, b, c, d, name, null);
+    }
+
+    /** コマンドを積む唯一の入口。集計もここでまとめる。 */
+    private void addCmd(Op op, float a, float b, float c, float d, String name, Object payload) {
+        boolean geometry = op == Op.RENDER_PARTS || op == Op.RENDER_GROUPS || op == Op.DRAW_MODEL_GROUP
+                || op == Op.DRAW_TEXT || op == Op.DRAW_TESS || op == Op.RENDER_BLOCK || op == Op.RENDER_ITEM || op == Op.RENDER_GUI_ITEM;
+        addCmd(op, a, b, c, d, name, payload, geometry ? this.state.snapshot() : null);
+    }
+
+    private void addCmd(Op op, float a, float b, float c, float d, String name, Object payload,
+                        LegacyRenderState.Snapshot state) {
+        Cmd cmd;
+        if (this.size < this.cmds.size()) {
+            cmd = this.cmds.get(this.size);
+            cmd.set(op, a, b, c, d, name, payload);
+        } else {
+            cmd = new Cmd(op, a, b, c, d, name, payload);
+            this.cmds.add(cmd);
+        }
+        this.size++;
+        // Parts インスタンス参照は 1 コマンド限り (取りこぼすと以降のコマンドに付いて回る)。
+        cmd.partsRef = this.pendingPartsRef;
+        this.pendingPartsRef = null;
+        cmd.state = state;
+        this.contentHash = 31 * this.contentHash + cmdKey(cmd);
+        switch (op) {
+            case RENDER_PARTS, RENDER_GROUPS, DRAW_MODEL_GROUP, RENDER_BLOCK, RENDER_ITEM, RENDER_GUI_ITEM, DRAW_TEXT -> this.geometry = true;
+            case DRAW_TESS -> {
+                this.geometry = true;
+                this.tess = true;
+            }
+            default -> {
+            }
+        }
+    }
+
+    public void clear() {
+        // ★配列は空にしない。Cmd を使い回すために書き込み位置だけ戻す。
+        this.state.clear();
+        this.matrices.clear();
+        this.size = 0;
+        this.contentHash = 1;
+        this.geometry = false;
+        this.tess = false;
+        this.viewDependent = false;
+        this.lightSignature = 0L;
+        this.pendingPartsRef = null;
+    }
+
+    /** 生きている範囲のビュー。記録が作り直されると中身が変わるので持ち越さないこと。 */
+    public List<Cmd> getCommands() {
+        return this.size == this.cmds.size() ? this.cmds : this.cmds.subList(0, this.size);
+    }
+
+    public boolean isEmpty() {
+        return this.size == 0;
+    }
+
+    /** 実際にジオメトリを 1 つでも描いたか。 行列操作 (PUSH/TRANSLATE/…) だけの記… */
+    public boolean hasGeometry() {
+        return this.geometry;
+    }
+
+    /** NGTTessellator の即時描画 (DRAW_TESS) を 1 つでも含むか。 */
+    public boolean hasTess() {
+        return this.tess;
+    }
+
+    public void push() {
+        this.addCmd(Op.PUSH, 0, 0, 0, 0, null);
+    }
+
+    public void pop() {
+        this.addCmd(Op.POP, 0, 0, 0, 0, null);
+    }
+
+    /** NaN/Inf を弾く。スクリプトが未実装フィールドを読むと undefined→NaN が入り、… */
+    private static float finite(float v) {
+        return Float.isFinite(v) ? v : 0.0F;
+    }
+
+    public void translate(float x, float y, float z) {
+        this.addCmd(Op.TRANSLATE, finite(x), finite(y), finite(z), 0, null);
+    }
+
+    public void rotate(float deg, float x, float y, float z) {
+        deg = finite(deg);
+        x = finite(x);
+        y = finite(y);
+        z = finite(z);
+        // 再生毎の Quaternion 生成を避けるため記録時に確定させる (payload)
+        org.joml.Quaternionf quat = null;
+        org.joml.Vector3f axis = new org.joml.Vector3f(x, y, z);
+        if (axis.lengthSquared() > 1.0e-6F) {
+            axis.normalize();
+            quat = new org.joml.Quaternionf().rotationAxis(deg * ((float) Math.PI / 180.0F), axis);
+        }
+        this.addCmd(Op.ROTATE, deg, x, y, z, null, quat);
+    }
+
+    /** glMultMatrix 相当。列優先 16 要素をそのまま payload で運び、再生側で掛け… */
+    public void multMatrix(float[] matrix) {
+        if (matrix == null || matrix.length < 16) {
+            return;
+        }
+        for (float v : matrix) {
+            if (!Float.isFinite(v)) {
+                return;
+            }
+        }
+        this.addCmd(Op.MULT_MATRIX, 0, 0, 0, 0, null, matrix.clone());
+    }
+
+    public void scale(float x, float y, float z) {
+        // NaN/Inf に加えて 0 倍も潰す (0 スケールは面が消える)
+        float sx = Float.isFinite(x) ? x : 1.0F;
+        float sy = Float.isFinite(y) ? y : 1.0F;
+        float sz = Float.isFinite(z) ? z : 1.0F;
+        this.addCmd(Op.SCALE, sx, sy, sz, 0, null);
+    }
+
+    public void color(float r, float g, float b, float a) {
+        this.state().color(r,g,b,a);
+        this.addCmd(Op.COLOR, r, g, b, a, null);
+    }
+
+    /** 記録に含まれる明るさの指紋。 明るさは頂点に焼き込まれるので、ワールドの光が変われば記録ごと作り直… */
+    private long lightSignature;
+
+    public long getLightSignature() {
+        return this.lightSignature;
+    }
+
+    public void brightness(int packedLight) {
+        this.lightSignature = this.lightSignature * 31L + packedLight;
+        this.addCmd(Op.BRIGHTNESS, packedLight, 0, 0, 0, null);
+    }
+
+    public void renderParts(String objName) {
+        // 再生毎の Set 生成を避け、renderNamedGroups の IdentityHashMa…
+        java.util.Set<String> names = java.util.Set.of(
+                objName.trim().toLowerCase(java.util.Locale.ROOT));
+        this.addCmd(Op.RENDER_PARTS, 0, 0, 0, 0, objName, names);
+    }
+
+    /** 正規化済みグループ名 Set を一括描画 (デフォルトレール配置用)。 */
+    public void renderGroups(java.util.Set<String> normalizedNames) {
+        this.addCmd(Op.RENDER_GROUPS, 0, 0, 0, 0, null, normalizedNames);
+    }
+
+    /** テクスチャ差し替え (null でデフォルトへ復帰)。 */
+    public void bindTexture(net.minecraft.resources.ResourceLocation texture) {
+        this.addCmd(Op.BIND_TEXTURE, 0, 0, 0, 0, null, texture);
+    }
+
+    /** bindTexture の元パス付き版。再生側が「素テクスチャへの復帰」を判定できる。 */
+    public record TexBind(net.minecraft.resources.ResourceLocation location, String rawPath) {}
+
+    public void bindTexture(net.minecraft.resources.ResourceLocation texture, String rawPath) {
+        this.addCmd(Op.BIND_TEXTURE, 0, 0, 0, 0, null, new TexBind(texture, rawPath));
+    }
+
+    public void drawTess(TessDraw draw) {
+        this.addCmd(Op.DRAW_TESS, 0, 0, 0, 0, null, draw);
+    }
+
+    /** バニラブロックのゴースト描画を記録 (プレビュー用)。 */
+    public void renderBlock(Object blockState, float x, float y, float z) {
+        this.addCmd(Op.RENDER_BLOCK, x, y, z, 0, null, blockState);
+    }
+
+    /** 別レコーダーの記録を末尾に追記する (GLHelper のディスプレイリスト callList 用… */
+    public void appendFrom(GLRecorder other) {
+        if (other != null && other != this) {
+            for (Cmd cmd : other.getCommands()) {
+                add(cmd);
+            }
+        }
+    }
+
+    public void drawModelGroup(Object model, String groupName) {
+        this.drawModelGroup(model, groupName, false);
+    }
+
+    /** 再生側 (VehicleScriptRenderers) が頂点法線を使うか面法線かの判断に使う。 */
+    public void drawModelGroup(Object model, String groupName, boolean smoothing) {
+        this.addCmd(Op.DRAW_MODEL_GROUP, smoothing ? 1.0F : 0.0F, 0, 0, 0, groupName, model);
+    }
+
+    /** 記録の内容から作る焼き直し判定キー。 にあたるもの。 */
+    public int contentKey() {
+        return this.contentHash;
+    }
+
+    /** 視点依存の光エフェクト (normal 付き renderLightEffect) を記録したか。 */
+    public void markViewDependent() {
+        this.viewDependent = true;
+    }
+
+    public boolean isViewDependent() {
+        return this.viewDependent;
+    }
+
+    /** 値を撹拌する (雪崩関数)。 焼き込みキーを組み立てるときは、足し合わせる前に必ずこれを通すこと。 */
+    public static int mixKey(int value) {
+        int e = value;
+        e *= 0x9E3779B1;
+        e ^= e >>> 15;
+        e *= 0x85EBCA6B;
+        e ^= e >>> 13;
+        return e;
+    }
+
+    /** Set の内容キー。順序非依存 (総和) は保ったまま、要素ごとに撹拌して線形性を壊す。 */
+    public static int setKey(java.util.Set<?> set) {
+        if (set == null) {
+            return 0;
+        }
+        int h = 0;
+        for (Object element : set) {
+            h += mixKey(element == null ? 0 : element.hashCode());
+        }
+        return 31 * h + set.size();
+    }
+
+    /** 1 コマンドぶんの内容ハッシュ。 */
+    private static int cmdKey(Cmd cmd) {
+        int key = 31 * cmd.op.ordinal() + java.util.Objects.hashCode(cmd.state);
+        key = 31 * key + Float.floatToIntBits(cmd.a);
+        key = 31 * key + Float.floatToIntBits(cmd.b);
+        key = 31 * key + Float.floatToIntBits(cmd.c);
+        key = 31 * key + Float.floatToIntBits(cmd.d);
+        key = 31 * key + (cmd.name == null ? 0 : cmd.name.hashCode());
+        key = 31 * key + payloadKey(cmd.payload);
+        return key;
+    }
+
+    private static int payloadKey(Object payload) {
+        if (payload == null) {
+            return 0;
+        }
+        // 中身で比べるもの
+        if (payload instanceof Number number) return number.hashCode();
+        if (payload instanceof java.util.Set<?> set) {
+            // ★Set.hashCode をそのまま使ってはいけない。
+            return setKey(set);
+        }
+        if (payload instanceof float[] fa) {
+            return java.util.Arrays.hashCode(fa);
+        }
+        if (payload instanceof GuiItemDraw item) {
+            return java.util.Objects.hash(net.minecraft.world.item.ItemStack.hashItemAndComponents(item.stack()),item.stack().getCount(),item.x(),item.y(),item.decorations(),item.text(),System.identityHashCode(item.font()),item.depth());
+        }
+        if (payload instanceof ItemDraw item) {
+            return 31 * (31 * net.minecraft.world.item.ItemStack.hashItemAndComponents(item.stack()) + item.stack().getCount()) + item.seed();
+        }
+        if (payload instanceof TessDraw td) {
+            int hash = 31 * td.mode + java.util.Arrays.hashCode(td.verts);
+            hash = 31 * hash + java.util.Arrays.hashCode(td.normals);
+            hash = 31 * hash + Boolean.hashCode(td.additive);
+            return 31 * (31 * hash + Boolean.hashCode(td.cullFront)) + Boolean.hashCode(td.useCurrentColor);
+        }
+        if (payload instanceof net.minecraft.resources.ResourceLocation
+                || payload instanceof TexBind
+                || payload instanceof org.joml.Quaternionf
+                || payload instanceof net.minecraft.world.level.block.state.BlockState) {
+            return payload.hashCode();
+        }
+        // モデルグラフ (DRAW_MODEL_GROUP の payload) は読み込み後は不変で、 同…
+        return System.identityHashCode(payload);
+    }
+}

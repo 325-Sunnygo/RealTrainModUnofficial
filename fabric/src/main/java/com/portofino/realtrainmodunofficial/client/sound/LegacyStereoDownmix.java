@@ -1,0 +1,88 @@
+package com.portofino.realtrainmodunofficial.client.sound;
+
+import com.mojang.blaze3d.audio.SoundBuffer;
+import com.portofino.realtrainmodunofficial.mixin.SoundBufferAccessor;
+import com.portofino.realtrainmodunofficial.RealTrainModUnofficial;
+import net.minecraft.resources.ResourceLocation;
+
+import javax.sound.sampled.AudioFormat;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * レガシー音源パック (MugenSoundLib 等) のステレオ音源をロード時にモノラルへ落とす。
+ * なぜ必要か: OpenAL はステレオ音源を距離減衰・3D定位しない (モノラルのみ)。
+ */
+public final class LegacyStereoDownmix {
+
+    private static final Map<ResourceLocation, CompletableFuture<SoundBuffer>> CACHE = new ConcurrentHashMap<>();
+
+    private LegacyStereoDownmix() {
+    }
+
+    /** SoundBufferLibrary.getCompleteBuffer の戻り値を包む (Mixin から)。 */
+    public static CompletableFuture<SoundBuffer> wrap(ResourceLocation id, CompletableFuture<SoundBuffer> original) {
+        if (id == null || original == null || !isLegacySoundNamespace(id.getNamespace())) {
+            return original;
+        }
+        return CACHE.computeIfAbsent(id, key -> original.thenApply(buffer -> downmixIfStereo(key, buffer)));
+    }
+
+    /** SoundBufferLibrary.clear に合わせて自前キャッシュも破棄 (リソースリロード時)。 */
+    public static void clearCache() {
+        for (CompletableFuture<SoundBuffer> future : CACHE.values()) {
+            if (future.isDone() && !future.isCompletedExceptionally()) {
+                try {
+                    SoundBuffer buffer = future.join();
+                    if (buffer != null) {
+                        buffer.discardAlBuffer();
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        CACHE.clear();
+    }
+
+    private static boolean isLegacySoundNamespace(String namespace) {
+        Set<String> generated = ExternalSoundPackBridge.generatedNamespaces();
+        if (!generated.isEmpty()) {
+            return generated.contains(namespace);
+        }
+        // パック未生成 (初回起動前など) のフォールバック: 既知のレガシー命名だけ対象にする
+        return "rtm".equals(namespace) || namespace.startsWith("sound_");
+    }
+
+    private static SoundBuffer downmixIfStereo(ResourceLocation id, SoundBuffer buffer) {
+        if (buffer == null) {
+            return null;
+        }
+        try {
+            AudioFormat format = ((SoundBufferAccessor) buffer).rtmu$format();
+            ByteBuffer data = ((SoundBufferAccessor) buffer).rtmu$data();
+            if (format == null || data == null
+                    || format.getChannels() != 2 || format.getSampleSizeInBits() != 16) {
+                return buffer; //モノラル or 想定外フォーマットはそのまま
+            }
+            data.order(format.isBigEndian() ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
+            int base = data.position();
+            int frames = data.remaining() / 4; //16bit × 2ch = 4 bytes/frame
+            for (int i = 0; i < frames; i++) {
+                short left = data.getShort(base + i * 4);
+                short right = data.getShort(base + i * 4 + 2);
+                data.putShort(base + i * 2, (short) ((left + right) / 2));
+            }
+            data.limit(base + frames * 2);
+            data.position(base);
+            AudioFormat mono = new AudioFormat(format.getSampleRate(), 16, 1, true, format.isBigEndian());
+            return new SoundBuffer(data, mono);
+        } catch (Throwable t) {
+            RealTrainModUnofficial.LOGGER.warn("Failed to downmix legacy stereo sound {}", id, t);
+            return buffer;
+        }
+    }
+}

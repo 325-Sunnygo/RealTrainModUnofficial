@@ -1,0 +1,70 @@
+package jp.ngt.mccompat.tileentity;
+
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.level.block.entity.BlockEntity;
+
+/** 1.7.10 の TileEntity の NBT 読み書きを 1.21 へ橋渡しする静的ヘルパー。 */
+public final class TileEntityCompat {
+
+    /** field_145850_b = TileEntity.worldObj。 */
+    public static jp.ngt.mccompat.WorldCompat field_145850_b(Object tile) {
+        if (tile instanceof net.minecraft.world.level.block.entity.BlockEntity be && be.getLevel() != null) {
+            return new jp.ngt.mccompat.WorldCompat(be.getLevel());
+        }
+        return null;
+    }
+
+    /** field_145851_c = TileEntity.xCoord。 */
+    public static int field_145851_c(Object tile) {
+        return tile instanceof net.minecraft.world.level.block.entity.BlockEntity be
+            ? be.getBlockPos().getX() : 0;
+    }
+
+    /** field_145848_d = TileEntity.yCoord。 */
+    public static int field_145848_d(Object tile) {
+        return tile instanceof net.minecraft.world.level.block.entity.BlockEntity be
+            ? be.getBlockPos().getY() : 0;
+    }
+
+    /** field_145849_e = TileEntity.zCoord。 */
+    public static int field_145849_e(Object tile) {
+        return tile instanceof net.minecraft.world.level.block.entity.BlockEntity be
+            ? be.getBlockPos().getZ() : 0;
+    }
+
+    private TileEntityCompat() {
+    }
+
+    private static HolderLookup.Provider registries(BlockEntity tile) {
+        return tile != null && tile.getLevel() != null ? tile.getLevel().registryAccess() : null;
+    }
+
+    /** func_145839_a = readFromNBT */
+    public static void func_145839_a(Object tileObj, Object nbt) {
+        if (!(tileObj instanceof BlockEntity tile)) {
+            return;
+        }
+        CompoundTag tag = jp.ngt.mccompat.nbt.NBTTagCompound.unwrap(nbt);
+        HolderLookup.Provider registries = registries(tile);
+        if (tag == null || registries == null) {
+            return;
+        }
+        tile.loadWithComponents(tag, registries);
+        tile.setChanged();
+    }
+
+    /** func_145841_b / func_189515_b = writeToNBT。 */
+    public static Object func_145841_b(Object tileObj, Object nbt) {
+        if (!(tileObj instanceof BlockEntity tile)) {
+            return nbt;
+        }
+        CompoundTag tag = jp.ngt.mccompat.nbt.NBTTagCompound.unwrap(nbt);
+        HolderLookup.Provider registries = registries(tile);
+        if (tag == null || registries == null) {
+            return nbt;
+        }
+        tag.merge(tile.saveWithFullMetadata(registries));
+        return nbt;
+    }
+}

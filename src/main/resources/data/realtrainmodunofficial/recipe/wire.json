@@ -1,0 +1,21 @@
+{
+  "type": "realtrainmodunofficial:work_bench",
+  "pattern": [
+    "     ",
+    "RRRRR",
+    "IIIII",
+    "RRRRR"
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "I": {
+      "item": "realtrainmodunofficial:ingot_steel"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:wire",
+    "count": 5
+  }
+}

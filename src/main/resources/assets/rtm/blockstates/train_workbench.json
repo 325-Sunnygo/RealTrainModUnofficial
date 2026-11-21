@@ -1,0 +1,20 @@
+{
+  "variants":{
+    "meta=0":{"model":"rtm:train_workbench0"},
+    "meta=1":{"model":"rtm:train_workbench1"},
+    "meta=2":{"model":"rtm:train_workbench0"},
+    "meta=3":{"model":"rtm:train_workbench0"},
+    "meta=4":{"model":"rtm:train_workbench0"},
+    "meta=5":{"model":"rtm:train_workbench0"},
+    "meta=6":{"model":"rtm:train_workbench0"},
+    "meta=7":{"model":"rtm:train_workbench0"},
+    "meta=8":{"model":"rtm:train_workbench0"},
+    "meta=9":{"model":"rtm:train_workbench0"},
+    "meta=10":{"model":"rtm:train_workbench0"},
+    "meta=11":{"model":"rtm:train_workbench0"},
+    "meta=12":{"model":"rtm:train_workbench0"},
+    "meta=13":{"model":"rtm:train_workbench0"},
+    "meta=14":{"model":"rtm:train_workbench0"},
+    "meta=15":{"model":"rtm:train_workbench0"}
+  }
+}

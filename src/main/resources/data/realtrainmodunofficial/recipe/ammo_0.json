@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " B",
+    " T",
+    " C"
+  ],
+  "key": {
+    "B": {
+      "item": "realtrainmodunofficial:bullet"
+    },
+    "C": {
+      "item": "realtrainmodunofficial:bullet"
+    },
+    "T": {
+      "item": "minecraft:tnt"
+    }
+  },
+  "result": {
+    "id": "realtrainmodunofficial:bullet",
+    "count": 1,
+    "components": {
+      "realtrainmodunofficial:item_variant": 0
+    }
+  },
+  "category": "misc"
+}
