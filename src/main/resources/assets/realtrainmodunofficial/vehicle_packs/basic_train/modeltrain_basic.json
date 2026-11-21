@@ -1,0 +1,10 @@
+{
+  "trainName": "basic_train",
+  "displayName": "Basic Train",
+  "trainModel2": {
+    "modelFile": "train.mqo",
+    "textures": [["default", "textures/train_body.png"]],
+    "offset": [0, 0, 0],
+    "scale": 1.0
+  }
+}
