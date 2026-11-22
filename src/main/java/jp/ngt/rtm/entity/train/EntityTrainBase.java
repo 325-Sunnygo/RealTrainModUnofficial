@@ -1514,4 +1514,12 @@ public abstract class EntityTrainBase extends EntityVehicleBase<TrainConfig> {
         return cfg != null ? cfg.getSubType() : "";
     }
 
+
+
+    // ==== ★GraalJS 互換オーバーロード (tools/generate_graaljs_overloads.py が生成) ====
+    /** ★GraalJS 互換オーバーロード (生成) */
+    public float getCouplerYaw(double dir) {
+    return this.getCouplerYaw((int) dir);
+    }
+
 }

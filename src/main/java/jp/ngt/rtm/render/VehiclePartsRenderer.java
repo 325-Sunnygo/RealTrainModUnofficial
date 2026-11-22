@@ -81,4 +81,12 @@ public class VehiclePartsRenderer extends EntityPartsRenderer {
         }
         return (float) v.pantograph_B / (float) EntityVehicleBase.MAX_PANTOGRAPH_MOVE;
     }
+
+
+    // ==== ★GraalJS 互換オーバーロード (tools/generate_graaljs_overloads.py が生成) ====
+    /** ★GraalJS 互換オーバーロード (生成) */
+    public void render(Object t, double pass, double partialTick) {
+    this.render(t, (int) pass, (float) partialTick);
+    }
+
 }

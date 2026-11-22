@@ -678,4 +678,12 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity
     public boolean canBeCollidedWith() {
         return false;
     }
+
+
+    // ==== ★GraalJS 互換オーバーロード (tools/generate_graaljs_overloads.py が生成) ====
+    /** ★GraalJS 互換オーバーロード (生成) */
+    public void lerpTo(double x, double y, double z, double yaw, double pitch, double steps) {
+    this.lerpTo(x, y, z, (float) yaw, (float) pitch, (int) steps);
+    }
+
 }

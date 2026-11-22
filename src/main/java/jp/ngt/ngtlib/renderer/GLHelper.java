@@ -147,4 +147,12 @@ public final class GLHelper {
         return LegacyShaderProgram.create(vsh,fsh);
     }
 
+
+
+    // ==== ★GraalJS 互換オーバーロード (tools/generate_graaljs_overloads.py が生成) ====
+    /** ★GraalJS 互換オーバーロード (生成) */
+    static public void setColor(double rgb, double alpha) {
+    setColor((int) rgb, (int) alpha);
+    }
+
 }

@@ -6592,4 +6592,12 @@ public class TrainEntity extends Entity implements jp.ngt.rtm.modelpack.IModelSe
         );
     }
 
+
+
+    // ==== ★GraalJS 互換オーバーロード (tools/generate_graaljs_overloads.py が生成) ====
+    /** ★GraalJS 互換オーバーロード (生成) */
+    public Vec3 getBogieEntityWorldPositionPrev(double bogieIndex) {
+    return this.getBogieEntityWorldPositionPrev((int) bogieIndex);
+    }
+
 }

@@ -665,4 +665,12 @@ public class PartsRenderer implements com.portofino.realtrainmodunofficial.clien
                 (float) rotationX, (float) rotationY, (float) rotationZ);
     }
 
+
+
+    // ==== ★GraalJS 互換オーバーロード (tools/generate_graaljs_overloads.py が生成) ====
+    /** ★GraalJS 互換オーバーロード (生成) */
+    public void rotate(double angle, String axis, double x, double y, double z) {
+    this.rotate((float) angle, String.valueOf(axis).charAt(0), (float) x, (float) y, (float) z);
+    }
+
 }

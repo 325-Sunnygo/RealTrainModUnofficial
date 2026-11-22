@@ -65,4 +65,12 @@ public abstract class TileEntityPartsRenderer extends PartsRenderer {
         return tile instanceof net.minecraft.world.level.block.entity.BlockEntity be
             ? be.getBlockPos().getZ() : 0;
     }
+
+
+    // ==== ★GraalJS 互換オーバーロード (tools/generate_graaljs_overloads.py が生成) ====
+    /** ★GraalJS 互換オーバーロード (生成) */
+    public void render(Object t, double pass, double partialTick) {
+    this.render(t, (int) pass, (float) partialTick);
+    }
+
 }
