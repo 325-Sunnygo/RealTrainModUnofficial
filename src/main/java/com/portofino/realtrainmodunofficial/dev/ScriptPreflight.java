@@ -88,7 +88,11 @@ public final class ScriptPreflight {
                     binds.add(rel + " -> " + bindFails);
                 }
             } catch (Throwable t) {
-                String s = String.valueOf(t);
+                Throwable envCause = t;
+                while (envCause.getCause() != null && envCause.getCause() != envCause) {
+                    envCause = envCause.getCause();
+                }
+                String s = String.valueOf(t) + " | root=" + envCause;
                 if (s.contains("mccompat") || s.contains("gameDir") || s.contains("FMLPaths")
                         || t instanceof NoClassDefFoundError || t instanceof ExceptionInInitializerError) {
                     envSkipped++;
@@ -98,7 +102,8 @@ public final class ScriptPreflight {
                 } else {
                     // 実行時エラー: スクリプト側の問題とは限らないため参考表示に留める。
                     runtimeSkipped++;
-                    binds.add(rel + " [runtime-skipped] " + t);
+                    Throwable c = t; while (c.getCause() != null && c.getCause() != c) c = c.getCause();
+                    binds.add(rel + " [runtime-skipped] " + t + " | root=" + c);
                 }
             }
             if (!preparedOk) {

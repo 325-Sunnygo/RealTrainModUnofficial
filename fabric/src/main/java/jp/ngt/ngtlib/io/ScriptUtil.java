@@ -22,6 +22,9 @@ public final class ScriptUtil {
     }
 
     private static volatile javax.script.ScriptEngineFactory rhinoFactory;
+    /** createEngine 後のクラス索引束縛フラグ (ScriptUtil_doScript の重複登録ガード用)。 */
+    static boolean bindClassesIndex;
+    private static volatile Object classesIndexHelper;
 
     /** 使う JS エンジンの種類。 */
     private enum EngineKind { GRAAL, NASHORN, RHINO }
@@ -132,30 +135,35 @@ public final class ScriptUtil {
      *  -Drtmu.scriptEngine=rhino / Nashorn 無し環境では軽量 Rhino エンジンを使う。 */
     public static ScriptEngine createEngine() {
         EngineKind kind = selectEngine();
-        if (kind == EngineKind.RHINO) {
-            // Rhino 依存は同梱していないため Nashorn へフォールバック
-            kind = EngineKind.NASHORN;
-        }
+        ScriptEngine se = null;
         if (kind == EngineKind.GRAAL) {
             try {
-                return createGraalEngine();
+                se = createGraalEngine();
             } catch (Throwable t) {
                 NGTLog.debug("[ScriptUtil] GraalJS init failed, fallback: %s", String.valueOf(t));
             }
         }
-        // Nashorn (本家 RTM/NGTLib と同じ)
-        if (SEM == null) {
-            init();
+        if (se == null) {
+            // Nashorn (本家 RTM/NGTLib と同じ) / Rhino 未同梱ならここへ来る
+            kind = EngineKind.NASHORN;
+            if (SEM == null) {
+                init();
+            }
+            // MOD のクラスローダを appLoader として渡す (Packages.jp.ngt.* 解決用)
+            se = SEM.getScriptEngine(
+                    new String[]{"-doe", "--language=es6"},
+                    ScriptUtil.class.getClassLoader());
+            try {
+                se.eval("load(\"nashorn:mozilla_compat.js\");");
+            } catch (javax.script.ScriptException e) {
+                NGTLog.debug("[ScriptUtil] mozilla_compat load failed: %s", e.getMessage());
+            }
         }
-        // MOD のクラスローダを appLoader として渡す (Packages.jp.ngt.* 解決用)
-        ScriptEngine se = SEM.getScriptEngine(
-                new String[]{"-doe", "--language=es6"},
-                ScriptUtil.class.getClassLoader());
-        // ★本家 doScript:47-51 と同じ mozilla_compat ロード
+        // ★importPackage シム (__rtmClassesOf) を全エンジンへ束縛する
+        // (PackScriptSource.PRELUDE の importPackage/importClass が参照する)。
         try {
-            se.eval("load(\"nashorn:mozilla_compat.js\");");
-        } catch (javax.script.ScriptException e) {
-            NGTLog.debug("[ScriptUtil] mozilla_compat load failed: %s", e.getMessage());
+            se.put("__rtmClassesOf", new com.portofino.realtrainmodunofficial.script.LegacyPackageIndexHelper());
+        } catch (Throwable ignored) {
         }
         return se;
     }
@@ -183,11 +191,6 @@ public final class ScriptUtil {
         try {
             se.put(ScriptEngine.FILENAME, fileName);
             // スクリプトの importPackage (GraalJS は遅延解決が無い) 用のクラス索引
-            try {
-                se.put("__rtmClassesOf", new com.portofino.realtrainmodunofficial.script.LegacyPackageIndexHelper());
-            } catch (Throwable noIndex) {
-                // (分離 mod など索引クラスが無い環境では省略)
-            }
             if (se.toString().contains("Nashorn") || se.getClass().getName().contains("nashorn")) {
                 // Java8ではimportPackageが使えないので、その対策 (本家コメントのまま)
                 se.eval("load(\"nashorn:mozilla_compat.js\");");
