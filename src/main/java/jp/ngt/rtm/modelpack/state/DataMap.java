@@ -86,6 +86,27 @@ public class DataMap {
 
     public void setString(String key, String value, boolean flag) { this.setString(key, value, flag ? 1 : 0); }
 
+    // ==== ★GraalJS 互換オーバーロード (Nashorn の暗黙変換を再現) ====
+    /** ★GraalJS 互換: スクリプトは数値を setString に入れることがある。 */
+    public void setString(String key, int value, int flag) { this.setString(key, Integer.toString(value), flag); }
+
+    /** ★GraalJS 互換。 */
+    public void setString(String key, double value, int flag) {
+        this.setString(key, (value == Math.rint(value) && !Double.isInfinite(value)) ? Long.toString((long) value) : String.valueOf(value), flag);
+    }
+
+    /** ★GraalJS 互換。 */
+    public void setString(String key, boolean value, int flag) { this.setString(key, String.valueOf(value), flag); }
+
+    /** ★GraalJS 互換: JS の double を int に緩めたオーバーロード。 */
+    public void setInt(String key, double value, int flag) { this.setInt(key, (int) value, flag); }
+
+    /** ★GraalJS 互換。 */
+    public void setBoolean(String key, double value, int flag) { this.setBoolean(key, value != 0.0D, flag); }
+
+    /** ★GraalJS 互換: JS の double が float の代わりに来ることがある。 */
+    public void setDouble(String key, boolean value, boolean flag) { this.setBoolean(key, value, flag); }
+
     public void setString(String key, String value, int flag) {
         this.map.put(key, value == null ? "" : value);
         if (this.shouldSync(flag)) {

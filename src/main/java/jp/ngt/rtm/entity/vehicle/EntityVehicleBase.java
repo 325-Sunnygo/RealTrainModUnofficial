@@ -492,6 +492,11 @@ public abstract class EntityVehicleBase<T extends TrainConfig> extends Entity
         return this.seatRotation;
     }
 
+    /** 本家スクリプト互換 API: 転換クロスシートの回転量を -1.0〜1.0 に正規化して返す。 */
+    public float getSeatRotation() {
+        return (float) this.seatRotation / (float) MAX_SEAT_ROTATION;
+    }
+
     /** 本家 EntityTrainBase.getRollsignAnimation: 方向幕のスクロー… */
     public float getRollsignAnimation() {
         return (float) this.rollsignAnimation / 16.0F;
